@@ -1,0 +1,63 @@
+﻿{
+    "generated_at":  "2026-07-06T18:26:16.4525626+00:00",
+    "base_url":  "http://localhost:8080",
+    "tenant_count":  4,
+    "projects_per_tenant":  25,
+    "total_requests":  504,
+    "duration_seconds":  2.06,
+    "requests_per_second":  244.07,
+    "latency_ms":  {
+                       "p50":  4.58,
+                       "p95":  5.84,
+                       "p99":  6.74
+                   },
+    "operations":  [
+                       {
+                           "operation":  "tenant_create",
+                           "count":  4,
+                           "p50_ms":  5.32,
+                           "p95_ms":  22.88,
+                           "p99_ms":  22.88
+                       },
+                       {
+                           "operation":  "project_create",
+                           "count":  100,
+                           "p50_ms":  5.18,
+                           "p95_ms":  6,
+                           "p99_ms":  6.74
+                       },
+                       {
+                           "operation":  "project_get",
+                           "count":  100,
+                           "p50_ms":  1.49,
+                           "p95_ms":  1.96,
+                           "p99_ms":  2.8
+                       },
+                       {
+                           "operation":  "project_update",
+                           "count":  100,
+                           "p50_ms":  5.17,
+                           "p95_ms":  6.3,
+                           "p99_ms":  7.41
+                       },
+                       {
+                           "operation":  "project_list",
+                           "count":  100,
+                           "p50_ms":  1.67,
+                           "p95_ms":  2.23,
+                           "p99_ms":  3.62
+                       },
+                       {
+                           "operation":  "project_delete",
+                           "count":  100,
+                           "p50_ms":  4.7,
+                           "p95_ms":  5.35,
+                           "p99_ms":  6.02
+                       }
+                   ],
+    "runtime":  {
+                    "os":  "Microsoft Windows 10.0.26200 ",
+                    "process_architecture":  "X64",
+                    "powershell":  "5.1.26100.8655"
+                }
+}

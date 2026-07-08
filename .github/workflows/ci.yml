@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: polyforge
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d polyforge"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      POLYFORGE_TEST_POSTGRES_ADMIN_URL: postgres://polyforge_admin@localhost:5432/polyforge?sslmode=disable
+      POLYFORGE_TEST_POSTGRES_APP_URL: postgres://polyforge_app@localhost:5432/polyforge?sslmode=disable
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Create database roles
+        run: |
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d polyforge -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE polyforge_admin LOGIN BYPASSRLS;
+          CREATE ROLE polyforge_app LOGIN NOBYPASSRLS;
+          ALTER DATABASE polyforge OWNER TO polyforge_admin;
+          SQL
+      - name: Verify formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test ./... -count=1
+      - name: Lint OpenAPI
+        run: npx --yes @redocly/cli lint api/openapi.yaml

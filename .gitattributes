@@ -1,0 +1,11 @@
+# Normalize text files to LF in the repository and in the working tree.
+#
+# Without eol=lf, core.autocrlf on Windows checks out CRLF. gofmt then reports
+# every Go file as unformatted locally, while the Linux CI `gofmt -l .` gate
+# passes. Pinning LF keeps the local and CI formatting gates in agreement.
+* text=auto eol=lf
+
+*.exe binary
+*.db binary
+*.png binary
+*.jpg binary

@@ -1,0 +1,7 @@
+.gocache/
+control-plane.log
+polyforge-control-plane.pid
+bin/
+tmp/
+data/*.db
+data/*.db-*
