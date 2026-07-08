@@ -507,6 +507,61 @@ func TestTelemetryFeaturesEndpointAggregatesPerService(t *testing.T) {
 	})
 }
 
+func TestRecoverPanicsReturnsStructured500(t *testing.T) {
+	server := NewServer(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		tenant.NewStore(),
+		telemetry.NewStore(10),
+		Config{AdminKey: "admin-test"},
+	)
+	panicking := server.recoverPanics(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic("boom")
+	}))
+	// Run through the full chain so the request carries a request ID and the
+	// panic response is recorded like any other request.
+	handler := requestLog(server.log, server.metrics, panicking)
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/panic", nil))
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rec.Code)
+	}
+	var envelope errorEnvelope
+	if err := json.NewDecoder(rec.Body).Decode(&envelope); err != nil {
+		t.Fatalf("panic response is not the structured error envelope: %v", err)
+	}
+	if envelope.Error.Code != "internal_error" {
+		t.Fatalf("expected internal_error code, got %q", envelope.Error.Code)
+	}
+	if envelope.Error.RequestID == "" {
+		t.Fatal("panic response must carry the request ID for correlation")
+	}
+	if strings.Contains(envelope.Error.Message, "boom") {
+		t.Fatal("panic details must not leak to the client")
+	}
+}
+
+func TestRecoverPanicsRethrowsAbortHandler(t *testing.T) {
+	server := NewServer(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		tenant.NewStore(),
+		telemetry.NewStore(10),
+		Config{AdminKey: "admin-test"},
+	)
+	handler := server.recoverPanics(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic(http.ErrAbortHandler)
+	}))
+
+	defer func() {
+		if recovered := recover(); !errors.Is(recovered.(error), http.ErrAbortHandler) {
+			t.Fatalf("http.ErrAbortHandler must propagate, got %v", recovered)
+		}
+	}()
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/v1/abort", nil))
+	t.Fatal("expected the abort sentinel to re-panic")
+}
+
 func TestMetricsEndpointExposesRequestAndTelemetryMetrics(t *testing.T) {
 	ctx := context.Background()
 	tenantStore := tenant.NewStore()

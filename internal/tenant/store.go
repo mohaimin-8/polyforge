@@ -360,9 +360,16 @@ func NewRandomAPIKey(tenantID, name string) (APIKey, string, error) {
 	if _, err := rand.Read(raw); err != nil {
 		return APIKey{}, "", err
 	}
+	// The ID is drawn independently of the secret. IDs appear in URLs,
+	// listings, and logs; deriving the ID from the secret's bytes would leak
+	// part of the secret's entropy into every one of those places.
+	id := make([]byte, 8)
+	if _, err := rand.Read(id); err != nil {
+		return APIKey{}, "", err
+	}
 	secret := "pf_live_" + hex.EncodeToString(raw)
 	key := APIKey{
-		ID:        "key_" + hex.EncodeToString(raw[:8]),
+		ID:        "key_" + hex.EncodeToString(id),
 		TenantID:  tenantID,
 		Name:      strings.TrimSpace(name),
 		Prefix:    prefix(secret),

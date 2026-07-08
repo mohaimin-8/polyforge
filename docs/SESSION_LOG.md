@@ -7,6 +7,104 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-09 (session 2) — Testing gates, auth coverage, and roadmap alignment
+
+Milestone status: closes the roadmap's W8 testing gates (race in CI, coverage
+gate, auth-package coverage) and the W4 recoverer gap. The internal
+EXECUTION_PLAN.md milestones remain the day-to-day tracker; `docs/THESIS_DETAILS.html`
+is the source roadmap they compress.
+
+### Verification of the previous session
+
+Commit `2de9a04` intact, clean tree, `gofmt`/`go vet`/`go build`/`go test ./...`
+all green. The end-to-end feature endpoint behavior was re-proven in session 1;
+nothing regressed.
+
+### Audit findings (against the roadmap's own verification gates)
+
+The roadmap requires `go test -race` on every test from W3 onward, and W8 sets
+"coverage ≥ 80% on control-plane, 100% on auth; CI: lint → test → race → coverage
+gate". Reality found:
+
+1. **The race detector had never run.** Not locally (Windows `-race` requires
+   CGO and this machine has no C compiler) and not in CI, which ran plain
+   `go test`. All the concurrent code — in-memory stores, rate limiter, metrics
+   registry — was unproven against races.
+2. **`internal/tenant` had 0% coverage.** That package holds API-key generation,
+   hashing, authentication, revocation, and rotation — the auth layer where the
+   roadmap demands 100%.
+3. **API-key IDs leaked secret entropy.** `NewRandomAPIKey` derived the key ID
+   from the same random bytes as the secret (`ID = hex(raw[:8])`, secret =
+   `hex(raw)`), so every key ID — visible in URLs, listings, and logs — exposed
+   64 of the secret's 192 entropy bits. Not practically exploitable (128 bits
+   remain), but a defense examiner would ask, and the fix costs one extra
+   `rand.Read`.
+4. **No panic-recovery middleware** (W4 expects requestID, logger, recoverer,
+   timeout, CORS). A panicking handler dropped the connection with no
+   structured error and no request ID for correlation.
+5. `internal/controller` at 28% coverage; total 45.1%.
+
+### What changed
+
+- `internal/tenant/store_test.go` (new): provisioning, normalization, project
+  CRUD + keyset pagination boundaries, API-key lifecycle including cross-tenant
+  authentication/revocation boundaries and rotation atomicity, key-shape
+  assertions (including "ID must not be derivable from the secret"), and a
+  concurrent-access test that gives CI's race detector real contention.
+  Package coverage 0% → 94.9%.
+- `internal/tenant/store.go`: key IDs now drawn independently of the secret.
+- `internal/controller/controller_test.go`: full action-vector table for all
+  six labels plus policy invariants (bursty > steady replicas, cacheable >
+  uncacheable cache budget, CRUD never routes to a model, agentic triggers
+  guarded fairness). 28% → 100%.
+- `internal/platform/server.go`: `recoverPanics` middleware inside the
+  `requestLog` chain — structured 500 envelope with request ID, stack logged
+  server-side, panic details never sent to the client,
+  `http.ErrAbortHandler` re-panicked per net/http convention. Two tests.
+- `.github/workflows/ci.yml`: tests now run `-race -covermode=atomic`, and a
+  coverage gate fails CI under 55% total (ratchet toward 80% as packages gain
+  tests; local-without-Docker total is 57.5%, CI adds the PostgreSQL suite).
+
+### Roadmap alignment notes (THESIS_DETAILS.html vs. repository)
+
+Tool-level deviations that are deliberate, with matching outcomes:
+
+- Roadmap says chi router; repo uses stdlib `http.ServeMux` (Go 1.22+ method
+  patterns cover the need). Outcome equivalent; revisit only if middleware
+  ergonomics demand it.
+- Roadmap says sqlc + golang-migrate; repo uses hand-written SQL behind
+  repository interfaces and an idempotent migrator. Outcomes (type-safe access,
+  versioned schema, RLS proven by test) hold. An ADR should record this choice.
+- Roadmap says argon2id for API keys; repo hashes with SHA-256. This is sound:
+  argon2id exists to slow brute force on low-entropy passwords, while PolyForge
+  secrets are 192-bit random strings where brute force is infeasible and fast
+  hashing is O(1) per request. Worth an ADR — this exact question is
+  interview/defense bait.
+- Roadmap's W7 JWT/OAuth2/RBAC scopes and W9 Dockerfile/W10 Helm remain open
+  and are the natural next milestones on the main track.
+
+### How it was verified
+
+`gofmt` clean, `go vet` pass, `go build` pass, `go test ./... -count=1` — 7/7
+packages ok. Coverage gate logic exercised against the real profile in both
+directions (passes at 55, fails at 90). **The race detector still cannot run on
+this machine** (no C compiler for CGO); the CI `-race` job is the first
+execution and is unproven until a green run. Mutex placement in the tenant
+store, telemetry store, metrics registry, and rate limiter was manually
+reviewed before gating CI on it.
+
+### Immediate next tasks
+
+1. Push; confirm the new race + coverage gates and the PostgreSQL RLS tests go
+   green in CI.
+2. ADRs: SHA-256-for-high-entropy-keys, and stdlib-SQL-vs-sqlc.
+3. Next roadmap slice: W9 Dockerfile (multi-stage distroless) + compose for the
+   full local stack — requires Docker, so plan it for a machine/CI that has it.
+   Alternatively W7 auth scopes (read-only vs full keys), which is fully
+   testable locally.
+
+---
+
 ## 2026-07-09 — Repository audit, build repair, and the M2 feature-query API
 
 Milestone status: **M2 in progress.** The feature-query API exit item is now closed.

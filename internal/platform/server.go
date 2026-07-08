@@ -8,12 +8,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"math"
 	"net"
 	"net/http"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -80,11 +82,39 @@ func NewServer(log *slog.Logger, tenants tenant.Repository, telemetry telemetry.
 }
 
 func (s *Server) Handler() http.Handler {
-	var handler http.Handler = s.mux
+	handler := s.recoverPanics(s.mux)
 	if s.limiter != nil {
 		handler = s.rateLimit(handler)
 	}
 	return requestLog(s.log, s.metrics, handler)
+}
+
+// recoverPanics converts a handler panic into a structured 500 response so a
+// single failing request cannot drop the connection without a request ID the
+// client can report. It sits inside requestLog, so the 500 still reaches the
+// request log and metrics.
+func (s *Server) recoverPanics(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			value := recover()
+			if value == nil {
+				return
+			}
+			// net/http uses this sentinel to abort a response on purpose.
+			if err, ok := value.(error); ok && errors.Is(err, http.ErrAbortHandler) {
+				panic(value)
+			}
+			s.log.Error("handler panic recovered",
+				"panic", fmt.Sprint(value),
+				"stack", string(debug.Stack()),
+				"method", r.Method,
+				"path", r.URL.Path,
+				"request_id", requestID(r.Context()),
+			)
+			s.writeError(w, r, http.StatusInternalServerError, errors.New("internal server error"))
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) routes() {
