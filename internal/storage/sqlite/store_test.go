@@ -29,7 +29,7 @@ func TestStorePersistsTenantDataAndTelemetry(t *testing.T) {
 		t.Fatalf("expected default plan, got %q", createdTenant.Plan)
 	}
 
-	key, err := store.CreateAPIKey(ctx, "alpha", "integration")
+	key, err := store.CreateAPIKey(ctx, "alpha", "integration", tenant.ScopeFull)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestAPIKeyRotationAndRevocation(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	_, _ = store.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
-	oldKey, err := store.CreateAPIKey(ctx, "alpha", "service")
+	oldKey, err := store.CreateAPIKey(ctx, "alpha", "service", tenant.ScopeFull)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestAPIKeyRotationAndRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if newKey.Secret == "" || newKey.Name != oldKey.Name {
+	if newKey.Secret == "" || newKey.Name != oldKey.Name || newKey.Scope != tenant.ScopeFull {
 		t.Fatalf("unexpected rotated key: %#v", newKey)
 	}
 	if _, err := store.AuthenticateAPIKey(ctx, "alpha", oldKey.Secret); !errors.Is(err, tenant.ErrUnauthorized) {
@@ -172,6 +172,26 @@ func TestAPIKeyRotationAndRevocation(t *testing.T) {
 	}
 	if _, err := store.AuthenticateAPIKey(ctx, "alpha", newKey.Secret); !errors.Is(err, tenant.ErrUnauthorized) {
 		t.Fatalf("expected revoked key rejection, got %v", err)
+	}
+
+	// Read scope persists through the database and survives rotation.
+	reader, err := store.CreateAPIKey(ctx, "alpha", "observer", tenant.ScopeRead)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authenticated, err := store.AuthenticateAPIKey(ctx, "alpha", reader.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if authenticated.Scope != tenant.ScopeRead {
+		t.Fatalf("read scope did not persist, got %q", authenticated.Scope)
+	}
+	rotatedReader, err := store.RotateAPIKey(ctx, "alpha", reader.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rotatedReader.Scope != tenant.ScopeRead {
+		t.Fatalf("rotation must preserve scope, got %q", rotatedReader.Scope)
 	}
 }
 
@@ -213,8 +233,13 @@ func TestOpenMigratesLegacyProjectAndAPIKeyColumns(t *testing.T) {
 	if project.UpdatedAt.IsZero() || !project.UpdatedAt.Equal(project.CreatedAt) {
 		t.Fatalf("legacy updated_at was not backfilled: %#v", project)
 	}
-	if _, err := store.AuthenticateAPIKey(ctx, "alpha", "legacy-secret"); err != nil {
+	legacyKey, err := store.AuthenticateAPIKey(ctx, "alpha", "legacy-secret")
+	if err != nil {
 		t.Fatalf("legacy API key did not survive migration: %v", err)
+	}
+	// Keys issued before scopes existed keep their original full authority.
+	if legacyKey.Scope != tenant.ScopeFull {
+		t.Fatalf("legacy key scope was not backfilled to full, got %q", legacyKey.Scope)
 	}
 }
 
@@ -255,7 +280,7 @@ func TestStoreRejectsCrossTenantAPIKey(t *testing.T) {
 
 	_, _ = store.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
 	_, _ = store.CreateTenant(ctx, tenant.Tenant{ID: "bravo", Name: "Bravo"})
-	key, err := store.CreateAPIKey(ctx, "alpha", "alpha-key")
+	key, err := store.CreateAPIKey(ctx, "alpha", "alpha-key", tenant.ScopeFull)
 	if err != nil {
 		t.Fatal(err)
 	}

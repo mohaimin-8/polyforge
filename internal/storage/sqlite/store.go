@@ -96,6 +96,13 @@ func (s *Store) migrate(ctx context.Context) error {
 	if err := s.ensureColumn(ctx, "api_keys", "revoked_at", "TEXT"); err != nil {
 		return err
 	}
+	if err := s.ensureColumn(ctx, "api_keys", "scope", "TEXT"); err != nil {
+		return err
+	}
+	// Keys issued before scopes existed keep their original full authority.
+	if _, err := s.db.ExecContext(ctx, `UPDATE api_keys SET scope = 'full' WHERE scope IS NULL OR scope = ''`); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -147,7 +154,7 @@ func (s *Store) CreateTenant(ctx context.Context, t tenant.Tenant) (tenant.Tenan
 
 func (s *Store) ProvisionTenant(ctx context.Context, t tenant.Tenant, keyName string) (tenant.Tenant, tenant.APIKey, error) {
 	t = tenant.NormalizeTenant(t)
-	key, hash, err := tenant.NewRandomAPIKey(t.ID, keyName)
+	key, hash, err := tenant.NewRandomAPIKey(t.ID, keyName, tenant.ScopeFull)
 	if err != nil {
 		return tenant.Tenant{}, tenant.APIKey{}, err
 	}
@@ -166,9 +173,9 @@ func (s *Store) ProvisionTenant(ctx context.Context, t tenant.Tenant, keyName st
 		return tenant.Tenant{}, tenant.APIKey{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO api_keys(id, tenant_id, name, prefix, key_hash, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, key.ID, key.TenantID, key.Name, key.Prefix, hash, encodeTime(key.CreatedAt)); err != nil {
+		INSERT INTO api_keys(id, tenant_id, name, scope, prefix, key_hash, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, encodeTime(key.CreatedAt)); err != nil {
 		return tenant.Tenant{}, tenant.APIKey{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -303,21 +310,21 @@ func (s *Store) DeleteProject(ctx context.Context, tenantID, projectID string) e
 	return nil
 }
 
-func (s *Store) CreateAPIKey(ctx context.Context, tenantID, name string) (tenant.APIKey, error) {
+func (s *Store) CreateAPIKey(ctx context.Context, tenantID, name, scope string) (tenant.APIKey, error) {
 	if _, ok, err := s.Tenant(ctx, tenantID); err != nil {
 		return tenant.APIKey{}, err
 	} else if !ok {
 		return tenant.APIKey{}, tenant.ErrTenantNotFound
 	}
 
-	key, hash, err := tenant.NewRandomAPIKey(tenantID, name)
+	key, hash, err := tenant.NewRandomAPIKey(tenantID, name, scope)
 	if err != nil {
 		return tenant.APIKey{}, err
 	}
 	_, err = s.db.ExecContext(ctx, `
-		INSERT INTO api_keys(id, tenant_id, name, prefix, key_hash, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, key.ID, key.TenantID, key.Name, key.Prefix, hash, encodeTime(key.CreatedAt))
+		INSERT INTO api_keys(id, tenant_id, name, scope, prefix, key_hash, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, encodeTime(key.CreatedAt))
 	return key, err
 }
 
@@ -328,7 +335,7 @@ func (s *Store) ListAPIKeys(ctx context.Context, tenantID string) ([]tenant.APIK
 		return nil, tenant.ErrTenantNotFound
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, tenant_id, name, prefix, created_at, revoked_at
+		SELECT id, tenant_id, name, scope, prefix, created_at, revoked_at
 		FROM api_keys WHERE tenant_id = ? ORDER BY created_at, id
 	`, tenantID)
 	if err != nil {
@@ -371,11 +378,11 @@ func (s *Store) RotateAPIKey(ctx context.Context, tenantID, keyID, name string) 
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var oldName string
+	var oldName, oldScope string
 	err = tx.QueryRowContext(ctx, `
-		SELECT name FROM api_keys
+		SELECT name, scope FROM api_keys
 		WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL
-	`, tenantID, keyID).Scan(&oldName)
+	`, tenantID, keyID).Scan(&oldName, &oldScope)
 	if errors.Is(err, sql.ErrNoRows) {
 		return tenant.APIKey{}, tenant.ErrAPIKeyNotFound
 	}
@@ -385,14 +392,15 @@ func (s *Store) RotateAPIKey(ctx context.Context, tenantID, keyID, name string) 
 	if strings.TrimSpace(name) == "" {
 		name = oldName
 	}
-	key, hash, err := tenant.NewRandomAPIKey(tenantID, name)
+	// Rotation replaces the credential, never its authority.
+	key, hash, err := tenant.NewRandomAPIKey(tenantID, name, oldScope)
 	if err != nil {
 		return tenant.APIKey{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO api_keys(id, tenant_id, name, prefix, key_hash, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, key.ID, key.TenantID, key.Name, key.Prefix, hash, encodeTime(key.CreatedAt)); err != nil {
+		INSERT INTO api_keys(id, tenant_id, name, scope, prefix, key_hash, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, encodeTime(key.CreatedAt)); err != nil {
 		return tenant.APIKey{}, err
 	}
 	result, err := tx.ExecContext(ctx, `
@@ -416,7 +424,7 @@ func (s *Store) RotateAPIKey(ctx context.Context, tenantID, keyID, name string) 
 func (s *Store) AuthenticateAPIKey(ctx context.Context, tenantID, secret string) (tenant.APIKey, error) {
 	hash := tenant.HashAPIKey(secret)
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, tenant_id, name, prefix, created_at, revoked_at
+		SELECT id, tenant_id, name, scope, prefix, created_at, revoked_at
 		FROM api_keys
 		WHERE tenant_id = ? AND key_hash = ? AND revoked_at IS NULL
 	`, tenantID, hash)
@@ -557,7 +565,7 @@ func scanAPIKey(row rowScanner) (tenant.APIKey, error) {
 	var key tenant.APIKey
 	var created string
 	var revoked sql.NullString
-	if err := row.Scan(&key.ID, &key.TenantID, &key.Name, &key.Prefix, &created, &revoked); err != nil {
+	if err := row.Scan(&key.ID, &key.TenantID, &key.Name, &key.Scope, &key.Prefix, &created, &revoked); err != nil {
 		return tenant.APIKey{}, err
 	}
 	var err error

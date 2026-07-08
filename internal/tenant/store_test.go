@@ -179,11 +179,11 @@ func TestAPIKeyAuthenticationBoundaries(t *testing.T) {
 	_, _ = store.CreateTenant(ctx, Tenant{ID: "alpha", Name: "Alpha"})
 	_, _ = store.CreateTenant(ctx, Tenant{ID: "bravo", Name: "Bravo"})
 
-	if _, err := store.CreateAPIKey(ctx, "ghost", "x"); !errors.Is(err, ErrTenantNotFound) {
+	if _, err := store.CreateAPIKey(ctx, "ghost", "x", ScopeFull); !errors.Is(err, ErrTenantNotFound) {
 		t.Fatalf("expected ErrTenantNotFound, got %v", err)
 	}
 
-	key, err := store.CreateAPIKey(ctx, "alpha", "primary")
+	key, err := store.CreateAPIKey(ctx, "alpha", "primary", ScopeFull)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestRotateAPIKeyInvalidatesOldSecretAtomically(t *testing.T) {
 	ctx := context.Background()
 	store := NewStore()
 	_, _ = store.CreateTenant(ctx, Tenant{ID: "alpha", Name: "Alpha"})
-	old, err := store.CreateAPIKey(ctx, "alpha", "primary")
+	old, err := store.CreateAPIKey(ctx, "alpha", "primary", ScopeFull)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,8 +241,72 @@ func TestRotateAPIKeyInvalidatesOldSecretAtomically(t *testing.T) {
 	}
 }
 
+func TestScopeAllowsMatrix(t *testing.T) {
+	cases := []struct {
+		keyScope, required string
+		want               bool
+	}{
+		{ScopeRead, ScopeRead, true},
+		{ScopeRead, ScopeFull, false},
+		{ScopeFull, ScopeRead, true},
+		{ScopeFull, ScopeFull, true},
+		{"", ScopeRead, true},  // legacy keys normalize to full
+		{"", ScopeFull, true},  // legacy keys normalize to full
+		{ScopeFull, "", false}, // an unknown requirement must fail closed
+		{"bogus", ScopeRead, false},
+	}
+	for _, tc := range cases {
+		if got := ScopeAllows(tc.keyScope, tc.required); got != tc.want {
+			t.Fatalf("ScopeAllows(%q, %q) = %v, want %v", tc.keyScope, tc.required, got, tc.want)
+		}
+	}
+
+	if !ValidScope("") || !ValidScope(ScopeRead) || !ValidScope(ScopeFull) {
+		t.Fatal("empty, read, and full must all be acceptable scope inputs")
+	}
+	if ValidScope("admin") {
+		t.Fatal("unknown scopes must be rejected")
+	}
+	if NormalizeScope("  ") != ScopeFull {
+		t.Fatal("blank scope must normalize to full for legacy compatibility")
+	}
+}
+
+func TestScopeSurvivesRotationAndRejectsInvalid(t *testing.T) {
+	ctx := context.Background()
+	store := NewStore()
+	_, _ = store.CreateTenant(ctx, Tenant{ID: "alpha", Name: "Alpha"})
+
+	if _, err := store.CreateAPIKey(ctx, "alpha", "bad", "admin"); err == nil {
+		t.Fatal("invalid scope must be rejected at creation")
+	}
+
+	readKey, err := store.CreateAPIKey(ctx, "alpha", "reader", ScopeRead)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if readKey.Scope != ScopeRead {
+		t.Fatalf("expected read scope, got %q", readKey.Scope)
+	}
+	authenticated, err := store.AuthenticateAPIKey(ctx, "alpha", readKey.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if authenticated.Scope != ScopeRead {
+		t.Fatalf("authentication must return the key's scope, got %q", authenticated.Scope)
+	}
+
+	rotated, err := store.RotateAPIKey(ctx, "alpha", readKey.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rotated.Scope != ScopeRead {
+		t.Fatalf("rotation must preserve scope, got %q", rotated.Scope)
+	}
+}
+
 func TestNewRandomAPIKeyShape(t *testing.T) {
-	key, hash, err := NewRandomAPIKey("alpha", "  ")
+	key, hash, err := NewRandomAPIKey("alpha", "  ", ScopeFull)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +331,7 @@ func TestNewRandomAPIKeyShape(t *testing.T) {
 		t.Fatalf("key ID %q is derived from the secret %q", key.ID, key.Prefix)
 	}
 
-	other, _, err := NewRandomAPIKey("alpha", "x")
+	other, _, err := NewRandomAPIKey("alpha", "x", ScopeFull)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +347,7 @@ func TestStoreConcurrentAccessIsRaceFree(t *testing.T) {
 	ctx := context.Background()
 	store := NewStore()
 	_, _ = store.CreateTenant(ctx, Tenant{ID: "alpha", Name: "Alpha"})
-	seed, err := store.CreateAPIKey(ctx, "alpha", "seed")
+	seed, err := store.CreateAPIKey(ctx, "alpha", "seed", ScopeFull)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +362,7 @@ func TestStoreConcurrentAccessIsRaceFree(t *testing.T) {
 				_, _ = store.CreateProject(ctx, Project{ID: id, TenantID: "alpha", Name: id})
 				_, _ = store.ListProjects(ctx, "alpha", PageRequest{Limit: 10})
 				_, _ = store.AuthenticateAPIKey(ctx, "alpha", seed.Secret)
-				key, err := store.CreateAPIKey(ctx, "alpha", id)
+				key, err := store.CreateAPIKey(ctx, "alpha", id, ScopeFull)
 				if err == nil && i%5 == 0 {
 					_, _ = store.RotateAPIKey(ctx, "alpha", key.ID, "")
 				}

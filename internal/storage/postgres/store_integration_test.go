@@ -133,6 +133,26 @@ func TestPostgresRowLevelIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// API-key scopes persist through PostgreSQL and survive rotation.
+	reader, err := store.CreateAPIKey(ctx, alpha, "observer", tenant.ScopeRead)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authenticated, err := store.AuthenticateAPIKey(ctx, alpha, reader.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if authenticated.Scope != tenant.ScopeRead {
+		t.Fatalf("read scope did not persist, got %q", authenticated.Scope)
+	}
+	rotated, err := store.RotateAPIKey(ctx, alpha, reader.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rotated.Scope != tenant.ScopeRead {
+		t.Fatalf("rotation must preserve scope, got %q", rotated.Scope)
+	}
+
 	visible, err := withTenantTx(ctx, store.app, alpha, func(tx pgx.Tx) (int, error) {
 		var count int
 		err := tx.QueryRow(ctx, `SELECT count(*) FROM projects WHERE tenant_id = $1`, bravo).Scan(&count)

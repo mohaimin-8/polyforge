@@ -108,7 +108,7 @@ func (s *Store) CreateTenant(ctx context.Context, t tenant.Tenant) (tenant.Tenan
 
 func (s *Store) ProvisionTenant(ctx context.Context, t tenant.Tenant, keyName string) (tenant.Tenant, tenant.APIKey, error) {
 	t = tenant.NormalizeTenant(t)
-	key, hash, err := tenant.NewRandomAPIKey(t.ID, keyName)
+	key, hash, err := tenant.NewRandomAPIKey(t.ID, keyName, tenant.ScopeFull)
 	if err != nil {
 		return tenant.Tenant{}, tenant.APIKey{}, err
 	}
@@ -124,9 +124,9 @@ func (s *Store) ProvisionTenant(ctx context.Context, t tenant.Tenant, keyName st
 		return tenant.Tenant{}, tenant.APIKey{}, mapPostgresError(err)
 	}
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO api_keys(id, tenant_id, name, prefix, key_hash, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, key.ID, key.TenantID, key.Name, key.Prefix, hash, key.CreatedAt); err != nil {
+		INSERT INTO api_keys(id, tenant_id, name, scope, prefix, key_hash, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, key.CreatedAt); err != nil {
 		return tenant.Tenant{}, tenant.APIKey{}, mapPostgresError(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -266,8 +266,8 @@ func (s *Store) DeleteProject(ctx context.Context, tenantID, projectID string) e
 	})
 }
 
-func (s *Store) CreateAPIKey(ctx context.Context, tenantID, name string) (tenant.APIKey, error) {
-	key, hash, err := tenant.NewRandomAPIKey(tenantID, name)
+func (s *Store) CreateAPIKey(ctx context.Context, tenantID, name, scope string) (tenant.APIKey, error) {
+	key, hash, err := tenant.NewRandomAPIKey(tenantID, name, scope)
 	if err != nil {
 		return tenant.APIKey{}, err
 	}
@@ -276,9 +276,9 @@ func (s *Store) CreateAPIKey(ctx context.Context, tenantID, name string) (tenant
 			return tenant.APIKey{}, err
 		}
 		_, err := tx.Exec(ctx, `
-			INSERT INTO api_keys(id, tenant_id, name, prefix, key_hash, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6)
-		`, key.ID, key.TenantID, key.Name, key.Prefix, hash, key.CreatedAt)
+			INSERT INTO api_keys(id, tenant_id, name, scope, prefix, key_hash, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, key.CreatedAt)
 		return key, mapPostgresError(err)
 	})
 }
@@ -289,7 +289,7 @@ func (s *Store) ListAPIKeys(ctx context.Context, tenantID string) ([]tenant.APIK
 			return nil, err
 		}
 		rows, err := tx.Query(ctx, `
-			SELECT id, tenant_id, name, prefix, created_at, revoked_at
+			SELECT id, tenant_id, name, scope, prefix, created_at, revoked_at
 			FROM api_keys WHERE tenant_id = $1 ORDER BY created_at, id
 		`, tenantID)
 		if err != nil {
@@ -326,11 +326,11 @@ func (s *Store) RevokeAPIKey(ctx context.Context, tenantID, keyID string) error 
 
 func (s *Store) RotateAPIKey(ctx context.Context, tenantID, keyID, name string) (tenant.APIKey, error) {
 	return withTenantTx(ctx, s.app, tenantID, func(tx pgx.Tx) (tenant.APIKey, error) {
-		var oldName string
+		var oldName, oldScope string
 		err := tx.QueryRow(ctx, `
-			SELECT name FROM api_keys
+			SELECT name, scope FROM api_keys
 			WHERE tenant_id = $1 AND id = $2 AND revoked_at IS NULL
-		`, tenantID, keyID).Scan(&oldName)
+		`, tenantID, keyID).Scan(&oldName, &oldScope)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return tenant.APIKey{}, tenant.ErrAPIKeyNotFound
 		}
@@ -340,14 +340,15 @@ func (s *Store) RotateAPIKey(ctx context.Context, tenantID, keyID, name string) 
 		if strings.TrimSpace(name) == "" {
 			name = oldName
 		}
-		key, hash, err := tenant.NewRandomAPIKey(tenantID, name)
+		// Rotation replaces the credential, never its authority.
+		key, hash, err := tenant.NewRandomAPIKey(tenantID, name, oldScope)
 		if err != nil {
 			return tenant.APIKey{}, err
 		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO api_keys(id, tenant_id, name, prefix, key_hash, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6)
-		`, key.ID, key.TenantID, key.Name, key.Prefix, hash, key.CreatedAt); err != nil {
+			INSERT INTO api_keys(id, tenant_id, name, scope, prefix, key_hash, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, key.CreatedAt); err != nil {
 			return tenant.APIKey{}, mapPostgresError(err)
 		}
 		tag, err := tx.Exec(ctx, `
@@ -368,7 +369,7 @@ func (s *Store) AuthenticateAPIKey(ctx context.Context, tenantID, secret string)
 	hash := tenant.HashAPIKey(secret)
 	return withTenantTx(ctx, s.app, tenantID, func(tx pgx.Tx) (tenant.APIKey, error) {
 		key, err := scanAPIKey(tx.QueryRow(ctx, `
-			SELECT id, tenant_id, name, prefix, created_at, revoked_at
+			SELECT id, tenant_id, name, scope, prefix, created_at, revoked_at
 			FROM api_keys
 			WHERE tenant_id = $1 AND key_hash = $2 AND revoked_at IS NULL
 		`, tenantID, hash))
@@ -491,7 +492,7 @@ func scanProject(row rowScanner) (tenant.Project, error) {
 func scanAPIKey(row rowScanner) (tenant.APIKey, error) {
 	var key tenant.APIKey
 	var revoked pgtype.Timestamptz
-	if err := row.Scan(&key.ID, &key.TenantID, &key.Name, &key.Prefix, &key.CreatedAt, &revoked); err != nil {
+	if err := row.Scan(&key.ID, &key.TenantID, &key.Name, &key.Scope, &key.Prefix, &key.CreatedAt, &revoked); err != nil {
 		return tenant.APIKey{}, err
 	}
 	if revoked.Valid {

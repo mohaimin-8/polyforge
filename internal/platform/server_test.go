@@ -24,8 +24,8 @@ func TestTenantProjectEndpointsEnforceAPIKeyIsolation(t *testing.T) {
 	telemetryStore := telemetry.NewStore(100)
 	_, _ = tenantStore.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
 	_, _ = tenantStore.CreateTenant(ctx, tenant.Tenant{ID: "bravo", Name: "Bravo"})
-	alphaKey, _ := tenantStore.CreateAPIKey(ctx, "alpha", "alpha")
-	bravoKey, _ := tenantStore.CreateAPIKey(ctx, "bravo", "bravo")
+	alphaKey, _ := tenantStore.CreateAPIKey(ctx, "alpha", "alpha", tenant.ScopeFull)
+	bravoKey, _ := tenantStore.CreateAPIKey(ctx, "bravo", "bravo", tenant.ScopeFull)
 	_, _ = tenantStore.CreateProject(ctx, tenant.Project{ID: "alpha-project", TenantID: "alpha", Name: "Alpha Project"})
 
 	server := httptest.NewServer(NewServer(slog.New(slog.NewTextHandler(io.Discard, nil)), tenantStore, telemetryStore, Config{AdminKey: "admin-test"}).Handler())
@@ -96,7 +96,7 @@ func TestProjectCRUDAndRequestErrorContract(t *testing.T) {
 	ctx := context.Background()
 	tenantStore := tenant.NewStore()
 	_, _ = tenantStore.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
-	key, _ := tenantStore.CreateAPIKey(ctx, "alpha", "test")
+	key, _ := tenantStore.CreateAPIKey(ctx, "alpha", "test", tenant.ScopeFull)
 	server := httptest.NewServer(NewServer(
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 		tenantStore,
@@ -191,7 +191,7 @@ func TestAPIKeyRotationEndpointInvalidatesOldSecret(t *testing.T) {
 	ctx := context.Background()
 	tenantStore := tenant.NewStore()
 	_, _ = tenantStore.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
-	oldKey, _ := tenantStore.CreateAPIKey(ctx, "alpha", "service")
+	oldKey, _ := tenantStore.CreateAPIKey(ctx, "alpha", "service", tenant.ScopeFull)
 	server := httptest.NewServer(NewServer(
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 		tenantStore,
@@ -377,8 +377,8 @@ func TestTelemetryFeaturesEndpointAggregatesPerService(t *testing.T) {
 	telemetryStore := telemetry.NewStore(100)
 	_, _ = tenantStore.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
 	_, _ = tenantStore.CreateTenant(ctx, tenant.Tenant{ID: "bravo", Name: "Bravo"})
-	alphaKey, _ := tenantStore.CreateAPIKey(ctx, "alpha", "alpha")
-	bravoKey, _ := tenantStore.CreateAPIKey(ctx, "bravo", "bravo")
+	alphaKey, _ := tenantStore.CreateAPIKey(ctx, "alpha", "alpha", tenant.ScopeFull)
+	bravoKey, _ := tenantStore.CreateAPIKey(ctx, "bravo", "bravo", tenant.ScopeFull)
 
 	events := []telemetry.Event{
 		{TenantID: "alpha", Service: "api", Timestamp: base.Add(-10 * time.Minute), LatencyMS: 10, PayloadBytes: 100, CacheHit: true, ModelTier: "small"},
@@ -507,6 +507,122 @@ func TestTelemetryFeaturesEndpointAggregatesPerService(t *testing.T) {
 	})
 }
 
+// TestReadOnlyScopeIsEnforced is the roadmap's W7 verification gate:
+// "API key with read-only scope returns 403 on POST".
+func TestReadOnlyScopeIsEnforced(t *testing.T) {
+	ctx := context.Background()
+	tenantStore := tenant.NewStore()
+	_, _ = tenantStore.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
+	fullKey, _ := tenantStore.CreateAPIKey(ctx, "alpha", "writer", tenant.ScopeFull)
+	readKey, _ := tenantStore.CreateAPIKey(ctx, "alpha", "reader", tenant.ScopeRead)
+
+	server := httptest.NewServer(NewServer(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		tenantStore,
+		telemetry.NewStore(100),
+		Config{AdminKey: "admin-test"},
+	).Handler())
+	defer server.Close()
+
+	do := func(t *testing.T, method, path, secret, body string) *http.Response {
+		t.Helper()
+		var reader io.Reader
+		if body != "" {
+			reader = strings.NewReader(body)
+		}
+		req, err := http.NewRequest(method, server.URL+path, reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("X-PolyForge-API-Key", secret)
+		if body != "" {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp
+	}
+
+	t.Run("read key gets 403 with forbidden code on POST", func(t *testing.T) {
+		resp := do(t, http.MethodPost, "/v1/tenants/alpha/projects", readKey.Secret, `{"id":"p1","name":"X"}`)
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("expected 403, got %d", resp.StatusCode)
+		}
+		var envelope errorEnvelope
+		if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+			t.Fatal(err)
+		}
+		if envelope.Error.Code != "forbidden" {
+			t.Fatalf("expected forbidden code, got %q", envelope.Error.Code)
+		}
+	})
+
+	t.Run("read key can read", func(t *testing.T) {
+		for _, path := range []string{
+			"/v1/tenants/alpha/projects",
+			"/v1/tenants/alpha/api-keys",
+			"/v1/tenants/alpha/telemetry/features",
+			"/v1/tenants/alpha/workload-profile",
+			"/v1/tenants/alpha/policy-recommendation",
+		} {
+			resp := do(t, http.MethodGet, path, readKey.Secret, "")
+			_ = resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("GET %s with read scope: expected 200, got %d", path, resp.StatusCode)
+			}
+		}
+	})
+
+	t.Run("read key cannot mutate anywhere", func(t *testing.T) {
+		telemetryBody := `{"tenant_id":"alpha","service":"api","latency_ms":10}`
+		for _, attempt := range []struct{ method, path, body string }{
+			{http.MethodPost, "/v1/tenants/alpha/projects", `{"id":"p2","name":"X"}`},
+			{http.MethodPost, "/v1/tenants/alpha/api-keys", `{"name":"escalate"}`},
+			{http.MethodDelete, "/v1/tenants/alpha/api-keys/" + readKey.ID, ""},
+			{http.MethodPost, "/v1/tenants/alpha/api-keys/" + readKey.ID + "/rotate", ""},
+			{http.MethodPost, "/v1/telemetry", telemetryBody},
+		} {
+			resp := do(t, attempt.method, attempt.path, readKey.Secret, attempt.body)
+			_ = resp.Body.Close()
+			if resp.StatusCode != http.StatusForbidden {
+				t.Fatalf("%s %s with read scope: expected 403, got %d", attempt.method, attempt.path, resp.StatusCode)
+			}
+		}
+	})
+
+	t.Run("full key can mutate", func(t *testing.T) {
+		resp := do(t, http.MethodPost, "/v1/tenants/alpha/projects", fullKey.Secret, `{"id":"p1","name":"X"}`)
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("expected 201 for full scope, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("scoped key creation round-trips and validates", func(t *testing.T) {
+		resp := do(t, http.MethodPost, "/v1/tenants/alpha/api-keys", fullKey.Secret, `{"name":"observer","scope":"read"}`)
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("expected 201, got %d", resp.StatusCode)
+		}
+		var created tenant.APIKey
+		if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+			t.Fatal(err)
+		}
+		if created.Scope != tenant.ScopeRead {
+			t.Fatalf("expected read scope on created key, got %q", created.Scope)
+		}
+
+		bad := do(t, http.MethodPost, "/v1/tenants/alpha/api-keys", fullKey.Secret, `{"name":"bad","scope":"admin"}`)
+		_ = bad.Body.Close()
+		if bad.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 for invalid scope, got %d", bad.StatusCode)
+		}
+	})
+}
+
 func TestRecoverPanicsReturnsStructured500(t *testing.T) {
 	server := NewServer(
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -566,7 +682,7 @@ func TestMetricsEndpointExposesRequestAndTelemetryMetrics(t *testing.T) {
 	ctx := context.Background()
 	tenantStore := tenant.NewStore()
 	_, _ = tenantStore.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
-	key, _ := tenantStore.CreateAPIKey(ctx, "alpha", "test")
+	key, _ := tenantStore.CreateAPIKey(ctx, "alpha", "test", tenant.ScopeFull)
 	server := httptest.NewServer(NewServer(
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 		tenantStore,

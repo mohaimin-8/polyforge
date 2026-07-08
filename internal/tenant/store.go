@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -17,6 +18,7 @@ var (
 	ErrProjectNotFound = errors.New("project not found")
 	ErrAPIKeyNotFound  = errors.New("api key not found")
 	ErrUnauthorized    = errors.New("unauthorized")
+	ErrForbidden       = errors.New("forbidden")
 	ErrConflict        = errors.New("resource already exists")
 )
 
@@ -24,6 +26,47 @@ const (
 	DefaultPageSize = 50
 	MaxPageSize     = 200
 )
+
+// API-key scopes. A read key can call read-only endpoints; a full key can
+// also mutate. Scope is fixed at key creation and survives rotation, so
+// widening access always requires issuing a new credential.
+const (
+	ScopeRead = "read"
+	ScopeFull = "full"
+)
+
+// NormalizeScope maps the empty scope to full so credentials issued before
+// scopes existed keep working unchanged.
+func NormalizeScope(scope string) string {
+	scope = strings.TrimSpace(scope)
+	if scope == "" {
+		return ScopeFull
+	}
+	return scope
+}
+
+func ValidScope(scope string) bool {
+	switch NormalizeScope(scope) {
+	case ScopeRead, ScopeFull:
+		return true
+	default:
+		return false
+	}
+}
+
+// ScopeAllows reports whether a key with keyScope may perform an action that
+// requires requiredScope.
+func ScopeAllows(keyScope, requiredScope string) bool {
+	keyScope = NormalizeScope(keyScope)
+	switch requiredScope {
+	case ScopeRead:
+		return keyScope == ScopeRead || keyScope == ScopeFull
+	case ScopeFull:
+		return keyScope == ScopeFull
+	default:
+		return false
+	}
+}
 
 type Tenant struct {
 	ID            string    `json:"id"`
@@ -55,6 +98,7 @@ type APIKey struct {
 	ID        string     `json:"id"`
 	TenantID  string     `json:"tenant_id"`
 	Name      string     `json:"name"`
+	Scope     string     `json:"scope"`
 	Prefix    string     `json:"prefix"`
 	Secret    string     `json:"secret,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
@@ -71,7 +115,7 @@ type Repository interface {
 	Project(ctx context.Context, tenantID, projectID string) (Project, error)
 	UpdateProject(ctx context.Context, p Project) (Project, error)
 	DeleteProject(ctx context.Context, tenantID, projectID string) error
-	CreateAPIKey(ctx context.Context, tenantID, name string) (APIKey, error)
+	CreateAPIKey(ctx context.Context, tenantID, name, scope string) (APIKey, error)
 	ListAPIKeys(ctx context.Context, tenantID string) ([]APIKey, error)
 	RevokeAPIKey(ctx context.Context, tenantID, keyID string) error
 	RotateAPIKey(ctx context.Context, tenantID, keyID, name string) (APIKey, error)
@@ -106,7 +150,7 @@ func (s *Store) ProvisionTenant(_ context.Context, t Tenant, keyName string) (Te
 	if _, exists := s.tenants[t.ID]; exists {
 		return Tenant{}, APIKey{}, ErrConflict
 	}
-	key, hash, err := NewRandomAPIKey(t.ID, keyName)
+	key, hash, err := NewRandomAPIKey(t.ID, keyName, ScopeFull)
 	if err != nil {
 		return Tenant{}, APIKey{}, err
 	}
@@ -225,11 +269,11 @@ func (s *Store) DeleteProject(_ context.Context, tenantID, projectID string) err
 	return nil
 }
 
-func (s *Store) CreateAPIKey(_ context.Context, tenantID, name string) (APIKey, error) {
+func (s *Store) CreateAPIKey(_ context.Context, tenantID, name, scope string) (APIKey, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.createAPIKeyLocked(tenantID, name)
+	return s.createAPIKeyLocked(tenantID, name, scope)
 }
 
 func (s *Store) ListAPIKeys(_ context.Context, tenantID string) ([]APIKey, error) {
@@ -267,7 +311,8 @@ func (s *Store) RotateAPIKey(_ context.Context, tenantID, keyID, name string) (A
 	if strings.TrimSpace(name) == "" {
 		name = rec.key.Name
 	}
-	key, err := s.createAPIKeyLocked(tenantID, name)
+	// Rotation replaces the credential, never its authority.
+	key, err := s.createAPIKeyLocked(tenantID, name, rec.key.Scope)
 	if err != nil {
 		return APIKey{}, err
 	}
@@ -291,11 +336,11 @@ func (s *Store) AuthenticateAPIKey(_ context.Context, tenantID, secret string) (
 	return APIKey{}, ErrUnauthorized
 }
 
-func (s *Store) createAPIKeyLocked(tenantID, name string) (APIKey, error) {
+func (s *Store) createAPIKeyLocked(tenantID, name, scope string) (APIKey, error) {
 	if _, ok := s.tenants[tenantID]; !ok {
 		return APIKey{}, ErrTenantNotFound
 	}
-	key, hash, err := NewRandomAPIKey(tenantID, name)
+	key, hash, err := NewRandomAPIKey(tenantID, name, scope)
 	if err != nil {
 		return APIKey{}, err
 	}
@@ -355,7 +400,11 @@ func NormalizePageRequest(page PageRequest) PageRequest {
 	return page
 }
 
-func NewRandomAPIKey(tenantID, name string) (APIKey, string, error) {
+func NewRandomAPIKey(tenantID, name, scope string) (APIKey, string, error) {
+	scope = NormalizeScope(scope)
+	if !ValidScope(scope) {
+		return APIKey{}, "", fmt.Errorf("invalid API key scope %q", scope)
+	}
 	raw := make([]byte, 24)
 	if _, err := rand.Read(raw); err != nil {
 		return APIKey{}, "", err
@@ -372,6 +421,7 @@ func NewRandomAPIKey(tenantID, name string) (APIKey, string, error) {
 		ID:        "key_" + hex.EncodeToString(id),
 		TenantID:  tenantID,
 		Name:      strings.TrimSpace(name),
+		Scope:     scope,
 		Prefix:    prefix(secret),
 		Secret:    secret,
 		CreatedAt: time.Now().UTC(),

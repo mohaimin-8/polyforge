@@ -184,7 +184,7 @@ func (s *Server) createTenant(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listAPIKeys(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeRead) {
 		return
 	}
 	keys, err := s.tenants.ListAPIKeys(r.Context(), tenantID)
@@ -197,11 +197,12 @@ func (s *Server) listAPIKeys(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeFull) {
 		return
 	}
 	var input struct {
-		Name string `json:"name"`
+		Name  string `json:"name"`
+		Scope string `json:"scope"`
 	}
 	if err := readJSON(w, r, &input); err != nil {
 		s.writeError(w, r, http.StatusBadRequest, err)
@@ -211,7 +212,11 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, http.StatusBadRequest, errors.New("name must be 1-200 characters"))
 		return
 	}
-	key, err := s.tenants.CreateAPIKey(r.Context(), tenantID, input.Name)
+	if !tenant.ValidScope(input.Scope) {
+		s.writeError(w, r, http.StatusBadRequest, errors.New(`scope must be "read" or "full"`))
+		return
+	}
+	key, err := s.tenants.CreateAPIKey(r.Context(), tenantID, input.Name, input.Scope)
 	if err != nil {
 		s.writeError(w, r, statusFor(err), err)
 		return
@@ -221,7 +226,7 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) revokeAPIKey(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeFull) {
 		return
 	}
 	if err := s.tenants.RevokeAPIKey(r.Context(), tenantID, r.PathValue("key_id")); err != nil {
@@ -233,7 +238,7 @@ func (s *Server) revokeAPIKey(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) rotateAPIKey(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeFull) {
 		return
 	}
 	var input struct {
@@ -257,7 +262,7 @@ func (s *Server) rotateAPIKey(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listProjects(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeRead) {
 		return
 	}
 	page := tenant.PageRequest{Cursor: r.URL.Query().Get("cursor")}
@@ -279,7 +284,7 @@ func (s *Server) listProjects(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createProject(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeFull) {
 		return
 	}
 	var input tenant.Project
@@ -302,7 +307,7 @@ func (s *Server) createProject(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getProject(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeRead) {
 		return
 	}
 	project, err := s.tenants.Project(r.Context(), tenantID, r.PathValue("project_id"))
@@ -315,7 +320,7 @@ func (s *Server) getProject(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateProject(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeFull) {
 		return
 	}
 	var input struct {
@@ -343,7 +348,7 @@ func (s *Server) updateProject(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) deleteProject(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeFull) {
 		return
 	}
 	if err := s.tenants.DeleteProject(r.Context(), tenantID, r.PathValue("project_id")); err != nil {
@@ -367,7 +372,7 @@ func (s *Server) ingestTelemetry(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, http.StatusBadRequest, errors.New("telemetry values are outside their valid ranges"))
 		return
 	}
-	if !s.authorizeTenant(w, r, event.TenantID) {
+	if !s.authorizeTenant(w, r, event.TenantID, tenant.ScopeFull) {
 		return
 	}
 	event, err := s.telemetry.Add(r.Context(), event)
@@ -381,7 +386,7 @@ func (s *Server) ingestTelemetry(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) telemetryFeatures(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeRead) {
 		return
 	}
 	if _, ok, err := s.tenants.Tenant(r.Context(), tenantID); err != nil {
@@ -439,7 +444,7 @@ func parseTimestampParam(raw string) (time.Time, error) {
 
 func (s *Server) workloadProfile(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeRead) {
 		return
 	}
 	if _, ok, err := s.tenants.Tenant(r.Context(), tenantID); err != nil {
@@ -459,7 +464,7 @@ func (s *Server) workloadProfile(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) policyRecommendation(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID) {
+	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeRead) {
 		return
 	}
 	if _, ok, err := s.tenants.Tenant(r.Context(), tenantID); err != nil {
@@ -478,14 +483,23 @@ func (s *Server) policyRecommendation(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, controller.Recommend(result))
 }
 
-func (s *Server) authorizeTenant(w http.ResponseWriter, r *http.Request, tenantID string) bool {
+// authorizeTenant authenticates the tenant API key and enforces its scope.
+// Authentication failures are 401; a valid key without the required scope is
+// 403 so the caller can distinguish a bad credential from missing authority.
+func (s *Server) authorizeTenant(w http.ResponseWriter, r *http.Request, tenantID, requiredScope string) bool {
 	secret := r.Header.Get("X-PolyForge-API-Key")
 	if strings.TrimSpace(secret) == "" {
 		s.writeError(w, r, http.StatusUnauthorized, tenant.ErrUnauthorized)
 		return false
 	}
-	if _, err := s.tenants.AuthenticateAPIKey(r.Context(), tenantID, secret); err != nil {
+	key, err := s.tenants.AuthenticateAPIKey(r.Context(), tenantID, secret)
+	if err != nil {
 		s.writeError(w, r, statusFor(err), err)
+		return false
+	}
+	if !tenant.ScopeAllows(key.Scope, requiredScope) {
+		s.writeError(w, r, http.StatusForbidden,
+			fmt.Errorf("%w: this endpoint requires the %q scope", tenant.ErrForbidden, requiredScope))
 		return false
 	}
 	return true
@@ -555,6 +569,8 @@ func statusFor(err error) int {
 		return http.StatusNotFound
 	case errors.Is(err, tenant.ErrUnauthorized):
 		return http.StatusUnauthorized
+	case errors.Is(err, tenant.ErrForbidden):
+		return http.StatusForbidden
 	case errors.Is(err, tenant.ErrConflict):
 		return http.StatusConflict
 	default:
@@ -572,6 +588,8 @@ func errorCode(status int, err error) string {
 		return "api_key_not_found"
 	case errors.Is(err, tenant.ErrUnauthorized):
 		return "unauthorized"
+	case errors.Is(err, tenant.ErrForbidden):
+		return "forbidden"
 	case errors.Is(err, tenant.ErrConflict):
 		return "conflict"
 	case errors.Is(err, errRateLimited), status == http.StatusTooManyRequests:

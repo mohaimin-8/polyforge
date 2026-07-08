@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: PolyForge Control Plane API
-  version: 0.3.0
+  version: 0.4.0
   description: Multi-tenant control-plane API for PolyForge research infrastructure.
   license:
     name: MIT
@@ -132,6 +132,8 @@ paths:
                   $ref: "#/components/schemas/APIKey"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
         "500":
@@ -158,6 +160,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
         "500":
@@ -176,6 +180,8 @@ paths:
           description: API key revoked.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -214,6 +220,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -242,6 +250,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
         "500":
@@ -268,6 +278,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
         "429":
@@ -292,6 +304,8 @@ paths:
                 $ref: "#/components/schemas/Project"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -320,6 +334,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -336,6 +352,8 @@ paths:
           description: Project deleted.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -365,6 +383,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
         "500":
@@ -395,6 +415,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -418,6 +440,8 @@ paths:
                 $ref: "#/components/schemas/WorkloadProfile"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -441,6 +465,8 @@ paths:
                 $ref: "#/components/schemas/PolicyRecommendation"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -542,6 +568,17 @@ components:
             $ref: "#/components/schemas/ErrorEnvelope"
     Unauthorized:
       description: Missing or invalid credentials.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+        traceparent:
+          $ref: "#/components/headers/TraceParent"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Forbidden:
+      description: The credential is valid but its scope does not permit this operation.
       headers:
         X-Request-ID:
           $ref: "#/components/headers/RequestID"
@@ -697,9 +734,17 @@ components:
           type: string
           minLength: 1
           maxLength: 200
+        scope:
+          type: string
+          enum: [read, full]
+          default: full
+          description: >-
+            read keys may only call read-only endpoints; full keys may also
+            mutate. Scope is fixed for the key's lifetime and preserved by
+            rotation.
     APIKey:
       type: object
-      required: [id, tenant_id, name, prefix, created_at]
+      required: [id, tenant_id, name, scope, prefix, created_at]
       properties:
         id:
           type: string
@@ -707,6 +752,9 @@ components:
           $ref: "#/components/schemas/ResourceID"
         name:
           type: string
+        scope:
+          type: string
+          enum: [read, full]
         prefix:
           type: string
         secret:
