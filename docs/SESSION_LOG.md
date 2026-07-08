@@ -64,6 +64,11 @@ gate". Reality found:
 - `.github/workflows/ci.yml`: tests now run `-race -covermode=atomic`, and a
   coverage gate fails CI under 55% total (ratchet toward 80% as packages gain
   tests; local-without-Docker total is 57.5%, CI adds the PostgreSQL suite).
+- golangci-lint v2.6.2 run locally first (never gate CI on an unverified tool):
+  it reported 16 `errcheck` findings — unchecked `rows.Close`, `tx.Rollback`,
+  `resp.Body.Close`, and one deferred cleanup `Exec`. All were the intentional
+  ignore-the-error idiom; each is now an explicit `_ =` so intent is visible.
+  With the tree clean, the linter was added to CI as a gate.
 
 ### Roadmap alignment notes (THESIS_DETAILS.html vs. repository)
 

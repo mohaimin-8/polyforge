@@ -120,7 +120,9 @@ func TestPostgresRowLevelIsolation(t *testing.T) {
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	alpha := "test-alpha-" + suffix
 	bravo := "test-bravo-" + suffix
-	defer store.admin.Exec(context.Background(), `DELETE FROM tenants WHERE id IN ($1, $2)`, alpha, bravo)
+	defer func() {
+		_, _ = store.admin.Exec(context.Background(), `DELETE FROM tenants WHERE id IN ($1, $2)`, alpha, bravo)
+	}()
 	if _, err := store.CreateTenant(ctx, tenant.Tenant{ID: alpha, Name: "Alpha"}); err != nil {
 		t.Fatal(err)
 	}

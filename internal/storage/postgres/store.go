@@ -116,7 +116,7 @@ func (s *Store) ProvisionTenant(ctx context.Context, t tenant.Tenant, keyName st
 	if err != nil {
 		return tenant.Tenant{}, tenant.APIKey{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO tenants(id, name, plan, isolation_mode, created_at)
 		VALUES ($1, $2, $3, $4, $5)
@@ -538,7 +538,7 @@ func withTenantTx[T any](ctx context.Context, pool *pgxpool.Pool, tenantID strin
 	if err != nil {
 		return zero, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if err := setTenant(ctx, tx, tenantID); err != nil {
 		return zero, err
 	}

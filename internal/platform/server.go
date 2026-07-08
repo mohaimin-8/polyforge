@@ -504,7 +504,7 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	if r.Body == nil {
 		return errors.New("request body is required")
 	}
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()

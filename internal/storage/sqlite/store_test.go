@@ -60,7 +60,7 @@ func TestStorePersistsTenantDataAndTelemetry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reopened.Close()
+	defer func() { _ = reopened.Close() }()
 
 	if _, err := reopened.AuthenticateAPIKey(ctx, "alpha", key.Secret); err != nil {
 		t.Fatalf("persisted API key did not authenticate: %v", err)
@@ -87,7 +87,7 @@ func TestProjectLifecycleAndPagination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	_, _ = store.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
 	for _, id := range []string{"p1", "p2", "p3"} {
@@ -139,7 +139,7 @@ func TestAPIKeyRotationAndRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	_, _ = store.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
 	oldKey, err := store.CreateAPIKey(ctx, "alpha", "service")
@@ -193,7 +193,7 @@ func TestOpenMigratesLegacyProjectAndAPIKeyColumns(t *testing.T) {
 	}
 	for _, statement := range statements {
 		if _, err := db.ExecContext(ctx, statement); err != nil {
-			db.Close()
+			_ = db.Close()
 			t.Fatal(err)
 		}
 	}
@@ -205,7 +205,7 @@ func TestOpenMigratesLegacyProjectAndAPIKeyColumns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	project, err := store.Project(ctx, "alpha", "p1")
 	if err != nil {
 		t.Fatal(err)
@@ -224,7 +224,7 @@ func TestProvisionTenantRollsBackWhenBootstrapKeyFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	if _, err := store.db.ExecContext(ctx, `
 		CREATE TRIGGER reject_bootstrap_key
 		BEFORE INSERT ON api_keys
@@ -251,7 +251,7 @@ func TestStoreRejectsCrossTenantAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	_, _ = store.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
 	_, _ = store.CreateTenant(ctx, tenant.Tenant{ID: "bravo", Name: "Bravo"})
@@ -271,7 +271,7 @@ func TestFeaturesAggregatesWithinWindowAndTenant(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	base := time.Now().UTC().Truncate(time.Second)
 	_, _ = store.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})

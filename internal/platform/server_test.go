@@ -38,7 +38,7 @@ func TestTenantProjectEndpointsEnforceAPIKeyIsolation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected 200, got %d", resp.StatusCode)
 		}
@@ -51,7 +51,7 @@ func TestTenantProjectEndpointsEnforceAPIKeyIsolation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusUnauthorized {
 			t.Fatalf("expected 401, got %d", resp.StatusCode)
 		}
@@ -72,7 +72,7 @@ func TestCreateTenantReturnsBootstrapAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201, got %d", resp.StatusCode)
 	}
@@ -110,7 +110,7 @@ func TestProjectCRUDAndRequestErrorContract(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		var payload errorEnvelope
 		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 			t.Fatal(err)
@@ -146,7 +146,7 @@ func TestProjectCRUDAndRequestErrorContract(t *testing.T) {
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("create: expected 201, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	resp = do(http.MethodPatch, "/v1/tenants/alpha/projects/p1", `{"name":"Updated"}`)
 	if resp.StatusCode != http.StatusOK {
@@ -156,7 +156,7 @@ func TestProjectCRUDAndRequestErrorContract(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&updated); err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if updated.Name != "Updated" || updated.UpdatedAt.IsZero() {
 		t.Fatalf("unexpected updated project: %#v", updated)
 	}
@@ -169,7 +169,7 @@ func TestProjectCRUDAndRequestErrorContract(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if len(page.Items) != 1 || page.Items[0].Name != "Updated" {
 		t.Fatalf("unexpected project page: %#v", page)
 	}
@@ -178,13 +178,13 @@ func TestProjectCRUDAndRequestErrorContract(t *testing.T) {
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("delete: expected 204, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	resp = do(http.MethodGet, "/v1/tenants/alpha/projects/p1", "")
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("get deleted: expected 404, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestAPIKeyRotationEndpointInvalidatesOldSecret(t *testing.T) {
@@ -206,7 +206,7 @@ func TestAPIKeyRotationEndpointInvalidatesOldSecret(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201, got %d", resp.StatusCode)
 	}
@@ -259,10 +259,10 @@ func TestRateLimitReturns429AndRetryAfter(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("first request: expected 200, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	resp = do()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("second request: expected 429, got %d", resp.StatusCode)
 	}
@@ -292,7 +292,7 @@ func TestRateLimitBypassesHealthz(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("health request %d: expected 200, got %d", i+1, resp.StatusCode)
 		}
@@ -318,7 +318,7 @@ func TestTraceParentPropagation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -357,7 +357,7 @@ func TestInvalidTraceParentGetsReplaced(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	outgoing := resp.Header.Get("traceparent")
 	trace, ok := parseTraceParent(outgoing)
@@ -415,7 +415,7 @@ func TestTelemetryFeaturesEndpointAggregatesPerService(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		var set telemetry.FeatureSet
 		if resp.StatusCode == http.StatusOK {
 			if err := json.NewDecoder(resp.Body).Decode(&set); err != nil {
@@ -585,7 +585,7 @@ func TestMetricsEndpointExposesRequestAndTelemetryMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("expected telemetry 202, got %d", resp.StatusCode)
 	}
@@ -594,7 +594,7 @@ func TestMetricsEndpointExposesRequestAndTelemetryMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected metrics 200, got %d", resp.StatusCode)
 	}

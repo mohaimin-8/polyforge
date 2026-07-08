@@ -155,7 +155,7 @@ func (s *Store) ProvisionTenant(ctx context.Context, t tenant.Tenant, keyName st
 	if err != nil {
 		return tenant.Tenant{}, tenant.APIKey{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO tenants(id, name, plan, isolation_mode, created_at)
 		VALUES (?, ?, ?, ?, ?)
@@ -182,7 +182,7 @@ func (s *Store) ListTenants(ctx context.Context) ([]tenant.Tenant, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []tenant.Tenant
 	for rows.Next() {
@@ -242,7 +242,7 @@ func (s *Store) ListProjects(ctx context.Context, tenantID string, page tenant.P
 	if err != nil {
 		return tenant.ProjectPage{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := tenant.ProjectPage{Items: make([]tenant.Project, 0, page.Limit)}
 	for rows.Next() {
@@ -334,7 +334,7 @@ func (s *Store) ListAPIKeys(ctx context.Context, tenantID string) ([]tenant.APIK
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	keys := make([]tenant.APIKey, 0)
 	for rows.Next() {
@@ -369,7 +369,7 @@ func (s *Store) RotateAPIKey(ctx context.Context, tenantID, keyID, name string) 
 	if err != nil {
 		return tenant.APIKey{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var oldName string
 	err = tx.QueryRowContext(ctx, `
@@ -461,7 +461,7 @@ func (s *Store) RecentByTenant(ctx context.Context, tenantID string, n int) ([]t
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	reversed := make([]telemetry.Event, 0, n)
 	for rows.Next() {
@@ -507,7 +507,7 @@ func (s *Store) Features(ctx context.Context, tenantID string, query telemetry.F
 	if err != nil {
 		return telemetry.FeatureSet{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	events := make([]telemetry.Event, 0)
 	for rows.Next() {
