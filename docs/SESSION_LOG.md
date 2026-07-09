@@ -7,6 +7,120 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-09 (session 6) — ADR 0006 events cluster + M5 AI cluster (W14/W15, W17-W19)
+
+Milestone status: closes the W14/W15 events cluster whole (outbox, NATS
+relay, audit events, onboarding saga, CQRS projection — the slice ADR 0006
+specified) and lands the M5 AI-workload MVP: W17 embeddings + vector
+search, W18 LLM gateway with semantic cache and streaming, W19 tool-use
+agent loop. Two commits, each cluster landing with its tests. Honest
+roadmap position after this session: ~59-60% pending a green CI run (W19
+is the roadmap's own 59% marker; pgvector and local model serving are the
+noted deferrals).
+
+### What changed — events cluster (commit 1)
+
+- **Transactional outbox in all three stores.** Every write path (tenant
+  provision/create/delete, project create/update/delete, key
+  create/revoke/rotate) inserts the domain row and an audit event in the
+  same transaction — memory store under the same mutex, SQLite and
+  PostgreSQL in the same tx (`003_outbox.sql`; app role gets INSERT only,
+  RLS scopes it to its tenant; the outbox has deliberately no FK to
+  tenants so the stream outlives its subjects). Shared constructors in
+  `internal/tenant/audit.go` keep payloads byte-identical across backends
+  and never include secrets or hashes.
+- **Relay + JetStream backbone (`internal/events`).** The relay drains
+  unpublished rows in insertion order and publishes with
+  `Nats-Msg-Id = outbox.id`. Crash between publish and mark-published is
+  the tested case: the retry republishes and JetStream's duplicate window
+  drops it — `TestRelayRetryAfterCrashDoesNotDuplicate` proves stream
+  count stays 1 against an embedded `nats-server` (no Docker, per ADR
+  0006's verification stance).
+- **Onboarding saga (`internal/saga`).** create tenant → bootstrap key →
+  default-policy event → welcome event; every step idempotent, every step
+  with an explicit compensation (event-only steps compensate by emitting a
+  `saga.compensated` fact — appended events cannot be unappended). State
+  persists in the DB (`sagas` table in SQLite/Postgres, memory for tests).
+  Tests cover the happy path, mid-saga failure with full compensation
+  (tenant gone, created+deleted both in the stream), crash-resume from a
+  persisted cursor without minting duplicate keys or events (deterministic
+  saga event IDs + `INSERT OR IGNORE`/`ON CONFLICT DO NOTHING`), and
+  terminal-state stickiness.
+- **CQRS projection.** `tenant_summary` folds the stream into per-tenant
+  counters; the regeneration test replays the stream twice and asserts
+  byte-identical JSON, then cross-checks counts against the write model.
+- `cmd/control-plane` starts the relay when `POLYFORGE_NATS_URL` is set;
+  without it events accumulate in the outbox and publish on the first
+  start that has a backbone — which is the outbox's whole point.
+
+### What changed — AI cluster (commit 2, ADR 0007)
+
+- **W17 (`internal/ai/embed`, `internal/ai/vector`).** One `Embedder`
+  interface; `OpenAI` speaks any OpenAI-compatible `/embeddings` endpoint,
+  `Local` is a deterministic hashed n-gram embedder that makes every
+  downstream assertion exact and offline. The vector index is exact
+  per-tenant brute-force cosine — the recall=1.0 baseline pgvector/HNSW
+  will be benchmarked against (`BenchmarkSearch10k`). Tenant isolation is
+  structural (one map per tenant), tested by asserting another tenant sees
+  zero results.
+- **W18 (`internal/ai/gateway`).** Chat proxy over the OpenAI wire
+  protocol with SSE streaming both up and down; per-tenant semantic cache
+  at 0.95 cosine over the full conversation (fails open on embedder
+  errors, `X-PolyForge-Cache: hit/miss` headers, hit/miss counters on
+  `/metrics`); tenant-scoped semantic search (`/ai/index`, `/ai/search`).
+  Auth reuses the control plane's API keys and scopes. Every AI request
+  records a telemetry event, so the classifier sees AI workload classes.
+- **W19 (`internal/ai/agent`).** OpenAI tool-calling loop with three
+  tools: `polyforge_query` (tenant's projects via the same repository as
+  the HTTP API — isolation inherited, not reimplemented), `polyforge_calc`
+  (recursive-descent arithmetic parser, no eval), `polyforge_search`
+  (injected engine; DuckDuckGo scrape in the binary, fake in tests). Tool
+  failures go back to the model as tool output so it can recover; the run
+  errors after 8 steps. `agent.run` → `llm.call`/`tool.call` spans give
+  the multi-span causal chain, and `child_spans = llm_calls + tool_calls`
+  lands in telemetry — the agentic-multistep feature the W26 classifier
+  reads.
+- **`cmd/ai-gateway`** (`:8081`): second service binary sharing the
+  control plane's SQLite database; defaults to Ollama's local endpoint and
+  the local embedder, so it runs with zero external dependencies.
+
+### How it was verified
+
+```text
+gofmt -l .                                   -> clean
+go vet ./...                                 -> pass
+staticcheck ./...                            -> clean
+go test ./... -count=1 -covermode=atomic     -> pass, total 60.5% local
+```
+
+Local coverage of 60.5% is with the PostgreSQL suite skipped (no Docker on
+this machine); CI runs it and measured 66.5% before this session, so the
+gate has headroom there. Not verified locally, as always: the PostgreSQL
+outbox (`003_outbox.sql`, outbox RLS policy, admin-side relay reads) — it
+compiles, vets, and mirrors the SQLite semantics, but CI is the first
+environment that executes it. `-race` also runs only in CI (local
+toolchain has no cgo).
+
+### Deliberate deviations from the roadmap's W17-W19 letter
+
+- pgvector + HNSW deferred (needs a CI Postgres image with the extension);
+  the exact in-memory index is the measured baseline it must beat.
+- No real model host in CI: scripted providers + the local embedder keep
+  the gate deterministic. The wire protocol is tested against fakes that
+  speak real OpenAI JSON/SSE.
+- Ollama/local serving (W20) untouched — next cluster.
+
+### Immediate next tasks
+
+1. Push; confirm CI green (executes the PostgreSQL outbox path for the
+   first time and re-measures coverage).
+2. W20 local model serving: point `cmd/ai-gateway` at Ollama and demo the
+   agent end-to-end against a real model.
+3. Choose the pgvector CI image and land the Postgres-backed vector index
+   against the exact baseline (ADR 0007 consequence).
+
+---
+
 ## 2026-07-09 (session 5) — W11 OTel migration, W13 Redis limiter, W14 idempotency, W16 5k-RPS gate
 
 Milestone status: closes W11's SDK migration (traces now come from the OTel
