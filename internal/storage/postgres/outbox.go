@@ -16,13 +16,15 @@ var _ events.Outbox = (*Store)(nil)
 var _ saga.StateStore = (*Store)(nil)
 
 // insertOutbox writes one outbox row on the caller's transaction, making
-// the domain write and its audit event atomic (ADR 0006). ON CONFLICT DO
-// NOTHING on the unique event ID makes deterministic-ID appends idempotent.
+// the domain write and its audit event atomic (ADR 0006). No ON CONFLICT
+// clause: evaluating an arbiter requires SELECT privilege on the arbiter
+// column, and the app role is deliberately INSERT-only on the outbox.
+// Events on this path carry fresh random IDs, so conflicts cannot occur;
+// idempotent deterministic-ID appends go through AppendEvent (admin role).
 func insertOutbox(ctx context.Context, tx pgx.Tx, e events.Event) error {
 	_, err := tx.Exec(ctx, `
 		INSERT INTO outbox(id, tenant_id, action, subject, occurred_at, payload)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (id) DO NOTHING
 	`, e.ID, e.TenantID, e.Action, e.Subject, e.OccurredAt, e.Payload)
 	return err
 }
