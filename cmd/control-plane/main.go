@@ -17,6 +17,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	"polyforge/internal/classifier"
+	"polyforge/internal/classifier/online"
 	"polyforge/internal/events"
 	"polyforge/internal/idempotency"
 	"polyforge/internal/limit"
@@ -90,6 +92,7 @@ func main() {
 	// JetStream (ADR 0006); without it, events accumulate in the outbox and
 	// publish on the first start that has a backbone. Nothing is lost either
 	// way — that is the point of the outbox.
+	var workloadPublisher online.Publisher
 	if natsURL := os.Getenv("POLYFORGE_NATS_URL"); natsURL != "" {
 		outbox, ok := tenantRepository.(events.Outbox)
 		if !ok {
@@ -102,6 +105,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer backbone.Close()
+		workloadPublisher = backbone
 		relayCtx, stopRelay := context.WithCancel(ctx)
 		defer stopRelay()
 		go events.NewRelay(outbox, backbone, log, time.Second).Run(relayCtx)
@@ -183,6 +187,39 @@ func main() {
 		log.Info("mirroring telemetry to ClickHouse")
 	}
 
+	// W27: the online classifier polls every tenant's recent telemetry,
+	// predicts the workload class, publishes label changes to NATS when
+	// configured, and tracks feature drift with PSI. The trained W26
+	// artifact is used when present; otherwise the W19 rules keep the
+	// loop useful out of the box.
+	var predictor online.Predictor = online.RulePredictor{}
+	modelPath := envDefault("POLYFORGE_CLASSIFIER_MODEL", filepath.Join("artifacts", "classifier-model.json"))
+	if model, err := classifier.LoadModel(modelPath); err == nil {
+		predictor = model
+		log.Info("online classifier using trained model", "path", modelPath)
+	} else if !os.IsNotExist(err) {
+		log.Error("load classifier model", "path", modelPath, "error", err)
+		os.Exit(1)
+	} else {
+		log.Info("no classifier model artifact; online classifier using rule baseline", "path", modelPath)
+	}
+	var driftDetector *classifier.DriftDetector
+	referencePath := envDefault("POLYFORGE_CLASSIFIER_REFERENCE", filepath.Join("artifacts", "classifier-reference.json"))
+	if detector, err := classifier.LoadDriftDetector(referencePath); err == nil {
+		driftDetector = detector
+	} else if !os.IsNotExist(err) {
+		log.Error("load drift reference", "path", referencePath, "error", err)
+		os.Exit(1)
+	}
+	workloadRegistry := online.NewRegistry(0)
+	poller := online.NewPoller(tenantRepository, telemetryRepository, predictor, driftDetector,
+		workloadPublisher, workloadRegistry, log, online.Config{
+			Interval: time.Duration(envInt("POLYFORGE_CLASSIFIER_INTERVAL_SECONDS", 10)) * time.Second,
+		})
+	pollCtx, stopPoller := context.WithCancel(ctx)
+	defer stopPoller()
+	go poller.Run(pollCtx)
+
 	tracerProvider := sdktrace.NewTracerProvider(tracerOptions...)
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -201,6 +238,7 @@ func main() {
 			IdempotencyStore: idempotencyStore,
 			TracerProvider:   tracerProvider,
 			Analytics:        analyticsEnqueuer,
+			Workloads:        workloadRegistry,
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
@@ -244,6 +282,13 @@ func healthcheck() int {
 		return 1
 	}
 	return 0
+}
+
+func envDefault(name, fallback string) string {
+	if value := os.Getenv(name); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func envInt(name string, fallback int) int {

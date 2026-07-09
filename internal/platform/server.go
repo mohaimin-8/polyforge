@@ -57,6 +57,7 @@ type Server struct {
 
 	idempotencyStore idempotency.Store
 	analytics        AnalyticsEnqueuer
+	workloads        WorkloadReader
 }
 
 // AnalyticsEnqueuer mirrors accepted telemetry events into the analytical
@@ -93,6 +94,9 @@ type Config struct {
 	// event for the analytical store (ADR 0011). Delivery is best-effort
 	// and never affects the ingest response.
 	Analytics AnalyticsEnqueuer
+	// Workloads, when set, exposes the online classifier's registry on
+	// the admin API and dashboard (W27).
+	Workloads WorkloadReader
 }
 
 type RateLimitConfig struct {
@@ -141,6 +145,7 @@ func NewServer(log *slog.Logger, tenants tenant.Repository, telemetry telemetry.
 		s.limiter = bucket
 	}
 	s.analytics = cfg.Analytics
+	s.workloads = cfg.Workloads
 	s.idempotencyStore = cfg.IdempotencyStore
 	if s.idempotencyStore == nil {
 		s.idempotencyStore = idempotency.NewMemoryStore()
@@ -209,6 +214,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/telemetry/features", s.telemetryFeatures)
 	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/workload-profile", s.workloadProfile)
 	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/policy-recommendation", s.policyRecommendation)
+	s.mux.HandleFunc("GET /v1/admin/workloads", s.adminWorkloads)
+	s.mux.HandleFunc("GET /v1/admin/workloads/{tenant_id}/history", s.adminWorkloadHistory)
+	s.mux.HandleFunc("GET /admin/workloads", s.workloadsUI)
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {

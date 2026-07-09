@@ -58,6 +58,16 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	detector, err := classifier.NewDriftDetector(train)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	referencePath := filepath.Join(*outDir, "artifacts", "classifier-reference.json")
+	if err := detector.Save(referencePath); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	csv := "model,dataset,accuracy,macro_f1,p_latency_us_per_inference\n"
 	for _, candidate := range candidates {

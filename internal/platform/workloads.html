@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PolyForge — Workload Classes</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fff; --fg:#1a1d21; --muted:#68707a; --line:#e3e6ea; --card:#f6f7f9; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14161a; --fg:#e8eaed; --muted:#9aa3ad; --line:#2a2e35; --card:#1c1f25; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui, sans-serif; }
+  header { display:flex; gap:12px; align-items:center; padding:14px 20px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 auto 0 0; font-weight:600; }
+  input { background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:6px 10px; width:260px; }
+  button { background:var(--fg); color:var(--bg); border:0; border-radius:6px; padding:6px 14px; cursor:pointer; }
+  main { padding:20px; max-width:960px; margin:0 auto; }
+  #drift { padding:10px 14px; border-radius:8px; background:var(--card); border:1px solid var(--line); margin-bottom:16px; }
+  #drift.alert { border-color:#c0392b; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:500; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  .chip { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+  .CRUD-bursty { background:#f39c1226; color:#b9770e; }
+  .CRUD-steady { background:#27ae6026; color:#1e8449; }
+  .AI-cacheable { background:#2980b926; color:#2471a3; }
+  .AI-uncacheable { background:#8e44ad26; color:#7d3c98; }
+  .agentic-multistep { background:#c0392b26; color:#a93226; }
+  .unknown { background:var(--card); color:var(--muted); }
+  .muted { color:var(--muted); }
+  #status { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PolyForge · live workload classes</h1>
+  <span id="status"></span>
+  <input id="key" type="password" placeholder="admin key" autocomplete="off">
+  <button id="go">Watch</button>
+</header>
+<main>
+  <div id="drift" hidden></div>
+  <table>
+    <thead><tr><th>Tenant</th><th>Class</th><th>Confidence</th><th>Since</th><th>Window</th><th>Observed</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="6" class="muted">Enter the admin key to start polling.</td></tr></tbody>
+  </table>
+</main>
+<script>
+  let timer = null;
+  const els = {
+    key: document.getElementById("key"),
+    go: document.getElementById("go"),
+    rows: document.getElementById("rows"),
+    drift: document.getElementById("drift"),
+    status: document.getElementById("status"),
+  };
+  async function poll() {
+    try {
+      const resp = await fetch("/v1/admin/workloads", { headers: { "X-PolyForge-Admin-Key": els.key.value } });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      render(await resp.json());
+      els.status.textContent = "updated " + new Date().toLocaleTimeString();
+    } catch (err) {
+      els.status.textContent = String(err);
+    }
+  }
+  function cell(text) { const td = document.createElement("td"); td.textContent = text; return td; }
+  function render(data) {
+    els.rows.replaceChildren();
+    const tenants = (data.tenants || []).sort((a, b) => a.tenant_id.localeCompare(b.tenant_id));
+    if (tenants.length === 0) {
+      const td = cell("No classified tenants yet — ingest telemetry and wait one poll interval.");
+      td.colSpan = 6; td.className = "muted";
+      els.rows.appendChild(document.createElement("tr")).appendChild(td);
+    }
+    for (const t of tenants) {
+      const tr = document.createElement("tr");
+      tr.appendChild(cell(t.tenant_id));
+      const chip = document.createElement("span");
+      chip.className = "chip " + t.label; chip.textContent = t.label;
+      const td = document.createElement("td"); td.appendChild(chip); tr.appendChild(td);
+      tr.appendChild(cell((t.confidence * 100).toFixed(1) + "%"));
+      tr.appendChild(cell(new Date(t.since).toLocaleTimeString()));
+      tr.appendChild(cell(t.events_in_window + " events"));
+      tr.appendChild(cell(new Date(t.observed_at).toLocaleTimeString()));
+      els.rows.appendChild(tr);
+    }
+    const d = data.drift || {};
+    els.drift.hidden = !d.checked_at || d.checked_at.startsWith("0001");
+    els.drift.classList.toggle("alert", !!d.drifted);
+    els.drift.textContent = d.drifted
+      ? `Drift alert: ${d.worst_feature} PSI ${d.worst_psi.toFixed(3)} over ${d.window_size} windows — retrain due`
+      : `Population stable (worst ${d.worst_feature || "—"} PSI ${(d.worst_psi || 0).toFixed(3)}, window ${d.window_size || 0})`;
+  }
+  els.go.addEventListener("click", () => {
+    clearInterval(timer);
+    poll();
+    timer = setInterval(poll, 5000);
+  });
+</script>
+</body>
+</html>
