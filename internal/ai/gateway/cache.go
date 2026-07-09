@@ -5,9 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"time"
 
 	"polyforge/internal/ai/embed"
+	"polyforge/internal/ai/gateway/eviction"
 	"polyforge/internal/ai/vector"
 )
 
@@ -26,6 +29,12 @@ type SemanticCache struct {
 	threshold float64
 	hits      atomic.Int64
 	misses    atomic.Int64
+
+	// W28: with a per-tenant capacity set, the cost-aware policy bounds
+	// the cache; unbounded remains the default for compatibility.
+	capacityPerTenant int
+	policyMu          sync.Mutex
+	policies          map[string]eviction.Policy
 }
 
 func NewSemanticCache(embedder embed.Embedder, threshold float64) *SemanticCache {
@@ -36,7 +45,26 @@ func NewSemanticCache(embedder embed.Embedder, threshold float64) *SemanticCache
 		embedder:  embedder,
 		index:     vector.NewIndex(embedder.Dimensions()),
 		threshold: threshold,
+		policies:  map[string]eviction.Policy{},
 	}
+}
+
+// WithCapacity bounds the cache to n entries per tenant, evicted by the
+// W28 cost-aware policy (internal/ai/gateway/eviction). Per-tenant, not
+// global: a noisy tenant evicting a quiet tenant's expensive entries
+// would be a cross-tenant interference channel.
+func (c *SemanticCache) WithCapacity(n int) *SemanticCache {
+	c.capacityPerTenant = n
+	return c
+}
+
+func (c *SemanticCache) policyFor(tenantID string) eviction.Policy {
+	policy, ok := c.policies[tenantID]
+	if !ok {
+		policy = eviction.NewCostAware(eviction.CostAwareConfig{})
+		c.policies[tenantID] = policy
+	}
+	return policy
 }
 
 // cacheKeyText flattens the conversation so the whole context, not just the
@@ -66,24 +94,73 @@ func (c *SemanticCache) Lookup(ctx context.Context, tenantID string, messages []
 		return "", 0, false
 	}
 	c.hits.Add(1)
+	if c.capacityPerTenant > 0 {
+		c.policyMu.Lock()
+		c.policyFor(tenantID).OnHit(matches[0].Doc.ID, time.Now())
+		c.policyMu.Unlock()
+	}
 	return matches[0].Doc.Meta["completion"], matches[0].Score, true
 }
 
-// Store records a completed exchange for future lookups.
+// Store records a completed exchange for future lookups, estimating the
+// recompute cost from the completion length at the local-tier price.
 func (c *SemanticCache) Store(ctx context.Context, tenantID string, messages []Message, completion string) {
+	// docs/INFERENCE_BENCH.md local tier: ~$0.0004 per 1k tokens, ~4
+	// chars per token. Callers that know the real backend cost should
+	// use StoreWithCost.
+	estimate := float64(len(completion)) / 4 / 1000 * 0.0004
+	c.StoreWithCost(ctx, tenantID, messages, completion, estimate)
+}
+
+// StoreWithCost records a completed exchange with the caller's true
+// recompute cost, which the W28 eviction policy weighs directly.
+func (c *SemanticCache) StoreWithCost(ctx context.Context, tenantID string, messages []Message, completion string, costUSD float64) {
 	text := cacheKeyText(messages)
 	vecs, err := c.embedder.Embed(ctx, []string{text})
 	if err != nil {
 		return
 	}
+	// Semantic density: similarity to the nearest already-cached prompt.
+	// Measured before the insert so the entry never counts itself.
+	density := 0.0
+	if c.capacityPerTenant > 0 {
+		if nearest := c.index.Search(tenantID, vecs[0], 1); len(nearest) > 0 && nearest[0].Score > 0 {
+			density = nearest[0].Score
+		}
+	}
 	sum := sha256.Sum256([]byte(text))
-	_ = c.index.Upsert(vector.Doc{
-		ID:       hex.EncodeToString(sum[:16]),
+	id := hex.EncodeToString(sum[:16])
+	if err := c.index.Upsert(vector.Doc{
+		ID:       id,
 		TenantID: tenantID,
 		Text:     text,
 		Vector:   vecs[0],
 		Meta:     map[string]string{"completion": completion},
-	})
+	}); err != nil {
+		return
+	}
+	if c.capacityPerTenant <= 0 {
+		return
+	}
+	now := time.Now()
+	c.policyMu.Lock()
+	defer c.policyMu.Unlock()
+	policy := c.policyFor(tenantID)
+	policy.OnStore(eviction.Entry{
+		ID:               id,
+		SizeBytes:        int64(len(completion)),
+		RecomputeCostUSD: costUSD,
+		EmbeddingDensity: density,
+		StoredAt:         now,
+	}, now)
+	for c.index.Count(tenantID) > c.capacityPerTenant {
+		victim, ok := policy.Victim(now)
+		if !ok {
+			break
+		}
+		c.index.Delete(tenantID, victim)
+		policy.OnRemove(victim)
+	}
 }
 
 // Stats reports lifetime hit/miss counters for metrics.

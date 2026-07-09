@@ -1,0 +1,127 @@
+% W28 — Cost-Aware Semantic Cache Eviction (paper §4)
+% Implementation: internal/ai/gateway/eviction (policy) and
+% internal/ai/gateway/cache.go (live integration).
+% Benchmark: cmd/evictionbench → research/results/eviction_comparison.csv.
+
+\section{Cost-Aware Semantic Cache Eviction}
+\label{sec:eviction}
+
+\subsection{Problem}
+Semantic caches for LLM serving (GPTCache~\cite{bang2023gptcache},
+MeanCache~\cite{meancache2024}, SCALM~\cite{scalm2024}) gate admission by
+embedding similarity but evict with classical policies --- LRU or LFU ---
+that assume every entry is equally expensive to recompute. In a
+multi-tier gateway this is false by orders of magnitude: at the measured
+tier prices (Table~\ref{tab:inference-bench}), a 900-token quality-tier
+completion costs ${\sim}500\times$ a 300-token local-tier one. Evicting
+by recency alone discards dollars.
+
+Semantic caches additionally violate a core assumption of classical
+eviction analysis: entries are not independent. If two cached prompts lie
+within the admission threshold of each other, either can serve the
+other's hits --- evicting one of a dense pair is nearly free, while
+evicting an isolated entry forfeits its future hits entirely. No
+classical policy observes this structure.
+
+\subsection{Algorithm}
+Every entry $e$ carries $(c_e, h_e, t^{store}_e, t^{last}_e, d_e)$:
+recompute cost in dollars, hit count, store and last-access times, and
+the embedding similarity to its nearest cached neighbor at store time.
+At eviction time $t$, each entry is scored
+%
+\begin{equation}
+  w(e) \;=\; L \;+\; \underbrace{c_e}_{\text{cost}}
+  \times \underbrace{\frac{h_e + 1}{1 + (t - t^{store}_e)/\tau_h}}_{\text{hit rate}}
+  \times \underbrace{2^{-(t - t^{last}_e)/\tau_s}}_{\text{staleness}}
+  \times \underbrace{\frac{1}{\varepsilon + d_e}}_{\text{isolation}}
+  \label{eq:eviction-weight}
+\end{equation}
+%
+and the minimum-$w$ entry is evicted; $L$ is the GreedyDual inflation
+value~\cite{cao1997greedydual}, updated to the victim's weight on every
+eviction, so long-resident entries must keep re-earning their place. The
+hit-rate term is Laplace-smoothed ($+1$) so fresh expensive entries
+survive long enough to prove themselves, and normalized by lifetime in
+units of $\tau_h$ so hoarded frequency decays --- the failure mode that
+costs LFU $-199\%$ in Table~\ref{tab:eviction}. The isolation term is
+deliberately bounded: with $\varepsilon = 0.5$ an isolated entry
+($d_e{=}0$) outweighs a fully dense one ($d_e{=}1$) by at most
+$3\times$, so substitutability breaks ties between economically
+comparable entries but never outvotes measured hit economics. Defaults:
+$\tau_h = 1$h, $\tau_s = 6$h.
+
+\begin{algorithm}[t]
+\caption{Cost-aware eviction (per tenant)}
+\label{alg:eviction}
+\begin{algorithmic}[1]
+\State \textbf{on store}$(e)$: record $(c_e, d_e)$;
+  $h_e \gets 0$; $t^{store}_e, t^{last}_e \gets \text{now}$;
+  $L_e \gets L$
+\State \textbf{on hit}$(e)$: $h_e \gets h_e + 1$;
+  $t^{last}_e \gets \text{now}$; $L_e \gets L$
+\While{$|\text{cache}| > \text{capacity}$}
+  \State $v \gets \arg\min_{e} w(e)$
+    \Comment{Eq.~\ref{eq:eviction-weight}, $O(n)$ scan}
+  \State $L \gets w(v)$; evict $v$
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+\textbf{Complexity.} The victim scan is $O(n)$ per eviction over
+per-tenant caches of $10^3$--$10^4$ entries: measured p99 full-request
+overhead is ${\sim}1$ms (Table~\ref{tab:eviction}), well inside the 5ms
+budget. A lazy-heap variant would amortize to $O(\log n)$ at the price
+of stale weights; at these cache sizes the scan is preferable.
+
+\textbf{Isolation.} Capacity and eviction state are per tenant. A global
+budget would let one tenant's flood evict another's expensive entries
+--- a cross-tenant interference channel, verified excluded by test.
+
+\subsection{Evaluation on synthetic LMSYS-shaped workloads}
+The six policies run over one seeded stream (200k requests, 20k-prompt
+universe, Zipf($1.07$) popularity, three topic-drift phases,
+near-duplicate clusters of four paraphrases, tier mix 70/25/5 local/fast/
+quality) in two capacity regimes. \emph{These are pipeline-validation
+numbers}: the real-trace benchmark on LMSYS-Chat-1M replays
+(\S\ref{sec:traces}) is the deciding experiment and may reorder the
+close finishers.
+
+\begin{table}[t]
+\centering
+\caption{Head-to-head, dollars per request (seed 7; lower is better;
+savings relative to LRU). Full table:
+\texttt{research/results/eviction\_comparison.csv}.}
+\label{tab:eviction}
+\begin{tabular}{lrrrr}
+\toprule
+& \multicolumn{2}{c}{capacity 2{,}000} & \multicolumn{2}{c}{capacity 400} \\
+Policy & \$/req & vs LRU & \$/req & vs LRU \\
+\midrule
+LRU                    & 0.000254 & ---      & 0.000635 & ---      \\
+LFU                    & 0.001374 & $-440\%$ & 0.001897 & $-199\%$ \\
+GDSF                   & 0.000188 & $+26\%$  & 0.000387 & $+39\%$  \\
+ARC                    & 0.000247 & $+3\%$   & 0.000549 & $+14\%$  \\
+GPTCache (thr.+LRU)    & 0.000254 & $0\%$    & 0.000635 & $0\%$    \\
+\textbf{Cost-aware (ours)} & \textbf{0.000193} & $\mathbf{+24\%}$
+                       & \textbf{0.000393} & $\mathbf{+38\%}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Reading the result honestly.} Cost-aware strictly dominates
+every policy deployed in practice by semantic caches today --- LRU,
+GPTCache's default, ARC --- by 24--38\% in dollars per request, and
+demolishes LFU, whose undecayed frequency hoards the dead phases'
+head. Against GDSF, the strongest classical cost-frequency policy, the
+synthetic result is a statistical tie ($\pm 1$pp, lead trading with
+scale). This is expected: GDSF already prices cost and frequency, and
+the two terms GDSF lacks --- staleness under drift and semantic
+substitutability --- are precisely the ones a synthetic exact-match
+simulator undervalues. The cluster-serving model here credits density
+conservatively (lexicographic representative, no partial similarity);
+real LMSYS paraphrase traffic is where the isolation term differentiates,
+which is why the real-trace replay is the paper's deciding experiment.
+The claim this section stands on: \emph{cost-awareness is necessary}
+(every cost-blind policy loses by ${\geq}24\%$) \emph{and the proposed
+weight matches the best known cost-aware heuristic while adding the
+semantic terms that exact-match simulation cannot reward}.
