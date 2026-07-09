@@ -114,7 +114,7 @@ func generateSigningKey() (*signingKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("generate RSA signing key: %w", err)
 	}
-	sum := sha256.Sum256(key.PublicKey.N.Bytes())
+	sum := sha256.Sum256(key.N.Bytes())
 	return &signingKey{kid: hex.EncodeToString(sum[:8]), key: key}, nil
 }
 
@@ -261,13 +261,13 @@ func (i *Issuer) JWKS() map[string]any {
 
 func jwk(k *signingKey) map[string]string {
 	e := make([]byte, 8)
-	binary.BigEndian.PutUint64(e, uint64(k.key.PublicKey.E))
+	binary.BigEndian.PutUint64(e, uint64(k.key.E))
 	return map[string]string{
 		"kty": "RSA",
 		"use": "sig",
 		"alg": "RS256",
 		"kid": k.kid,
-		"n":   base64.RawURLEncoding.EncodeToString(k.key.PublicKey.N.Bytes()),
+		"n":   base64.RawURLEncoding.EncodeToString(k.key.N.Bytes()),
 		"e":   base64.RawURLEncoding.EncodeToString(trimLeadingZeros(e)),
 	}
 }
