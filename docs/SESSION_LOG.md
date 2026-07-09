@@ -7,6 +7,90 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-10 (session 8) — W25a-W28: Month 7 complete — analytics pipeline, traces, classifier, cost-aware eviction
+
+Milestone status: closes **all of M7 (Research I)** — W25a analytical
+telemetry, W25b trace acquisition + replay, W26 taxonomy + feature
+pipeline + model, W27 online classification + drift, W28 cost-aware
+eviction. The user asked for "the next 10%" (explicit override of the
+~5% norm); the roadmap places end-of-W28 at 80%, and the honest position
+is **~78-79%** — the deltas are the real-dataset items (downloads gated
+or multi-GB) and live-cluster runs (no Docker here), each implemented,
+unit-verified, and documented as pending rather than claimed. Session
+started by pushing the previously-unpushed W20-W24 backlog; CI went
+green on it (run 29054784590) before new work landed on top.
+
+What changed, per week:
+
+- **W25a** (ADR 0011, `docs/CLICKHOUSE_DESIGN.md`): ClickHouse chosen
+  over Postgres/Timescale for the analytical store. DDL with justified
+  `PARTITION BY toYYYYMM` / `ORDER BY (tenant_id, timestamp)`, an
+  AggregatingMergeTree minute rollup for the W27 poll loop, OTel
+  collector pipeline with file-backed queue (the no-loss path), and an
+  in-process best-effort mirror (bounded batcher, JSONEachRow over HTTP,
+  drop accounting) that never blocks or fails ingest.
+- **W25b**: three ETL pipelines to the normalized
+  `trace_event(timestamp_ms, tenant_id, request_kind, payload_bytes,
+  expected_latency_ms)` schema, each with a `--synthetic` mode that
+  exercises the identical normalize path. Go replay driver (`cmd/replay`,
+  in-repo deviation from k6 like `cmd/loadgen`) with weighted tenant-mix
+  mapping and seeded determinism; the Go `trace_hash` reproduces the
+  Python `stream_hash` byte-for-byte (cross-language fixture is a test).
+- **W26** (ADR 0012, `research/TAXONOMY.md`): 12-feature vector as the
+  single implementation both the API and the trainer read; pure-Go
+  softmax LR with deterministic training and a drift-guarded JSON
+  artifact (feature/class-name mismatch refuses to load). ONNX/XGBoost
+  deliberately deferred to real-trace data — comparing model families on
+  synthetic windows would rank noise. Rules baseline drops to 0.885
+  macro-F1 under 30%-contaminated windows; the LR holds 1.0 (pipeline
+  validation, not a research claim — labeled as such everywhere).
+- **W27**: online classification loop inside the control plane
+  (documented deviation from a separate microservice), 10s default
+  interval, label-change events to NATS, PSI drift detector (decile
+  bins, 0.25 threshold; the 3σ-shift scenario is a test), bounded label
+  history, admin API + zero-dependency dashboard at `/admin/workloads`.
+  OpenAPI updated and lint-clean. Live-verified end to end: booted the
+  server, ingested 45 AI-shaped events, watched `/v1/admin/workloads`
+  report AI-cacheable at 0.9999 confidence.
+- **W28** (`research/paper/sec-eviction.tex`): eviction weight
+  `w = L + cost × smoothed-hit-rate × staleness × 1/(ε+density)` with
+  GreedyDual inflation aging; five baselines (LRU, LFU, GDSF, ARC,
+  GPTCache threshold+LRU) behind one Policy interface; benchmark over a
+  seeded LMSYS-shaped stream (Zipf, topic drift, paraphrase clusters,
+  70/25/5 tier mix) in two capacity regimes. Honest result, stated as
+  such in the paper section: 24-38% cheaper per request than every
+  deployed-practice policy, statistical tie with GDSF on synthetic
+  exact-match traffic (the density term needs real substitute traffic to
+  differentiate — the real-LMSYS replay is the deciding experiment).
+  The live `SemanticCache` gained an optional per-tenant capacity bound
+  using the cost-aware policy; capacity is per tenant because a global
+  budget would be a cross-tenant interference channel (tested).
+
+### How it was verified
+
+- `gofmt`/`go vet`/`go test ./... -count=1` clean at every commit; new
+  packages (`analytics`, `replay`, `classifier/online`, `eviction`) also
+  run under `-race`.
+- Redocly lint on the extended OpenAPI spec: valid.
+- Determinism proofs actually executed: repeated ETL runs → identical
+  hashes; repeated `cmd/replay -dry-run` → identical schedule hashes;
+  repeated `cmd/classifier-train` → identical printed metrics.
+- W27 verified against the running binary, not just httptest (see above).
+- **Not verified here**: PostgreSQL RLS suites (skip without Docker),
+  live ClickHouse (stress plan documented in `docs/CLICKHOUSE_DESIGN.md`),
+  real trace downloads, Ollama throughput numbers. None are claimed.
+
+### Immediate next tasks
+
+1. W29+ (M8): kubebuilder operator scaffold — Tenant/WorkloadProfile/
+   Policy/Budget CRDs and reconcile loops; manifests are writable here,
+   cluster verification is not.
+2. First Docker-capable machine: ClickHouse stress run, Postgres RLS
+   suites, real-trace ETL + 5k RPS replay gate.
+3. Consider surfacing the analytics batcher's drop counter on /metrics.
+
+---
+
 ## 2026-07-09 (session 7) — W20-W24: LLM routing, tenant isolation ladder, canary, Vault/OIDC, security hardening
 
 Milestone status: closes the *implementable-on-this-machine* core of W20

@@ -646,6 +646,58 @@ paths:
           $ref: "#/components/responses/RateLimited"
         "500":
           $ref: "#/components/responses/InternalError"
+  /v1/admin/workloads:
+    get:
+      summary: List every tenant's live workload class (admin)
+      description: >-
+        Snapshot of the online classifier (W27): current label, confidence,
+        and window size per tenant, plus the population PSI drift status.
+        Admin-only — labels reveal cross-tenant behavior.
+      operationId: adminWorkloads
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Current workload classes and drift status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkloadSnapshot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          description: The online classifier is not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /v1/admin/workloads/{tenant_id}/history:
+    get:
+      summary: Get one tenant's workload label history (admin)
+      operationId: adminWorkloadHistory
+      security:
+        - AdminKey: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Bounded label history, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkloadHistory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          description: The online classifier is not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 components:
   securitySchemes:
     AdminKey:
@@ -1117,6 +1169,71 @@ components:
           type: number
         reason:
           type: string
+    WorkloadSnapshot:
+      type: object
+      required: [tenants, drift]
+      properties:
+        tenants:
+          type: array
+          items:
+            $ref: "#/components/schemas/TenantWorkload"
+        drift:
+          $ref: "#/components/schemas/DriftStatus"
+    TenantWorkload:
+      type: object
+      required: [tenant_id, label, confidence, since, observed_at, events_in_window]
+      properties:
+        tenant_id:
+          type: string
+        label:
+          type: string
+          enum: [CRUD-bursty, CRUD-steady, AI-cacheable, AI-uncacheable, agentic-multistep, unknown]
+        confidence:
+          type: number
+        since:
+          type: string
+          format: date-time
+          description: When the current label was first observed.
+        observed_at:
+          type: string
+          format: date-time
+        events_in_window:
+          type: integer
+    DriftStatus:
+      type: object
+      required: [drifted, worst_feature, worst_psi, window_size, checked_at]
+      properties:
+        drifted:
+          type: boolean
+          description: True when any feature's PSI exceeds 0.25 — a retrain is due.
+        worst_feature:
+          type: string
+        worst_psi:
+          type: number
+        window_size:
+          type: integer
+        checked_at:
+          type: string
+          format: date-time
+    WorkloadHistory:
+      type: object
+      required: [tenant_id, samples]
+      properties:
+        tenant_id:
+          type: string
+        samples:
+          type: array
+          items:
+            type: object
+            required: [at, label, confidence]
+            properties:
+              at:
+                type: string
+                format: date-time
+              label:
+                type: string
+              confidence:
+                type: number
     PolicyRecommendation:
       type: object
       required: [tenant_id, workload, replicas, cache_mb, model_tier, fairness_mode, reason]

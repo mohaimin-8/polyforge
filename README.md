@@ -27,6 +27,11 @@ The current implementation provides a persistent control-plane backend:
 - secrets via a Vault Agent file → Vault KV (K8s auth) → env chain; OIDC code+PKCE relying party for human login (ADR 0010)
 - security hardening: default-deny NetworkPolicies, OWASP API Top 10 compliance doc (`docs/SECURITY.md`), gitleaks + SBOM in CI, cosign-signed release images
 - inference benchmark harness (`cmd/llmbench`) producing the TTFT/throughput/cost CSV behind `docs/INFERENCE_BENCH.md`
+- analytical telemetry pipeline: ClickHouse schema + OTel collector config (`deploy/clickhouse/`), best-effort in-process mirror behind `POLYFORGE_CLICKHOUSE_URL` (ADR 0011, `docs/CLICKHOUSE_DESIGN.md`)
+- trace research infrastructure: Azure/Alibaba/LMSYS ETL to a normalized schema (`research/traces/`), deterministic replay driver (`cmd/replay`) with cross-language stream-hash proof
+- workload classifier: 12-feature pipeline, trained softmax model with drift-guarded JSON artifact (`cmd/classifier-train`, ADR 0012), formal 5-class taxonomy (`research/TAXONOMY.md`)
+- online classification: per-tenant labels every 10s with PSI drift detection, label-change events to NATS, admin dashboard at `/admin/workloads` (W27)
+- cost-aware semantic-cache eviction: per-tenant bounded cache, 6-policy benchmark (`cmd/evictionbench`, `research/results/eviction_comparison.csv`), paper section at `research/paper/sec-eviction.tex` (W28)
 
 SQLite remains the zero-infrastructure development path. PostgreSQL is the production path and requires separate admin and application roles so row-level security is testable rather than bypassed accidentally.
 
