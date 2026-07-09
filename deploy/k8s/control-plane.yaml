@@ -25,6 +25,9 @@ spec:
       labels:
         app.kubernetes.io/name: control-plane
       annotations:
+        # W22: mesh sidecar injection — every service-to-service call gets
+        # mTLS with auto-rotated certs (see deploy/linkerd/README.md).
+        linkerd.io/inject: enabled
         prometheus.io/scrape: "true"
         prometheus.io/port: "8080"
         prometheus.io/path: /metrics

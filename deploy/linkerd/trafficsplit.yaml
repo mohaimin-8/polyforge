@@ -1,0 +1,16 @@
+# W22 canary: 95% of ai-gateway traffic to v1, 5% to v2 (SMI TrafficSplit,
+# enforced by the linkerd-smi extension). Promote by shifting weights;
+# roll back by zeroing v2. The application-level twin with automatic
+# rollback is gateway.CanaryProvider.
+apiVersion: split.smi-spec.io/v1alpha2
+kind: TrafficSplit
+metadata:
+  name: ai-gateway-canary
+  namespace: polyforge
+spec:
+  service: ai-gateway
+  backends:
+    - service: ai-gateway-v1
+      weight: 95
+    - service: ai-gateway-v2
+      weight: 5

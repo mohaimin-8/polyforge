@@ -1,0 +1,155 @@
+# AI gateway deployments (W22): stable v1 plus a v2 canary. The Linkerd
+# TrafficSplit in deploy/linkerd/trafficsplit.yaml sends 95/5 between the
+# two versioned Services through the apex Service `ai-gateway`.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-gateway-v1
+  namespace: polyforge
+  labels:
+    app.kubernetes.io/name: ai-gateway
+    app.kubernetes.io/version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-gateway
+      app.kubernetes.io/version: v1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-gateway
+        app.kubernetes.io/version: v1
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: /metrics
+    spec:
+      containers:
+        - name: ai-gateway
+          image: polyforge/ai-gateway:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8081
+          env:
+            - name: POLYFORGE_AI_ADDR
+              value: ":8081"
+            - name: POLYFORGE_LLM_BASE_URL
+              value: "http://ollama.polyforge-ai.svc.cluster.local:11434/v1"
+            - name: POLYFORGE_ROUTING_CONFIG
+              value: /etc/polyforge/routing.json
+          volumeMounts:
+            - name: routing
+              mountPath: /etc/polyforge
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+      volumes:
+        - name: routing
+          configMap:
+            name: ai-gateway-routing
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-gateway-v2
+  namespace: polyforge
+  labels:
+    app.kubernetes.io/name: ai-gateway
+    app.kubernetes.io/version: v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-gateway
+      app.kubernetes.io/version: v2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-gateway
+        app.kubernetes.io/version: v2
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: /metrics
+    spec:
+      containers:
+        - name: ai-gateway
+          image: polyforge/ai-gateway:v2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8081
+          env:
+            - name: POLYFORGE_AI_ADDR
+              value: ":8081"
+            - name: POLYFORGE_LLM_BASE_URL
+              value: "http://ollama.polyforge-ai.svc.cluster.local:11434/v1"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+# Apex service: what clients call; the TrafficSplit rewrites this to the
+# versioned backends below.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-gateway
+  namespace: polyforge
+  labels:
+    app.kubernetes.io/name: ai-gateway
+spec:
+  selector:
+    app.kubernetes.io/name: ai-gateway
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-gateway-v1
+  namespace: polyforge
+spec:
+  selector:
+    app.kubernetes.io/name: ai-gateway
+    app.kubernetes.io/version: v1
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-gateway-v2
+  namespace: polyforge
+spec:
+  selector:
+    app.kubernetes.io/name: ai-gateway
+    app.kubernetes.io/version: v2
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
