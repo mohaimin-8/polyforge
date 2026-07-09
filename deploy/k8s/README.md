@@ -6,6 +6,7 @@ Plain manifests for a local `kind` cluster. Apply in order:
 kind create cluster --name polyforge
 kubectl apply -f namespace.yaml
 kubectl apply -f postgres.yaml
+kubectl apply -f redis.yaml
 kubectl apply -f control-plane.yaml
 kubectl apply -f ingress.yaml   # requires the NGINX ingress controller
 ```

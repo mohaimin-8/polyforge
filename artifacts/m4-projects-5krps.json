@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-07-09T11:57:52Z",
+  "target_url": "http://localhost:8080/v1/tenants/bench/projects",
+  "duration_seconds": 300,
+  "concurrency": 96,
+  "target_rate": 5300,
+  "total_requests": 1579872,
+  "requests_per_second": 5266.23,
+  "non_2xx_responses": 0,
+  "transport_errors": 0,
+  "latency_ms": {
+    "max": 160.46,
+    "p50": 2.87,
+    "p90": 5.72,
+    "p95": 8.6,
+    "p99": 22.61
+  },
+  "runtime": {
+    "arch": "amd64",
+    "cpus": 8,
+    "go_version": "go1.25.5",
+    "os": "windows"
+  }
+}

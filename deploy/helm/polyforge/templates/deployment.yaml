@@ -35,6 +35,10 @@ spec:
               value: {{ .Values.postgres.adminURL | quote }}
             - name: POLYFORGE_POSTGRES_APP_URL
               value: {{ .Values.postgres.appURL | quote }}
+            {{- if .Values.redis.url }}
+            - name: POLYFORGE_REDIS_URL
+              value: {{ .Values.redis.url | quote }}
+            {{- end }}
             - name: POLYFORGE_RATE_LIMIT_RPM
               value: {{ .Values.rateLimit.requestsPerMinute | quote }}
             - name: POLYFORGE_RATE_LIMIT_BURST

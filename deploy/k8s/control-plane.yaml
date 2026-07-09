@@ -46,6 +46,8 @@ spec:
               value: postgres://polyforge_admin@postgres:5432/polyforge
             - name: POLYFORGE_POSTGRES_APP_URL
               value: postgres://polyforge_app@postgres:5432/polyforge
+            - name: POLYFORGE_REDIS_URL
+              value: redis://redis:6379/0
           readinessProbe:
             httpGet:
               path: /healthz
