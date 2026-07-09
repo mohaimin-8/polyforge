@@ -21,6 +21,7 @@ import (
 	"polyforge/internal/idempotency"
 	"polyforge/internal/limit"
 	"polyforge/internal/platform"
+	"polyforge/internal/secrets"
 	postgresstore "polyforge/internal/storage/postgres"
 	sqlitestore "polyforge/internal/storage/sqlite"
 	"polyforge/internal/telemetry"
@@ -106,9 +107,12 @@ func main() {
 		log.Info("outbox relay started", "stream", events.StreamName, "nats_url", natsURL)
 	}
 
-	adminKey := os.Getenv("POLYFORGE_ADMIN_KEY")
-	if adminKey == "" {
-		log.Error("POLYFORGE_ADMIN_KEY is required")
+	// W23: the admin key resolves through the secrets chain — Vault Agent
+	// file, then Vault HTTP, then env — so rotating it in Vault requires no
+	// binary change, and no restart when the agent rewrites the file.
+	adminKey, err := secrets.FromEnvironment().Secret(ctx, "POLYFORGE_ADMIN_KEY")
+	if err != nil {
+		log.Error("POLYFORGE_ADMIN_KEY is required (env, secrets dir, or Vault)", "error", err)
 		os.Exit(1)
 	}
 	rateLimit := platform.RateLimitConfig{
