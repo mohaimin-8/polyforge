@@ -1,0 +1,35 @@
+{
+  "default": "local",
+  "daily_budget_usd": 5,
+  "backends": [
+    {
+      "name": "local",
+      "kind": "ollama",
+      "base_url": "http://127.0.0.1:11434",
+      "model": "llama3.2:3b",
+      "cost_per_1m_tokens": 0
+    },
+    {
+      "name": "fast",
+      "kind": "openai",
+      "base_url": "https://api.groq.com/openai/v1",
+      "model": "llama-3.3-70b-versatile",
+      "api_key_env": "GROQ_API_KEY",
+      "cost_per_1m_tokens": 0.64
+    },
+    {
+      "name": "quality",
+      "kind": "openai",
+      "base_url": "https://api.openai.com/v1",
+      "model": "gpt-4o-mini",
+      "api_key_env": "OPENAI_API_KEY",
+      "cost_per_1m_tokens": 0.45
+    }
+  ],
+  "rules": [
+    { "plan": "free", "backend": "local" },
+    { "plan": "standard", "backend": "fast" },
+    { "plan": "premium", "backend": "quality" },
+    { "min_prompt_chars": 8000, "backend": "local" }
+  ]
+}

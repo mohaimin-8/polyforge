@@ -56,6 +56,33 @@ services:
       retries: 30
     restart: unless-stopped
 
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ai"]
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - polyforge-ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  # One-shot: pulls the two W20 models into the shared volume, then exits.
+  #   docker compose --profile ai run --rm ollama-init
+  ollama-init:
+    image: ollama/ollama:latest
+    profiles: ["ai"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "ollama pull llama3.2:3b && ollama pull phi3.5"]
+    restart: "no"
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.120.0
     profiles: ["observability"]
@@ -102,6 +129,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  polyforge-ollama:
   polyforge-redis:
   polyforge-postgres:
   polyforge-prometheus:

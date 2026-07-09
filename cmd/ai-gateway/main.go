@@ -29,6 +29,7 @@ import (
 	"polyforge/internal/ai/agent"
 	"polyforge/internal/ai/embed"
 	"polyforge/internal/ai/gateway"
+	"polyforge/internal/secrets"
 	sqlitestore "polyforge/internal/storage/sqlite"
 )
 
@@ -64,9 +65,44 @@ func main() {
 		// Ollama's OpenAI-compatible endpoint is the local default.
 		llmBase = "http://127.0.0.1:11434/v1"
 	}
-	provider := gateway.NewOpenAICompat(llmBase,
-		os.Getenv("POLYFORGE_LLM_API_KEY"),
+	// W23: provider credentials resolve through the secrets chain (Vault
+	// Agent file -> Vault -> env). Local Ollama needs no key, so a resolution
+	// miss is not an error here.
+	secretSource := secrets.FromEnvironment()
+	llmKey, _ := secretSource.Secret(ctx, "POLYFORGE_LLM_API_KEY")
+	provider := gateway.NewOpenAICompat(llmBase, llmKey,
 		envOr("POLYFORGE_LLM_MODEL", "llama3.2"))
+
+	// Application-level canary (roadmap W22): a second model host gets
+	// POLYFORGE_CANARY_WEIGHT percent of traffic and auto-rolls-back on an
+	// error spike. The in-mesh pod-level twin is deploy/linkerd/.
+	var chatProvider gateway.Provider = provider
+	if canaryBase := os.Getenv("POLYFORGE_CANARY_LLM_BASE_URL"); canaryBase != "" {
+		weight := envInt("POLYFORGE_CANARY_WEIGHT", 5)
+		canaryProvider := gateway.NewOpenAICompat(canaryBase,
+			os.Getenv("POLYFORGE_CANARY_LLM_API_KEY"),
+			envOr("POLYFORGE_CANARY_LLM_MODEL", envOr("POLYFORGE_LLM_MODEL", "llama3.2")))
+		chatProvider = gateway.NewCanaryProvider(provider, canaryProvider, weight)
+		log.Info("canary active", "base_url", canaryBase, "weight_percent", weight)
+	}
+
+	// Multi-backend routing (roadmap W20): a JSON policy file turns the
+	// single provider into a routed fleet — local Ollama for free tenants,
+	// fast/quality cloud backends for paid plans, budget-capped.
+	var router *gateway.Router
+	if path := os.Getenv("POLYFORGE_ROUTING_CONFIG"); path != "" {
+		file, err := gateway.LoadRouterFile(path)
+		if err != nil {
+			log.Error("load routing config", "path", path, "error", err)
+			os.Exit(1)
+		}
+		router, err = file.Build()
+		if err != nil {
+			log.Error("build router", "path", path, "error", err)
+			os.Exit(1)
+		}
+		log.Info("routing policy active", "backends", len(file.Backends), "rules", len(file.Rules), "default", file.Default)
+	}
 
 	tracerOptions := []sdktrace.TracerProviderOption{
 		sdktrace.WithResource(resource.NewSchemaless(
@@ -100,7 +136,8 @@ func main() {
 	server := &http.Server{
 		Addr: envOr("POLYFORGE_AI_ADDR", ":8081"),
 		Handler: gateway.NewServer(log, gateway.Config{
-			Provider:  provider,
+			Provider:  chatProvider,
+			Router:    router,
 			Embedder:  embedder,
 			Tenants:   store,
 			Telemetry: store,

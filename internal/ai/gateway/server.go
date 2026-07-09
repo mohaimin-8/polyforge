@@ -27,6 +27,7 @@ type AgentFunc func(ctx context.Context, tenantID, prompt string) (any, int, err
 type Server struct {
 	log       *slog.Logger
 	provider  Provider
+	router    *Router
 	cache     *SemanticCache
 	embedder  embed.Embedder
 	search    *vector.Index
@@ -40,6 +41,9 @@ type Server struct {
 
 type Config struct {
 	Provider Provider
+	// Router, when set, picks the backend per request (roadmap W20); the
+	// chosen Provider then overrides Provider for that request.
+	Router   *Router
 	Embedder embed.Embedder
 	Tenants  tenant.Repository
 	// Telemetry, when set, records one event per AI request so the
@@ -63,6 +67,7 @@ func NewServer(log *slog.Logger, cfg Config) *Server {
 	s := &Server{
 		log:       log,
 		provider:  cfg.Provider,
+		router:    cfg.Router,
 		cache:     NewSemanticCache(cfg.Embedder, cfg.CacheThreshold),
 		embedder:  cfg.Embedder,
 		search:    vector.NewIndex(cfg.Embedder.Dimensions()),
@@ -162,6 +167,10 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("X-PolyForge-Cache", "miss")
 
+	// Routing happens only on a cache miss: a cached answer costs nothing,
+	// so charging or routing it would distort the budget ledger.
+	provider, backendName := s.pickProvider(r.Context(), w, tenantID, input.Messages)
+
 	req := ChatRequest{Model: input.Model, Messages: input.Messages}
 	if input.Stream {
 		flusher, ok := w.(http.Flusher)
@@ -172,7 +181,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.WriteHeader(http.StatusOK)
-		response, err := s.provider.StreamChat(r.Context(), req, func(delta string) error {
+		response, err := provider.StreamChat(r.Context(), req, func(delta string) error {
 			payload, err := json.Marshal(map[string]string{"delta": delta})
 			if err != nil {
 				return err
@@ -190,20 +199,50 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 		}
 		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
 		flusher.Flush()
+		s.chargeUsage(tenantID, backendName, response)
 		s.cache.Store(r.Context(), tenantID, input.Messages, response.Message.Content)
 		s.record(r.Context(), tenantID, input.Messages, response.Message.Content, start, false, 1)
 		return
 	}
 
-	response, err := s.provider.Chat(r.Context(), req)
+	response, err := provider.Chat(r.Context(), req)
 	if err != nil {
-		s.log.Error("chat provider failed", "tenant", tenantID, "error", err)
+		s.log.Error("chat provider failed", "tenant", tenantID, "backend", backendName, "error", err)
 		writeError(w, http.StatusBadGateway, "upstream_error", "the model provider failed")
 		return
 	}
+	s.chargeUsage(tenantID, backendName, response)
 	s.cache.Store(r.Context(), tenantID, input.Messages, response.Message.Content)
 	writeJSON(w, http.StatusOK, response)
 	s.record(r.Context(), tenantID, input.Messages, response.Message.Content, start, false, 1)
+}
+
+// pickProvider consults the router when one is configured, exposing the
+// decision in response headers so the routing policy is observable from the
+// outside (and assertable in tests).
+func (s *Server) pickProvider(ctx context.Context, w http.ResponseWriter, tenantID string, messages []Message) (Provider, string) {
+	if s.router == nil {
+		return s.provider, ""
+	}
+	plan := ""
+	if t, ok, err := s.tenants.Tenant(ctx, tenantID); err == nil && ok {
+		plan = t.Plan
+	}
+	chars := 0
+	for _, m := range messages {
+		chars += len(m.Content)
+	}
+	decision := s.router.Route(tenantID, plan, chars)
+	w.Header().Set("X-PolyForge-Backend", decision.Backend.Name)
+	w.Header().Set("X-PolyForge-Route-Reason", decision.Reason)
+	return decision.Backend.Provider, decision.Backend.Name
+}
+
+func (s *Server) chargeUsage(tenantID, backendName string, response ChatResponse) {
+	if s.router == nil || backendName == "" {
+		return
+	}
+	s.router.RecordUsage(tenantID, backendName, response.PromptTokens, response.CompletionTokens)
 }
 
 // streamOut replays a completed response as a single-delta SSE stream so
