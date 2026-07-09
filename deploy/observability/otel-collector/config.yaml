@@ -1,0 +1,22 @@
+# OTel Collector (roadmap W11): the single export point for telemetry.
+# Today it receives OTLP/HTTP traces from the control plane and logs them;
+# Tempo/Loki backends are added when the LGTM stack lands (W12 on kind).
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: normal
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

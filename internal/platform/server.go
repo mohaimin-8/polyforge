@@ -21,12 +21,23 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
+
 	"polyforge/internal/auth"
 	"polyforge/internal/classifier"
 	"polyforge/internal/controller"
+	"polyforge/internal/idempotency"
 	"polyforge/internal/telemetry"
 	"polyforge/internal/tenant"
 )
+
+// otelPropagator implements W3C trace-context extraction and injection,
+// replacing the hand-rolled traceparent parser (roadmap W11 migration).
+var otelPropagator = propagation.TraceContext{}
 
 const maxRequestBodyBytes = 1 << 20
 
@@ -39,14 +50,36 @@ type Server struct {
 	telemetry telemetry.Repository
 	adminKey  string
 	mux       *http.ServeMux
-	limiter   *rateLimiter
+	limiter   RequestLimiter
 	metrics   *metrics
 	issuer    *auth.Issuer
+	tracer    trace.Tracer
+
+	idempotencyStore idempotency.Store
+}
+
+// RequestLimiter admits or rejects a request for a rate-limit key. The
+// Redis-backed sliding window (internal/limit) implements it for
+// multi-replica deployments; the in-process token bucket below is the
+// fallback when Redis is not configured.
+type RequestLimiter interface {
+	Allow(ctx context.Context, key string) (allowed bool, retryAfter time.Duration, err error)
 }
 
 type Config struct {
 	AdminKey  string
 	RateLimit RateLimitConfig
+	// Limiter overrides the in-process token bucket, typically with the
+	// Redis sliding window so all replicas share one budget per key.
+	Limiter RequestLimiter
+	// IdempotencyStore overrides the in-memory store, typically with the
+	// Redis store so replays hit the cache regardless of which replica
+	// served the original request.
+	IdempotencyStore idempotency.Store
+	// TracerProvider supplies the OTel tracer; when nil the server creates a
+	// local SDK provider so spans (and therefore trace IDs in logs and
+	// response headers) always exist even without an exporter configured.
+	TracerProvider trace.TracerProvider
 }
 
 type RateLimitConfig struct {
@@ -67,7 +100,6 @@ type apiError struct {
 type contextKey string
 
 const requestIDKey contextKey = "request_id"
-const traceContextKey contextKey = "trace_context"
 
 func NewServer(log *slog.Logger, tenants tenant.Repository, telemetry telemetry.Repository, cfg Config) *Server {
 	issuer, err := auth.NewIssuer()
@@ -76,15 +108,28 @@ func NewServer(log *slog.Logger, tenants tenant.Repository, telemetry telemetry.
 		// every credential this process could mint would be compromised.
 		panic(fmt.Sprintf("platform: create JWT issuer: %v", err))
 	}
+	provider := cfg.TracerProvider
+	if provider == nil {
+		provider = sdktrace.NewTracerProvider()
+	}
 	s := &Server{
 		log:       log,
 		tenants:   tenants,
 		telemetry: telemetry,
 		adminKey:  cfg.AdminKey,
 		mux:       http.NewServeMux(),
-		limiter:   newRateLimiter(cfg.RateLimit),
 		metrics:   newMetrics(),
 		issuer:    issuer,
+		tracer:    provider.Tracer("polyforge/internal/platform"),
+	}
+	if cfg.Limiter != nil {
+		s.limiter = cfg.Limiter
+	} else if bucket := newRateLimiter(cfg.RateLimit); bucket != nil {
+		s.limiter = bucket
+	}
+	s.idempotencyStore = cfg.IdempotencyStore
+	if s.idempotencyStore == nil {
+		s.idempotencyStore = idempotency.NewMemoryStore()
 	}
 	s.routes()
 	return s
@@ -92,10 +137,11 @@ func NewServer(log *slog.Logger, tenants tenant.Repository, telemetry telemetry.
 
 func (s *Server) Handler() http.Handler {
 	handler := s.recoverPanics(s.mux)
+	handler = s.idempotency(handler)
 	if s.limiter != nil {
 		handler = s.rateLimit(handler)
 	}
-	return requestLog(s.log, s.metrics, handler)
+	return s.requestLog(handler)
 }
 
 // recoverPanics converts a handler panic into a structured 500 response so a
@@ -564,11 +610,12 @@ func (s *Server) writeError(w http.ResponseWriter, r *http.Request, status int, 
 	message := err.Error()
 	if status >= http.StatusInternalServerError {
 		message = "internal server error"
-		trace := traceFromContext(r.Context())
+		span := trace.SpanFromContext(r.Context())
+		span.RecordError(err)
 		s.log.Error("request failed",
 			"request_id", requestID(r.Context()),
-			"trace_id", trace.TraceID,
-			"span_id", trace.SpanID,
+			"trace_id", span.SpanContext().TraceID().String(),
+			"span_id", span.SpanContext().SpanID().String(),
 			"error", err,
 		)
 	}
@@ -649,32 +696,57 @@ func (w *statusWriter) Write(value []byte) (int, error) {
 	return n, err
 }
 
-func requestLog(log *slog.Logger, metrics *metrics, next http.Handler) http.Handler {
+// requestLog is the outermost middleware: it opens the server span (W3C
+// context extracted from the incoming traceparent header, if valid),
+// assigns the request ID, and emits the access log and golden-signal
+// metrics with trace correlation.
+func (s *Server) requestLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		id := newRequestID()
-		trace := newTraceContext(r.Header.Get("traceparent"))
-		ctx := context.WithValue(r.Context(), requestIDKey, id)
-		ctx = context.WithValue(ctx, traceContextKey, trace)
+
+		ctx := otelPropagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		parent := trace.SpanContextFromContext(ctx)
+		// The span name is provisional until the router resolves the route
+		// pattern; it is rewritten below to keep cardinality bounded.
+		ctx, span := s.tracer.Start(ctx, r.Method+" "+r.URL.Path,
+			trace.WithSpanKind(trace.SpanKindServer),
+			trace.WithAttributes(attribute.String("polyforge.request_id", id)),
+		)
+		defer span.End()
+
+		ctx = context.WithValue(ctx, requestIDKey, id)
 		r = r.WithContext(ctx)
 		w.Header().Set("X-Request-ID", id)
-		w.Header().Set("traceparent", trace.TraceParent())
+		otelPropagator.Inject(ctx, propagation.HeaderCarrier(w.Header()))
+
 		recorder := &statusWriter{ResponseWriter: w}
-		metrics.IncInFlight()
-		defer metrics.DecInFlight()
+		s.metrics.IncInFlight()
+		defer s.metrics.DecInFlight()
 		next.ServeHTTP(recorder, r)
 		if recorder.status == 0 {
 			recorder.status = http.StatusOK
 		}
 		duration := time.Since(start)
 		route := routePattern(r)
-		metrics.RecordHTTPRequest(r.Method, route, recorder.status, duration)
-		log.Info("request",
+
+		span.SetName(r.Method + " " + route)
+		span.SetAttributes(
+			attribute.String("http.request.method", r.Method),
+			attribute.String("http.route", route),
+			attribute.Int("http.response.status_code", recorder.status),
+		)
+		if recorder.status >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(recorder.status))
+		}
+
+		s.metrics.RecordHTTPRequest(r.Method, route, recorder.status, duration)
+		s.log.Info("request",
 			"request_id", id,
-			"trace_id", trace.TraceID,
-			"span_id", trace.SpanID,
-			"parent_span_id", trace.ParentSpanID,
-			"trace_remote", trace.Remote,
+			"trace_id", span.SpanContext().TraceID().String(),
+			"span_id", span.SpanContext().SpanID().String(),
+			"parent_span_id", spanIDOrEmpty(parent),
+			"trace_remote", parent.IsRemote(),
 			"method", r.Method,
 			"route", route,
 			"path", r.URL.Path,
@@ -683,6 +755,13 @@ func requestLog(log *slog.Logger, metrics *metrics, next http.Handler) http.Hand
 			"duration_ms", duration.Milliseconds(),
 		)
 	})
+}
+
+func spanIDOrEmpty(sc trace.SpanContext) string {
+	if !sc.IsValid() {
+		return ""
+	}
+	return sc.SpanID().String()
 }
 
 func routePattern(r *http.Request) string {
@@ -708,18 +787,21 @@ func requestID(ctx context.Context) string {
 	return id
 }
 
-func traceFromContext(ctx context.Context) traceContext {
-	trace, _ := ctx.Value(traceContextKey).(traceContext)
-	return trace
-}
-
 func (s *Server) rateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/healthz" || r.URL.Path == "/metrics" {
 			next.ServeHTTP(w, r)
 			return
 		}
-		ok, retryAfter := s.limiter.Allow(rateLimitKey(r))
+		ok, retryAfter, err := s.limiter.Allow(r.Context(), rateLimitKey(r))
+		if err != nil {
+			// Fail open: the control plane stays available when Redis is
+			// down; the in-flight gauge and this log line surface the gap.
+			s.log.Warn("rate limiter unavailable; admitting request",
+				"request_id", requestID(r.Context()), "error", err)
+			next.ServeHTTP(w, r)
+			return
+		}
 		if !ok {
 			w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(retryAfter.Seconds())))))
 			s.writeError(w, r, http.StatusTooManyRequests, errRateLimited)
@@ -740,13 +822,23 @@ func rateLimitKey(r *http.Request) string {
 	if secret := strings.TrimSpace(r.Header.Get("X-PolyForge-Admin-Key")); secret != "" {
 		return "admin:" + secretFingerprint(secret)
 	}
-	if secret := strings.TrimSpace(r.Header.Get("X-PolyForge-API-Key")); secret != "" {
-		return "tenant:" + secretFingerprint(secret)
+	credential := strings.TrimSpace(r.Header.Get("X-PolyForge-API-Key"))
+	if credential == "" {
+		credential = bearerToken(r)
 	}
-	if token := bearerToken(r); token != "" {
-		return "tenant:" + secretFingerprint(token)
+	if credential == "" {
+		return "anon:" + host
 	}
-	return "anon:" + host
+	// Credentialed traffic on a tenant-scoped path shares one window per
+	// tenant (the W13 per-tenant limit), so a tenant cannot dodge its budget
+	// by minting more keys. Requests without a credential never spend a
+	// tenant's budget — they stay host-keyed above.
+	if rest, ok := strings.CutPrefix(r.URL.Path, "/v1/tenants/"); ok {
+		if id, _, _ := strings.Cut(rest, "/"); id != "" {
+			return "tenant:" + id
+		}
+	}
+	return "key:" + secretFingerprint(credential)
 }
 
 func secretFingerprint(secret string) string {
@@ -781,7 +873,13 @@ func newRateLimiter(cfg RateLimitConfig) *rateLimiter {
 	}
 }
 
-func (l *rateLimiter) Allow(key string) (bool, time.Duration) {
+// Allow satisfies RequestLimiter; the in-process bucket cannot fail.
+func (l *rateLimiter) Allow(_ context.Context, key string) (bool, time.Duration, error) {
+	ok, retryAfter := l.allow(key)
+	return ok, retryAfter, nil
+}
+
+func (l *rateLimiter) allow(key string) (bool, time.Duration) {
 	now := l.clock()
 	l.mu.Lock()
 	defer l.mu.Unlock()

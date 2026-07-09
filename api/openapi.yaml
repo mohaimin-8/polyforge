@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: PolyForge Control Plane API
-  version: 0.5.0
+  version: 0.6.0
   description: Multi-tenant control-plane API for PolyForge research infrastructure.
   license:
     name: MIT
@@ -378,6 +378,8 @@ paths:
       security:
         - TenantAPIKey: []
         - BearerToken: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -436,6 +438,8 @@ paths:
       security:
         - TenantAPIKey: []
         - BearerToken: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -467,6 +471,8 @@ paths:
       security:
         - TenantAPIKey: []
         - BearerToken: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "204":
           description: Project deleted.
@@ -623,6 +629,22 @@ components:
         type: string
         pattern: "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
   parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: >-
+        Makes the request repeat-safe. A retry carrying the same key and the
+        same body replays the original response (marked with an
+        Idempotency-Replayed: true response header) instead of executing the
+        write again; the same key with a different body executes as a
+        distinct operation. Honored on every mutating endpoint; cached for
+        24 hours; a concurrent duplicate returns 409. 5xx responses are not
+        cached, so failures can be retried with the same key.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
     TenantID:
       name: tenant_id
       in: path

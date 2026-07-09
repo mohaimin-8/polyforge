@@ -14,6 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/propagation"
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"polyforge/internal/telemetry"
 	"polyforge/internal/tenant"
 )
@@ -324,19 +327,28 @@ func TestTraceParentPropagation(t *testing.T) {
 	}
 
 	outgoing := resp.Header.Get("traceparent")
-	trace, ok := parseTraceParent(outgoing)
+	sc, ok := parseTraceParentHeader(outgoing)
 	if !ok {
 		t.Fatalf("response traceparent is invalid: %q", outgoing)
 	}
-	if trace.TraceID != "4bf92f3577b34da6a3ce929d0e0e4736" {
+	if sc.TraceID().String() != "4bf92f3577b34da6a3ce929d0e0e4736" {
 		t.Fatalf("trace id was not propagated: %q", outgoing)
 	}
-	if trace.SpanID == "00f067aa0ba902b7" {
+	if sc.SpanID().String() == "00f067aa0ba902b7" {
 		t.Fatalf("server reused parent span id: %q", outgoing)
 	}
-	if trace.Flags != "01" {
+	if !sc.IsSampled() {
 		t.Fatalf("trace flags were not preserved: %q", outgoing)
 	}
+}
+
+// parseTraceParentHeader decodes a W3C traceparent value using the OTel
+// propagator, the way a downstream service would.
+func parseTraceParentHeader(header string) (oteltrace.SpanContext, bool) {
+	ctx := (propagation.TraceContext{}).Extract(context.Background(),
+		propagation.MapCarrier{"traceparent": header})
+	sc := oteltrace.SpanContextFromContext(ctx)
+	return sc, sc.IsValid()
 }
 
 func TestInvalidTraceParentGetsReplaced(t *testing.T) {
@@ -360,11 +372,11 @@ func TestInvalidTraceParentGetsReplaced(t *testing.T) {
 	_ = resp.Body.Close()
 
 	outgoing := resp.Header.Get("traceparent")
-	trace, ok := parseTraceParent(outgoing)
+	sc, ok := parseTraceParentHeader(outgoing)
 	if !ok {
 		t.Fatalf("response traceparent is invalid: %q", outgoing)
 	}
-	if trace.TraceID == "00000000000000000000000000000000" || trace.SpanID == "0000000000000000" {
+	if !sc.TraceID().IsValid() || !sc.SpanID().IsValid() {
 		t.Fatalf("invalid trace identifiers were reused: %q", outgoing)
 	}
 }
@@ -635,7 +647,7 @@ func TestRecoverPanicsReturnsStructured500(t *testing.T) {
 	}))
 	// Run through the full chain so the request carries a request ID and the
 	// panic response is recorded like any other request.
-	handler := requestLog(server.log, server.metrics, panicking)
+	handler := server.requestLog(panicking)
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/panic", nil))

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -18,11 +20,22 @@ type Store struct {
 }
 
 func Open(ctx context.Context, path string) (*Store, error) {
-	db, err := sql.Open("sqlite", path)
+	// WAL lets readers run concurrently with a writer and the busy timeout
+	// absorbs writer contention between pooled connections; before this the
+	// store was pinned to one connection and every request serialized on it
+	// (measured: ~830 RPS ceiling on the projects list endpoint; see
+	// artifacts/m4-projects-5krps.json for the after). The pragmas ride the
+	// DSN so every pooled connection gets them, not only the first.
+	dsn := "file:" + filepath.ToSlash(path) +
+		"?_pragma=journal_mode(WAL)" +
+		"&_pragma=busy_timeout(5000)" +
+		"&_pragma=foreign_keys(1)" +
+		"&_pragma=synchronous(NORMAL)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(max(4, runtime.NumCPU()))
 
 	s := &Store{db: db}
 	if err := s.migrate(ctx); err != nil {
@@ -38,7 +51,6 @@ func (s *Store) Close() error {
 
 func (s *Store) migrate(ctx context.Context) error {
 	stmts := []string{
-		`PRAGMA foreign_keys = ON;`,
 		`CREATE TABLE IF NOT EXISTS tenants (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
@@ -336,7 +348,7 @@ func (s *Store) ListAPIKeys(ctx context.Context, tenantID string) ([]tenant.APIK
 	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, tenant_id, name, scope, prefix, created_at, revoked_at
-		FROM api_keys WHERE tenant_id = ? ORDER BY created_at, id
+		FROM api_keys WHERE tenant_id = ? ORDER BY created_at, rowid
 	`, tenantID)
 	if err != nil {
 		return nil, err

@@ -11,6 +11,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"polyforge/internal/idempotency"
+	"polyforge/internal/limit"
 	"polyforge/internal/platform"
 	postgresstore "polyforge/internal/storage/postgres"
 	sqlitestore "polyforge/internal/storage/sqlite"
@@ -85,9 +93,63 @@ func main() {
 		Burst:             envInt("POLYFORGE_RATE_LIMIT_BURST", 60),
 	}
 
+	// With Redis, rate limiting (sliding window) and idempotency replay are
+	// shared across replicas; without it, both fall back to in-process
+	// implementations, which is correct for a single instance.
+	var requestLimiter platform.RequestLimiter
+	var idempotencyStore idempotency.Store
+	if redisURL := os.Getenv("POLYFORGE_REDIS_URL"); redisURL != "" {
+		options, err := redis.ParseURL(redisURL)
+		if err != nil {
+			log.Error("parse POLYFORGE_REDIS_URL", "error", err)
+			os.Exit(1)
+		}
+		client := redis.NewClient(options)
+		defer func() { _ = client.Close() }()
+		if rateLimit.RequestsPerMinute > 0 {
+			requestLimiter = limit.NewSlidingWindow(client, rateLimit.RequestsPerMinute, time.Minute)
+		}
+		idempotencyStore = idempotency.NewRedisStore(client)
+		log.Info("using Redis for rate limiting and idempotency", "addr", options.Addr)
+	}
+
+	// Spans are always created (trace IDs correlate logs even standalone);
+	// they only leave the process when an OTLP endpoint is configured.
+	tracerOptions := []sdktrace.TracerProviderOption{
+		sdktrace.WithResource(resource.NewSchemaless(
+			attribute.String("service.name", "polyforge-control-plane"),
+		)),
+	}
+	if endpoint := os.Getenv("POLYFORGE_OTLP_ENDPOINT"); endpoint != "" {
+		exporter, err := otlptracehttp.New(ctx,
+			otlptracehttp.WithEndpoint(endpoint),
+			otlptracehttp.WithInsecure(),
+		)
+		if err != nil {
+			log.Error("create OTLP trace exporter", "error", err)
+			os.Exit(1)
+		}
+		tracerOptions = append(tracerOptions, sdktrace.WithBatcher(exporter))
+		log.Info("exporting traces via OTLP/HTTP", "endpoint", endpoint)
+	}
+	tracerProvider := sdktrace.NewTracerProvider(tracerOptions...)
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := tracerProvider.Shutdown(shutdownCtx); err != nil {
+			log.Error("tracer provider shutdown", "error", err)
+		}
+	}()
+
 	server := &http.Server{
-		Addr:              ":8080",
-		Handler:           platform.NewServer(log, tenantRepository, telemetryRepository, platform.Config{AdminKey: adminKey, RateLimit: rateLimit}).Handler(),
+		Addr: ":8080",
+		Handler: platform.NewServer(log, tenantRepository, telemetryRepository, platform.Config{
+			AdminKey:         adminKey,
+			RateLimit:        rateLimit,
+			Limiter:          requestLimiter,
+			IdempotencyStore: idempotencyStore,
+			TracerProvider:   tracerProvider,
+		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

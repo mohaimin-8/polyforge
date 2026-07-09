@@ -32,6 +32,7 @@ type artifact struct {
 	TargetURL       string             `json:"target_url"`
 	DurationSeconds float64            `json:"duration_seconds"`
 	Concurrency     int                `json:"concurrency"`
+	TargetRate      int                `json:"target_rate,omitempty"`
 	TotalRequests   int                `json:"total_requests"`
 	RequestsPerSec  float64            `json:"requests_per_second"`
 	Non2xx          int                `json:"non_2xx_responses"`
@@ -45,6 +46,7 @@ func main() {
 	duration := flag.Duration("duration", 15*time.Second, "how long to generate load")
 	concurrency := flag.Int("concurrency", 2*runtime.NumCPU(), "number of worker goroutines")
 	warmup := flag.Duration("warmup", 2*time.Second, "load to apply and discard before measuring")
+	rate := flag.Int("rate", 0, "target total requests/sec across all workers (0 = unthrottled)")
 	out := flag.String("out", "", "path for the JSON artifact (omit to skip writing)")
 	headers := flag.String("headers", "", `extra request headers, semicolon-separated ("K: V; K2: V2")`)
 	flag.Parse()
@@ -78,7 +80,7 @@ func main() {
 
 	if *warmup > 0 {
 		warmupCtx, cancel := context.WithTimeout(ctx, *warmup)
-		runPool(warmupCtx, client, request, *concurrency)
+		runPool(warmupCtx, client, request, *concurrency, *rate)
 		cancel()
 	}
 	if ctx.Err() != nil {
@@ -89,7 +91,7 @@ func main() {
 	runCtx, cancel := context.WithTimeout(ctx, *duration)
 	defer cancel()
 	started := time.Now()
-	results := runPool(runCtx, client, request, *concurrency)
+	results := runPool(runCtx, client, request, *concurrency, *rate)
 	elapsed := time.Since(started)
 
 	var latencies []float64
@@ -106,6 +108,7 @@ func main() {
 		TargetURL:       *url,
 		DurationSeconds: round2(elapsed.Seconds()),
 		Concurrency:     *concurrency,
+		TargetRate:      *rate,
 		TotalRequests:   len(latencies),
 		RequestsPerSec:  round2(float64(len(latencies)) / elapsed.Seconds()),
 		Non2xx:          non2xx,
@@ -149,12 +152,53 @@ func main() {
 // runPool fans the request out over size workers until ctx is done. Each
 // worker records into its own slice so the hot path takes no locks; results
 // are merged after every worker has returned over an unbuffered channel.
-func runPool(ctx context.Context, client *http.Client, request *http.Request, size int) []workerResult {
+func runPool(ctx context.Context, client *http.Client, request *http.Request, size, rate int) []workerResult {
+	// rate > 0 paces the pool with a shared token dispatcher (the W16 gate
+	// shape: sustain a target aggregate RPS instead of running flat out).
+	// Tokens are minted from measured elapsed time, so coarse OS timer
+	// granularity cannot silently under-deliver the rate; the buffer bounds
+	// how large a burst can form when workers fall behind.
+	var tokens chan struct{}
+	if rate > 0 {
+		tokens = make(chan struct{}, max(1, rate/10))
+		go func() {
+			ticker := time.NewTicker(5 * time.Millisecond)
+			defer ticker.Stop()
+			var accumulated float64
+			last := time.Now()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+				}
+				now := time.Now()
+				accumulated += float64(rate) * now.Sub(last).Seconds()
+				last = now
+				for accumulated >= 1 {
+					select {
+					case tokens <- struct{}{}:
+					default: // workers are saturated; shed instead of bursting later
+					}
+					accumulated--
+				}
+			}
+		}()
+	}
 	resultCh := make(chan workerResult)
 	for worker := 0; worker < size; worker++ {
 		go func() {
 			var result workerResult
 			for ctx.Err() == nil {
+				if tokens != nil {
+					select {
+					case <-tokens:
+					case <-ctx.Done():
+					}
+				}
+				if ctx.Err() != nil {
+					break
+				}
 				started := time.Now()
 				resp, err := client.Do(request.Clone(ctx))
 				if err != nil {

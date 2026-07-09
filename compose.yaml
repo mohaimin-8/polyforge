@@ -5,10 +5,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       POLYFORGE_ADMIN_KEY: ${POLYFORGE_ADMIN_KEY:-polyforge-local-admin}
       POLYFORGE_POSTGRES_ADMIN_URL: postgres://polyforge_admin@postgres:5432/polyforge
       POLYFORGE_POSTGRES_APP_URL: postgres://polyforge_app@postgres:5432/polyforge
+      POLYFORGE_REDIS_URL: redis://redis:6379/0
+      # Uncomment to ship traces to the collector (observability profile):
+      # POLYFORGE_OTLP_ENDPOINT: otel-collector:4318
     ports:
       - "127.0.0.1:8080:8080"
     healthcheck:
@@ -34,6 +39,31 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+    restart: unless-stopped
+
+  redis:
+    image: redis:8
+    # AOF durability per W13; RDB snapshots remain on by default.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - polyforge-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.120.0
+    profiles: ["observability"]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    ports:
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ./deploy/observability/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
     restart: unless-stopped
 
   prometheus:
@@ -72,6 +102,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  polyforge-redis:
   polyforge-postgres:
   polyforge-prometheus:
   polyforge-grafana:
