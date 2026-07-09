@@ -19,6 +19,13 @@ import (
 )
 
 func main() {
+	// -healthcheck probes the running server and exits 0/1. It exists for
+	// container health checks: the distroless production image has no shell
+	// or curl, so the binary is the only thing that can perform the probe.
+	if len(os.Args) > 1 && os.Args[1] == "-healthcheck" {
+		os.Exit(healthcheck())
+	}
+
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: envLogLevel("POLYFORGE_LOG_LEVEL", slog.LevelInfo)}))
 
 	ctx := context.Background()
@@ -110,6 +117,19 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		log.Error("graceful shutdown failed", "error", err)
 	}
+}
+
+func healthcheck() int {
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:8080/healthz")
+	if err != nil {
+		return 1
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }
 
 func envInt(name string, fallback int) int {

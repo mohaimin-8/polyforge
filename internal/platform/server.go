@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"polyforge/internal/auth"
 	"polyforge/internal/classifier"
 	"polyforge/internal/controller"
 	"polyforge/internal/telemetry"
@@ -40,6 +41,7 @@ type Server struct {
 	mux       *http.ServeMux
 	limiter   *rateLimiter
 	metrics   *metrics
+	issuer    *auth.Issuer
 }
 
 type Config struct {
@@ -68,6 +70,12 @@ const requestIDKey contextKey = "request_id"
 const traceContextKey contextKey = "trace_context"
 
 func NewServer(log *slog.Logger, tenants tenant.Repository, telemetry telemetry.Repository, cfg Config) *Server {
+	issuer, err := auth.NewIssuer()
+	if err != nil {
+		// Only reachable if the OS entropy source is broken, in which case
+		// every credential this process could mint would be compromised.
+		panic(fmt.Sprintf("platform: create JWT issuer: %v", err))
+	}
 	s := &Server{
 		log:       log,
 		tenants:   tenants,
@@ -76,6 +84,7 @@ func NewServer(log *slog.Logger, tenants tenant.Repository, telemetry telemetry.
 		mux:       http.NewServeMux(),
 		limiter:   newRateLimiter(cfg.RateLimit),
 		metrics:   newMetrics(),
+		issuer:    issuer,
 	}
 	s.routes()
 	return s
@@ -120,6 +129,10 @@ func (s *Server) recoverPanics(next http.Handler) http.Handler {
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("GET /metrics", s.metricsEndpoint)
+	s.mux.HandleFunc("GET /.well-known/jwks.json", s.jwks)
+	s.mux.HandleFunc("POST /v1/auth/token", s.issueToken)
+	s.mux.HandleFunc("POST /v1/auth/token/refresh", s.refreshToken)
+	s.mux.HandleFunc("POST /v1/auth/keys/rotate", s.rotateSigningKeys)
 	s.mux.HandleFunc("GET /v1/tenants", s.listTenants)
 	s.mux.HandleFunc("POST /v1/tenants", s.createTenant)
 	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/api-keys", s.listAPIKeys)
@@ -487,6 +500,9 @@ func (s *Server) policyRecommendation(w http.ResponseWriter, r *http.Request) {
 // Authentication failures are 401; a valid key without the required scope is
 // 403 so the caller can distinguish a bad credential from missing authority.
 func (s *Server) authorizeTenant(w http.ResponseWriter, r *http.Request, tenantID, requiredScope string) bool {
+	if token := bearerToken(r); token != "" {
+		return s.authorizeBearer(w, r, token, tenantID, requiredScope)
+	}
 	secret := r.Header.Get("X-PolyForge-API-Key")
 	if strings.TrimSpace(secret) == "" {
 		s.writeError(w, r, http.StatusUnauthorized, tenant.ErrUnauthorized)
@@ -644,6 +660,8 @@ func requestLog(log *slog.Logger, metrics *metrics, next http.Handler) http.Hand
 		w.Header().Set("X-Request-ID", id)
 		w.Header().Set("traceparent", trace.TraceParent())
 		recorder := &statusWriter{ResponseWriter: w}
+		metrics.IncInFlight()
+		defer metrics.DecInFlight()
 		next.ServeHTTP(recorder, r)
 		if recorder.status == 0 {
 			recorder.status = http.StatusOK
@@ -724,6 +742,9 @@ func rateLimitKey(r *http.Request) string {
 	}
 	if secret := strings.TrimSpace(r.Header.Get("X-PolyForge-API-Key")); secret != "" {
 		return "tenant:" + secretFingerprint(secret)
+	}
+	if token := bearerToken(r); token != "" {
+		return "tenant:" + secretFingerprint(token)
 	}
 	return "anon:" + host
 }

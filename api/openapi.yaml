@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: PolyForge Control Plane API
-  version: 0.4.0
+  version: 0.5.0
   description: Multi-tenant control-plane API for PolyForge research infrastructure.
   license:
     name: MIT
@@ -58,6 +58,117 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /.well-known/jwks.json:
+    get:
+      summary: Fetch the JSON Web Key Set for access-token verification
+      operationId: jwks
+      security: []
+      responses:
+        "200":
+          description: RFC 7517 key set containing the current and, after a rotation, previous public signing keys.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+            traceparent:
+              $ref: "#/components/headers/TraceParent"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JWKS"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /v1/auth/token:
+    post:
+      summary: Exchange a tenant API key for an RS256 access/refresh token pair
+      operationId: issueToken
+      security:
+        - TenantAPIKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant_id]
+              additionalProperties: false
+              properties:
+                tenant_id:
+                  $ref: "#/components/schemas/ResourceID"
+      responses:
+        "200":
+          description: Token pair. The access token inherits the API key's scope and expires in 15 minutes.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+            traceparent:
+              $ref: "#/components/headers/TraceParent"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /v1/auth/token/refresh:
+    post:
+      summary: Rotate a refresh token for a new token pair
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              additionalProperties: false
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "200":
+          description: New token pair. Refresh tokens are single-use; the presented token is consumed and replaying it returns 401.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+            traceparent:
+              $ref: "#/components/headers/TraceParent"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /v1/auth/keys/rotate:
+    post:
+      summary: Rotate the JWT signing key
+      operationId: rotateSigningKeys
+      description: Swaps in a fresh signing key without a restart. The previous key remains in the JWKS for verification, so already-issued tokens stay valid until expiry.
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: The updated key set, now listing the new current key first.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+            traceparent:
+              $ref: "#/components/headers/TraceParent"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JWKS"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
   /v1/tenants:
     get:
       summary: List tenants
@@ -121,6 +232,7 @@ paths:
       operationId: listAPIKeys
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       responses:
         "200":
           description: API keys, never including plaintext secrets.
@@ -143,6 +255,7 @@ paths:
       operationId: createAPIKey
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       requestBody:
         required: true
         content:
@@ -175,6 +288,7 @@ paths:
       operationId: revokeAPIKey
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       responses:
         "204":
           description: API key revoked.
@@ -197,6 +311,7 @@ paths:
       operationId: rotateAPIKey
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       requestBody:
         required: false
         content:
@@ -236,6 +351,7 @@ paths:
       operationId: listProjects
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       parameters:
         - $ref: "#/components/parameters/PageLimit"
         - $ref: "#/components/parameters/PageCursor"
@@ -261,6 +377,7 @@ paths:
       operationId: createProject
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       requestBody:
         required: true
         content:
@@ -295,6 +412,7 @@ paths:
       operationId: getProject
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       responses:
         "200":
           description: Project details.
@@ -317,6 +435,7 @@ paths:
       operationId: updateProject
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       requestBody:
         required: true
         content:
@@ -347,6 +466,7 @@ paths:
       operationId: deleteProject
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       responses:
         "204":
           description: Project deleted.
@@ -366,6 +486,7 @@ paths:
       operationId: ingestTelemetry
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       requestBody:
         required: true
         content:
@@ -399,6 +520,7 @@ paths:
       operationId: telemetryFeatures
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       parameters:
         - $ref: "#/components/parameters/TenantID"
         - $ref: "#/components/parameters/FeatureService"
@@ -429,6 +551,7 @@ paths:
       operationId: workloadProfile
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       parameters:
         - $ref: "#/components/parameters/TenantID"
       responses:
@@ -454,6 +577,7 @@ paths:
       operationId: policyRecommendation
       security:
         - TenantAPIKey: []
+        - BearerToken: []
       parameters:
         - $ref: "#/components/parameters/TenantID"
       responses:
@@ -483,6 +607,11 @@ components:
       type: apiKey
       in: header
       name: X-PolyForge-API-Key
+    BearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RS256 access token minted by POST /v1/auth/token; carries the issuing API key's tenant and scope.
   headers:
     RequestID:
       description: Correlation identifier assigned to the request.
@@ -644,6 +773,49 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
   schemas:
+    TokenPair:
+      type: object
+      required: [access_token, token_type, expires_in, refresh_token]
+      properties:
+        access_token:
+          type: string
+          description: RS256-signed JWT carrying iss, sub, tenant_id, scope, iat, exp, jti.
+        token_type:
+          type: string
+          const: Bearer
+        expires_in:
+          type: integer
+          description: Access-token lifetime in seconds.
+        refresh_token:
+          type: string
+          description: Single-use opaque token; consumed by POST /v1/auth/token/refresh.
+    JWKS:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            type: object
+            required: [kty, use, alg, kid, n, e]
+            properties:
+              kty:
+                type: string
+                const: RSA
+              use:
+                type: string
+                const: sig
+              alg:
+                type: string
+                const: RS256
+              kid:
+                type: string
+              n:
+                type: string
+                description: Base64url-encoded modulus.
+              e:
+                type: string
+                description: Base64url-encoded exponent.
     ResourceID:
       type: string
       pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$"

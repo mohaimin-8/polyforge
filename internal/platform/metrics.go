@@ -24,6 +24,12 @@ type metrics struct {
 
 	startedAt time.Time
 
+	// inFlight is the saturation golden signal: requests currently being
+	// handled. The other three signals are derivable from the series below
+	// (traffic and errors from polyforge_http_requests_total, latency from
+	// the duration histogram).
+	inFlight int64
+
 	httpRequests        map[httpMetricKey]uint64
 	httpRequestDuration map[httpDurationMetricKey]*histogram
 
@@ -65,6 +71,24 @@ func newMetrics() *metrics {
 		telemetryLatency:    make(map[string]*histogram),
 		telemetryPayload:    make(map[string]*histogram),
 	}
+}
+
+func (m *metrics) IncInFlight() {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	m.inFlight++
+	m.mu.Unlock()
+}
+
+func (m *metrics) DecInFlight() {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	m.inFlight--
+	m.mu.Unlock()
 }
 
 func (m *metrics) RecordHTTPRequest(method, route string, status int, duration time.Duration) {
@@ -135,6 +159,9 @@ func (m *metrics) WritePrometheus(w http.ResponseWriter) {
 
 	writeMetricHeader(w, "polyforge_process_start_time_seconds", "gauge", "Unix timestamp when this process started.")
 	_, _ = fmt.Fprintf(w, "polyforge_process_start_time_seconds %.0f\n\n", float64(m.startedAt.Unix()))
+
+	writeMetricHeader(w, "polyforge_http_in_flight_requests", "gauge", "Requests currently being handled (saturation golden signal).")
+	_, _ = fmt.Fprintf(w, "polyforge_http_in_flight_requests %d\n\n", m.inFlight)
 
 	writeMetricHeader(w, "polyforge_http_requests_total", "counter", "HTTP requests handled by method, route, and status.")
 	for _, key := range sortedHTTPKeys(m.httpRequests) {
