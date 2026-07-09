@@ -53,10 +53,10 @@ jobs:
         run: go test ./... -count=1 -race -covermode=atomic -coverprofile=coverage.out
       - name: Coverage gate
         # Ratchet: raise toward the 80% target as packages gain tests.
-        # Local total without Docker is 57.5%; CI also runs the PostgreSQL suite.
+        # First green CI run (2026-07-09) measured 66.5% with the PostgreSQL suite.
         run: |
           total=$(go tool cover -func=coverage.out | tail -1 | awk '{gsub("%","",$3); print $3}')
           echo "total statement coverage: ${total}%"
-          awk -v t="$total" 'BEGIN { exit !(t >= 55.0) }' || { echo "FAIL: coverage ${total}% is below the 55% gate"; exit 1; }
+          awk -v t="$total" 'BEGIN { exit !(t >= 60.0) }' || { echo "FAIL: coverage ${total}% is below the 60% gate"; exit 1; }
       - name: Lint OpenAPI
         run: npx --yes @redocly/cli lint api/openapi.yaml

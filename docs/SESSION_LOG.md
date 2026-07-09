@@ -110,13 +110,34 @@ failover, compose bring-up, kind/Helm, collector end-to-end, RLS tests.
   about reader/writer interaction.
 - Why fail-open is right for rate limits and wrong for billing quotas.
 
+### Addendum (same day): first push and first green CI
+
+Repo published to `github.com/mohaimin-8/polyforge` (private). The first CI
+run earned its keep immediately:
+
+1. Lint gate caught 3 staticcheck QF1008 findings in `internal/auth/jwt.go`
+   (explicit selectors through the embedded `rsa.PublicKey`) — fixed.
+2. The RLS integration tests failed their first-ever execution with
+   `role "polyforge_admin" does not exist`: the CI role-creation step used
+   `docker exec` without `-i`, so psql received no stdin and exited 0
+   having executed nothing. A green checkmark on a step that did nothing —
+   fixed with `-i` and a warning comment.
+
+Run 3 is fully green: gofmt, vet, golangci-lint, **race detector across all
+packages** (first execution ever — no cgo locally), **both PostgreSQL RLS
+tests against real Postgres 18** (multi-tenant isolation now proven, not
+just designed), coverage 66.5% (gate ratcheted 55% → 60%), OpenAPI lint.
+ADR 0006 (NATS JetStream backbone: subjects, outbox schema, relay dedupe
+semantics, embedded-server test strategy) also landed, unblocking W14/W15.
+
 ### Immediate next tasks
 
-1. First `git push` — everything CI-provable is still unproven in CI.
-2. Event backbone ADR (NATS JetStream vs alternatives), then outbox → saga
-   → CQRS (W15) on top of it.
-3. Docker-capable host: compose up, Redis failover drill, kind/Helm, image
-   size gate, SLO outage drill.
+1. Implement ADR 0006: outbox schema + relay → audit events → onboarding
+   saga → CQRS projection (W14 remainder + W15), each landing whole with
+   embedded-NATS tests.
+2. Docker-capable host: compose up, Redis failover drill, kind/Helm, image
+   size gate, SLO outage drill. Consider a CI job for the Docker build +
+   Trivy to close the W9 gates without local Docker.
 
 ---
 
