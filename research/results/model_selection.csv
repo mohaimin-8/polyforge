@@ -1,0 +1,3 @@
+model,dataset,accuracy,macro_f1,p_latency_us_per_inference
+rules_w19_baseline,synthetic_seed1,0.8880,0.8848,0.10
+logreg_softmax_go,synthetic_seed1,1.0000,1.0000,0.67
