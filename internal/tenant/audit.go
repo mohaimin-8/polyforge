@@ -28,6 +28,14 @@ func AuditTenantCreated(t Tenant) (events.Event, error) {
 	return events.New(t.ID, events.ActionTenantCreated, t)
 }
 
+// AuditTenantIsolationPromoted carries both endpoints of the transition so
+// consumers (silo provisioner, bridge migrator) can act without a lookup.
+func AuditTenantIsolationPromoted(t Tenant, from string) (events.Event, error) {
+	return events.New(t.ID, events.ActionTenantPromoted, map[string]any{
+		"tenant": t, "from": from, "to": t.IsolationMode,
+	})
+}
+
 func AuditTenantDeleted(tenantID string) (events.Event, error) {
 	return events.New(tenantID, events.ActionTenantDeleted, map[string]string{"id": tenantID})
 }

@@ -181,6 +181,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/auth/keys/rotate", s.rotateSigningKeys)
 	s.mux.HandleFunc("GET /v1/tenants", s.listTenants)
 	s.mux.HandleFunc("POST /v1/tenants", s.createTenant)
+	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/isolation", s.promoteTenantIsolation)
 	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/api-keys", s.listAPIKeys)
 	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/api-keys", s.createAPIKey)
 	s.mux.HandleFunc("DELETE /v1/tenants/{tenant_id}/api-keys/{key_id}", s.revokeAPIKey)
@@ -229,7 +230,7 @@ func (s *Server) createTenant(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, http.StatusBadRequest, errors.New("id must be 1-63 safe characters and name must be 1-200 characters"))
 		return
 	}
-	if input.IsolationMode != "" && input.IsolationMode != "pool" && input.IsolationMode != "bridge" && input.IsolationMode != "silo" {
+	if !tenant.ValidIsolationMode(input.IsolationMode) {
 		s.writeError(w, r, http.StatusBadRequest, errors.New("isolation_mode must be pool, bridge, or silo"))
 		return
 	}
@@ -239,6 +240,32 @@ func (s *Server) createTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"tenant": created, "bootstrap_api_key": key})
+}
+
+// promoteTenantIsolation is the operator lever behind the roadmap's
+// Pool -> Bridge -> Silo story (W21). Admin-only: isolation is a platform
+// posture decision, so no tenant credential may reach it.
+func (s *Server) promoteTenantIsolation(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAdmin(w, r) {
+		return
+	}
+	var input struct {
+		Mode string `json:"mode"`
+	}
+	if err := readJSON(w, r, &input); err != nil {
+		s.writeError(w, r, http.StatusBadRequest, err)
+		return
+	}
+	if !tenant.ValidIsolationMode(input.Mode) || input.Mode == "" {
+		s.writeError(w, r, http.StatusBadRequest, errors.New("mode must be pool, bridge, or silo"))
+		return
+	}
+	updated, err := s.tenants.PromoteTenantIsolation(r.Context(), r.PathValue("tenant_id"), input.Mode)
+	if err != nil {
+		s.writeError(w, r, statusFor(err), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
 }
 
 func (s *Server) listAPIKeys(w http.ResponseWriter, r *http.Request) {
@@ -635,6 +662,8 @@ func statusFor(err error) int {
 	case errors.Is(err, tenant.ErrForbidden):
 		return http.StatusForbidden
 	case errors.Is(err, tenant.ErrConflict):
+		return http.StatusConflict
+	case errors.Is(err, tenant.ErrInvalidPromotion):
 		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError

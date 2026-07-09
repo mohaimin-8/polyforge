@@ -28,6 +28,7 @@ const (
 	ActionTenantCreated     = "tenant.created"
 	ActionTenantDeleted     = "tenant.deleted"
 	ActionTenantOnboarded   = "tenant.onboarded"
+	ActionTenantPromoted    = "tenant.promoted"
 	ActionPolicyDefaulted   = "policy.defaulted"
 	ActionProjectCreated    = "project.created"
 	ActionProjectUpdated    = "project.updated"

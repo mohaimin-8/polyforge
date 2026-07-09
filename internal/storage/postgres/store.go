@@ -192,6 +192,47 @@ func (s *Store) Tenant(ctx context.Context, id string) (tenant.Tenant, bool, err
 	return result.tenant, result.found, err
 }
 
+// PromoteTenantIsolation moves the tenant up the isolation ladder (W21).
+// It runs on the admin pool like every tenants-table write: promotion is an
+// operator action, not something a tenant credential can reach.
+func (s *Store) PromoteTenantIsolation(ctx context.Context, tenantID, mode string) (tenant.Tenant, error) {
+	tx, err := s.admin.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return tenant.Tenant{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	current, err := scanTenant(tx.QueryRow(ctx, `
+		SELECT id, name, plan, isolation_mode, created_at FROM tenants WHERE id = $1 FOR UPDATE
+	`, tenantID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return tenant.Tenant{}, tenant.ErrTenantNotFound
+	}
+	if err != nil {
+		return tenant.Tenant{}, err
+	}
+	if err := tenant.ValidatePromotion(current.IsolationMode, mode); err != nil {
+		return tenant.Tenant{}, err
+	}
+	updated := current
+	updated.IsolationMode = tenant.NormalizeIsolationMode(mode)
+	if _, err := tx.Exec(ctx, `
+		UPDATE tenants SET isolation_mode = $1 WHERE id = $2
+	`, updated.IsolationMode, tenantID); err != nil {
+		return tenant.Tenant{}, err
+	}
+	event, err := tenant.AuditTenantIsolationPromoted(updated, current.IsolationMode)
+	if err != nil {
+		return tenant.Tenant{}, err
+	}
+	if err := insertOutbox(ctx, tx, event); err != nil {
+		return tenant.Tenant{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return tenant.Tenant{}, err
+	}
+	return updated, nil
+}
+
 func (s *Store) CreateProject(ctx context.Context, p tenant.Project) (tenant.Project, error) {
 	p = tenant.NormalizeProject(p)
 	return withTenantTx(ctx, s.app, p.TenantID, func(tx pgx.Tx) (tenant.Project, error) {

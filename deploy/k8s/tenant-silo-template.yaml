@@ -1,0 +1,54 @@
+# Silo-mode tenant template (roadmap W21, ADR 0008).
+# Instantiate per tenant:
+#
+#   export TENANT_ID=acme
+#   envsubst < deploy/k8s/tenant-silo-template.yaml | kubectl apply -f -
+#   kubectl get all -n tenant-${TENANT_ID}   # the W21 verification step
+#
+# Default-deny NetworkPolicies for these namespaces live in
+# deploy/k8s/networkpolicies.yaml (W24); apply both.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-${TENANT_ID}
+  labels:
+    app.kubernetes.io/part-of: polyforge
+    polyforge.io/tenant: ${TENANT_ID}
+    polyforge.io/isolation: silo
+---
+# Hard ceiling on what one tenant can consume. Exceeding the quota fails
+# pod admission — a noisy silo tenant cannot starve the shared nodes.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+  namespace: tenant-${TENANT_ID}
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "4"
+    limits.memory: 8Gi
+    pods: "10"
+    persistentvolumeclaims: "4"
+    services: "5"
+---
+# Per-container defaults and bounds, so a pod spec without explicit
+# requests still counts against the quota instead of bypassing it.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tenant-limits
+  namespace: tenant-${TENANT_ID}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      max:
+        cpu: "2"
+        memory: 2Gi

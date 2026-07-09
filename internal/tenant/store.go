@@ -110,6 +110,7 @@ type Repository interface {
 	CreateTenant(ctx context.Context, t Tenant) (Tenant, error)
 	ListTenants(ctx context.Context) ([]Tenant, error)
 	Tenant(ctx context.Context, id string) (Tenant, bool, error)
+	PromoteTenantIsolation(ctx context.Context, tenantID, mode string) (Tenant, error)
 	CreateProject(ctx context.Context, p Project) (Project, error)
 	ListProjects(ctx context.Context, tenantID string, page PageRequest) (ProjectPage, error)
 	Project(ctx context.Context, tenantID, projectID string) (Project, error)

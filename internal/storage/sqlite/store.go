@@ -270,6 +270,45 @@ func (s *Store) Tenant(ctx context.Context, id string) (tenant.Tenant, bool, err
 	return t, true, nil
 }
 
+// PromoteTenantIsolation moves the tenant up the isolation ladder (W21).
+// The read, the validation, the update, and the outbox row share one
+// transaction so a concurrent promotion cannot interleave a downgrade.
+func (s *Store) PromoteTenantIsolation(ctx context.Context, tenantID, mode string) (tenant.Tenant, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return tenant.Tenant{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	current, err := scanTenant(tx.QueryRowContext(ctx,
+		`SELECT id, name, plan, isolation_mode, created_at FROM tenants WHERE id = ?`, tenantID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return tenant.Tenant{}, tenant.ErrTenantNotFound
+	}
+	if err != nil {
+		return tenant.Tenant{}, err
+	}
+	if err := tenant.ValidatePromotion(current.IsolationMode, mode); err != nil {
+		return tenant.Tenant{}, err
+	}
+	updated := current
+	updated.IsolationMode = tenant.NormalizeIsolationMode(mode)
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE tenants SET isolation_mode = ? WHERE id = ?`, updated.IsolationMode, tenantID); err != nil {
+		return tenant.Tenant{}, err
+	}
+	event, err := tenant.AuditTenantIsolationPromoted(updated, current.IsolationMode)
+	if err != nil {
+		return tenant.Tenant{}, err
+	}
+	if err := insertOutbox(ctx, tx, event); err != nil {
+		return tenant.Tenant{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return tenant.Tenant{}, err
+	}
+	return updated, nil
+}
+
 func (s *Store) CreateProject(ctx context.Context, p tenant.Project) (tenant.Project, error) {
 	if _, ok, err := s.Tenant(ctx, p.TenantID); err != nil {
 		return tenant.Project{}, err

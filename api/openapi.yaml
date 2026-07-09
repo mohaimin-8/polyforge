@@ -224,6 +224,49 @@ paths:
           $ref: "#/components/responses/RateLimited"
         "500":
           $ref: "#/components/responses/InternalError"
+  /v1/tenants/{tenant_id}/isolation:
+    parameters:
+      - $ref: "#/components/parameters/TenantID"
+    post:
+      summary: Promote the tenant's isolation mode
+      description: >
+        Moves the tenant up the isolation ladder (pool -> bridge -> silo).
+        Upward-only: downgrades are rejected with 409 because they weaken
+        the tenant's security posture and require a migration project, not
+        an API call.
+      operationId: promoteTenantIsolation
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  type: string
+                  enum: [pool, bridge, silo]
+      responses:
+        "200":
+          description: The tenant after promotion.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/tenants/{tenant_id}/api-keys:
     parameters:
       - $ref: "#/components/parameters/TenantID"
