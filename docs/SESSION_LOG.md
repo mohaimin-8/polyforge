@@ -13,10 +13,10 @@ Milestone status: closes the W14/W15 events cluster whole (outbox, NATS
 relay, audit events, onboarding saga, CQRS projection — the slice ADR 0006
 specified) and lands the M5 AI-workload MVP: W17 embeddings + vector
 search, W18 LLM gateway with semantic cache and streaming, W19 tool-use
-agent loop. Two commits, each cluster landing with its tests. Honest
-roadmap position after this session: ~59-60% pending a green CI run (W19
-is the roadmap's own 59% marker; pgvector and local model serving are the
-noted deferrals).
+agent loop. Two commits, each cluster landing with its tests, plus one
+CI-fix commit. CI is green (65.4% coverage). Honest roadmap position after
+this session: ~59-60% (W19 is the roadmap's own 59% marker; pgvector and
+local model serving are the noted deferrals).
 
 ### What changed — events cluster (commit 1)
 
@@ -94,12 +94,16 @@ go test ./... -count=1 -covermode=atomic     -> pass, total 60.5% local
 ```
 
 Local coverage of 60.5% is with the PostgreSQL suite skipped (no Docker on
-this machine); CI runs it and measured 66.5% before this session, so the
-gate has headroom there. Not verified locally, as always: the PostgreSQL
-outbox (`003_outbox.sql`, outbox RLS policy, admin-side relay reads) — it
-compiles, vets, and mirrors the SQLite semantics, but CI is the first
-environment that executes it. `-race` also runs only in CI (local
-toolchain has no cgo).
+this machine). CI (race detector + PostgreSQL 18) is GREEN on `be57419`
+with **65.4% total coverage** — after one CI-only failure that proves why
+the CI-first stance matters: the first run of `003_outbox.sql` failed
+`TestPostgresRowLevelIsolation` with `permission denied for table outbox`,
+because `INSERT ... ON CONFLICT (id)` needs SELECT privilege on the
+arbiter column and the app role is deliberately INSERT-only on the outbox.
+Fix: the tenant-transaction path (always fresh random IDs) drops the
+conflict clause; deterministic-ID idempotent appends stay on the
+admin-role `AppendEvent`. The green run is the first execution of the
+PostgreSQL outbox, its RLS policy, and the INSERT-only grant.
 
 ### Deliberate deviations from the roadmap's W17-W19 letter
 
@@ -112,12 +116,12 @@ toolchain has no cgo).
 
 ### Immediate next tasks
 
-1. Push; confirm CI green (executes the PostgreSQL outbox path for the
-   first time and re-measures coverage).
-2. W20 local model serving: point `cmd/ai-gateway` at Ollama and demo the
+1. W20 local model serving: point `cmd/ai-gateway` at Ollama and demo the
    agent end-to-end against a real model.
-3. Choose the pgvector CI image and land the Postgres-backed vector index
+2. Choose the pgvector CI image and land the Postgres-backed vector index
    against the exact baseline (ADR 0007 consequence).
+3. Add the gateway's AI endpoints to `api/openapi.yaml` (currently the
+   spec covers only the control plane).
 
 ---
 
