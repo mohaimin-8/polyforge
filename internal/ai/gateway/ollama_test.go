@@ -33,13 +33,13 @@ func fakeOllama(t *testing.T, deltas []string) *httptest.Server {
 			for _, d := range deltas {
 				full += d
 			}
-			fmt.Fprintf(w, `{"model":%q,"message":{"role":"assistant","content":%q},"done":true,"done_reason":"stop","prompt_eval_count":12,"eval_count":34}`+"\n", req.Model, full)
+			_, _ = fmt.Fprintf(w, `{"model":%q,"message":{"role":"assistant","content":%q},"done":true,"done_reason":"stop","prompt_eval_count":12,"eval_count":34}`+"\n", req.Model, full)
 			return
 		}
 		for _, d := range deltas {
-			fmt.Fprintf(w, `{"model":%q,"message":{"role":"assistant","content":%q},"done":false}`+"\n", req.Model, d)
+			_, _ = fmt.Fprintf(w, `{"model":%q,"message":{"role":"assistant","content":%q},"done":false}`+"\n", req.Model, d)
 		}
-		fmt.Fprintf(w, `{"model":%q,"message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","prompt_eval_count":12,"eval_count":34}`+"\n", req.Model)
+		_, _ = fmt.Fprintf(w, `{"model":%q,"message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","prompt_eval_count":12,"eval_count":34}`+"\n", req.Model)
 	}))
 	t.Cleanup(ts.Close)
 	return ts
