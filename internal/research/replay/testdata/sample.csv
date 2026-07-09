@@ -1,0 +1,6 @@
+timestamp_ms,tenant_id,request_kind,payload_bytes,expected_latency_ms
+1000,alpha,chat,512,87.25
+1250,beta,crud_read,128,3.5
+2000,alpha,chat,2048,1200.0
+2100,alpha,agent,96,45.125
+5000,beta,batch,4096,30000.0

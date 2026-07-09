@@ -5,3 +5,5 @@ bin/
 tmp/
 data/*.db
 data/*.db-*
+research/traces/out/
+__pycache__/
