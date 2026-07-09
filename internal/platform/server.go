@@ -56,6 +56,15 @@ type Server struct {
 	tracer    trace.Tracer
 
 	idempotencyStore idempotency.Store
+	analytics        AnalyticsEnqueuer
+}
+
+// AnalyticsEnqueuer mirrors accepted telemetry events into the analytical
+// pipeline (ADR 0011). Implementations must not block the request path;
+// the batcher in internal/telemetry/analytics is the production
+// implementation. The returned bool reports whether the event was buffered.
+type AnalyticsEnqueuer interface {
+	Enqueue(event telemetry.Event) bool
 }
 
 // RequestLimiter admits or rejects a request for a rate-limit key. The
@@ -80,6 +89,10 @@ type Config struct {
 	// local SDK provider so spans (and therefore trace IDs in logs and
 	// response headers) always exist even without an exporter configured.
 	TracerProvider trace.TracerProvider
+	// Analytics, when set, receives a copy of every accepted telemetry
+	// event for the analytical store (ADR 0011). Delivery is best-effort
+	// and never affects the ingest response.
+	Analytics AnalyticsEnqueuer
 }
 
 type RateLimitConfig struct {
@@ -127,6 +140,7 @@ func NewServer(log *slog.Logger, tenants tenant.Repository, telemetry telemetry.
 	} else if bucket := newRateLimiter(cfg.RateLimit); bucket != nil {
 		s.limiter = bucket
 	}
+	s.analytics = cfg.Analytics
 	s.idempotencyStore = cfg.IdempotencyStore
 	if s.idempotencyStore == nil {
 		s.idempotencyStore = idempotency.NewMemoryStore()
@@ -467,6 +481,11 @@ func (s *Server) ingestTelemetry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.metrics.RecordTelemetryEvent(event)
+	if s.analytics != nil {
+		// Best-effort mirror to the analytical store; the batcher counts
+		// drops, so a rejected enqueue must not change the response.
+		_ = s.analytics.Enqueue(event)
+	}
 	writeJSON(w, http.StatusAccepted, event)
 }
 

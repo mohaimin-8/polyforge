@@ -25,6 +25,7 @@ import (
 	postgresstore "polyforge/internal/storage/postgres"
 	sqlitestore "polyforge/internal/storage/sqlite"
 	"polyforge/internal/telemetry"
+	"polyforge/internal/telemetry/analytics"
 	"polyforge/internal/tenant"
 )
 
@@ -159,6 +160,29 @@ func main() {
 		tracerOptions = append(tracerOptions, sdktrace.WithBatcher(exporter))
 		log.Info("exporting traces via OTLP/HTTP", "endpoint", endpoint)
 	}
+	// W25a: with ClickHouse configured, every accepted telemetry event is
+	// mirrored to the analytical store through a bounded batcher (ADR 0011).
+	// The mirror is best-effort by design; the transactional repository
+	// remains the source of truth for the feature API.
+	var analyticsEnqueuer platform.AnalyticsEnqueuer
+	if clickhouseURL := os.Getenv("POLYFORGE_CLICKHOUSE_URL"); clickhouseURL != "" {
+		sink, err := analytics.NewClickHouseSink(analytics.ClickHouseConfig{URL: clickhouseURL})
+		if err != nil {
+			log.Error("configure ClickHouse sink", "error", err)
+			os.Exit(1)
+		}
+		batcher := analytics.NewBatcher(sink, log, analytics.BatcherConfig{})
+		defer func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := batcher.Close(shutdownCtx); err != nil {
+				log.Error("analytics batcher shutdown", "error", err, "dropped", batcher.Dropped())
+			}
+		}()
+		analyticsEnqueuer = batcher
+		log.Info("mirroring telemetry to ClickHouse")
+	}
+
 	tracerProvider := sdktrace.NewTracerProvider(tracerOptions...)
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -176,6 +200,7 @@ func main() {
 			Limiter:          requestLimiter,
 			IdempotencyStore: idempotencyStore,
 			TracerProvider:   tracerProvider,
+			Analytics:        analyticsEnqueuer,
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
