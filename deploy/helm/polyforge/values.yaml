@@ -1,0 +1,35 @@
+# Env-specific overrides land here (the point of the chart, per roadmap W10):
+# image tag, replica count, and resource limits are all templated.
+
+image:
+  repository: polyforge/control-plane
+  tag: dev
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+# Rendered into a Secret; override per environment, never commit real keys.
+adminKey: polyforge-kind-admin
+
+postgres:
+  adminURL: postgres://polyforge_admin@postgres:5432/polyforge
+  appURL: postgres://polyforge_app@postgres:5432/polyforge
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+service:
+  port: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  path: /api
+
+rateLimit:
+  requestsPerMinute: 600
+  burst: 60

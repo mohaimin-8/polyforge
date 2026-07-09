@@ -1,4 +1,24 @@
 services:
+  control-plane:
+    build: .
+    image: polyforge/control-plane:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POLYFORGE_ADMIN_KEY: ${POLYFORGE_ADMIN_KEY:-polyforge-local-admin}
+      POLYFORGE_POSTGRES_ADMIN_URL: postgres://polyforge_admin@postgres:5432/polyforge
+      POLYFORGE_POSTGRES_APP_URL: postgres://polyforge_app@postgres:5432/polyforge
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      # Distroless image has no shell/curl; the binary probes itself.
+      test: ["CMD", "/control-plane", "-healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   postgres:
     image: postgres:18
     environment:

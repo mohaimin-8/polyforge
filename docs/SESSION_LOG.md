@@ -7,6 +7,95 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-09 (session 4) — W7 JWT layer closed; W9/W10/W12 deployment + SLO artifacts written (Docker-blocked, unverified)
+
+Milestone status: closes the W7 remainder (RS256 JWT issuer, refresh
+rotation, JWKS, key rotation without restart — the last open W7 item after
+OAuth2/Hydra was deferred whole, see ADR 0004). Completes the four golden
+signals at `/metrics` (W11's metrics deliverable; the OTel SDK migration
+itself remains open). Writes the W9 Docker, W10 kind/Helm, and W12 SLO
+artifacts, none of which can be executed on this machine.
+
+### What changed
+
+**`internal/auth` — stdlib RS256 JWT issuer (W7).**
+
+- JWS compact serialization on `crypto/rsa` — zero new dependencies
+  (ADR 0004). Verifier pins `alg` to RS256 before key lookup; tests attack
+  it with `alg=none`, a foreign key, and a tampered payload.
+- Refresh tokens: opaque, single-use, stored as SHA-256 digests in memory.
+  Replay of a consumed token is 401. In-memory means a restart drops
+  refresh sessions — accepted and documented in ADR 0004.
+- Key rotation keeps the previous key verifiable: `TestKeyRotationWithoutRestart`
+  proves pre-rotation tokens verify, new tokens carry a new kid, and the
+  JWKS material itself verifies real signatures (reconstructed `rsa.PublicKey`
+  from n/e, the way an external verifier would).
+
+**Platform wiring.**
+
+- `POST /v1/auth/token` (API key → token pair; JWT inherits the key's
+  scope), `POST /v1/auth/token/refresh`, `GET /.well-known/jwks.json`
+  (public), `POST /v1/auth/keys/rotate` (admin).
+- `authorizeTenant` accepts `Authorization: Bearer` as a peer of the API-key
+  header, with the same 401/403 contract; wrong-tenant tokens are 403.
+  Bearer credentials get their own rate-limit buckets.
+- The W7 gate restated for JWTs is automated: read-scope bearer token → 200
+  on GET, 403 on POST.
+- `/metrics` gains `polyforge_http_in_flight_requests` (saturation), so all
+  four golden signals are now derivable from the endpoint.
+- `control-plane -healthcheck` subcommand probes `/healthz` and exits 0/1,
+  because the distroless image has no shell for container health checks.
+
+**Deployment artifacts — written, NOT verified locally (no Docker).**
+
+- `Dockerfile`: multi-stage, CGO off (modernc SQLite is pure Go),
+  distroless/static-debian12 nonroot. The <20MB gate is unproven.
+- `compose.yaml`: control-plane service added (postgres-healthy dependency,
+  self-probe healthcheck). `docker compose up` has never been run here.
+- `deploy/k8s/`: namespace, postgres (Recreate strategy, RLS roles via init
+  ConfigMap), control-plane (2 replicas, probes, read-only rootfs), NGINX
+  ingress `/api`. `deploy/helm/polyforge/`: chart templating image tag,
+  replicas, resources, admin-key Secret, rate limits. Schema-reviewed only;
+  `helm install` and the rollout-restart gate need a kind cluster.
+- `docs/SLO.md`: 99.9% availability / p99 < 200ms objectives against the
+  real metric names, error budget (43.2 min/30d), and the 14.4×/6× burn-rate
+  alert expressions. Alerts are not loaded into Prometheus yet.
+- OpenAPI 0.5.0: four auth paths, `BearerToken` scheme offered on all
+  tenant-scoped operations, `TokenPair`/`JWKS` schemas. Redocly-clean.
+
+### How it was verified
+
+```
+gofmt -l .                              -> clean
+go vet ./...                            -> pass
+go test ./... -count=1                  -> pass (auth: 7 tests; platform: +3 endpoint suites)
+npx @redocly/cli lint api/openapi.yaml  -> valid, 0 warnings
+```
+
+Not verified: everything under "Deployment artifacts" above, plus the two
+standing PostgreSQL RLS integration tests (still Docker-blocked). CI on
+first push is the earliest environment that can prove any of it.
+
+### What to be able to explain next
+
+- Why pinning `alg` before key lookup kills both `alg=none` and RS256→HS256
+  confusion, and why that ordering (not the library choice) is the security
+  property.
+- Why refresh-token rotation must consume the token even on the success
+  path, and what replay window exists if it doesn't.
+- Why 429 is excluded from the availability SLI in `docs/SLO.md`.
+
+### Immediate next tasks
+
+1. First `git push`: proves CI (race/lint/coverage), Postgres migrations,
+   and can add a Docker build + Trivy job to exercise the W9 artifacts.
+2. W11 proper: migrate hand-rolled traceparent/metrics to the OTel SDK
+   (whole, not half — same rule as Hydra).
+3. On any Docker-capable host: `docker compose up`, image-size gate,
+   `helm install` on kind, and the SLO fake-outage drill.
+
+---
+
 ## 2026-07-09 (session 3) — API-key scopes with RBAC, and the 30k-RPS gate beaten 2.4×
 
 Milestone status: closes the roadmap's W7 deliverable "API keys with scoped

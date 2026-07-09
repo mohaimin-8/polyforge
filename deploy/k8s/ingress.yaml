@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: polyforge
+  namespace: polyforge
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m # matches maxRequestBodyBytes
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # /api → control-plane, per the W10 routing layout. /auth is
+          # reserved for the future split-out auth service; today the
+          # control-plane serves /v1/auth/* itself.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: control-plane
+                port:
+                  name: http

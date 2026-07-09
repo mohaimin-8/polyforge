@@ -1,0 +1,9 @@
+.git
+.github
+artifacts
+data
+deploy
+docs
+*.md
+Dockerfile
+compose.yaml

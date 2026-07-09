@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "polyforge.name" . }}
+  labels:
+    {{- include "polyforge.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "polyforge.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "polyforge.selectorLabels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      containers:
+        - name: control-plane
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: POLYFORGE_ADMIN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "polyforge.name" . }}
+                  key: admin-key
+            - name: POLYFORGE_POSTGRES_ADMIN_URL
+              value: {{ .Values.postgres.adminURL | quote }}
+            - name: POLYFORGE_POSTGRES_APP_URL
+              value: {{ .Values.postgres.appURL | quote }}
+            - name: POLYFORGE_RATE_LIMIT_RPM
+              value: {{ .Values.rateLimit.requestsPerMinute | quote }}
+            - name: POLYFORGE_RATE_LIMIT_BURST
+              value: {{ .Values.rateLimit.burst | quote }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
