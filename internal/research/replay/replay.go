@@ -111,7 +111,7 @@ func LoadTrace(r io.Reader) ([]Event, error) {
 func TraceHash(events []Event) string {
 	digest := sha256.New()
 	for _, e := range events {
-		fmt.Fprintf(digest, "%d,%s,%s,%d,%s\n",
+		_, _ = fmt.Fprintf(digest, "%d,%s,%s,%d,%s\n",
 			e.TimestampMS, e.TenantID, e.RequestKind, e.PayloadBytes,
 			strconv.FormatFloat(e.ExpectedLatencyMS, 'f', 3, 64))
 	}
@@ -169,7 +169,7 @@ func (m Mix) totalWeight() int {
 // exact assignment.
 func (m Mix) Target(seed uint64, source string) MixTarget {
 	h := fnv.New64a()
-	fmt.Fprintf(h, "%d|%s", seed, source)
+	_, _ = fmt.Fprintf(h, "%d|%s", seed, source)
 	slot := int(h.Sum64() % uint64(m.totalWeight()))
 	for _, t := range m.Targets {
 		slot -= t.Weight
@@ -232,7 +232,7 @@ func Schedule(events []Event, mix Mix, seed uint64, speed float64) ([]ScheduledE
 func ScheduleHash(schedule []ScheduledEvent) string {
 	digest := sha256.New()
 	for _, s := range schedule {
-		fmt.Fprintf(digest, "%d,%s,%s,%d,%s,%s,%d,%s\n",
+		_, _ = fmt.Fprintf(digest, "%d,%s,%s,%d,%s,%s,%d,%s\n",
 			s.TimestampMS, s.TenantID, s.RequestKind, s.PayloadBytes,
 			strconv.FormatFloat(s.ExpectedLatencyMS, 'f', 3, 64),
 			s.Target.TenantID, s.Due.Nanoseconds(),

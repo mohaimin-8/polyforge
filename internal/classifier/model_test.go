@@ -43,7 +43,9 @@ func TestTrainingIsDeterministic(t *testing.T) {
 		}
 		return model
 	}
-	if *build() != *build() {
+	first := build()
+	second := build()
+	if *first != *second {
 		t.Fatal("same seeds produced different models")
 	}
 }

@@ -200,7 +200,6 @@ func TestBatcherCountsDropsWhenQueueIsFull(t *testing.T) {
 
 type blockingSink struct {
 	unblock chan struct{}
-	once    sync.Once
 	blocked bool
 	mu      sync.Mutex
 }
