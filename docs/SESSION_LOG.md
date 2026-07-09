@@ -7,6 +7,132 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-09 (session 7) — W20-W24: LLM routing, tenant isolation ladder, canary, Vault/OIDC, security hardening
+
+Milestone status: closes the *implementable-on-this-machine* core of W20
+(local LLM serving + routing policy), W21 (multi-tenant isolation modes),
+W22 (mesh + canary), W23 (Vault + OIDC + secret scanning), and W24
+(network policy + OWASP + supply chain). The user explicitly asked for the
+W20-24 block in one session (overriding the usual ~5% slice), with license
+to deviate from the HTML where a better path exists. Honest roadmap
+position after this session: **~70-71%** against the roadmap's 72% marker
+for end-of-W24 — the gap is exactly the cluster-execution items this
+machine cannot run (live Ollama benchmark numbers, Linkerd mTLS tap,
+live Keycloak login, ZAP scan, compromised-pod simulation), all of which
+now have runnable harnesses/runbooks and pending-status documentation.
+
+### What changed — W20 local LLM serving + routing (ADR 0007 extended)
+
+- **Native Ollama adapter** (`gateway.Ollama`, `/api/chat` NDJSON): the
+  native API reports `prompt_eval_count`/`eval_count`, which the benchmark
+  needs for honest tokens/sec. Tool calls map both directions.
+- **Policy router** (`gateway.Router` + `deploy/routing.json`): routes
+  /chat per request by tenant plan, prompt length, and a per-tenant daily
+  budget (UTC-day ledger; exhaustion degrades to the cheapest backend
+  rather than failing). Decision exposed via `X-PolyForge-Backend` /
+  `X-PolyForge-Route-Reason` headers; usage charged post-response from
+  provider-reported tokens. Routing happens only on cache miss. This
+  static rule table is the baseline JCAC (M8) will replace.
+- **Benchmark harness** (`internal/ai/bench`, `cmd/llmbench`): identical
+  streaming instrumentation for every backend; TTFT = first delta,
+  throughput = tokens/(total−TTFT); per-request CSV to `benchmarks/`,
+  aggregate markdown for `docs/INFERENCE_BENCH.md`. **No live numbers
+  published** — no Ollama on this machine; the doc says so explicitly.
+- Compose gains an `ai` profile (ollama + one-shot model puller).
+
+### What changed — W21 isolation ladder (ADR 0008)
+
+- `isolation_mode` was already a column; it is now a *state machine*:
+  `POST /v1/tenants/{id}/isolation` (admin-only) promotes pool → bridge →
+  silo, upward-only (skip allowed, downgrade 409). Implemented in all
+  three stores; Postgres takes `FOR UPDATE` on the tenant row; every
+  promotion writes a `tenant.promoted` outbox event in-transaction, so
+  namespace provisioning can be event-driven later.
+- `deploy/k8s/tenant-silo-template.yaml`: Namespace + ResourceQuota +
+  LimitRange per silo tenant (envsubst-instantiated).
+- Deliberate deviation, documented in the ADR: bridge's schema-per-tenant
+  data migration is specified but **not implemented** — zero-downtime
+  copy/cutover needs a real Postgres to prove and this machine has none.
+
+### What changed — W22 mesh + canary (ADR 0009)
+
+- **Two canary layers.** Mesh: `deploy/linkerd/` (install runbook, mTLS
+  verification commands, SMI TrafficSplit 95/5 over new
+  `deploy/k8s/ai-gateway.yaml` v1/v2 deployments; inject annotations added
+  to workloads). App: `gateway.CanaryProvider` — deterministic
+  position-mod-100 split between model hosts with a sliding-window breaker
+  that auto-rolls-back on error spike. The roadmap's rollback gate is a
+  unit test (`TestCanaryErrorSpikeAutoRollsBack`), not a manual step.
+
+### What changed — W23 secrets + OIDC (ADR 0010)
+
+- `internal/secrets`: `Dir` (Vault-Agent files; re-read per call, so
+  rotation is instant — beats the 60s gate) → `Vault` (KV v2, Kubernetes
+  auth with lease-aware token renewal) → `Env` chain. Control plane admin
+  key and gateway LLM key now resolve through it.
+- `internal/auth/oidc.go`: stdlib OIDC relying party — discovery, JWKS
+  with rotation-tolerant refetch, S256 PKCE, code exchange, ID-token
+  validation with alg pinned to RS256. Tested end-to-end against a fake
+  IdP that *enforces* PKCE server-side; negative tests cover wrong aud,
+  expired, wrong issuer, tampered payload.
+- CI gains a `secret-scan` job (gitleaks, full history) and an `sbom` job
+  (syft CycloneDX artifact). `deploy/vault/`, `deploy/keycloak/` dev
+  manifests + runbooks.
+
+### What changed — W24 hardening
+
+- `deploy/k8s/networkpolicies.yaml`: default-deny both directions, then
+  DNS + ingress→services + control-plane→{postgres,redis} +
+  ai-gateway→ollama; postgres/redis also pin inbound to the control plane.
+- `docs/SECURITY.md`: OWASP API Top 10 (2023) line-by-line with code
+  citations, threat model, supply-chain section, and an explicit
+  known-gaps list (API7 egress allowlist is network-level only; ZAP and
+  pod-pivot simulation pending Docker).
+- `release.yml`: tag-triggered image push to GHCR + cosign keyless sign +
+  CycloneDX SBOM attestation. `scripts/zap-baseline.sh` for the pen-test.
+- OpenAPI spec documents the new isolation endpoint (redocly-valid).
+
+### How it was verified
+
+```text
+gofmt -l .                              -> clean
+go vet ./...                            -> pass
+go test ./... -count=1 -cover           -> all pass (bench 89%, gateway 74%,
+                                           auth 81%, secrets 70%, tenant 83%)
+npx @redocly/cli lint api/openapi.yaml  -> valid
+```
+
+Not verified locally: `-race` (no gcc on this machine — CI runs it),
+PostgreSQL suite incl. the new `PromoteTenantIsolation` (skips without
+Docker; CI executes it), golangci-lint (not installed; CI runs v2.6.2),
+gitleaks/sbom/release workflows (first execution on push), and everything
+listed above as needing a cluster. Treat all of those as unproven until
+the next green CI run.
+
+### What to be able to explain next
+
+- Why the router charges budget from *reported* usage post-response
+  rather than estimating pre-route, and what a provider that reports no
+  usage does to the ledger (answer: nothing — cost 0; the bench estimates
+  at 4 chars/token but the ledger never guesses).
+- Why isolation demotion is a 409 and not a feature.
+- Why the canary splits deterministically (position mod 100) instead of
+  randomly, and what that does to test reproducibility and low-traffic
+  rollouts.
+- Why the ID-token verifier pins RS256 (alg=none / RS-HS confusion).
+
+### Immediate next tasks
+
+1. Push; confirm CI green including the two new jobs — that run is the
+   proof for -race, Postgres promotion test, gitleaks, and SBOM.
+2. First live run of `cmd/llmbench` on a machine with Ollama; paste the
+   table into docs/INFERENCE_BENCH.md and commit `benchmarks/inference.csv`.
+3. W25 (M7 research phase) starts the telemetry-pipeline/classifier work —
+   the routing policy and isolation ladder built this session are its
+   actuators.
+
+---
+
 ## 2026-07-09 (session 6) — ADR 0006 events cluster + M5 AI cluster (W14/W15, W17-W19)
 
 Milestone status: closes the W14/W15 events cluster whole (outbox, NATS

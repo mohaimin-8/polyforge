@@ -21,6 +21,12 @@ The current implementation provides a persistent control-plane backend:
 - classifier feature-query API over a bounded time window
 - deterministic workload classifier
 - adaptive policy recommendation endpoint
+- AI gateway: multi-backend chat routing by tenant plan / prompt length / daily budget (`deploy/routing.json`), native Ollama + OpenAI-compatible adapters, semantic cache, vector search, agent loop
+- tenant isolation ladder (pool → bridge → silo) with an admin promotion API, audited via the outbox (ADR 0008)
+- canary releases at two layers: Linkerd TrafficSplit manifests and an in-process weighted split with automatic error-spike rollback (ADR 0009)
+- secrets via a Vault Agent file → Vault KV (K8s auth) → env chain; OIDC code+PKCE relying party for human login (ADR 0010)
+- security hardening: default-deny NetworkPolicies, OWASP API Top 10 compliance doc (`docs/SECURITY.md`), gitleaks + SBOM in CI, cosign-signed release images
+- inference benchmark harness (`cmd/llmbench`) producing the TTFT/throughput/cost CSV behind `docs/INFERENCE_BENCH.md`
 
 SQLite remains the zero-infrastructure development path. PostgreSQL is the production path and requires separate admin and application roles so row-level security is testable rather than bypassed accidentally.
 
