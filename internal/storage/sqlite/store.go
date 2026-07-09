@@ -92,6 +92,29 @@ func (s *Store) migrate(ctx context.Context) error {
 			FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_telemetry_tenant_time ON telemetry_events(tenant_id, timestamp DESC);`,
+		// Transactional outbox (ADR 0006). Deliberately no FK to tenants:
+		// audit events must survive tenant deletion.
+		`CREATE TABLE IF NOT EXISTS outbox (
+			seq INTEGER PRIMARY KEY AUTOINCREMENT,
+			id TEXT NOT NULL UNIQUE,
+			tenant_id TEXT NOT NULL,
+			action TEXT NOT NULL,
+			subject TEXT NOT NULL,
+			occurred_at TEXT NOT NULL,
+			payload TEXT NOT NULL,
+			published_at TEXT
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_outbox_unpublished ON outbox(seq) WHERE published_at IS NULL;`,
+		// Saga state lives in the DB, not the broker (ADR 0006).
+		`CREATE TABLE IF NOT EXISTS sagas (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			tenant_id TEXT NOT NULL,
+			status TEXT NOT NULL,
+			steps_done INTEGER NOT NULL,
+			error TEXT NOT NULL DEFAULT '',
+			updated_at TEXT NOT NULL
+		);`,
 	}
 
 	for _, stmt := range stmts {
@@ -154,14 +177,28 @@ func (s *Store) ensureColumn(ctx context.Context, table, column, definition stri
 
 func (s *Store) CreateTenant(ctx context.Context, t tenant.Tenant) (tenant.Tenant, error) {
 	t = tenant.NormalizeTenant(t)
-	_, err := s.db.ExecContext(ctx, `
+	event, err := tenant.AuditTenantCreated(t)
+	if err != nil {
+		return tenant.Tenant{}, err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return tenant.Tenant{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO tenants(id, name, plan, isolation_mode, created_at)
 		VALUES (?, ?, ?, ?, ?)
-	`, t.ID, t.Name, t.Plan, t.IsolationMode, encodeTime(t.CreatedAt))
-	if sqliteConstraint(err) {
-		return tenant.Tenant{}, tenant.ErrConflict
+	`, t.ID, t.Name, t.Plan, t.IsolationMode, encodeTime(t.CreatedAt)); err != nil {
+		if sqliteConstraint(err) {
+			return tenant.Tenant{}, tenant.ErrConflict
+		}
+		return tenant.Tenant{}, err
 	}
-	return t, err
+	if err := insertOutbox(ctx, tx, event); err != nil {
+		return tenant.Tenant{}, err
+	}
+	return t, tx.Commit()
 }
 
 func (s *Store) ProvisionTenant(ctx context.Context, t tenant.Tenant, keyName string) (tenant.Tenant, tenant.APIKey, error) {
@@ -188,6 +225,13 @@ func (s *Store) ProvisionTenant(ctx context.Context, t tenant.Tenant, keyName st
 		INSERT INTO api_keys(id, tenant_id, name, scope, prefix, key_hash, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, encodeTime(key.CreatedAt)); err != nil {
+		return tenant.Tenant{}, tenant.APIKey{}, err
+	}
+	event, err := tenant.AuditTenantProvisioned(t, key)
+	if err != nil {
+		return tenant.Tenant{}, tenant.APIKey{}, err
+	}
+	if err := insertOutbox(ctx, tx, event); err != nil {
 		return tenant.Tenant{}, tenant.APIKey{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -233,14 +277,28 @@ func (s *Store) CreateProject(ctx context.Context, p tenant.Project) (tenant.Pro
 		return tenant.Project{}, tenant.ErrTenantNotFound
 	}
 	p = tenant.NormalizeProject(p)
-	_, err := s.db.ExecContext(ctx, `
+	event, err := tenant.AuditProjectCreated(p)
+	if err != nil {
+		return tenant.Project{}, err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return tenant.Project{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO projects(id, tenant_id, name, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?)
-	`, p.ID, p.TenantID, p.Name, encodeTime(p.CreatedAt), encodeTime(p.UpdatedAt))
-	if sqliteConstraint(err) {
-		return tenant.Project{}, tenant.ErrConflict
+	`, p.ID, p.TenantID, p.Name, encodeTime(p.CreatedAt), encodeTime(p.UpdatedAt)); err != nil {
+		if sqliteConstraint(err) {
+			return tenant.Project{}, tenant.ErrConflict
+		}
+		return tenant.Project{}, err
 	}
-	return p, err
+	if err := insertOutbox(ctx, tx, event); err != nil {
+		return tenant.Project{}, err
+	}
+	return p, tx.Commit()
 }
 
 func (s *Store) ListProjects(ctx context.Context, tenantID string, page tenant.PageRequest) (tenant.ProjectPage, error) {
@@ -294,7 +352,12 @@ func (s *Store) Project(ctx context.Context, tenantID, projectID string) (tenant
 }
 
 func (s *Store) UpdateProject(ctx context.Context, p tenant.Project) (tenant.Project, error) {
-	result, err := s.db.ExecContext(ctx, `
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return tenant.Project{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	result, err := tx.ExecContext(ctx, `
 		UPDATE projects SET name = ?, updated_at = ?
 		WHERE tenant_id = ? AND id = ?
 	`, strings.TrimSpace(p.Name), encodeTime(time.Now().UTC()), p.TenantID, p.ID)
@@ -306,11 +369,34 @@ func (s *Store) UpdateProject(ctx context.Context, p tenant.Project) (tenant.Pro
 	} else if affected == 0 {
 		return tenant.Project{}, tenant.ErrProjectNotFound
 	}
-	return s.Project(ctx, p.TenantID, p.ID)
+	updated, err := scanProject(tx.QueryRowContext(ctx, `
+		SELECT id, tenant_id, name, created_at, updated_at
+		FROM projects WHERE tenant_id = ? AND id = ?
+	`, p.TenantID, p.ID))
+	if err != nil {
+		return tenant.Project{}, err
+	}
+	event, err := tenant.AuditProjectUpdated(updated)
+	if err != nil {
+		return tenant.Project{}, err
+	}
+	if err := insertOutbox(ctx, tx, event); err != nil {
+		return tenant.Project{}, err
+	}
+	return updated, tx.Commit()
 }
 
 func (s *Store) DeleteProject(ctx context.Context, tenantID, projectID string) error {
-	result, err := s.db.ExecContext(ctx, `DELETE FROM projects WHERE tenant_id = ? AND id = ?`, tenantID, projectID)
+	event, err := tenant.AuditProjectDeleted(tenantID, projectID)
+	if err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	result, err := tx.ExecContext(ctx, `DELETE FROM projects WHERE tenant_id = ? AND id = ?`, tenantID, projectID)
 	if err != nil {
 		return err
 	}
@@ -319,7 +405,10 @@ func (s *Store) DeleteProject(ctx context.Context, tenantID, projectID string) e
 	} else if affected == 0 {
 		return tenant.ErrProjectNotFound
 	}
-	return nil
+	if err := insertOutbox(ctx, tx, event); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) CreateAPIKey(ctx context.Context, tenantID, name, scope string) (tenant.APIKey, error) {
@@ -333,11 +422,25 @@ func (s *Store) CreateAPIKey(ctx context.Context, tenantID, name, scope string) 
 	if err != nil {
 		return tenant.APIKey{}, err
 	}
-	_, err = s.db.ExecContext(ctx, `
+	event, err := tenant.AuditAPIKeyCreated(key)
+	if err != nil {
+		return tenant.APIKey{}, err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return tenant.APIKey{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO api_keys(id, tenant_id, name, scope, prefix, key_hash, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, encodeTime(key.CreatedAt))
-	return key, err
+	`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, encodeTime(key.CreatedAt)); err != nil {
+		return tenant.APIKey{}, err
+	}
+	if err := insertOutbox(ctx, tx, event); err != nil {
+		return tenant.APIKey{}, err
+	}
+	return key, tx.Commit()
 }
 
 func (s *Store) ListAPIKeys(ctx context.Context, tenantID string) ([]tenant.APIKey, error) {
@@ -367,7 +470,16 @@ func (s *Store) ListAPIKeys(ctx context.Context, tenantID string) ([]tenant.APIK
 }
 
 func (s *Store) RevokeAPIKey(ctx context.Context, tenantID, keyID string) error {
-	result, err := s.db.ExecContext(ctx, `
+	event, err := tenant.AuditAPIKeyRevoked(tenantID, keyID)
+	if err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	result, err := tx.ExecContext(ctx, `
 		UPDATE api_keys
 		SET revoked_at = COALESCE(revoked_at, ?)
 		WHERE tenant_id = ? AND id = ?
@@ -380,7 +492,10 @@ func (s *Store) RevokeAPIKey(ctx context.Context, tenantID, keyID string) error 
 	} else if affected == 0 {
 		return tenant.ErrAPIKeyNotFound
 	}
-	return nil
+	if err := insertOutbox(ctx, tx, event); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) RotateAPIKey(ctx context.Context, tenantID, keyID, name string) (tenant.APIKey, error) {
@@ -426,6 +541,13 @@ func (s *Store) RotateAPIKey(ctx context.Context, tenantID, keyID, name string) 
 		return tenant.APIKey{}, err
 	} else if affected != 1 {
 		return tenant.APIKey{}, tenant.ErrAPIKeyNotFound
+	}
+	event, err := tenant.AuditAPIKeyRotated(key, keyID)
+	if err != nil {
+		return tenant.APIKey{}, err
+	}
+	if err := insertOutbox(ctx, tx, event); err != nil {
+		return tenant.APIKey{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return tenant.APIKey{}, err

@@ -96,12 +96,26 @@ func roleSecurity(ctx context.Context, pool *pgxpool.Pool) (string, bool, error)
 
 func (s *Store) CreateTenant(ctx context.Context, t tenant.Tenant) (tenant.Tenant, error) {
 	t = tenant.NormalizeTenant(t)
-	_, err := s.admin.Exec(ctx, `
+	event, err := tenant.AuditTenantCreated(t)
+	if err != nil {
+		return tenant.Tenant{}, err
+	}
+	tx, err := s.admin.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return tenant.Tenant{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `
 		INSERT INTO tenants(id, name, plan, isolation_mode, created_at)
 		VALUES ($1, $2, $3, $4, $5)
-	`, t.ID, t.Name, t.Plan, t.IsolationMode, t.CreatedAt)
-	if err != nil {
+	`, t.ID, t.Name, t.Plan, t.IsolationMode, t.CreatedAt); err != nil {
 		return tenant.Tenant{}, mapPostgresError(err)
+	}
+	if err := insertOutbox(ctx, tx, event); err != nil {
+		return tenant.Tenant{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return tenant.Tenant{}, err
 	}
 	return t, nil
 }
@@ -128,6 +142,13 @@ func (s *Store) ProvisionTenant(ctx context.Context, t tenant.Tenant, keyName st
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, key.CreatedAt); err != nil {
 		return tenant.Tenant{}, tenant.APIKey{}, mapPostgresError(err)
+	}
+	event, err := tenant.AuditTenantProvisioned(t, key)
+	if err != nil {
+		return tenant.Tenant{}, tenant.APIKey{}, err
+	}
+	if err := insertOutbox(ctx, tx, event); err != nil {
+		return tenant.Tenant{}, tenant.APIKey{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return tenant.Tenant{}, tenant.APIKey{}, err
@@ -184,7 +205,11 @@ func (s *Store) CreateProject(ctx context.Context, p tenant.Project) (tenant.Pro
 		if err != nil {
 			return tenant.Project{}, mapPostgresError(err)
 		}
-		return p, nil
+		event, err := tenant.AuditProjectCreated(p)
+		if err != nil {
+			return tenant.Project{}, err
+		}
+		return p, insertOutbox(ctx, tx, event)
 	})
 }
 
@@ -249,7 +274,14 @@ func (s *Store) UpdateProject(ctx context.Context, p tenant.Project) (tenant.Pro
 		if errors.Is(err, pgx.ErrNoRows) {
 			return tenant.Project{}, tenant.ErrProjectNotFound
 		}
-		return updated, err
+		if err != nil {
+			return tenant.Project{}, err
+		}
+		event, err := tenant.AuditProjectUpdated(updated)
+		if err != nil {
+			return tenant.Project{}, err
+		}
+		return updated, insertOutbox(ctx, tx, event)
 	})
 }
 
@@ -262,7 +294,11 @@ func (s *Store) DeleteProject(ctx context.Context, tenantID, projectID string) e
 		if tag.RowsAffected() == 0 {
 			return tenant.ErrProjectNotFound
 		}
-		return nil
+		event, err := tenant.AuditProjectDeleted(tenantID, projectID)
+		if err != nil {
+			return err
+		}
+		return insertOutbox(ctx, tx, event)
 	})
 }
 
@@ -275,11 +311,17 @@ func (s *Store) CreateAPIKey(ctx context.Context, tenantID, name, scope string) 
 		if err := requireTenant(ctx, tx, tenantID); err != nil {
 			return tenant.APIKey{}, err
 		}
-		_, err := tx.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 			INSERT INTO api_keys(id, tenant_id, name, scope, prefix, key_hash, created_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
-		`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, key.CreatedAt)
-		return key, mapPostgresError(err)
+		`, key.ID, key.TenantID, key.Name, key.Scope, key.Prefix, hash, key.CreatedAt); err != nil {
+			return tenant.APIKey{}, mapPostgresError(err)
+		}
+		event, err := tenant.AuditAPIKeyCreated(key)
+		if err != nil {
+			return tenant.APIKey{}, err
+		}
+		return key, insertOutbox(ctx, tx, event)
 	})
 }
 
@@ -320,7 +362,11 @@ func (s *Store) RevokeAPIKey(ctx context.Context, tenantID, keyID string) error 
 		if tag.RowsAffected() == 0 {
 			return tenant.ErrAPIKeyNotFound
 		}
-		return nil
+		event, err := tenant.AuditAPIKeyRevoked(tenantID, keyID)
+		if err != nil {
+			return err
+		}
+		return insertOutbox(ctx, tx, event)
 	})
 }
 
@@ -361,7 +407,11 @@ func (s *Store) RotateAPIKey(ctx context.Context, tenantID, keyID, name string) 
 		if tag.RowsAffected() != 1 {
 			return tenant.APIKey{}, tenant.ErrAPIKeyNotFound
 		}
-		return key, nil
+		event, err := tenant.AuditAPIKeyRotated(key, keyID)
+		if err != nil {
+			return tenant.APIKey{}, err
+		}
+		return key, insertOutbox(ctx, tx, event)
 	})
 }
 

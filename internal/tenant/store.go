@@ -123,10 +123,12 @@ type Repository interface {
 }
 
 type Store struct {
-	mu       sync.RWMutex
-	tenants  map[string]Tenant
-	projects map[string]Project
-	apiKeys  map[string]apiKeyRecord
+	mu        sync.RWMutex
+	tenants   map[string]Tenant
+	projects  map[string]Project
+	apiKeys   map[string]apiKeyRecord
+	outbox    []outboxRow
+	outboxIDs map[string]struct{}
 }
 
 type apiKeyRecord struct {
@@ -136,9 +138,10 @@ type apiKeyRecord struct {
 
 func NewStore() *Store {
 	return &Store{
-		tenants:  map[string]Tenant{},
-		projects: map[string]Project{},
-		apiKeys:  map[string]apiKeyRecord{},
+		tenants:   map[string]Tenant{},
+		projects:  map[string]Project{},
+		apiKeys:   map[string]apiKeyRecord{},
+		outboxIDs: map[string]struct{}{},
 	}
 }
 
@@ -154,8 +157,13 @@ func (s *Store) ProvisionTenant(_ context.Context, t Tenant, keyName string) (Te
 	if err != nil {
 		return Tenant{}, APIKey{}, err
 	}
+	event, err := AuditTenantProvisioned(t, key)
+	if err != nil {
+		return Tenant{}, APIKey{}, err
+	}
 	s.tenants[t.ID] = t
 	s.apiKeys[key.ID] = apiKeyRecord{key: KeyWithoutSecret(key), hash: hash}
+	s.appendOutboxLocked(event)
 	return t, key, nil
 }
 
@@ -167,7 +175,12 @@ func (s *Store) CreateTenant(_ context.Context, t Tenant) (Tenant, error) {
 	if _, exists := s.tenants[t.ID]; exists {
 		return Tenant{}, ErrConflict
 	}
+	event, err := AuditTenantCreated(t)
+	if err != nil {
+		return Tenant{}, err
+	}
 	s.tenants[t.ID] = t
+	s.appendOutboxLocked(event)
 	return t, nil
 }
 
@@ -203,7 +216,12 @@ func (s *Store) CreateProject(_ context.Context, p Project) (Project, error) {
 	if _, exists := s.projects[key]; exists {
 		return Project{}, ErrConflict
 	}
+	event, err := AuditProjectCreated(p)
+	if err != nil {
+		return Project{}, err
+	}
 	s.projects[key] = p
+	s.appendOutboxLocked(event)
 	return p, nil
 }
 
@@ -253,7 +271,12 @@ func (s *Store) UpdateProject(_ context.Context, p Project) (Project, error) {
 	}
 	existing.Name = strings.TrimSpace(p.Name)
 	existing.UpdatedAt = time.Now().UTC()
+	event, err := AuditProjectUpdated(existing)
+	if err != nil {
+		return Project{}, err
+	}
 	s.projects[key] = existing
+	s.appendOutboxLocked(event)
 	return existing, nil
 }
 
@@ -265,7 +288,12 @@ func (s *Store) DeleteProject(_ context.Context, tenantID, projectID string) err
 	if _, ok := s.projects[key]; !ok {
 		return ErrProjectNotFound
 	}
+	event, err := AuditProjectDeleted(tenantID, projectID)
+	if err != nil {
+		return err
+	}
 	delete(s.projects, key)
+	s.appendOutboxLocked(event)
 	return nil
 }
 
@@ -273,7 +301,17 @@ func (s *Store) CreateAPIKey(_ context.Context, tenantID, name, scope string) (A
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.createAPIKeyLocked(tenantID, name, scope)
+	key, err := s.createAPIKeyLocked(tenantID, name, scope)
+	if err != nil {
+		return APIKey{}, err
+	}
+	event, err := AuditAPIKeyCreated(key)
+	if err != nil {
+		delete(s.apiKeys, key.ID)
+		return APIKey{}, err
+	}
+	s.appendOutboxLocked(event)
+	return key, nil
 }
 
 func (s *Store) ListAPIKeys(_ context.Context, tenantID string) ([]APIKey, error) {
@@ -297,7 +335,15 @@ func (s *Store) RevokeAPIKey(_ context.Context, tenantID, keyID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.revokeAPIKeyLocked(tenantID, keyID)
+	if err := s.revokeAPIKeyLocked(tenantID, keyID); err != nil {
+		return err
+	}
+	event, err := AuditAPIKeyRevoked(tenantID, keyID)
+	if err != nil {
+		return err
+	}
+	s.appendOutboxLocked(event)
+	return nil
 }
 
 func (s *Store) RotateAPIKey(_ context.Context, tenantID, keyID, name string) (APIKey, error) {
@@ -320,6 +366,12 @@ func (s *Store) RotateAPIKey(_ context.Context, tenantID, keyID, name string) (A
 		delete(s.apiKeys, key.ID)
 		return APIKey{}, err
 	}
+	event, err := AuditAPIKeyRotated(key, keyID)
+	if err != nil {
+		delete(s.apiKeys, key.ID)
+		return APIKey{}, err
+	}
+	s.appendOutboxLocked(event)
 	return key, nil
 }
 

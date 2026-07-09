@@ -79,6 +79,9 @@ func (s *Store) grantAppRole(ctx context.Context) error {
 	role := pgx.Identifier{s.appRole}.Sanitize()
 	statements := []string{
 		`GRANT SELECT, INSERT, UPDATE, DELETE ON tenants, projects, api_keys, telemetry_events TO ` + role,
+		// The app role only appends to the outbox; reading and stamping
+		// published_at is the relay's job through the admin role.
+		`GRANT INSERT ON outbox TO ` + role,
 		`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ` + role,
 	}
 	for _, statement := range statements {

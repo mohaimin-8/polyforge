@@ -17,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	"polyforge/internal/events"
 	"polyforge/internal/idempotency"
 	"polyforge/internal/limit"
 	"polyforge/internal/platform"
@@ -82,6 +83,28 @@ func main() {
 		closeStore = func() { _ = store.Close() }
 	}
 	defer closeStore()
+
+	// With NATS configured, the outbox relay streams every audit event to
+	// JetStream (ADR 0006); without it, events accumulate in the outbox and
+	// publish on the first start that has a backbone. Nothing is lost either
+	// way — that is the point of the outbox.
+	if natsURL := os.Getenv("POLYFORGE_NATS_URL"); natsURL != "" {
+		outbox, ok := tenantRepository.(events.Outbox)
+		if !ok {
+			log.Error("configured store does not expose an outbox")
+			os.Exit(1)
+		}
+		backbone, err := events.Connect(ctx, natsURL, events.BackboneConfig{})
+		if err != nil {
+			log.Error("connect NATS JetStream", "error", err)
+			os.Exit(1)
+		}
+		defer backbone.Close()
+		relayCtx, stopRelay := context.WithCancel(ctx)
+		defer stopRelay()
+		go events.NewRelay(outbox, backbone, log, time.Second).Run(relayCtx)
+		log.Info("outbox relay started", "stream", events.StreamName, "nats_url", natsURL)
+	}
 
 	adminKey := os.Getenv("POLYFORGE_ADMIN_KEY")
 	if adminKey == "" {
