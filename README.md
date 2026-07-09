@@ -11,8 +11,8 @@ The current implementation provides a persistent control-plane backend:
 - tenant registration API
 - complete project CRUD with keyset pagination
 - SQLite local persistence and PostgreSQL production persistence behind repository interfaces
-- admin and tenant API-key authentication
-- API-key listing, revocation, and atomic rotation
+- admin and tenant API-key authentication with read/full scopes enforced per route
+- API-key listing, revocation, and atomic scope-preserving rotation
 - request IDs, W3C `traceparent` propagation, structured JSON errors, and structured request logs
 - Prometheus-compatible `/metrics` endpoint for HTTP and accepted telemetry metrics
 - in-process token-bucket rate limiting for authenticated and anonymous API traffic
@@ -98,6 +98,40 @@ Generate a repeatable local SQLite CRUD profile:
 
 The default run creates 4 tenants and performs 25 project create/read/update/list/delete cycles per tenant. The latest artifact is `artifacts/m1-crud-baseline.json`.
 
+## HTTP Throughput Baseline
+
+Measure raw handler-path throughput with the Go load generator:
+
+```powershell
+.\scripts\bench-http.ps1
+```
+
+This builds the server and `cmd/loadgen`, drives `/healthz` for 15 seconds with
+a worker pool (2 goroutines per CPU by default), and writes
+`artifacts/m1-http-baseline.json`. The run sets `POLYFORGE_LOG_LEVEL=warn` and
+disables the rate limiter so the number reflects the handler path rather than
+the logger. Latest measurement: **71,893 RPS, p99 1 ms, 0 errors** over 1.07M
+requests on an 8-CPU Windows laptop (roadmap gate: ≥ 30,000 RPS). Windows'
+~0.5 ms timer granularity makes sub-millisecond percentiles such as p50
+unreliable; throughput is measured over the full run and unaffected.
+
+## API-Key Scopes
+
+Tenant API keys carry an immutable scope: `read` (read-only endpoints) or
+`full` (read + mutate; the default). Rotation preserves scope, so widening
+access always requires issuing a new key. A valid key used beyond its scope
+receives `403` with error code `forbidden`; a bad credential receives `401`.
+
+```powershell
+$headers = @{ "X-PolyForge-API-Key" = $fullKey }
+Invoke-RestMethod `
+  -Method Post `
+  -Uri http://localhost:8080/v1/tenants/acme/api-keys `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{"name":"observer","scope":"read"}'
+```
+
 ## Rate Limiting
 
 The control plane enables a local token-bucket limiter by default:
@@ -108,6 +142,10 @@ POLYFORGE_RATE_LIMIT_BURST=60
 ```
 
 Limits are keyed by remote address for tenant-management routes, tenant API-key fingerprint for tenant-scoped routes, or remote address when no credential is present. Set either value to `0` only for isolated local debugging.
+
+Structured JSON logs default to `info`, which emits one access-log line per
+request; set `POLYFORGE_LOG_LEVEL` to `warn`, `error`, or `debug` to change
+the threshold.
 
 ## PostgreSQL
 

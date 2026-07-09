@@ -1,0 +1,23 @@
+{
+  "generated_at": "2026-07-09T05:48:36Z",
+  "target_url": "http://localhost:8080/healthz",
+  "duration_seconds": 15,
+  "concurrency": 16,
+  "total_requests": 1078405,
+  "requests_per_second": 71893.26,
+  "non_2xx_responses": 0,
+  "transport_errors": 0,
+  "latency_ms": {
+    "max": 11.01,
+    "p50": 0,
+    "p90": 0.58,
+    "p95": 0.62,
+    "p99": 1
+  },
+  "runtime": {
+    "arch": "amd64",
+    "cpus": 8,
+    "go_version": "go1.25.5",
+    "os": "windows"
+  }
+}

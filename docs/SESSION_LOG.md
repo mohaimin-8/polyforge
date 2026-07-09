@@ -7,6 +7,78 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-09 (session 3) — API-key scopes with RBAC, and the 30k-RPS gate beaten 2.4×
+
+Milestone status: closes the roadmap's W7 deliverable "API keys with scoped
+permissions" including its verification gate ("read-only key returns 403 on
+POST"), and the W4 throughput gate ("≥ 30,000 RPS for a simple GET handler").
+Commits: `a06f329` (scopes + RBAC), plus this session's benchmark commit.
+
+### What changed
+
+**Read/full API-key scopes, enforced per route (`a06f329`).**
+
+- `tenant` package: `ScopeRead`/`ScopeFull` constants, `NormalizeScope`,
+  `ValidScope`, and `ScopeAllows` (fails closed on unknown scopes and unknown
+  requirements). `APIKey.Scope` is immutable for the key's lifetime and
+  preserved by rotation — widening access requires a new credential.
+- All three repositories persist scope. SQLite backfills legacy rows to
+  `full` during migration (asserted by the legacy-migration test); PostgreSQL
+  migration `002_api_key_scope.sql` adds the column with `DEFAULT 'full'` and
+  a CHECK constraint. Backfilling to full rather than least-privilege was
+  deliberate: least-privilege would silently break every existing
+  deployment's credentials.
+- `authorizeTenant` takes the route's required scope: GETs require `read`,
+  mutations and telemetry ingest require `full`. 401 (bad credential) vs 403
+  (valid credential, missing authority) is deliberate, with a structured
+  `forbidden` error code.
+- `TestReadOnlyScopeIsEnforced` automates the roadmap gate: a read key gets
+  403 with code `forbidden` on every mutating route, 200 on every read route;
+  a full key mutates; invalid scopes are 400.
+- OpenAPI 0.4.0: `scope` on `APIKey`/`CreateAPIKey`, `Forbidden` response,
+  403 documented on all 13 tenant-scoped operations. Redocly-clean.
+
+**HTTP throughput baseline (W4 gate).**
+
+- `cmd/loadgen`: Go load generator — fixed worker pool, per-worker latency
+  slices (no locks in the hot path), context cancellation, JSON artifact with
+  RPS/percentiles/runtime metadata. Doubles as the W3 concurrency reference
+  implementation.
+- `scripts/bench-http.ps1`: builds server + loadgen, runs 15 s against
+  `/healthz` with the limiter off and logs at warn, writes
+  `artifacts/m1-http-baseline.json`.
+- `POLYFORGE_LOG_LEVEL` env var (default `info`): per-request access logs are
+  info-level, so benchmarks set `warn` to measure the handler path rather
+  than the logger. A production ops knob the service needed anyway.
+
+### Measured result
+
+**71,893 RPS, p99 1 ms, 0 transport errors, 0 non-2xx over 1,078,405
+requests** in 15 s at concurrency 16 on this 8-CPU Windows laptop — the
+roadmap gate is ≥ 30,000. Caveat recorded honestly: Windows' ~0.5 ms
+interrupt-timer granularity quantizes sub-millisecond samples, so p50 reads
+0 and is not meaningful; throughput is computed over the full wall-clock run
+and is unaffected. The middleware chain (request ID, trace context, metrics,
+recoverer) was active during the run.
+
+### How it was verified
+
+gofmt/vet/golangci-lint clean, `go test ./...` 7/7 packages, Redocly lint
+clean, smoke script green end-to-end, benchmark run twice (warmup discarded).
+PostgreSQL migration 002 and the integration-test scope assertions compile
+locally but execute only in CI (no local Docker) — not claimed as locally
+verified.
+
+### Immediate next tasks
+
+1. Push to a remote; watch race + coverage + lint + migration 002 go green.
+2. W7 remainder: JWT RS256 + JWKS (deferred — half-landing auth is worse
+   than deferring it).
+3. W5 evidence artifacts (EXPLAIN ANALYZE) and W9 Dockerfiles — both need
+   Docker; consider installing Docker Desktop before next session.
+
+---
+
 ## 2026-07-09 (session 2) — Testing gates, auth coverage, and roadmap alignment
 
 Milestone status: closes the roadmap's W8 testing gates (race in CI, coverage

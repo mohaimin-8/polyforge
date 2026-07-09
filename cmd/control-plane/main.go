@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: envLogLevel("POLYFORGE_LOG_LEVEL", slog.LevelInfo)}))
 
 	ctx := context.Background()
 	var tenantRepository tenant.Repository
@@ -122,4 +122,15 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+// envLogLevel reads a slog level name (debug, info, warn, error) from the
+// environment. Per-request access logs are emitted at info, so warn is the
+// right setting for load benchmarks where logging would dominate the cost.
+func envLogLevel(name string, fallback slog.Level) slog.Level {
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(os.Getenv(name))); err != nil {
+		return fallback
+	}
+	return level
 }
