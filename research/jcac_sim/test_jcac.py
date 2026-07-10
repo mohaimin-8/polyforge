@@ -197,6 +197,97 @@ class BaselineTests(unittest.TestCase):
             baselines.make_baseline("nope", configs)
 
 
+class ForecastMethodTests(unittest.TestCase):
+    def _observe_series(self, method: str, series: list[float]) -> Forecast:
+        f = Forecast(method=method)
+        for v in series:
+            f.observe(demand({"chat": v}))
+        return f
+
+    def test_persistence_is_flat(self):
+        f = self._observe_series("persistence", [1.0, 2.0, 9.0])
+        self.assertTrue(all(d.rps["chat"] == 9.0 for d in f.horizon()))
+
+    def test_holt_tracks_level_without_chasing_one_spike(self):
+        f = self._observe_series("holt", [10.0] * 30 + [40.0])  # single spike
+        first = f.horizon()[0].rps["chat"]
+        self.assertGreater(first, 10.0)  # it responds...
+        self.assertLess(first, 40.0)  # ...but does not swallow the spike whole
+        g = self._observe_series("trend", [10.0] * 30 + [40.0])
+        self.assertGreater(g.horizon()[0].rps["chat"], first)  # trend overreacts more
+
+    def test_seasonal_detects_a_square_wave_period(self):
+        period, cycles = 12, 6
+        wave = ([50.0] * 4 + [5.0] * 8) * cycles
+        f = self._observe_series("seasonal", wave)
+        # History ends at a period boundary, so the next steps are the
+        # burst phase: a period-aware forecast predicts the burst *before*
+        # it arrives; trend, looking at the recent quiet phase, cannot.
+        self.assertGreater(f.horizon()[0].rps["chat"], 25.0)
+        t = self._observe_series("trend", wave)
+        self.assertLess(t.horizon()[0].rps["chat"], 25.0)
+
+    def test_seasonal_falls_back_to_trend_without_periodicity(self):
+        # A pure ramp has no season; raw autocorrelation would claim one
+        # (same-signed deviations), which is why the detector detrends.
+        ramp = [float(i) for i in range(30)]
+        f = self._observe_series("seasonal", ramp)
+        t = self._observe_series("trend", ramp)
+        self.assertEqual(
+            [d.rps["chat"] for d in f.horizon()],
+            [d.rps["chat"] for d in t.horizon()],
+        )
+
+
+class AdaptiveCapacityTests(unittest.TestCase):
+    def test_feedback_shrinks_then_recovers_capacity_trust(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = JCACController(configs, adaptive_capacity=True)
+        ctl.plan({"a": TenantState()}, {"a": demand({"crud_read": 10.0})})
+        projected = ctl._projected["a"]
+        ctl.observe_feedback({"a": projected + 0.5})  # world much worse than promised
+        shrunk = ctl.capacity_scale["a"]
+        self.assertLess(shrunk, 1.0)
+        ctl.plan({"a": TenantState()}, {"a": demand({"crud_read": 10.0})})
+        ctl.observe_feedback({"a": 0.0})  # world fine again
+        self.assertGreater(ctl.capacity_scale["a"], shrunk)
+        self.assertLessEqual(ctl.capacity_scale["a"], 1.0)
+
+    def test_non_adaptive_controller_ignores_feedback(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = JCACController(configs)
+        ctl.plan({"a": TenantState()}, {"a": demand({"crud_read": 10.0})})
+        ctl.observe_feedback({"a": 1.0})
+        self.assertEqual(ctl.capacity_scale["a"], 1.0)
+
+
+class TransitionCostTests(unittest.TestCase):
+    def test_effective_state_lags_growth_not_shrink(self):
+        import simulate
+
+        prev = TenantState(replicas=2, cache_mb=128)
+        up = simulate.effective_state(prev, TenantState(replicas=5, cache_mb=512))
+        self.assertEqual(up.replicas, 2)  # startup lag
+        self.assertEqual(up.cache_mb, 320)  # half-warm
+        down = simulate.effective_state(prev, TenantState(replicas=1, cache_mb=64))
+        self.assertEqual((down.replicas, down.cache_mb), (1, 64))  # instant
+
+    def test_transition_costs_punish_a_reactive_scaler(self):
+        import simulate
+
+        # Bursty demand: HPA scales after each burst arrives, so under
+        # startup lag its new replicas always miss the burst they were
+        # bought for.
+        buckets = []
+        for step in range(40):
+            rate = 260.0 if (step // 5) % 2 == 0 else 10.0
+            buckets.append({"a": demand({"crud_read": rate})})
+        ideal = simulate.run("hpa", ["a"], buckets, collect_rows=False)
+        laggy = simulate.run("hpa", ["a"], buckets, collect_rows=False,
+                             transition_costs=True)
+        self.assertGreater(laggy.mean_violation, ideal.mean_violation)
+
+
 class SimulateTests(unittest.TestCase):
     def _buckets(self, steps: int = 12):
         return [

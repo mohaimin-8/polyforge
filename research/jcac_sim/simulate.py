@@ -164,6 +164,21 @@ def _percentile(values: list[float], q: float) -> float:
     return ordered[min(len(ordered) - 1, int(q * (len(ordered) - 1) + 0.5))]
 
 
+def effective_state(prev: TenantState, nominal: TenantState) -> TenantState:
+    """What actually serves this interval under reconfiguration realism:
+    replicas added this step are still starting up (serve at the previous
+    count); a cache grown this step is half-warm (serves at the midpoint).
+    Shrinking either is instant — capacity leaves faster than it arrives."""
+    replicas = prev.replicas if nominal.replicas > prev.replicas else nominal.replicas
+    if nominal.cache_mb > prev.cache_mb:
+        cache_mb = (nominal.cache_mb + prev.cache_mb) // 2
+    else:
+        cache_mb = nominal.cache_mb
+    if replicas == nominal.replicas and cache_mb == nominal.cache_mb:
+        return nominal
+    return TenantState(replicas=replicas, cache_mb=cache_mb, tier=nominal.tier)
+
+
 def run(
     controller_name: str,
     tenant_ids: list[str],
@@ -177,20 +192,30 @@ def run(
     jitter_seed: int | None = None,
     plan_demand_transform=None,
     miss_cost_factor: float = 1.0,
+    transition_costs: bool = False,
 ) -> RunResult:
     """Replay `buckets` under one controller.
 
     W33 harness extensions, all defaulting to the original behavior:
-    - `controller_params`: tuning knobs forwarded to the baseline (W34 grids).
+    - `controller_params`: tuning knobs forwarded to the controller
+      (baseline grids; JCAC's forecast_method / adaptive_capacity).
     - `jitter_seed`: Poisson-resample the trace so repetitions differ.
     - `plan_demand_transform(demands) -> demands`: what the *controller*
       sees; scoring always uses the true demand (classifier ablation).
     - `miss_cost_factor`: scales inference (tier) spend for systems that
       evict LRU instead of cost-aware (W28 measured factor).
+    - `transition_costs`: reconfiguration realism. Scale-*ups* take one
+      interval to serve (replica startup lag) and a grown cache serves its
+      first interval half-warm, while billing follows the *nominal*
+      configuration immediately — you pay for capacity the moment you ask
+      for it and benefit one step later. Scale-downs are instant both
+      ways. Controllers are not told (no controller sees the lag), so
+      thrashing is punished and hysteresis finally earns its keep.
     """
     configs = configs or default_configs(tenant_ids)
     if controller_name == "jcac":
-        ctl = JCACController(configs, weights=weights, limits=limits)
+        ctl = JCACController(configs, weights=weights, limits=limits,
+                             **(controller_params or {}))
     else:
         ctl = baselines.make_baseline(controller_name, configs, **(controller_params or {}))
 
@@ -206,24 +231,38 @@ def run(
     ai_hit_rps = ai_total_rps = 0.0
 
     horizon = buckets[:max_steps] if max_steps else buckets
+    prev_states = dict(states)
     for step, demands in enumerate(horizon):
         # Controller decides on this bucket's observed demand...
         seen = plan_demand_transform(demands) if plan_demand_transform else demands
         plans = ctl.plan(states, seen)
-        states = {tid: (p.state if hasattr(p, "state") else p) for tid, p in plans.items()}
+        prev_states, states = states, {
+            tid: (p.state if hasattr(p, "state") else p) for tid, p in plans.items()
+        }
         # ...and is scored against the next bucket that actually arrives.
         if step + 1 >= len(horizon):
             break
         actual = horizon[step + 1]
         satisfactions = []
+        realized: dict[str, float] = {}
         for tid in tenant_ids:
-            m = evaluate_step(configs[tid], states[tid], actual[tid])
-            cost = m.cost_infra_usd + miss_cost_factor * m.cost_tier_usd
+            nominal = states[tid]
+            serving = nominal
+            if transition_costs:
+                serving = effective_state(prev_states[tid], nominal)
+            m = evaluate_step(configs[tid], serving, actual[tid])
+            cost = miss_cost_factor * m.cost_tier_usd
+            if transition_costs and serving != nominal:
+                # Billing follows the nominal configuration immediately.
+                cost += evaluate_step(configs[tid], nominal, actual[tid]).cost_infra_usd
+            else:
+                cost += m.cost_infra_usd
             result.total_cost_usd += cost
             viol_sum += m.violation
             viol_steps += 1 if m.violation > 0.0 else 0
             tenant_steps += 1
             satisfactions.append(1.0 - m.violation)
+            realized[tid] = m.violation
 
             demand = actual[tid]
             if sum(demand.rps.get(k, 0.0) for k in CRUD_KINDS) > 0.0:
@@ -231,7 +270,7 @@ def run(
             ai_rps = sum(demand.rps.get(k, 0.0) for k in AI_KINDS)
             if ai_rps > 0.0:
                 ai_p95s.append(m.ai_p95_ms)
-                hit = hit_rate(states[tid].cache_mb)
+                hit = hit_rate(serving.cache_mb)
                 ai_hit_rps += sum(
                     demand.rps.get(k, 0.0) * hit * CACHEABLE_FRACTION[k] for k in AI_KINDS
                 )
@@ -252,6 +291,8 @@ def run(
                 })
         jain_sum += jain_index(satisfactions)
         result.steps += 1
+        if hasattr(ctl, "observe_feedback"):
+            ctl.observe_feedback(realized)
 
     if tenant_steps:
         result.mean_violation = viol_sum / tenant_steps

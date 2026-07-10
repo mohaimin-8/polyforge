@@ -132,6 +132,25 @@ SYSTEMS: dict[str, SystemSpec] = {
         "gptcache", lru_eviction=True,
         description="GPTCache posture: cache everything with LRU, HPA replicas",
     ),
+    # --- Forecast ablation (Tier 2A): same controller, different eyes ----
+    "jcac_persistence": SystemSpec(
+        "jcac", params={"forecast_method": "persistence"},
+        description="PolyForge with a persistence forecast: lookahead floor",
+    ),
+    "jcac_holt": SystemSpec(
+        "jcac", params={"forecast_method": "holt"},
+        description="PolyForge with damped Holt smoothing: noise-robust trend",
+    ),
+    "jcac_seasonal": SystemSpec(
+        "jcac", params={"forecast_method": "seasonal"},
+        description="PolyForge with online period detection: sees the next burst coming",
+    ),
+    # --- Self-calibration (Tier 2C): trusts the model only while it keeps
+    # its promises; earns its keep under reconfiguration realism ----------
+    "jcac_adaptive": SystemSpec(
+        "jcac", params={"adaptive_capacity": True},
+        description="PolyForge that learns effective capacity from realized-vs-projected feedback",
+    ),
     # --- W36 ablations (PolyForge minus one contribution) ----------------
     "jcac_noclassifier": SystemSpec(
         "jcac", blind_classifier=True,

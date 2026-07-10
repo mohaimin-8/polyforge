@@ -1,0 +1,15 @@
+# Tier 2A forecast ablation: the same JCAC controller with four different
+# demand forecasters. How much of the win is lookahead, and how much
+# better can lookahead get?
+#   4 systems x 5 workloads x 2 mixes x 1 cluster x 5 reps = 200 runs
+name: forecasters
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac_persistence, jcac, jcac_holt, jcac_seasonal]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, whale]
+cluster_sizes: [medium]
+output: eval/results/forecasters.duckdb
+retries: 2
+timeseries_reps: 1

@@ -1,0 +1,19 @@
+# Tier 2B reconfiguration realism: replica scale-ups take one interval to
+# serve and grown caches start half-warm, while billing follows the
+# nominal configuration immediately. No controller is told. Reactive
+# scalers pay for capacity that misses the burst it was bought for;
+# PolyForge's hysteresis and (in the adaptive variant) self-calibration
+# are the mechanisms under test.
+#   7 systems x 5 workloads x 1 mix x 1 cluster x 5 reps = 175 runs
+name: realism
+backend: sim
+steps: 120
+reps: 5
+transition_costs: true
+systems: [jcac, jcac_adaptive, hpa, keda, firm, static, gptcache]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform]
+cluster_sizes: [medium]
+output: eval/results/realism.duckdb
+retries: 2
+timeseries_reps: 1

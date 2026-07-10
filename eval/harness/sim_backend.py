@@ -52,6 +52,7 @@ def execute(run: RunSpec) -> dict:
         jitter_seed=run.seed ^ _JITTER_SALT,
         plan_demand_transform=global_mix_transform if spec.blind_classifier else None,
         miss_cost_factor=lru_miss_cost_factor() if spec.lru_eviction else 1.0,
+        transition_costs=run.transition_costs,
     )
     wall_s = time.time() - started
 

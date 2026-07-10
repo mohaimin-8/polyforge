@@ -40,6 +40,7 @@ class RunSpec:
     run_id: str
     seed: int
     store_timeseries: bool
+    transition_costs: bool = False
 
 
 @dataclass
@@ -54,6 +55,9 @@ class ExperimentSpec:
     cluster_sizes: list = field(default_factory=lambda: list(CLUSTER_SIZES))
     output: str = "eval/results/results.duckdb"
     retries: int = 2
+    # Reconfiguration realism (replica startup lag, cache warm-up) in the
+    # scoring engine; see simulate.run(transition_costs=...).
+    transition_costs: bool = False
     # Per-step, per-tenant rows are large; keep them for the first
     # `timeseries_reps` repetitions only (figures need one trace, stats
     # need only the per-run aggregates).
@@ -101,6 +105,9 @@ def run_identity(spec: ExperimentSpec, system: str, workload: str, mix: str,
     material = "|".join(
         [SCHEMA_VERSION, spec.name, system, workload, mix, cluster, str(rep), str(spec.steps)]
     )
+    if spec.transition_costs:
+        # Appended only when set so every pre-existing run_id is unchanged.
+        material += "|tc" 
     digest = hashlib.sha256(material.encode()).hexdigest()
     run_id = digest[:16]
     seed = int(digest[16:28], 16) % (2**31 - 1)
@@ -129,5 +136,6 @@ def expand(spec: ExperimentSpec) -> list[RunSpec]:
                             run_id=run_id,
                             seed=seed,
                             store_timeseries=rep < spec.timeseries_reps,
+                            transition_costs=spec.transition_costs,
                         ))
     return runs
