@@ -1,0 +1,15 @@
+# W35b full matrix:
+#   6 systems x 5 workload classes x 4 tenant mixes x 3 cluster sizes x 5 reps
+#   = 1,800 runs
+# Systems = PolyForge (jcac) + the five W34 baselines.
+name: full
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, hpa, keda, firm, static, gptcache]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim.duckdb
+retries: 2
+timeseries_reps: 1

@@ -7,3 +7,12 @@ data/*.db
 data/*.db-*
 research/traces/out/
 __pycache__/
+# Raw result databases are archived via Zenodo (eval/scripts/archive_zenodo.py);
+# git carries the run-level CSV exports, figures, and logs instead.
+eval/results/*.duckdb
+eval/results/*.duckdb.wal
+eval/results/zenodo/
+# Terraform state contains the k3s join token — never commit it.
+eval/infra/terraform/.terraform/
+eval/infra/terraform/*.tfstate*
+eval/infra/terraform/kubeconfig.yaml

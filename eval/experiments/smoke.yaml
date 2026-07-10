@@ -1,0 +1,14 @@
+# W35a smoke set: 50 runs, PolyForge + one fast baseline, built to surface
+# harness bugs before they cost days at run 700 of 1,800.
+#   2 systems x 5 workload classes x 1 tenant mix x 1 cluster size x 5 reps = 50
+name: smoke
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, hpa]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform]
+cluster_sizes: [medium]
+output: eval/results/smoke.duckdb
+retries: 2
+timeseries_reps: 1

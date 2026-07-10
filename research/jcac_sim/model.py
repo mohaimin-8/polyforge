@@ -150,6 +150,12 @@ class StepMetrics:
     crud_p95_ms: float
     ai_p95_ms: float
     cache_hit_rate: float
+    # Cost decomposition (cost_usd = cost_infra_usd + cost_tier_usd). The
+    # W33 harness scales the tier component for systems that evict with
+    # plain LRU instead of the W28 cost-aware policy — eviction changes
+    # *which* requests miss, so it moves inference spend, not infra spend.
+    cost_infra_usd: float = 0.0
+    cost_tier_usd: float = 0.0
 
 
 def evaluate_step(config: TenantConfig, state: TenantState, demand: Demand) -> StepMetrics:
@@ -199,17 +205,19 @@ def evaluate_step(config: TenantConfig, state: TenantState, demand: Demand) -> S
             excess += (ai_rps / total_rps) * over
 
     interval_hr = CONTROL_INTERVAL_S / 3600.0
-    cost = state.replicas * REPLICA_COST_USD_HR * interval_hr
-    cost += (state.cache_mb / 1024.0) * MEM_COST_USD_GB_HR * interval_hr
-    cost += miss_rps * CONTROL_INTERVAL_S * TIER_COST_USD_PER_REQ[state.tier]
+    cost_infra = state.replicas * REPLICA_COST_USD_HR * interval_hr
+    cost_infra += (state.cache_mb / 1024.0) * MEM_COST_USD_GB_HR * interval_hr
+    cost_tier = miss_rps * CONTROL_INTERVAL_S * TIER_COST_USD_PER_REQ[state.tier]
 
     return StepMetrics(
-        cost_usd=cost,
+        cost_usd=cost_infra + cost_tier,
         violation=violation,
         excess=excess,
         crud_p95_ms=crud_p95,
         ai_p95_ms=ai_p95,
         cache_hit_rate=hit,
+        cost_infra_usd=cost_infra,
+        cost_tier_usd=cost_tier,
     )
 
 

@@ -1,0 +1,11 @@
+# Harness core
+duckdb>=1.0
+PyYAML>=6.0
+# Analysis (W36)
+pandas>=2.0
+scipy>=1.11
+statsmodels>=0.14
+matplotlib>=3.8
+seaborn>=0.13
+# Tests
+pytest>=8.0

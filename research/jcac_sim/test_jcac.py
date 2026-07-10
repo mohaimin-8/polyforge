@@ -148,6 +148,113 @@ class BaselineTests(unittest.TestCase):
         )
         self.assertEqual(out["a"].tier, "mid")
 
+    def test_static_overprovisioned_pins_to_peak(self):
+        configs = {"a": TenantConfig(tenant_id="a", replica_max=8)}
+        ctl = baselines.StaticController(configs, overprovisioned=True)
+        out = ctl.plan({"a": TenantState()}, {"a": demand({"crud_read": 1.0})})
+        self.assertEqual(out["a"].replicas, 8)
+        self.assertEqual(out["a"].cache_mb, model.CACHE_LEVELS_MB[-1])
+        # And it never moves after that.
+        again = ctl.plan(out, {"a": demand({"chat": 100.0})})
+        self.assertEqual(again["a"], out["a"])
+
+    def test_firm_learns_to_scale_out_of_violation(self):
+        configs = {"a": TenantConfig(tenant_id="a", slo_class="premium")}
+        ctl = baselines.FIRMReplicaController(configs, seed=7, epsilon=0.05)
+        states = {"a": TenantState(replicas=1)}
+        overload = {"a": demand({"crud_read": 400.0})}
+        for _ in range(40):  # enough steps for the Q-table to converge
+            states = ctl.plan(states, overload)
+        self.assertGreater(states["a"].replicas, 2)
+        self.assertEqual(states["a"].cache_mb, 128)  # replica-only controller
+        self.assertEqual(states["a"].tier, "small")
+
+    def test_firm_is_deterministic_under_a_seed(self):
+        def run_once():
+            configs = {"a": TenantConfig(tenant_id="a")}
+            ctl = baselines.FIRMReplicaController(configs, seed=3)
+            states = {"a": TenantState()}
+            for i in range(20):
+                states = ctl.plan(states, {"a": demand({"crud_read": float(20 * i)})})
+            return states["a"]
+
+        self.assertEqual(run_once(), run_once())
+
+    def test_gptcache_grows_cache_on_cacheable_traffic(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = baselines.GPTCacheLRUController(configs)
+        states = {"a": TenantState(cache_mb=0)}
+        chatty = {"a": demand({"chat": 5.0})}
+        for _ in range(len(model.CACHE_LEVELS_MB)):
+            states = ctl.plan(states, chatty)
+        self.assertEqual(states["a"].cache_mb, model.CACHE_LEVELS_MB[-1])
+
+    def test_make_baseline_forwards_tuning_params(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = baselines.make_baseline("hpa", configs, target_rho=0.4)
+        self.assertEqual(ctl.target_rho, 0.4)
+        with self.assertRaises(ValueError):
+            baselines.make_baseline("nope", configs)
+
+
+class SimulateTests(unittest.TestCase):
+    def _buckets(self, steps: int = 12):
+        return [
+            {"a": demand({"crud_read": 30.0, "chat": 2.0}), "b": demand({"chat": 4.0})}
+            for _ in range(steps)
+        ]
+
+    def test_jitter_is_seeded_and_changes_demand(self):
+        import simulate
+
+        buckets = self._buckets()
+        j1 = simulate.jitter_buckets(buckets, seed=1)
+        j2 = simulate.jitter_buckets(buckets, seed=1)
+        j3 = simulate.jitter_buckets(buckets, seed=2)
+        self.assertEqual(
+            [b["a"].rps for b in j1], [b["a"].rps for b in j2]
+        )
+        self.assertNotEqual(
+            [b["a"].rps for b in j1], [b["a"].rps for b in j3]
+        )
+
+    def test_miss_cost_factor_only_scales_tier_spend(self):
+        import simulate
+
+        buckets = self._buckets()
+        base = simulate.run("static", ["a", "b"], buckets, collect_rows=False)
+        lru = simulate.run(
+            "static", ["a", "b"], buckets, collect_rows=False, miss_cost_factor=2.0
+        )
+        self.assertGreater(lru.total_cost_usd, base.total_cost_usd)
+        # Same decisions, so violation profile is untouched.
+        self.assertEqual(lru.mean_violation, base.mean_violation)
+
+    def test_plan_transform_blinds_controller_not_scoring(self):
+        import simulate
+
+        buckets = self._buckets()
+
+        def blind(demands):
+            return {tid: Demand(rps={}, crud_base_ms=d.crud_base_ms) for tid, d in demands.items()}
+
+        seeing = simulate.run("hpa", ["a", "b"], buckets, collect_rows=False)
+        blinded = simulate.run(
+            "hpa", ["a", "b"], buckets, collect_rows=False, plan_demand_transform=blind
+        )
+        # A blinded HPA sees zero demand, scales to the floor, and violates more.
+        self.assertGreaterEqual(blinded.mean_violation, seeing.mean_violation)
+
+    def test_summary_reports_hit_rate_and_p95(self):
+        import simulate
+
+        r = simulate.run("gptcache", ["a", "b"], self._buckets(), collect_rows=True)
+        s = r.summary()
+        self.assertGreater(s["cache_hit_rate"], 0.0)
+        self.assertGreater(s["ai_p95_ms"], 0.0)
+        self.assertGreater(s["crud_p95_ms"], 0.0)
+        self.assertIn("cache_hit_rate", r.rows[0])
+
 
 if __name__ == "__main__":
     unittest.main()
