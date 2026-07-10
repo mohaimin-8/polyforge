@@ -155,7 +155,19 @@ def main() -> None:
 
     report = run_experiment(spec, workers=args.workers, limit=args.limit)
     print(json.dumps(report, indent=2))
-    if not report["ok"]:
+    if args.limit is not None:
+        # A deliberately partial run cannot satisfy the full-count check;
+        # gate on integrity only (nothing failed, nothing corrupted).
+        ok = (
+            report["failed_runs"] == 0
+            and report["duplicate_run_ids"] == 0
+            and report["orphan_metrics"] == 0
+            and report["valid_without_metrics"] == 0
+            and report["null_metrics"] == 0
+        )
+    else:
+        ok = report["ok"]
+    if not ok:
         raise SystemExit(1)
 
 
