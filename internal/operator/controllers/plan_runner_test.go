@@ -6,11 +6,13 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	pfv1alpha1 "polyforge/internal/operator/api/v1alpha1"
+	"polyforge/internal/operator/fairness"
 	"polyforge/internal/operator/planner"
 )
 
@@ -190,6 +192,38 @@ type stubInterference struct{ scores map[string]float64 }
 
 func (s stubInterference) TenantInterference(_ context.Context, tid string) float64 {
 	return s.scores[tid]
+}
+
+// TestNoisyNeighborClosedLoop chains the real W32 detector into the plan
+// loop: three windows of eBPF-shaped samples flag the tenant, the next
+// plan request carries its interference score, and the fairness gauge
+// reflects the planner's projected satisfaction spread. (The throttle
+// itself is the planner's move — proven on the Python side by
+// test_interference_throttles_noisy_tenant.)
+func TestNoisyNeighborClosedLoop(t *testing.T) {
+	c, _ := plannerFixtures(t)
+	detector := fairness.NewDetector(fairness.DetectorConfig{})
+	for range 3 { // 3 windows x 10s control interval = flagged within 30s
+		detector.Observe([]fairness.Sample{
+			{TenantID: "acme", CPUStallShare: 0.6, SyscallRate: 50_000, MemPressureEvents: 12},
+			{TenantID: "quiet-a", CPUStallShare: 0.05, SyscallRate: 2_000},
+			{TenantID: "quiet-b", CPUStallShare: 0.06, SyscallRate: 2_500},
+		})
+	}
+	stub := &stubPlanner{response: planner.Response{
+		Plans: map[string]planner.Plan{"acme": {Replicas: 1, CacheMB: 64, Tier: "small", ProjectedViolation: 0.2}},
+	}}
+	runner := &PlanRunner{Client: c, Planner: stub, Demands: demandFor("acme"), Interference: detector}
+
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := stub.requests[0].Tenants[0].Interference; got <= 0 {
+		t.Errorf("flagged tenant's interference not forwarded, got %v", got)
+	}
+	if got := testutil.ToFloat64(jainGauge); got != 1.0 { // single tenant: vacuously fair
+		t.Errorf("jain gauge = %v, want 1.0", got)
+	}
 }
 
 func TestPlanRunnerForwardsInterference(t *testing.T) {

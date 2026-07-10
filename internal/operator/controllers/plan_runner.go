@@ -7,17 +7,32 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 
 	pfv1alpha1 "polyforge/internal/operator/api/v1alpha1"
+	"polyforge/internal/operator/fairness"
 	"polyforge/internal/operator/planner"
 )
+
+// jainGauge reports cluster-wide fairness over per-tenant SLO satisfaction
+// after every plan cycle (W32 verification: Jain's index visible over
+// time, dropping when a tenant goes noisy and recovering post-mitigation).
+var jainGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+	Name: "polyforge_operator_fairness_jain",
+	Help: "Jain's fairness index over per-tenant projected SLO satisfaction, per plan cycle.",
+})
+
+func init() {
+	metrics.Registry.MustRegister(jainGauge)
+}
 
 const (
 	// DefaultPlanInterval is JCAC's control period: plan, apply the first
@@ -125,12 +140,15 @@ func (p *PlanRunner) RunOnce(ctx context.Context) error {
 		return nil // fallback is the designed behavior, not a cycle error
 	}
 
+	satisfactions := make([]float64, 0, len(inputs))
 	for _, input := range inputs {
 		plan := resp.Plans[input.TenantID]
+		satisfactions = append(satisfactions, 1.0-plan.ProjectedViolation)
 		if err := p.apply(ctx, policies[input.TenantID], input, plan, resp.Solver); err != nil && p.Log != nil {
 			p.Log.Error("apply plan", "tenant", input.TenantID, "error", err)
 		}
 	}
+	jainGauge.Set(fairness.JainIndex(satisfactions))
 	return nil
 }
 

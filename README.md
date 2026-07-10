@@ -32,6 +32,9 @@ The current implementation provides a persistent control-plane backend:
 - workload classifier: 12-feature pipeline, trained softmax model with drift-guarded JSON artifact (`cmd/classifier-train`, ADR 0012), formal 5-class taxonomy (`research/TAXONOMY.md`)
 - online classification: per-tenant labels every 10s with PSI drift detection, label-change events to NATS, admin dashboard at `/admin/workloads` (W27)
 - cost-aware semantic-cache eviction: per-tenant bounded cache, 6-policy benchmark (`cmd/evictionbench`, `research/results/eviction_comparison.csv`), paper section at `research/paper/sec-eviction.tex` (W28)
+- Kubernetes operator (`cmd/operator`): Tenant/WorkloadProfile/Policy/Budget CRDs with status subresources, ordered finalizer teardown, replica-bound guardrails, OTel-traced reconciles (ADR 0013, W29)
+- JCAC joint controller: MPC formulation + offline simulator with Pareto sweep (`research/jcac_sim`, `research/paper/sec-jcac.tex`, W30); live planner service (`services/planner`) called by the operator every 10s with last-good-plan fallback and NATS action audit (ADR 0014, W31)
+- multi-tenant fairness: peer-relative noisy-neighbor detector on eBPF-shaped signals feeding an interference penalty into the planner, Jain's index exported per plan cycle (ADR 0015, W32; Pixie adapter + soak deferred to the harness environment)
 
 SQLite remains the zero-infrastructure development path. PostgreSQL is the production path and requires separate admin and application roles so row-level security is testable rather than bypassed accidentally.
 

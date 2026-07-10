@@ -7,6 +7,122 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-10 (session 9) — W29-W32: Month 8 complete — operator, JCAC, planner loop, fairness
+
+Milestone status: closes **all of M8 (Research II)** — W29 Kubernetes
+operator + CRDs, W30 JCAC formulation + offline simulator, W31 live
+planner loop, W32 noisy-neighbor fairness. The user asked for "the next
+10%" (explicit override of the ~5% norm); the roadmap places end-of-W32
+at 90%, and the honest position is **~88-89%** — the deltas are the
+live-cluster items (kubectl-against-a-real-API-server verification,
+Pixie/eBPF collection, the 24-hour soak), each designed behind an
+interface, unit-verified, and documented as deferred to the W33 harness
+environment rather than claimed. Four commits, one per week.
+
+### What was built
+
+**W29 (ADR 0013).** `internal/operator` on controller-runtime v0.22:
+four cluster-scoped CRDs (Tenant, WorkloadProfile, Policy, Budget) with
+status subresources and printcolumns, deepcopy + CRD manifests generated
+by controller-gen via `go run` (no kubebuilder scaffold — single-module
+repo). TenantReconciler ensures namespace (silo tenants own one;
+pool/bridge share `polyforge-tenants` per ADR 0008), read-only tenant
+RBAC, and default Policy/Budget/WorkloadProfile it never overwrites
+after creation; a finalizer deletes dependents in order. PolicyReconciler
+clamps replicas to `[replicaMin, replicaMax]` and patches the target
+Deployment + per-tenant ConfigMap. Money is integer milli-USD and
+confidence is permille because CRD schemas reject floats.
+
+**W30 (ADR 0014).** JCAC as receding-horizon MPC over a discrete action
+lattice (`research/jcac_sim`): α·cost + β·log1p(SLO excess) + γ·(1−Jain)
+over a 60s horizon, re-planned every 10s; budget, cluster-cache, and
+cluster-CPU constraints; switch-penalty hysteresis. CVXPY was deliberately
+dropped: the problem is mixed-integer (integer replicas, categorical
+tier), which CVXPY's free solvers cannot express — the ≤60-candidate
+move-blocked lattice is solved *exactly* by enumeration with two rounds
+of coordinate descent across tenants. Two modeling lessons worth
+remembering: saturating penalties kill optimizers (violation capped at 1
+and congestion capped flat left deep overload gradient-free — the fix is
+graded overload and log1p shaping), and per-layer baselines need to be
+strong to be meaningful (`layered` runs HPA + a cache autoscaler + a
+latency-reactive tier rule, all locally sensible).
+
+**W31 (ADR 0014).** The planner is a stdlib-only Python HTTP service
+(`services/planner`) importing the simulator's controller verbatim —
+offline figures and online decisions come from provably the same solver.
+The Go `PlanRunner` (a manager Runnable, not a per-policy reconcile)
+gathers all tenants + feature-API demand, requests **one joint plan**
+every 10s, re-clamps to Policy bounds, writes specs, and publishes every
+action to the existing NATS audit stream. Planner failure = specs
+untouched (last good plan keeps running) + one status flip to
+`fallback`. JSON-over-HTTP instead of gRPC (no protoc locally) is
+isolated behind the `planner.Client` interface.
+
+**W32 (ADR 0015).** Noisy-neighbor detector scoring each tenant's
+eBPF-shaped signals (PSI CPU stall, syscall rate, memory pressure)
+against the *cluster median* — a uniformly busy cluster flags nobody.
+3 noisy windows flag (30s), 6 clean windows clear. The score reaches the
+planner in the plan request; expansion of a flagged tenant pays
+γ·score·resource_share, so mitigation flows through the same guarded
+plan/apply/audit path as every action. Jain's index is exported per
+cycle as `polyforge_operator_fairness_jain`.
+
+### Key numbers (azure_synth, seed 42, first 20 min, defaults α=1 β=2 γ=0.5)
+
+| controller | cost | mean violation | Jain |
+|---|---|---|---|
+| static | $0.538 | 0.099 | 0.940 |
+| hpa | $0.348 | 0.102 | 0.938 |
+| keda | $0.348 | 0.102 | 0.938 |
+| layered | $11.549 | 0.085 | 0.941 |
+| **jcac** | **$1.598** | **0.054** | **0.977** |
+
+The 16-point α/β sweep traces a 12-point Pareto front that touches HPA's
+operating point (α=10, β=2: $0.372 at violation 0.101) and extends to
+violations no single-layer scaler reaches (0.044) — HPA/KEDA's residual
+violations come from the model tier, a knob they cannot see. That, not
+any absolute dollar figure, is the paper's claim.
+
+### How it was verified
+
+```text
+gofmt -l .                              -> clean
+go vet ./...                            -> pass
+go test ./... -count=1                  -> pass (operator: 21 Go tests)
+python -m unittest (research/jcac_sim)  -> 16 tests pass
+python -m unittest (services/planner)   -> 7 tests pass
+sweep + pareto.png                      -> regenerated deterministically
+```
+
+Cross-language contract: `TestLivePlannerContract` was executed against
+the real Python planner (surge scales replicas within 3 cycles). It
+caught a genuine bug: Go marshals zero-value `hourly_budget_usd: 0`,
+which the planner correctly reads as "spend nothing" and sheds the
+tenant to its floor — callers must always send a real budget.
+
+Not verified locally (no Docker/kind): operator against a live API
+server, planner pod deployment, Pixie/eBPF collection, the 24-hour soak.
+All deferred to the W33 harness environment and marked in ADRs 0013-0015.
+
+### What to be able to explain next
+
+- Why the guardrail clamp lives in the operator when the planner already
+  respects bounds (no plan source is trusted, including humans).
+- Why detection is peer-relative (median-normalized) rather than
+  threshold-absolute, and what Jain's index does and does not measure.
+- Move blocking: what it costs (within-horizon action sequences) and why
+  the 10s re-plan makes that acceptable.
+
+### Immediate next tasks
+
+1. Push; confirm CI green (first execution of operator tests in CI).
+2. W33: benchmark harness — kind provisioning, `experiment.yaml`-driven
+   runs, DuckDB result store; this is also where the deferred
+   live-cluster verifications land.
+3. Decide the Pixie-vs-Hubble question with cluster access in hand.
+
+---
+
 ## 2026-07-10 (session 8) — W25a-W28: Month 7 complete — analytics pipeline, traces, classifier, cost-aware eviction
 
 Milestone status: closes **all of M7 (Research I)** — W25a analytical
