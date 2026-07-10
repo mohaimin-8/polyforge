@@ -7,6 +7,51 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-11 (session 12) — v2 Phase 0: pre-registration committed before any v2 run
+
+Milestone status: v2 phase per `docs/V2_README.md` begun. Phase 0 complete;
+Phases 1–9 untouched. No v2 matrix cell has been run — that ordering is the
+point of this session.
+
+### What was done
+
+**`research/analysis/PREREG_V2.md`** — dated configuration freeze, written
+before any v2 run per V2_README ground rule 1. Pins: the exact `jcac_v2`
+parameters (`forecast_method: "holt"`, `adaptive_capacity: true` — the two
+Tier-2 mechanisms session 11 showed independently helped, now combined) and
+the fact that these two keys are the *complete* effective params (tuned.yaml
+has no `jcac` entry to merge in); the v2 headline matrix design (same 300
+blocked cells as `full.yaml`, 7 systems, 2,100 runs, new output DB
+`raw_sim_v2.duckdb` so the v1 DB is never reopened); the confirmatory
+hypotheses — H1: SLO violation below HPA and KEDA at paired p<0.01 with the
+cost point estimate ≤ 0, no significance escape hatch on cost; H2: any
+large-effect regression vs v1 `jcac` blocks promotion; gate v2 (same ≥3/5,
+p<0.01, |d_z|≥0.5 thresholds, baselines iso-cost, budgets matched per cell
+with ceiling rounding — strict against PolyForge); and the stopping rule
+(one matrix run, analysis run once, negative results published, any
+parameter change requires a new dated pre-registration).
+
+**`eval/harness/systems.py::SYSTEMS["jcac_v2"]`** — the pre-registered
+SystemSpec, one registry entry, no change to any existing system.
+
+### How it was verified
+
+- Smoke through the real matrix code path (`harness.sim_backend.execute`,
+  scratchpad script): merged params assert-equal to exactly the two
+  pre-registered keys; a 30-step `ai_cacheable/uniform/small` cell runs
+  valid; the same cell at the same seed under v1 `jcac` produces different
+  cost/latency — the combination is demonstrably active, not silently
+  ignored.
+- `python -m pytest eval/tests/ -q`: 28 passed. Existing systems untouched.
+
+### Next tasks
+
+1. Phase 1: `eval/experiments/matrix_v2.yaml`, run the 2,100-run matrix
+   locally, verify 100% valid.
+2. Extend `run_analysis.py` for the v1-vs-v2 paired comparison →
+   `RESULTS_V2.md` (RESULTS.md immutable).
+3. Then Phase 2 iso-cost baselines per the pre-registered definitions.
+
 ## 2026-07-11 (session 11) — Advanced work: forecasting, self-calibration, reconfiguration realism, and a cache side-channel security contribution
 
 Milestone status: post-roadmap depth work, on the user's demand to make

@@ -151,6 +151,11 @@ SYSTEMS: dict[str, SystemSpec] = {
         "jcac", params={"adaptive_capacity": True},
         description="PolyForge that learns effective capacity from realized-vs-projected feedback",
     ),
+    # --- v2 (pre-registered: research/analysis/PREREG_V2.md) -------------
+    "jcac_v2": SystemSpec(
+        "jcac", params={"forecast_method": "holt", "adaptive_capacity": True},
+        description="PolyForge v2: Holt forecast + capacity self-calibration (PREREG_V2.md)",
+    ),
     # --- W36 ablations (PolyForge minus one contribution) ----------------
     "jcac_noclassifier": SystemSpec(
         "jcac", blind_classifier=True,
