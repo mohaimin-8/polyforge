@@ -56,6 +56,29 @@ func TestBoundedCacheIsolatesTenantCapacity(t *testing.T) {
 	}
 }
 
+// TestCacheGivesNoCrossTenantHit is the read-isolation invariant behind the
+// cross-tenant timing side-channel study (research/security): one tenant's
+// entry must never produce a hit for another tenant probing the *identical*
+// prompt. A shared cache would return a fast hit here and leak, via response
+// time alone, that some other tenant recently asked this question. The
+// per-tenant index closes that channel; this test is what keeps it closed.
+func TestCacheGivesNoCrossTenantHit(t *testing.T) {
+	cache := NewSemanticCache(embed.NewLocal(128), 0.95)
+	ctx := context.Background()
+	secret := prompt("victim's confidential prompt about an unreleased product")
+	cache.StoreWithCost(ctx, "victim", secret, "the sensitive completion", 0.01)
+
+	// The victim, of course, hits its own entry.
+	if _, _, ok := cache.Lookup(ctx, "victim", secret); !ok {
+		t.Fatal("victim must hit its own cached prompt")
+	}
+	// The attacker probes the byte-identical prompt and must miss: no hit,
+	// no borrowed completion, nothing but a cold lookup.
+	if completion, _, ok := cache.Lookup(ctx, "attacker", secret); ok {
+		t.Fatalf("cross-tenant hit leaked (completion=%q): the timing side channel is open", completion)
+	}
+}
+
 func TestUnboundedCacheKeepsCompatibleBehavior(t *testing.T) {
 	cache := NewSemanticCache(embed.NewLocal(128), 0.95)
 	ctx := context.Background()
