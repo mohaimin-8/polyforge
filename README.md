@@ -4,6 +4,18 @@ PolyForge is a thesis-grade platform engineering research project for adaptive m
 
 The target research contribution is a workload-aware controller that observes tenant traffic, classifies workload behavior, and recommends joint control actions across replicas, cache budget, and model routing.
 
+**Start here**: [ARCHITECTURE.md](ARCHITECTURE.md) (system tour) · [eval/README.md](eval/README.md) (evaluation + results) · [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/adr/](docs/adr/) (design decisions)
+
+## Install the operator (Helm)
+
+```bash
+helm install polyforge-operator deploy/helm/polyforge-operator \
+  --namespace polyforge-system --create-namespace
+kubectl apply -f deploy/operator/samples/tenant-acme.yaml
+```
+
+Chart details: [deploy/helm/polyforge-operator/README.md](deploy/helm/polyforge-operator/README.md).
+
 ## Current Phase
 
 The current implementation provides a persistent control-plane backend:
@@ -35,6 +47,11 @@ The current implementation provides a persistent control-plane backend:
 - Kubernetes operator (`cmd/operator`): Tenant/WorkloadProfile/Policy/Budget CRDs with status subresources, ordered finalizer teardown, replica-bound guardrails, OTel-traced reconciles (ADR 0013, W29)
 - JCAC joint controller: MPC formulation + offline simulator with Pareto sweep (`research/jcac_sim`, `research/paper/sec-jcac.tex`, W30); live planner service (`services/planner`) called by the operator every 10s with last-good-plan fallback and NATS action audit (ADR 0014, W31)
 - multi-tenant fairness: peer-relative noisy-neighbor detector on eBPF-shaped signals feeding an interference penalty into the planner, Jain's index exported per plan cycle (ADR 0015, W32; Pixie adapter + soak deferred to the harness environment)
+- evaluation harness (`eval/`): YAML-driven experiment matrix with deterministic run IDs, resume, retry-on-flake, and a standardized DuckDB result schema; sim backend verified, cluster backend (kind + Helm + k6) code-complete for the cloud box (W33)
+- five tuned baselines — HPA, KEDA, FIRM-replica (OSDI '20 re-implementation), static over-provisioned, GPTCache+LRU — each grid-searched with committed sweep evidence (`eval/baselines/TUNING.md`, W34)
+- 1,800-run full matrix + 500-run ablation matrix executed and validated: exact row counts, zero duplicate/NULL rows, 10/10 bit-identical spot-check replays, Holm-corrected KS reproducibility gate (`eval/SMOKE_BUGS.md`, W35)
+- statistical analysis: two-way ANOVA, Cohen's d vs every baseline, 95% CIs, per-component ablation significance, 12 publication figures (600-DPI PNG + vector PDF, color-blind-safe) — `research/analysis/RESULTS.md` (W36)
+- open-source packaging: `polyforge-operator` Helm chart (`deploy/helm/polyforge-operator`), architecture guide, contributor guide + templates, Zenodo artifact bundler, release checklist (`docs/RELEASE_CHECKLIST.md`, W39)
 
 SQLite remains the zero-infrastructure development path. PostgreSQL is the production path and requires separate admin and application roles so row-level security is testable rather than bypassed accidentally.
 

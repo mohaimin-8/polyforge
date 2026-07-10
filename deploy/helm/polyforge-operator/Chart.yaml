@@ -1,0 +1,41 @@
+apiVersion: v2
+name: polyforge-operator
+description: >-
+  Kubernetes operator for multi-tenant hybrid CRUD+AI serving: Tenant,
+  WorkloadProfile, Policy and Budget CRDs with reconciled guardrails, plus
+  the optional JCAC planner that jointly controls replicas, semantic-cache
+  budget and model tier per tenant.
+type: application
+version: 0.1.0
+appVersion: "0.9.0"
+kubeVersion: ">=1.27.0"
+home: https://github.com/polyforge/polyforge
+sources:
+  - https://github.com/polyforge/polyforge
+keywords:
+  - operator
+  - multi-tenancy
+  - autoscaling
+  - llm-serving
+  - semantic-cache
+maintainers:
+  - name: PolyForge authors
+annotations:
+  artifacthub.io/crds: |
+    - kind: Tenant
+      version: v1alpha1
+      name: tenants.polyforge.io
+      description: A tenant with SLO class, isolation tier and lifecycle finalizers
+    - kind: WorkloadProfile
+      version: v1alpha1
+      name: workloadprofiles.polyforge.io
+      description: Observed workload classification the planner consumes
+    - kind: Policy
+      version: v1alpha1
+      name: policies.polyforge.io
+      description: Per-tenant control bounds (replica min/max, cache levels, tiers)
+    - kind: Budget
+      version: v1alpha1
+      name: budgets.polyforge.io
+      description: Hourly spend cap the planner must respect
+  artifacthub.io/license: MIT

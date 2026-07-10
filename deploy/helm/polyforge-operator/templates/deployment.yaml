@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "polyforge-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "polyforge-operator.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "polyforge-operator.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels: {{- include "polyforge-operator.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "polyforge-operator.fullname" . }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: operator
+          image: {{ include "polyforge-operator.operatorImage" . }}
+          imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+          args:
+            {{- if .Values.operator.leaderElect }}
+            - --leader-elect
+            {{- end }}
+          env:
+            - name: POLYFORGE_OTLP_ENDPOINT
+              value: {{ .Values.operator.otlpEndpoint | quote }}
+            {{- if .Values.planner.enabled }}
+            - name: POLYFORGE_PLANNER_URL
+              value: "http://{{ include "polyforge-operator.fullname" . }}-planner.{{ .Release.Namespace }}:{{ .Values.planner.port }}"
+            {{- else }}
+            - name: POLYFORGE_PLANNER_URL
+              value: ""
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          resources: {{- toYaml .Values.operator.resources | nindent 12 }}
+          ports:
+            - name: metrics
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5

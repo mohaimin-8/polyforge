@@ -1,0 +1,41 @@
+# Default values for polyforge-operator.
+
+operator:
+  image:
+    repository: ghcr.io/polyforge/polyforge-operator
+    tag: ""            # defaults to .Chart.appVersion
+    pullPolicy: IfNotPresent
+  leaderElect: true
+  # OTLP endpoint for reconcile spans, e.g. otel-collector.observability:4318.
+  # Empty disables export.
+  otlpEndpoint: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      memory: 256Mi
+
+# JCAC planner (W31): jointly plans replicas, cache and tier every 10 s.
+# Disabled = operator enforces static Policy guardrails only.
+planner:
+  enabled: true
+  image:
+    repository: ghcr.io/polyforge/polyforge-planner
+    tag: ""            # defaults to .Chart.appVersion
+    pullPolicy: IfNotPresent
+  port: 8090
+  # Objective weights (alpha: cost, beta: SLO, gamma: fairness) — the
+  # committed defaults are the W30 Pareto-sweep choice.
+  alpha: 1.0
+  beta: 2.0
+  gamma: 0.5
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+nameOverride: ""
+fullnameOverride: ""

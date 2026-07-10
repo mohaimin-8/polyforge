@@ -50,11 +50,18 @@ SOLVER_NAME = "jcac-lattice-v1"
 
 
 class PlannerCore:
-    """Request validation + a controller instance persisted across calls."""
+    """Request validation + a controller instance persisted across calls.
 
-    def __init__(self) -> None:
+    `default_weights` are deployment-level fallbacks (Helm values / CLI
+    flags) used only when the request omits a weight — a request that
+    names its weights always wins, the operator stays the source of truth.
+    """
+
+    def __init__(self, default_weights: dict | None = None) -> None:
         self._controller: JCACController | None = None
         self._signature: tuple | None = None
+        self._defaults = {"alpha": 1.0, "beta": 2.0, "gamma": 0.5}
+        self._defaults.update(default_weights or {})
 
     def plan(self, payload: dict) -> dict:
         weights = payload.get("weights") or {}
@@ -93,9 +100,9 @@ class PlannerCore:
             interference[tid] = float(entry.get("interference", 0.0))
 
         signature = (
-            float(weights.get("alpha", 1.0)),
-            float(weights.get("beta", 2.0)),
-            float(weights.get("gamma", 0.5)),
+            float(weights.get("alpha", self._defaults["alpha"])),
+            float(weights.get("beta", self._defaults["beta"])),
+            float(weights.get("gamma", self._defaults["gamma"])),
             int(limits.get("cache_mb", 4096)),
             int(limits.get("replicas", 60)),
             tuple(sorted(configs)),
@@ -164,8 +171,18 @@ def make_handler(core: PlannerCore):
 def main() -> None:
     ap = argparse.ArgumentParser(description="JCAC planner service")
     ap.add_argument("--port", type=int, default=8090)
+    ap.add_argument("--alpha", type=float, default=1.0,
+                    help="default cost weight when a request omits weights")
+    ap.add_argument("--beta", type=float, default=2.0,
+                    help="default SLO-violation weight when a request omits weights")
+    ap.add_argument("--gamma", type=float, default=0.5,
+                    help="default fairness weight when a request omits weights "
+                         "(0 disables the fairness objective, e.g. for ablation)")
     args = ap.parse_args()
-    server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(PlannerCore()))
+    core = PlannerCore(
+        default_weights={"alpha": args.alpha, "beta": args.beta, "gamma": args.gamma}
+    )
+    server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(core))
     print(f"jcac planner ({SOLVER_NAME}) listening on :{args.port}")
     server.serve_forever()
 

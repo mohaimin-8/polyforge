@@ -1,0 +1,72 @@
+{{- if .Values.planner.enabled }}
+# JCAC planner (W31). Stateless apart from in-memory demand forecasts,
+# which rebuild within 3 control cycles after a restart — hence one
+# replica and no persistence.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "polyforge-operator.fullname" . }}-planner
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "polyforge-operator.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "polyforge-operator.name" . }}-planner
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "polyforge-operator.name" . }}-planner
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: planner
+          image: {{ include "polyforge-operator.plannerImage" . }}
+          imagePullPolicy: {{ .Values.planner.image.pullPolicy }}
+          command:
+            - python
+            - /app/services/planner/planner.py
+            - --port={{ .Values.planner.port }}
+            - --alpha={{ .Values.planner.alpha }}
+            - --beta={{ .Values.planner.beta }}
+            - --gamma={{ .Values.planner.gamma }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.planner.port }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          resources: {{- toYaml .Values.planner.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.planner.port }}
+            initialDelaySeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.planner.port }}
+            initialDelaySeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "polyforge-operator.fullname" . }}-planner
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "polyforge-operator.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ include "polyforge-operator.name" . }}-planner
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.planner.port }}
+      targetPort: {{ .Values.planner.port }}
+{{- end }}

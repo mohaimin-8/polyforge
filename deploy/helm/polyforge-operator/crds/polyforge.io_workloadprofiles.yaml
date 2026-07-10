@@ -1,0 +1,127 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: workloadprofiles.polyforge.io
+spec:
+  group: polyforge.io
+  names:
+    kind: WorkloadProfile
+    listKind: WorkloadProfileList
+    plural: workloadprofiles
+    shortNames:
+    - pfwp
+    singular: workloadprofile
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.tenantRef
+      name: Tenant
+      type: string
+    - jsonPath: .status.predictedClass
+      name: Class
+      type: string
+    - jsonPath: .status.confidencePermille
+      name: Confidence
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: WorkloadProfile records what the classifier believes about a
+          tenant's traffic.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              WorkloadProfileSpec is the desired state of a WorkloadProfile. The spec is
+              deliberately thin: predictions are observations, so they live in status,
+              written by the classifier sync loop — never by humans.
+            properties:
+              historyLimit:
+                default: 12
+                description: HistoryLimit bounds how many past classifications status
+                  retains.
+                format: int32
+                maximum: 100
+                minimum: 1
+                type: integer
+              tenantRef:
+                description: TenantRef names the Tenant this profile describes.
+                minLength: 1
+                type: string
+            required:
+            - tenantRef
+            type: object
+          status:
+            description: WorkloadProfileStatus is the observed state of a WorkloadProfile.
+            properties:
+              confidencePermille:
+                description: ConfidencePermille is the confidence of PredictedClass,
+                  0–1000.
+                format: int32
+                type: integer
+              history:
+                description: |-
+                  History holds the most recent observations, newest first,
+                  truncated to spec.historyLimit.
+                items:
+                  description: ClassObservation is one classifier output at a point
+                    in time.
+                  properties:
+                    class:
+                      description: |-
+                        Class is the predicted workload class from the 6-label taxonomy
+                        (research/TAXONOMY.md), e.g. "crud-bursty" or "ai-cacheable".
+                      type: string
+                    confidencePermille:
+                      description: |-
+                        Confidence is the classifier softmax probability, 0–1000 permille.
+                        Stored as permille because CRD schemas reject floating point.
+                      format: int32
+                      maximum: 1000
+                      minimum: 0
+                      type: integer
+                    observedAt:
+                      description: ObservedAt is when the classification window closed.
+                      format: date-time
+                      type: string
+                  required:
+                  - class
+                  - confidencePermille
+                  - observedAt
+                  type: object
+                type: array
+              lastUpdated:
+                description: LastUpdated is when status was last written.
+                format: date-time
+                type: string
+              predictedClass:
+                description: PredictedClass is the most recent classifier output.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

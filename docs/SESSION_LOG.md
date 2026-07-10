@@ -7,6 +7,146 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-10 (session 10) — W33-W36 + W39: Month 9 complete — harness, baselines, 2,300 runs, statistics, OSS packaging
+
+Milestone status: closes **all of M9 (Evaluation)** on the sim backend plus
+the automatable half of **W39 (open-source polish)**. The user explicitly
+asked to complete the whole remaining project scope (override of the ~5%
+norm), excluding paper writing. What remains after this session is
+exactly the set of things that need a human: paid cloud runs (~€10 on
+Hetzner via the committed Terraform), Zenodo publish, Artifact Hub
+publish, the demo video, and M10's paper/defense work —
+`docs/RELEASE_CHECKLIST.md` enumerates each with exact steps. Honest
+position: **all engineering 100% built and locally verified; the
+cluster-backend path and cloud items are code-complete but unexecuted.**
+
+### What was built
+
+**W33 — harness (`eval/harness`).** One YAML describes an experiment
+(systems × 5 taxonomy workload classes × 4 tenant mixes × 3 cluster
+sizes × reps); the harness expands it into runs with sha256 run IDs,
+executes on a backend, and lands everything in one DuckDB file (`runs` /
+`metrics` / `timeseries`, `status` as the integrity contract). Resume
+skips valid run_ids; failures retry then record as failed/invalid — never
+dropped. Two backends: `sim` (drives `research/jcac_sim`; the verified
+path) and `cluster` (kind + Helm + generated k6 replay + teardown;
+code-complete, needs Docker and a `control-plane eval-export` CLI that
+does not exist yet — contract documented in `eval/README.md`).
+Repetitions are seeded Poisson resamples of the demand trace
+(`simulate.jitter_buckets`), so reps are independent draws, not identical
+replays. Metric note: latency is **p95** (the model's estimator), not the
+roadmap's p99 — documented deviation.
+
+**W34 — baselines.** `research/jcac_sim/baselines.py` gained
+**FIRM-replica** (OSDI '20 RL controller re-implemented as per-tenant
+tabular Q-learning over (ρ-bucket, violating), replica knob only, seeded)
+and **GPTCache-LRU** (cache-everything posture + HPA replicas + reactive
+tier). `static` gained the over-provisioned-to-peak mode. All controllers
+parameterized; `tune.py` grid-searched each on a tuning slice disjoint
+from evaluation cells, scored by the paper's own objective
+(J = cost + 2·viol + 0.5·(1−Jain)). Best-of-grid committed
+(`tuned.yaml`, sweeps in `grids/*.csv`): hpa ρ=0.3, keda 2 rps/replica,
+gptcache ρ=0.3, firm lr=0.1/ε=0.1/w_slo=4. Grids are bounded at the
+vendor-sane envelope because J improves monotonically toward
+over-provisioning — the degenerate end is already represented by
+`static` (TUNING.md documents this; it is a finding, not a dodge).
+Eviction accounting: baselines evict LRU, so their inference spend is
+scaled by the W28-measured LRU/cost-aware ratio (geometric mean 1.458,
+loaded from `eviction_comparison.csv`).
+
+**W35a — smoke + IaC.** 50-run smoke: 50/50 valid, 0 flakes, 34 s with 4
+workers. Three real bugs found and fixed before the full matrix
+(`eval/SMOKE_BUGS.md`): (1) `hash()`-based tuning seeds are randomized
+per process — replaced with sha256 everywhere; (2) unconstrained tuning
+degenerates utilization baselines into static — bounded grids; (3) the
+KS reproducibility gate false-alarmed under multiple comparisons (4
+tests at α=0.1 ≈ 34% familywise false-positive; an empirical 6-group
+bias test showed the harness itself unbiased) — Holm-Bonferroni fixed
+the gate, and the same correction discipline applies to paper claims.
+Terraform for a 4-node Hetzner k3s cluster committed
+(`eval/infra/terraform`, ~€7.60 for the 7-day W35b window); **not
+applied** — cloud spend is a user decision.
+
+**W35b/c — the runs.** Full matrix: **1,800/1,800 valid, zero flakes,
+~31 min wall at 6 workers** (the roadmap budgeted 7 days on cloud
+hardware; the sim backend is why). Ablations: 500/500 valid. Validation:
+exact expected run_id sets, zero duplicates, zero NULLs, every valid run
+has metrics. Spot-check: 10 (full) + 5 (ablations) random runs replayed
+**bit-identically** (tolerance was ±3%). Run-level CSVs are committed
+(`eval/results/metrics_*.csv.gz`); raw DuckDBs are gitignored and go in
+the Zenodo bundle (`scripts/archive_zenodo.py` → 2.6 MB zip + sha256
+manifest + deposit.json, ready for upload).
+
+**W36 — statistics (`research/analysis/`).** Scripted analysis instead
+of the roadmap's notebook (deliberate deviation: scripts diff and re-run
+deterministically). Primary claim, paired by matrix cell (the matrix is
+a blocked factorial design, so per-cell differences are the correct
+test): **PolyForge beats every tuned baseline on the composite objective
+with p ≤ 4.6e-25 and |d_z| 0.66–1.44** (J = 0.402 vs 0.555–7.54). It
+also wins cost against every baseline (|d_z| 0.66–1.12) and is the only
+Pareto-undominated system (fig. 3). The roadmap's raw per-metric gate
+("≥3 of 5 metrics vs every baseline") **fails as measured and is
+reported as FAIL**: `static` wins SLO-shaped metrics by construction at
+~12× cost, `gptcache` wins hit rate at ~30× — you cannot out-violate a
+baseline that never violates, only match it at radically lower cost.
+RESULTS.md carries that framing verbatim for the paper. Ablations
+(paired): removing the joint controller costs +2884% (p<0.01), removing
+cost-aware eviction +35.7% (p<0.01), removing the classifier +2.1% cost
+and −45% cache hit rate (p<0.01); the fairness ablation is **untested,
+not refuted** — the sim never injects the W32 interference signal γ
+responds to (limitation for §9). Two-way ANOVA (system × workload) and
+12 publication figures (600-DPI PNG + vector PDF, validated
+color-blind-safe palette, CIs on everything) in
+`eval/results/figures/`, each caption answering "what does this prove".
+
+**W39 — OSS packaging.** `polyforge-operator` Helm chart
+(`deploy/helm/polyforge-operator`: CRDs, RBAC, operator + optional
+planner with weight values; planner gained `--alpha/--beta/--gamma`
+default-override flags — request weights still win). ARCHITECTURE.md
+(the whole loop, one diagram), CONTRIBUTING.md, CODE_OF_CONDUCT.md,
+issue/PR templates, README overhaul, RELEASE_CHECKLIST.md. CI gained a
+`python` job (simulator, planner, harness tests + a 4-run end-to-end
+smoke) and a `helm` job (lint + render both charts) — before this,
+nothing protected the Python half of the repo.
+
+### How it was verified
+
+```
+research/jcac_sim: python -m unittest        -> 25 tests OK (was 16)
+services/planner:  python -m pytest          -> 7 passed
+eval:              python -m pytest tests    -> 22 passed
+gofmt -l . / go vet / go test ./... -count=1 -> clean / pass / pass
+full matrix validation                        -> 1800 valid, 0 dup, 0 NULL, all green
+ablations validation                          -> 500 valid, all green
+spot-check replays                            -> 15/15 bit-identical
+KS reproducibility (Holm at family α=0.1)     -> green on all 4 gated metrics
+```
+
+Not verified locally (no Docker): the cluster backend end-to-end, helm
+lint/template (CI will run it), `terraform apply`. None are claimed.
+
+### What to be able to explain next
+
+- Why the per-metric roadmap gate *cannot* pass against a tuned baseline
+  set that includes static-overprovisioned, and why the paired
+  composite-objective sweep is the defensible headline instead.
+- Why paired-by-cell d_z is the right effect size for a blocked
+  factorial design, and what the pooled d answers instead.
+- Why the tuning objective drives utilization targets toward
+  over-provisioning, and what that says about single-knob controllers.
+- Why the fairness ablation is silent on the sim backend and what
+  cluster evidence would activate it.
+
+### Immediate next tasks
+
+1. Push; confirm the new CI jobs (python, helm) are green.
+2. Human items in order of leverage: Zenodo publish (10 min), first
+   cloud smoke on Hetzner (needs `eval-export` CLI, ~1 day + ~€2),
+   Artifact Hub + demo video, then M10 paper writing from
+   RESULTS.md + FIGURES.md.
+
+---
+
 ## 2026-07-10 (session 9) — W29-W32: Month 8 complete — operator, JCAC, planner loop, fairness
 
 Milestone status: closes **all of M8 (Research II)** — W29 Kubernetes

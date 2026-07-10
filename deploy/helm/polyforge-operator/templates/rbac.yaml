@@ -1,0 +1,80 @@
+# RBAC mirrors deploy/operator/rbac.yaml: broad rights over the polyforge.io
+# CRDs, narrow rights over managed core objects, no secrets access.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "polyforge-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "polyforge-operator.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "polyforge-operator.fullname" . }}
+  labels: {{- include "polyforge-operator.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["polyforge.io"]
+    resources: ["tenants", "workloadprofiles", "policies", "budgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["polyforge.io"]
+    resources: ["tenants/status", "workloadprofiles/status", "policies/status", "budgets/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["polyforge.io"]
+    resources: ["tenants/finalizers"]
+    verbs: ["update"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "polyforge-operator.fullname" . }}
+  labels: {{- include "polyforge-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "polyforge-operator.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "polyforge-operator.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# Leader election needs lease access in the release namespace only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "polyforge-operator.fullname" . }}-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "polyforge-operator.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "polyforge-operator.fullname" . }}-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "polyforge-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "polyforge-operator.fullname" . }}-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "polyforge-operator.fullname" . }}
+    namespace: {{ .Release.Namespace }}

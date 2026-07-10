@@ -85,3 +85,48 @@ jobs:
         with:
           format: cyclonedx-json
           artifact-name: polyforge-sbom.cdx.json
+
+  # W33/W34: the Python surface — JCAC simulator + baselines, planner
+  # service, and the evaluation harness (config expansion, DB integrity,
+  # backends). A quick 4-run experiment exercises the runner end to end.
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install harness dependencies
+        run: pip install -r eval/requirements.txt
+      - name: Simulator + baselines tests
+        run: python -m unittest discover -s research/jcac_sim -q
+      - name: Planner service tests
+        run: python -m pytest services/planner -q
+      - name: Harness tests
+        run: python -m pytest eval/tests -q
+      - name: Smoke the runner end to end (4 runs)
+        working-directory: eval
+        run: |
+          python -m harness.runner experiments/smoke.yaml --limit 4
+          python -c "
+          import sys; sys.path.insert(0, '.')
+          from harness import results
+          con = results.connect('results/smoke.duckdb')
+          n = con.execute(\"SELECT count(*) FROM runs WHERE status='valid'\").fetchone()[0]
+          assert n == 4, f'expected 4 valid runs, got {n}'
+          "
+
+  # W39: both Helm charts must lint and render.
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+      - name: Lint charts
+        run: |
+          helm lint deploy/helm/polyforge
+          helm lint deploy/helm/polyforge-operator
+      - name: Render operator chart (planner on and off)
+        run: |
+          helm template t deploy/helm/polyforge-operator > /dev/null
+          helm template t deploy/helm/polyforge-operator --set planner.enabled=false > /dev/null
