@@ -7,6 +7,115 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-11 (session 11) — Advanced work: forecasting, self-calibration, reconfiguration realism, and a cache side-channel security contribution
+
+Milestone status: post-roadmap depth work, on the user's demand to make
+the project "more advanced" and add a novel contribution. All engineering
+built and locally verified; two new experiments (200 + 175 runs) ran
+100% valid. Nothing here changes the committed 1,800-run headline — the
+new work stacks on top and is reported as such.
+
+### What was built
+
+**Tier 2A — pluggable forecasters (`research/jcac_sim/controller.py`).**
+`Forecast` gained four methods behind one interface: persistence (the
+no-lookahead floor), trend (the W30 original), damped Holt smoothing, and
+online-seasonal (autocorrelation period detection on a *detrended*
+series, seasonal-naive forecast, falling back to trend below correlation
+0.4). Exposed as JCAC system variants and swept in `forecasters.yaml`.
+**The forecast ablation is an ablation that improved our own system:**
+the linear-trend default *overreacts* to single-bucket noise — Holt beats
+it by 16% on SLO violation (p=0.0027, d_z=−0.45) at statistically equal
+cost; persistence does about as well; seasonal is neutral where no period
+exists. Holt is now the documented recommended default, but trend stays
+the code default so the committed headline stays reproducible (the gain
+stacks, it isn't folded in). This is the honest inversion of my first
+auto-generated narrative, which had wrongly called lookahead
+"load-bearing" — corrected against the numbers.
+
+**Tier 2C — self-calibrating capacity (`JCACController`,
+`adaptive_capacity`).** The controller compares each step's realized
+violation to what it projected and learns a per-tenant capacity
+correction bounded to [0.5, 1.0] — it may become humbler, never
+optimistic. Applied as demand inflation in `_project`; fed by a new
+`observe_feedback` hook the replay engine calls each step.
+
+**Tier 2B — reconfiguration realism (`simulate.run(transition_costs=)`).**
+Scale-ups take one interval to serve (replica startup lag) and grown
+caches start half-warm, while billing follows the nominal config
+immediately — you pay when you ask, benefit one step later; scale-downs
+instant. Controllers aren't told, so thrashing is punished and hysteresis
+finally earns its keep. `effective_state()` computes what actually
+serves. Under this model (`realism.yaml`, 175 runs) self-calibration
+beats the base controller (d_z=+0.46, p=0.029 on violation) — it earns
+its keep specifically where the world underperforms the model.
+
+**Novel contribution — cross-tenant cache timing side channel
+(`research/security/cache_side_channel.py`).** A shared semantic cache
+(GPTCache's default posture) is a covert channel: a hit means *some other
+tenant* recently asked a similar prompt, so response time alone leaks
+prompt membership across tenants. The study quantifies it end to end on
+PolyForge's own latency/hit-rate constants: a membership-inference
+threshold classifier reaches **AUC 0.88** against a shared cache and
+**0.50 (chance)** against PolyForge's per-tenant bounded cache (W28) — the
+isolation eliminates essentially all exploitable signal. It also measures
+the cost: naive equal-split isolation loses 29% of the aggregate hit
+rate, the joint planner's demand-proportional sizing cuts that to 24%.
+Novel framing: prior semantic-cache work optimizes hit rate; treating the
+shared cache as a covert channel and quantifying the isolation/efficiency
+trade-off is new, and PolyForge's existing per-tenant design is the
+defense. Backed by a new Go invariant test
+`TestCacheGivesNoCrossTenantHit` (internal/ai/gateway) — a probe by one
+tenant must miss another tenant's identical prompt.
+
+**Analysis + delivery.** `research/analysis/advanced.py` produces figures
+13–16 (forecast ablation, realism Pareto, adaptive-under-realism, the
+side channel) and `ADVANCED.md`; wired into `run_analysis.py` (skips
+cleanly without the DBs). CSV exports committed; pitch page and README
+updated with the security result (stat strip now leads with 0.88→0.50).
+CI gained the security-study run.
+
+**Hallucination fixes.** The Helm chart pointed at a fictional
+`github.com/polyforge/polyforge` org and `ghcr.io/polyforge/*` images —
+corrected to the real `mohaimin-8` repo. Also removed a compiled
+`control-plane.exe` that had been committed at the repo root and added a
+`pyrightconfig.json` so the IDE resolves the `sys.path`-injected sim
+imports (was a persistent false-positive diagnostic).
+
+### How it was verified
+
+```
+research/jcac_sim: python -m unittest   -> 33 tests OK (was 25)
+services/planner:  python -m pytest     -> 7 passed
+eval:              python -m pytest tests-> 28 passed (was 22)
+internal/ai/gateway: go test            -> ok (incl. new side-channel invariant)
+forecasters.yaml   -> 200/200 valid, 0 flakes
+realism.yaml       -> 175/175 valid, 0 flakes
+cache_side_channel.py -> AUC 0.88 (shared) vs 0.50 (per-tenant)
+```
+
+### What to be able to explain next
+
+- Why the trend forecaster overreacts and Holt fixes it — and why we
+  report the gain separately instead of swapping the default.
+- Why self-calibration is invisible in the ideal model but real under
+  reconfiguration realism (it corrects a model/world gap that only exists
+  when capacity lags).
+- The threat model of the cache side channel: what the attacker observes,
+  what "membership inference" means for prompts, and why per-tenant
+  isolation is a complete rather than partial mitigation.
+
+### Immediate next tasks
+
+1. Push; confirm CI (python job now also runs the security study) green.
+2. Optional: promote Holt to the default in a fresh experiment name
+   (`full_holt`) so a second headline exists without touching the first.
+3. Still the human items in RELEASE_CHECKLIST.md (cloud runs, Zenodo,
+   Artifact Hub, video) and M10 paper — §security now has its own
+   subsection ready in ADVANCED.md.
+
+---
+
 ## 2026-07-10 (session 10) — W33-W36 + W39: Month 9 complete — harness, baselines, 2,300 runs, statistics, OSS packaging
 
 Milestone status: closes **all of M9 (Evaluation)** on the sim backend plus

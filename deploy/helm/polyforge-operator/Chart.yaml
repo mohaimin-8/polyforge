@@ -9,9 +9,9 @@ type: application
 version: 0.1.0
 appVersion: "0.9.0"
 kubeVersion: ">=1.27.0"
-home: https://github.com/polyforge/polyforge
+home: https://github.com/mohaimin-8/polyforge
 sources:
-  - https://github.com/polyforge/polyforge
+  - https://github.com/mohaimin-8/polyforge
 keywords:
   - operator
   - multi-tenancy

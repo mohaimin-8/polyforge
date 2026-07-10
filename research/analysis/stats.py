@@ -25,6 +25,8 @@ from statsmodels.formula.api import ols
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FULL_DB = REPO_ROOT / "eval" / "results" / "raw_sim.duckdb"
 ABLATIONS_DB = REPO_ROOT / "eval" / "results" / "ablations.duckdb"
+FORECASTERS_DB = REPO_ROOT / "eval" / "results" / "forecasters.duckdb"
+REALISM_DB = REPO_ROOT / "eval" / "results" / "realism.duckdb"
 
 METRICS = [
     "total_cost_usd",
@@ -170,6 +172,32 @@ def headline_comparison(df: pd.DataFrame, treatment: str = "jcac",
                 "significant_large": bool(better and p < 0.01 and abs(dz) >= 0.5),
             })
     return pd.DataFrame(rows)
+
+
+def paired_summary(df: pd.DataFrame, systems: list[str], baseline: str,
+                   metric: str) -> pd.DataFrame:
+    """Per-system paired-by-cell comparison vs `baseline` on one metric,
+    over whatever cells the given experiment defines. Reused by the
+    forecast ablation and the realism experiment."""
+    b = df[df.system == baseline]
+    rows = []
+    for system in systems:
+        s = df[df.system == system]
+        merged = s.merge(b, on=CELL_KEYS, suffixes=("_s", "_b"))
+        diff = merged[f"{metric}_s"] - merged[f"{metric}_b"]
+        sd = diff.std(ddof=1)
+        if len(merged) < 2 or sd == 0.0:
+            t_stat, p, dz = 0.0, 1.0, 0.0
+        else:
+            t_stat, p = sps.ttest_1samp(diff, 0.0)
+            dz = float(diff.mean() / sd)
+        rows.append({
+            "system": system, "mean": float(s[metric].mean()),
+            "vs_baseline_rel": float((s[metric].mean() - b[metric].mean())
+                                     / abs(b[metric].mean())) if b[metric].mean() else 0.0,
+            "p": float(p), "cohens_dz": dz,
+        })
+    return pd.DataFrame(rows).set_index("system")
 
 
 def composite_objective(df: pd.DataFrame) -> pd.Series:

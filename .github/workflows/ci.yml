@@ -115,6 +115,8 @@ jobs:
           n = con.execute(\"SELECT count(*) FROM runs WHERE status='valid'\").fetchone()[0]
           assert n == 4, f'expected 4 valid runs, got {n}'
           "
+      - name: Security study runs (cache side channel)
+        run: python research/security/cache_side_channel.py
 
   # W39: both Helm charts must lint and render.
   helm:

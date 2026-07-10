@@ -202,6 +202,15 @@ def main() -> None:
 
     figures.main()
 
+    # Advanced work (forecast ablation, realism, security) if its result
+    # databases are present; skipped cleanly on a base-only checkout.
+    if stats.FORECASTERS_DB.exists() and stats.REALISM_DB.exists():
+        import advanced
+
+        advanced.main()
+    else:
+        print("advanced.py skipped: run forecasters.yaml + realism.yaml first")
+
 
 if __name__ == "__main__":
     main()
