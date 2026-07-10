@@ -1,0 +1,12 @@
+# Applying this single object makes the operator create the tenant
+# namespace, RBAC, and default Policy/Budget/WorkloadProfile (W29
+# verification: `kubectl apply -f tenant-acme.yaml` then
+# `kubectl get tenant acme` shows READY=True).
+apiVersion: polyforge.io/v1alpha1
+kind: Tenant
+metadata:
+  name: acme
+spec:
+  displayName: "Acme Corp"
+  isolationMode: silo
+  sloClass: premium

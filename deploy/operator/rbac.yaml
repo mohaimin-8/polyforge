@@ -1,0 +1,76 @@
+# RBAC for the polyforge-operator: broad rights over its own CRDs, narrow
+# rights over the core objects it manages (namespaces, RBAC, deployments,
+# configmaps). No secrets access — the operator never needs one.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: polyforge-operator
+  namespace: polyforge-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: polyforge-operator
+rules:
+  - apiGroups: ["polyforge.io"]
+    resources: ["tenants", "workloadprofiles", "policies", "budgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["polyforge.io"]
+    resources: ["tenants/status", "workloadprofiles/status", "policies/status", "budgets/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["polyforge.io"]
+    resources: ["tenants/finalizers"]
+    verbs: ["update"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: polyforge-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: polyforge-operator
+subjects:
+  - kind: ServiceAccount
+    name: polyforge-operator
+    namespace: polyforge-system
+---
+# Leader election needs lease access in its own namespace only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: polyforge-operator-leader-election
+  namespace: polyforge-system
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: polyforge-operator-leader-election
+  namespace: polyforge-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: polyforge-operator-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: polyforge-operator
+    namespace: polyforge-system
