@@ -9,6 +9,7 @@ import (
 	"flag"
 	"log/slog"
 	"os"
+	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -24,8 +25,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"polyforge/internal/events"
 	pfv1alpha1 "polyforge/internal/operator/api/v1alpha1"
 	"polyforge/internal/operator/controllers"
+	"polyforge/internal/operator/planner"
 )
 
 var scheme = runtime.NewScheme()
@@ -98,6 +101,38 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		log.Error("setup policy controller", "error", err)
 		os.Exit(1)
+	}
+
+	// The JCAC loop is opt-in: it needs both a planner and a demand
+	// signal. Without either, the operator still reconciles CRDs — plans
+	// just come from humans editing Policy objects.
+	plannerURL := os.Getenv("POLYFORGE_PLANNER_URL")
+	featuresURL := os.Getenv("POLYFORGE_FEATURES_URL")
+	if plannerURL != "" && featuresURL != "" {
+		runner := &controllers.PlanRunner{
+			Client:  mgr.GetClient(),
+			Planner: planner.NewHTTPClient(plannerURL, 3*time.Second),
+			Demands: planner.NewFeatureDemandSource(featuresURL, os.Getenv("POLYFORGE_FEATURES_TOKEN")),
+			Log:     log,
+			Weights: planner.Weights{Alpha: 1, Beta: 2, Gamma: 0.5},
+			Limits:  planner.Limits{CacheMB: 4096, Replicas: 60},
+		}
+		if natsURL := os.Getenv("POLYFORGE_NATS_URL"); natsURL != "" {
+			backbone, err := events.Connect(context.Background(), natsURL, events.BackboneConfig{})
+			if err != nil {
+				log.Error("connect NATS audit backbone", "error", err)
+				os.Exit(1)
+			}
+			defer backbone.Close()
+			runner.Audit = backbone
+		}
+		if err := mgr.Add(runner); err != nil {
+			log.Error("add plan runner", "error", err)
+			os.Exit(1)
+		}
+		log.Info("JCAC plan loop enabled", "planner", plannerURL, "features", featuresURL)
+	} else {
+		log.Info("JCAC plan loop disabled (set POLYFORGE_PLANNER_URL and POLYFORGE_FEATURES_URL)")
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

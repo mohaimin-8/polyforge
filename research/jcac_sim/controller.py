@@ -120,12 +120,22 @@ class JCACController:
         self.weights = weights or Weights()
         self.limits = limits or ClusterLimits()
         self.forecasts = {tid: Forecast() for tid in configs}
+        self._interference: dict[str, float] = {}
 
     def plan(
-        self, states: dict[str, TenantState], demands: dict[str, Demand]
+        self,
+        states: dict[str, TenantState],
+        demands: dict[str, Demand],
+        interference: dict[str, float] | None = None,
     ) -> dict[str, PlanEntry]:
         """One control cycle: observe demand, optimize, return the first
-        action of the best move-blocked plan for every tenant."""
+        action of the best move-blocked plan for every tenant.
+
+        `interference` carries the W32 noisy-neighbor detector's per-tenant
+        score (0 = clean). A flagged tenant pays a fairness surcharge on
+        resource expansion, so the planner throttles it rather than feeding
+        the interference."""
+        self._interference = interference or {}
         for tid, demand in demands.items():
             self.forecasts[tid].observe(demand)
         horizons = {tid: self.forecasts[tid].horizon() for tid in self.configs}
@@ -202,10 +212,22 @@ class JCACController:
                         + (candidate.tier != current.tier)
                     )
                     fairness = 1.0 - jain_index(other_satisfaction + [1.0 - viol])
+                    # W32: a tenant flagged noisy pays for expansion in
+                    # proportion to its interference score — the planner
+                    # shrinks it back toward its floor instead of scaling
+                    # the interference up.
+                    noise = self._interference.get(tid, 0.0)
+                    resource_share = 0.0
+                    if noise > 0.0:
+                        resource_share = 0.5 * (
+                            candidate.replicas / max(1, config.replica_max)
+                            + candidate.cache_mb / 1024.0
+                        )
                     score = (
                         self.weights.alpha * (other_cost + cost) / COST_SCALE_USD
                         + self.weights.beta * (other_obj + obj)
                         + self.weights.gamma * (0.5 + config.fairness_weight) * fairness
+                        + self.weights.gamma * noise * resource_share
                         + SWITCH_PENALTY * switches
                     )
                     if score < best_score:
