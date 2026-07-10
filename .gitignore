@@ -1,4 +1,5 @@
 .gocache/
+control-plane.exe
 control-plane.log
 polyforge-control-plane.pid
 bin/
