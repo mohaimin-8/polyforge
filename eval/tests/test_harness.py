@@ -17,7 +17,7 @@ EVAL_DIR = Path(__file__).resolve().parents[1]
 if str(EVAL_DIR) not in sys.path:
     sys.path.insert(0, str(EVAL_DIR))
 
-from harness import cluster_backend, results, sim_backend, workloads  # noqa: E402
+from harness import cluster_backend, demo, results, sim_backend, workloads  # noqa: E402
 from harness.config import ExperimentSpec, expand, load, run_identity  # noqa: E402
 from harness.systems import SYSTEMS, global_mix_transform, lru_miss_cost_factor  # noqa: E402
 
@@ -193,6 +193,47 @@ class TestResults:
         results.record(con, runs[-1], "valid", 1, sim_backend.execute(runs[-1]))
         report = results.validate(con, "test", len(runs))
         assert report["ok"] and report["valid_runs"] == 4
+
+
+class TestDemo:
+    def _comparison(self, **kw):
+        return demo.compare(steps=12, **kw)
+
+    def test_default_cast_runs_and_reports_every_metric(self):
+        c = self._comparison()
+        assert [o.system for o in c.outcomes] == list(demo.DEFAULT_SYSTEMS)
+        for o in c.outcomes:
+            assert set(o.metrics) == {attr for attr, *_ in demo.METRIC_ROWS}
+
+    def test_deltas_are_relative_to_the_baseline(self):
+        c = self._comparison()
+        assert c.delta("hpa", "total_cost_usd") == 0.0
+        static_delta = c.delta("static", "total_cost_usd")
+        assert static_delta is not None and static_delta > 0  # over-provision costs more
+
+    def test_near_zero_baseline_suppresses_percentages(self):
+        c = self._comparison(workload="crud_steady")  # no AI traffic -> hit rate ~ 0
+        assert c.delta("jcac", "cache_hit_rate") is None
+
+    def test_rejects_unknown_system_and_foreign_baseline(self):
+        with pytest.raises(ValueError, match="unknown systems"):
+            demo.compare(systems=("hpa", "nope"), steps=12)
+        with pytest.raises(ValueError, match="baseline"):
+            demo.compare(systems=("hpa", "jcac"), baseline="static", steps=12)
+
+    def test_renderings_are_ascii_and_computed(self):
+        c = self._comparison()
+        table = demo.render_table(c)
+        takeaway = demo.render_takeaway(c)
+        (table + takeaway).encode("ascii")  # cp1252 terminals must never crash
+        assert "PolyForge" in table and "$" in takeaway
+
+    def test_to_dict_round_trips_through_json(self):
+        import json
+
+        payload = json.loads(json.dumps(self._comparison().to_dict()))
+        assert payload["baseline"] == "hpa"
+        assert set(payload["systems"]) == set(demo.DEFAULT_SYSTEMS)
 
 
 class TestClusterBackend:

@@ -1,0 +1,5 @@
+{
+  "// why": "eval/harness wires research/jcac_sim onto sys.path at runtime (harness/__init__.py); these extraPaths teach static analysis the same layout so 'import simulate'/'import model' resolve in the IDE.",
+  "extraPaths": ["research/jcac_sim", "eval", "research/analysis"],
+  "exclude": ["**/__pycache__", ".gocache", "tmp", "eval/results"]
+}
