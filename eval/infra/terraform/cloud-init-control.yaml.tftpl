@@ -1,0 +1,14 @@
+#cloud-config
+# k3s control plane. The token is Terraform-generated per cluster and
+# never reused across clusters.
+package_update: true
+packages:
+  - curl
+runcmd:
+  - |
+    curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
+      --token=${k3s_token} \
+      --node-ip=10.42.1.10 \
+      --flannel-iface=enp7s0 \
+      --disable=traefik \
+      --write-kubeconfig-mode=644" sh -

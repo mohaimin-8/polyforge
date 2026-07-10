@@ -1,0 +1,11 @@
+#cloud-config
+# k3s worker joining the private-network control plane.
+package_update: true
+packages:
+  - curl
+runcmd:
+  - |
+    curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent \
+      --token=${k3s_token} \
+      --server=https://${control_ip}:6443 \
+      --flannel-iface=enp7s0" sh -
