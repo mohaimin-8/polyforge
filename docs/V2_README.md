@@ -95,15 +95,20 @@ model GPT-3.5/4, request/response tokens).
       tokens→work units, session/hash→tenant. `--synthetic` mode reproduces the
       trace's daily periodicity + heavy-tailed tokens and is exercised end-to-end;
       real 10M-row CSV replays through the identical `normalize()`.
-- [~] Headline-matrix-on-BurstGPT and the "on 10M real requests" restatement need
-      the multi-GB download (network) — deferred; the pipeline that consumes it is
-      committed and tested.
-- [x] **Forecast ablation on real periodicity DONE** (`research/analysis/forecast_trace.py`):
-      on the trace bucketed hourly, the seasonal detector locks a **24-bucket daily
-      period (autocorr 0.85)** and seasonal — neutral on synthetic noise — now
-      **cuts one-step RMSE 44.8% vs trend** (Holt is +35% *worse* here, chasing the
-      diurnal ramp). Exactly the V2_README prediction; pointable at the real trace
-      with `--trace`.
+- [x] **Real v2.0 release downloaded and normalized** (session 14): not multi-GB —
+      3 CSVs, 429 MB, 10,632,194 requests over 335 days (two collection periods,
+      ~104-day gap). Reproducible via `research/traces/fetch_burstgpt.py` (raw data
+      gitignored). Headline-matrix-on-BurstGPT still needs its own declared replay
+      protocol before running (do not ad-hoc a slice).
+- [x] **Forecast ablation, stand-in vs real (both measured, session 14):** on the
+      *synthetic stand-in* the seasonal detector locks a 24-bucket daily period
+      (autocorr 0.85) and cuts one-step RMSE 44.8% vs trend (`FORECAST_TRACE.md`).
+      On the **real trace the prediction does not transfer**
+      (`FORECAST_TRACE_REAL.md`): best autocorrelation is only ≤0.49 (lag 8 h),
+      seasonal never beats trend, and **damped Holt leads (−26.9% RMSE vs trend,
+      segment 1; persistence −16.6%, segment 2)** — the real data vindicates the
+      W36+ control-loop recommendation and `jcac_v2`'s forecaster choice, and
+      bounds seasonal's value to strongly periodic regimes (RESULTS_V3.md H2′).
 
 **3b. LMSYS-Chat-1M semantic-cache evaluation** —
 [huggingface.co/datasets/lmsys/lmsys-chat-1m](https://huggingface.co/datasets/lmsys/lmsys-chat-1m)

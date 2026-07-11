@@ -128,6 +128,11 @@ def main() -> None:
       "operates at the 10s control interval where sub-minute periods dominate; "
       "this harness is the complementary coarse-resolution view where the "
       "daily cycle lives. Both use the identical forecaster code.")
+    w("")
+    w("The measurement on the real BurstGPT v2.0 release (10.63M requests) "
+      "lives in `FORECAST_TRACE_REAL.md` (`forecast_trace_real.py`, same "
+      "protocol functions); where the stand-in and the real trace disagree, "
+      "the real trace is the reading that counts.")
 
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {OUT}: period={lag}@{corr:.2f}, best={best}")

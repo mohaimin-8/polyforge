@@ -33,34 +33,37 @@ RMSE 44.8% on real daily periodicity — but the matrix cells never expose the c
 loop to that periodicity, so the advantage never gets to act. Both facts point at the
 same experiment: **new cells, not new tuning.**
 
-## Phase A — SLO overload + trace-periodicity matrix (2 sessions, local)
+## Phase A — SLO overload + trace-periodicity matrix — DONE (session 14, as measured)
 
-- [ ] `research/analysis/PREREG_V3.md` **committed before any run**: systems
-      (`jcac`, `jcac_seasonal`, HPA, KEDA, FIRM — all existing specs, untouched),
-      the new cell axes, H1′ and the stopping rule.
-  - **H1′ (confirmatory):** on overload/periodic cells, PolyForge (jcac or
-    jcac_seasonal, *named in advance* — pick one, no post-hoc selection) shows SLO
-    violation significantly below HPA and KEDA (paired, p<0.01) with paired cost
-    point estimate ≤ 0. Same bar H1 failed at; new regime, not new tuning.
-- [ ] `eval/experiments/matrix_v3_overload.yaml`:
-  - **Overload axis:** step/ramp cells whose ramp time is shorter than the tuned
-    HPA/KEDA stabilization+reaction window (derive the threshold from their tuned
-    params in `eval/baselines/TUNING.md` — committed in the prereg, not swept).
-  - **Periodicity axis:** demand driven by the committed BurstGPT stand-in's diurnal
-    shape (time-compressed so ≥3 periods fit a run), giving `jcac_seasonal`'s
-    detector a real period at control timescale.
-  - Include *non*-overload control cells so the claim is "wins where reaction time
-    binds, ties elsewhere" — the reviewer-proof shape.
-- [ ] Run (~600–900 runs, CPU, same harness), `analysis_v3.py` → `RESULTS_V3.md`,
-      reported alongside v1/v2, never instead.
-- [ ] Acceptance: H1′ verdict as measured. If PASS: SLO segment claim becomes
-      "under demand that outruns reactive scaling, PolyForge cuts violations at
-      lower cost; elsewhere it matches attainment at ~half the cost." If FAIL:
-      published as measured; the standing claim below still holds.
-- **Standing claim already earned (no run needed):** parity attainment at −43…−48%
-  cost *is* the iso-attainment win — Chiron's "+90%" is an "up to" on their own
-  substrate (ground rule 4 forbids the head-to-head cell anyway). Write this frame
-  into the thesis SLO section regardless of H1′.
+- [x] `research/analysis/PREREG_V3.md` committed **and pushed** before any run
+      (commit 6229b6a); `jcac_seasonal` named in advance as the sole treatment;
+      analysis_v3.py frozen in the same commit.
+- [x] `eval/experiments/matrix_v3_overload.yaml`: four classes sized by
+      model-constant arithmetic (pinned by unit tests, not trial runs) —
+      `flash_crud`/`flash_ai` (5-of-16-step 6× bursts), `spike_agentic`
+      (2-of-12-step 8× spikes), `ramp_gentle` control (same envelope,
+      actuation-feasible slope). 1,200 runs, **1,200/1,200 valid, 0 failed**.
+- [x] `analysis_v3.py` → `RESULTS_V3.md` (commit 7021573), executed once per
+      the stopping rule.
+- [x] **Verdict as measured: H1′ FAIL, H2′ PASS.** Pooled, tuned HPA/KEDA buy
+      overload attainment with 3.2–3.4× spend (seasonal −69/−71% cost at
+      +0.05/+0.09 violation), and only PolyForge honors the cluster capacity
+      cap at these amplitudes. The *mechanism* is confirmed (H2′: seasonal <
+      trend on violation, p=6e-4, no cost regression), and the
+      declared-exploratory spike class shows the full predicted phenomenon —
+      seasonal beats HPA on violation (p=5e-5, d_z=0.57) at 46% lower cost.
+      Composite J: seasonal wins vs all three baselines (p ≤ 1e-11). Per
+      PREREG_V3 §4 the attempt is closed: no third confirmatory attempt inside
+      this thesis.
+- **The SLO section's final shape (post-v3):** (1) iso-attainment framing —
+  parity attainment at −43…−48% cost (RESULTS_V2.md); (2) confirmed mechanism —
+  period-aware forecasting reduces violations over trend at no cost premium
+  (H2′, RESULTS_V3.md); (3) declared-exploratory spike-class result — where
+  reaction is structurally impossible, proactive control beats HPA on violation
+  *and* cost simultaneously; (4) the honest boundary — reactive scalers at
+  SLO-generous tuning can outbuy proactive control on attainment at 3.2–3.4×
+  spend, and PolyForge alone respects shared-cluster capacity limits. Chiron's
+  "+90%" stays an "up to" on their own substrate (ground rule 4).
 
 ## Phase B — Cache headline on real LMSYS-Chat-1M (1 session + user unblock)
 
@@ -78,16 +81,25 @@ same experiment: **new cells, not new tuning.**
 - [ ] Acceptance: a real-dataset semantic hit-rate number exists next to the
       InstCache/SCALM anchors (their shape, our substrate), with $-savings attached.
 
-## Phase C — Cost & forecasting real-trace restatement (1 session, download only)
+## Phase C — Cost & forecasting real-trace restatement — forecasting half DONE (session 14)
 
-- [ ] Download real BurstGPT CSV (multi-GB, network); run the committed
-      `etl_burstgpt.py` normalize (identical code path already tested).
-- [ ] `forecast_trace.py --trace <real parquet>` — upgrades the −44.8% forecasting
-      result from "committed stand-in" to "10.31M real Azure requests."
-- [ ] Headline-matrix-on-BurstGPT replay (V2_README 3a deferred item) — the
-      "on 10M real requests" cost restatement.
-- [ ] Acceptance: both segments' numbers pointable at a real public trace; no
-      synthetic-only asterisk left on a won segment.
+- [x] Real BurstGPT v2.0 downloaded (429 MB, 3 CSVs — not multi-GB) and normalized:
+      10,632,194 requests / 335 days through the committed `normalize()`
+      (`research/traces/fetch_burstgpt.py`, deterministic, raw data gitignored).
+- [x] Forecast ablation on the real trace (`forecast_trace_real.py`, same protocol
+      functions): **the stand-in's seasonal prediction does not transfer** — real
+      periodicity is weak (best autocorr ≤0.49 @ lag 8 h), seasonal never beats
+      trend; **Holt −26.9% RMSE (segment 1), persistence −16.6% (segment 2)**.
+      Honest upgrade: the real data confirms the W36+ Holt recommendation and
+      `jcac_v2`'s forecaster; seasonal's value is bounded to strongly periodic
+      regimes (RESULTS_V3.md H2′ proves the mechanism there). Reported per
+      contiguous segment (104-day collection gap = missing data, not zero demand),
+      gap-inclusive numbers alongside.
+- [ ] Headline-matrix-on-BurstGPT replay — the "on 10M real requests" cost
+      restatement. Needs its own short declared protocol (slice selection, time
+      compression, tenant mapping committed before running) — next session.
+- [x] Acceptance (forecasting): the segment's numbers are pointable at a real
+      public trace, including the parts that contradicted the stand-in.
 
 ## Phase D — Fairness strengthening (optional, 1 session)
 
