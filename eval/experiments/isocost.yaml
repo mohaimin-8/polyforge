@@ -1,0 +1,15 @@
+# Phase 2 delta cells (PREREG_V2 §5): the two iso-cost baselines over the
+# same 300 blocked cells as matrix_v2. Budgets must exist first:
+#   python baselines/isocost.py   (after matrix_v2 completes)
+# Gate v2 pairs these cells with matrix_v2's jcac_v2/hpa/keda/firm runs.
+name: isocost
+backend: sim
+steps: 120
+reps: 5
+systems: [static_isocost, cache_isocost]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/isocost.duckdb
+retries: 2
+timeseries_reps: 1

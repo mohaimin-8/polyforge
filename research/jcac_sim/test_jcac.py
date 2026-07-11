@@ -288,6 +288,83 @@ class TransitionCostTests(unittest.TestCase):
         self.assertGreater(laggy.mean_violation, ideal.mean_violation)
 
 
+class InterferenceInjectionTests(unittest.TestCase):
+    """v2 Phase 4: noisy-neighbor interference (simulate)."""
+
+    def test_only_dominant_tenant_past_gate_is_flagged(self):
+        import simulate
+
+        states = {t: TenantState(replicas=4) for t in ("w", "a", "b", "c")}
+        # w offers ~10x the others' work: it clears the 2x-fair-share gate.
+        demands = {"w": demand({"crud_read": 400.0}), "a": demand({"crud_read": 5.0}),
+                   "b": demand({"crud_read": 5.0}), "c": demand({"crud_read": 5.0})}
+        scores = simulate.interference_scores(states, demands)
+        self.assertEqual(list(scores), ["w"])
+        self.assertGreater(scores["w"], 0.0)
+
+    def test_balanced_cluster_flags_nobody(self):
+        import simulate
+
+        states = {t: TenantState(replicas=4) for t in ("a", "b", "c", "d")}
+        demands = {t: demand({"crud_read": 20.0}) for t in ("a", "b", "c", "d")}
+        self.assertEqual(simulate.interference_scores(states, demands), {})
+
+    def test_victims_lose_capacity_not_the_aggressor(self):
+        import simulate
+
+        serving = TenantState(replicas=8, cache_mb=128, tier="mid")
+        hit = simulate.interfered_state(serving, theta=1.0)
+        self.assertEqual(hit.replicas, 4)  # up to 50% stolen at theta=1
+        self.assertEqual((hit.cache_mb, hit.tier), (128, "mid"))
+        self.assertEqual(simulate.interfered_state(serving, theta=0.0), serving)
+
+    def test_stolen_capacity_raises_a_loaded_victims_violation(self):
+        # The mechanic in isolation: a victim sized for its own load
+        # violates more once a neighbor steals half its replicas.
+        config = TenantConfig(tenant_id="v", slo_class="premium")
+        loaded = TenantState(replicas=4, cache_mb=0, tier="none")
+        d = demand({"crud_read": 150.0})  # fine on 4 replicas, not on 2
+        import simulate
+
+        clean = evaluate_step(config, loaded, d)
+        stolen = evaluate_step(config, simulate.interfered_state(loaded, 1.0), d)
+        self.assertGreater(stolen.violation, clean.violation)
+
+    def test_injection_is_a_noop_without_a_dominant_tenant(self):
+        # A balanced cluster injects nothing, so the run is identical with
+        # and without the flag — injection only bites past the gate.
+        import simulate
+
+        ids = ["a", "b", "c", "d"]
+        buckets = [{t: demand({"crud_read": 40.0}) for t in ids} for _ in range(20)]
+        off = simulate.run("jcac", ids, buckets, collect_rows=False, jitter_seed=7)
+        on = simulate.run("jcac", ids, buckets, collect_rows=False, jitter_seed=7,
+                          interference_injection=True)
+        self.assertEqual(on.mean_violation, off.mean_violation)
+        self.assertEqual(on.total_cost_usd, off.total_cost_usd)
+
+
+class IsoCostBaselineTests(unittest.TestCase):
+    """v2 Phase 2: pinned iso-cost baseline controllers (baselines)."""
+
+    def test_static_fixed_replicas_pins_and_clamps(self):
+        configs = {"t": TenantConfig(tenant_id="t", replica_max=6)}
+        ctl = baselines.StaticController(configs, fixed_replicas=3)
+        out = ctl.plan({"t": TenantState(replicas=1)}, {"t": demand({"crud_read": 1.0})})
+        self.assertEqual(out["t"].replicas, 3)
+        capped = baselines.StaticController(configs, fixed_replicas=99)
+        out2 = capped.plan({"t": TenantState(replicas=1)}, {"t": demand({"crud_read": 1.0})})
+        self.assertEqual(out2["t"].replicas, 6)  # clamped to replica_max
+
+    def test_gptcache_fixed_cache_holds_level(self):
+        configs = {"t": TenantConfig(tenant_id="t", replica_max=6)}
+        ctl = baselines.GPTCacheLRUController(configs, fixed_cache_mb=128)
+        # From a 0 cache it walks toward 128 (one level/interval), never past.
+        state = TenantState(replicas=2, cache_mb=64)
+        out = ctl.plan({"t": state}, {"t": demand({"chat": 4.0})})
+        self.assertLessEqual(out["t"].cache_mb, 128)
+
+
 class SimulateTests(unittest.TestCase):
     def _buckets(self, steps: int = 12):
         return [

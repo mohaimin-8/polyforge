@@ -35,6 +35,18 @@ What this script computes
    We measure that penalty under equal splitting, then show PolyForge's
    demand-proportional cache sizing (what the joint planner does) recovers
    most of it — security at a fraction of the naive cost.
+4. DEFENSE FRONTIER (v2 Phase 5): the two standard timing-channel
+   mitigations, evaluated on the same attack —
+   - response-time quantization ("padding"): every response is delayed to
+     the next multiple of Q ms. Cost: latency benefit of caching shrinks.
+   - probabilistic TTL jitter: a would-be hit is served cold with
+     probability q (early expiry). Cost: q of all hits are sacrificed
+     (latency AND inference dollars).
+   Each defense is swept over a fixed grid (not tuned) and plotted as
+   leakage (worst-case AUC) vs the share of the cache's latency benefit
+   given up. Per-tenant partitioning is placed on the same axes at its
+   measured hit-rate cost. The claim this upgrades: partitioning is not
+   just *a* defense — it dominates the known mitigation frontier.
 
 Deterministic; stdlib + the repo's own model constants only. Run:
     python research/security/cache_side_channel.py --out ../results/security
@@ -82,6 +94,30 @@ def _sample_latency(is_hit: bool, rng: random.Random) -> float:
     return max(0.0, base + rng.gauss(0.0, NETWORK_JITTER_MS))
 
 
+# --- v2 Phase 5: timing-channel defenses -------------------------------
+# Fixed sweep grids, committed before the frontier was computed; never
+# tuned. Padding grids run up to the miss latency because that is the
+# point where hit and miss become indistinguishable by construction.
+PAD_GRID_MS = (50.0, 100.0, 200.0, 400.0, 800.0)
+TTL_JITTER_GRID = (0.1, 0.25, 0.5, 0.75, 0.9)
+
+
+def _quantize_up(latency_ms: float, grid_ms: float) -> float:
+    """Response-time padding: hold every response until the next multiple
+    of `grid_ms` — the deployable form of constant-time defenses."""
+    return math.ceil(latency_ms / grid_ms) * grid_ms
+
+
+def _defended_latency(is_hit: bool, rng: random.Random, defense) -> float:
+    kind, param = defense if defense else (None, 0.0)
+    if kind == "ttl" and is_hit and rng.random() < param:
+        is_hit = False  # entry expired early: served cold
+    t = _sample_latency(is_hit, rng)
+    if kind == "pad":
+        t = _quantize_up(t, param)
+    return t
+
+
 def _auc(pos: list[float], neg: list[float]) -> float:
     """AUC = P(a warm-probe time ranks below a cold-probe time), i.e. the
     Mann-Whitney statistic. 0.5 is chance; 1.0 is perfect leakage. Timing
@@ -98,10 +134,13 @@ def _auc(pos: list[float], neg: list[float]) -> float:
     return (wins + 0.5 * ties) / (len(pos) * len(neg))
 
 
-def run_attack(scenario: str, warm_fraction: float, probes: int, seed: int) -> AttackResult:
+def run_attack(scenario: str, warm_fraction: float, probes: int, seed: int,
+               defense=None) -> AttackResult:
     """One attacker campaign: `probes` timed requests against a secret the
     attacker does not hold, half in a world where the victim asked the
-    secret (positive class) and half where they did not (negative)."""
+    secret (positive class) and half where they did not (negative).
+    `defense` is None or ("pad", grid_ms) / ("ttl", expiry_prob), applied
+    to the shared cache the attacker observes."""
     rng = random.Random(seed)
     pos_times, neg_times = [], []
     for _ in range(probes):
@@ -109,8 +148,8 @@ def run_attack(scenario: str, warm_fraction: float, probes: int, seed: int) -> A
             # Positive world: victim asked it, so it is warm with the
             # shared hit probability. Negative world: nobody did -> cold.
             p_hit_when_asked = _hit_probability_shared(warm_fraction, rng)
-            pos_times.append(_sample_latency(rng.random() < p_hit_when_asked, rng))
-            neg_times.append(_sample_latency(False, rng))
+            pos_times.append(_defended_latency(rng.random() < p_hit_when_asked, rng, defense))
+            neg_times.append(_defended_latency(False, rng, defense))
         else:  # per-tenant isolation
             # The attacker probes its OWN cache. The victim asking or not
             # changes nothing the attacker can observe -> both draws cold.
@@ -160,6 +199,65 @@ def isolation_cost(total_mb: float, n_tenants: int, demand_shares: list[float]) 
     }
 
 
+def latency_benefit_cost(defense, probes: int, seed: int) -> float:
+    """Share of the cache's expected latency benefit a defense gives up,
+    measured on the same latency model (Monte Carlo, includes jitter).
+    Undefended benefit per hit is MISS − HIT; padding shrinks the gap by
+    delaying hits to the grid, TTL jitter throws hits away outright."""
+    kind, param = defense
+    if kind == "ttl":
+        return float(param)  # exactly q of hits are sacrificed
+    rng = random.Random(seed)
+    hit = sum(_defended_latency(True, rng, defense) for _ in range(probes)) / probes
+    miss = sum(_defended_latency(False, rng, defense) for _ in range(probes)) / probes
+    base_gap = MISS_LATENCY_MS - CACHE_HIT_LATENCY_MS
+    return max(0.0, min(1.0, 1.0 - (miss - hit) / base_gap))
+
+
+def defense_frontier(probes: int, seed: int, worst_wf: float = 0.9) -> list[dict]:
+    """Leakage (worst-case AUC at the attacker's best leverage) vs latency
+    cost, for every defense on the fixed grids plus per-tenant isolation.
+    `hits_retained` carries the dollar dimension: hits avoid tier-priced
+    inference, so sacrificing hits (TTL, partitioning's hit-rate penalty)
+    costs money where padding only costs time."""
+    rows = []
+    rows.append({
+        "defense": "none", "param": 0.0,
+        "auc_worst": run_attack("shared", worst_wf, probes, seed).auc,
+        "latency_benefit_cost": 0.0, "hits_retained": 1.0,
+    })
+    for q_ms in PAD_GRID_MS:
+        d = ("pad", q_ms)
+        rows.append({
+            "defense": "pad", "param": q_ms,
+            "auc_worst": run_attack("shared", worst_wf, probes, seed, defense=d).auc,
+            "latency_benefit_cost": latency_benefit_cost(d, probes, seed),
+            "hits_retained": 1.0,
+        })
+    for q in TTL_JITTER_GRID:
+        d = ("ttl", q)
+        rows.append({
+            "defense": "ttl", "param": q,
+            "auc_worst": run_attack("shared", worst_wf, probes, seed, defense=d).auc,
+            "latency_benefit_cost": latency_benefit_cost(d, probes, seed),
+            "hits_retained": round(1.0 - q, 4),
+        })
+    demand = [8.0, 4.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    cost = isolation_cost(total_mb=4096.0, n_tenants=len(demand), demand_shares=demand)
+    iso_auc = run_attack("per_tenant", worst_wf, probes, seed).auc
+    for name, penalty in (("partition_equal", cost["naive_isolation_penalty"]),
+                          ("partition_polyforge", cost["polyforge_penalty"])):
+        rows.append({
+            "defense": name, "param": 0.0, "auc_worst": iso_auc,
+            "latency_benefit_cost": penalty,
+            "hits_retained": round(1.0 - penalty, 4),
+        })
+    for r in rows:
+        r["auc_worst"] = round(r["auc_worst"], 4)
+        r["latency_benefit_cost"] = round(r["latency_benefit_cost"], 4)
+    return rows
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default=None, help="output prefix (.json + .csv)")
@@ -182,6 +280,8 @@ def main() -> None:
 
     demand = [8.0, 4.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0]  # a whale + minnows
     cost = isolation_cost(total_mb=4096.0, n_tenants=len(demand), demand_shares=demand)
+
+    frontier_rows = defense_frontier(args.probes, args.seed)
 
     summary = {
         "attack": {
@@ -206,14 +306,20 @@ def main() -> None:
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
         (out.parent / (out.name + ".json")).write_text(json.dumps(
-            {"summary": summary, "attack_rows": attack_rows, "warm_grid": warm_grid},
+            {"summary": summary, "attack_rows": attack_rows, "warm_grid": warm_grid,
+             "defense_frontier": frontier_rows},
             indent=2), encoding="utf-8")
         import csv
         with open(out.parent / (out.name + ".csv"), "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(attack_rows[0].keys()))
             w.writeheader()
             w.writerows(attack_rows)
-        print(f"\nwrote {out}.json and {out}.csv")
+        with open(out.parent / (out.name + "_frontier.csv"), "w", newline="",
+                  encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(frontier_rows[0].keys()))
+            w.writeheader()
+            w.writerows(frontier_rows)
+        print(f"\nwrote {out}.json, {out}.csv and {out}_frontier.csv")
 
 
 if __name__ == "__main__":

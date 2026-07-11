@@ -33,20 +33,26 @@ class StaticController:
     """Fixed configuration. Default: the do-nothing floor (initial states).
     `overprovisioned=True` is the W34 baseline sense — every tenant pinned
     at replica_max with a large cache and the mid tier, i.e. provisioned to
-    peak so it never violates but always pays."""
+    peak so it never violates but always pays.
+    `fixed_replicas=n` is the v2 iso-cost sense (PREREG_V2 §5): the same
+    posture but pinned at n replicas per tenant, where n is derived from
+    PolyForge's realized spend — same never-adapts behavior, matched budget."""
 
     name = "static"
 
-    def __init__(self, configs: dict[str, TenantConfig], overprovisioned: bool = False):
+    def __init__(self, configs: dict[str, TenantConfig], overprovisioned: bool = False,
+                 fixed_replicas: int | None = None):
         self.configs = configs
         self.overprovisioned = overprovisioned
+        self.fixed_replicas = fixed_replicas
 
     def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
-        if not self.overprovisioned:
+        if not self.overprovisioned and self.fixed_replicas is None:
             return dict(states)
         return {
             tid: TenantState(
-                replicas=self.configs[tid].replica_max,
+                replicas=(self.configs[tid].replica_max if self.fixed_replicas is None
+                          else max(1, min(self.configs[tid].replica_max, self.fixed_replicas))),
                 cache_mb=CACHE_LEVELS_MB[-1],
                 tier="mid",
             )
@@ -253,9 +259,14 @@ class GPTCacheLRUController:
 
     name = "gptcache"
 
-    def __init__(self, configs: dict[str, TenantConfig], target_rho: float = 0.6):
+    def __init__(self, configs: dict[str, TenantConfig], target_rho: float = 0.6,
+                 fixed_cache_mb: int | None = None):
         self.configs = configs
         self.target_rho = target_rho
+        # v2 iso-cost sense (PREREG_V2 §5): same posture, but the cache is
+        # pinned at a level derived from PolyForge's realized cache spend
+        # instead of growing toward the maximum.
+        self.fixed_cache_mb = fixed_cache_mb
 
     def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
         out = {}
@@ -267,16 +278,19 @@ class GPTCacheLRUController:
             desired = math.ceil(state.replicas * rho / self.target_rho) if rho > 0 else config.replica_min
             delta = max(-2, min(2, desired - state.replicas))
 
-            cacheable_rps = sum(
-                demand.rps.get(k, 0.0) * CACHEABLE_FRACTION[k] for k in AI_KINDS
-            )
-            i = CACHE_LEVELS_MB.index(state.cache_mb) if state.cache_mb in CACHE_LEVELS_MB else 0
-            if cacheable_rps > 0.0 and i < len(CACHE_LEVELS_MB) - 1:
-                cache_mb = CACHE_LEVELS_MB[i + 1]  # cache everything
-            elif cacheable_rps <= 0.0 and i > 0:
-                cache_mb = CACHE_LEVELS_MB[i - 1]
+            if self.fixed_cache_mb is not None:
+                cache_mb = self.fixed_cache_mb
             else:
-                cache_mb = state.cache_mb
+                cacheable_rps = sum(
+                    demand.rps.get(k, 0.0) * CACHEABLE_FRACTION[k] for k in AI_KINDS
+                )
+                i = CACHE_LEVELS_MB.index(state.cache_mb) if state.cache_mb in CACHE_LEVELS_MB else 0
+                if cacheable_rps > 0.0 and i < len(CACHE_LEVELS_MB) - 1:
+                    cache_mb = CACHE_LEVELS_MB[i + 1]  # cache everything
+                elif cacheable_rps <= 0.0 and i > 0:
+                    cache_mb = CACHE_LEVELS_MB[i - 1]
+                else:
+                    cache_mb = state.cache_mb
 
             tier = self._tier_rule(config, state, demand)
             out[tid] = apply_action(config, state, delta, cache_mb, tier)

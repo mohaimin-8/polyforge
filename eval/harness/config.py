@@ -41,6 +41,7 @@ class RunSpec:
     seed: int
     store_timeseries: bool
     transition_costs: bool = False
+    interference: bool = False
 
 
 @dataclass
@@ -58,6 +59,9 @@ class ExperimentSpec:
     # Reconfiguration realism (replica startup lag, cache warm-up) in the
     # scoring engine; see simulate.run(transition_costs=...).
     transition_costs: bool = False
+    # Noisy-neighbor interference injection (v2 Phase 4); see
+    # simulate.run(interference_injection=...).
+    interference: bool = False
     # Per-step, per-tenant rows are large; keep them for the first
     # `timeseries_reps` repetitions only (figures need one trace, stats
     # need only the per-run aggregates).
@@ -107,7 +111,9 @@ def run_identity(spec: ExperimentSpec, system: str, workload: str, mix: str,
     )
     if spec.transition_costs:
         # Appended only when set so every pre-existing run_id is unchanged.
-        material += "|tc" 
+        material += "|tc"
+    if spec.interference:
+        material += "|if"
     digest = hashlib.sha256(material.encode()).hexdigest()
     run_id = digest[:16]
     seed = int(digest[16:28], 16) % (2**31 - 1)
@@ -137,5 +143,6 @@ def expand(spec: ExperimentSpec) -> list[RunSpec]:
                             seed=seed,
                             store_timeseries=rep < spec.timeseries_reps,
                             transition_costs=spec.transition_costs,
+                            interference=spec.interference,
                         ))
     return runs

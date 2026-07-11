@@ -1,0 +1,425 @@
+generated: '2026-07-11'
+source: eval/results/raw_sim_v2.duckdb (matrix_v2)
+protocol: PREREG_V2.md section 5 - ceiling rounding, strict against PolyForge
+B_per_replica_run_usd: 0.016
+cells:
+  agentic|besteffort_heavy|large:
+    budget_usd: 2.531801
+    static_A_usd: 32.461077
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 853.47
+    cache_level_mb: 1024
+  agentic|besteffort_heavy|medium:
+    budget_usd: 2.164979
+    static_A_usd: 32.397503
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 497.87
+    cache_level_mb: 512
+  agentic|besteffort_heavy|small:
+    budget_usd: 1.497552
+    static_A_usd: 32.451721
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 255.87
+    cache_level_mb: 256
+  agentic|premium_heavy|large:
+    budget_usd: 4.825919
+    static_A_usd: 32.408961
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 961.33
+    cache_level_mb: 1024
+  agentic|premium_heavy|medium:
+    budget_usd: 3.635253
+    static_A_usd: 32.474624
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 507.33
+    cache_level_mb: 512
+  agentic|premium_heavy|small:
+    budget_usd: 2.906755
+    static_A_usd: 32.37315
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 255.47
+    cache_level_mb: 256
+  agentic|uniform|large:
+    budget_usd: 2.994978
+    static_A_usd: 32.310987
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 956.93
+    cache_level_mb: 1024
+  agentic|uniform|medium:
+    budget_usd: 1.867254
+    static_A_usd: 32.473851
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 494.13
+    cache_level_mb: 512
+  agentic|uniform|small:
+    budget_usd: 1.298991
+    static_A_usd: 32.319412
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 256.0
+    cache_level_mb: 256
+  agentic|whale|large:
+    budget_usd: 2.525388
+    static_A_usd: 38.018842
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 879.73
+    cache_level_mb: 1024
+  agentic|whale|medium:
+    budget_usd: 2.105618
+    static_A_usd: 38.1591
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 490.67
+    cache_level_mb: 512
+  agentic|whale|small:
+    budget_usd: 1.393025
+    static_A_usd: 38.124614
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 254.27
+    cache_level_mb: 256
+  ai_cacheable|besteffort_heavy|large:
+    budget_usd: 2.094425
+    static_A_usd: 62.799236
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 987.87
+    cache_level_mb: 1024
+  ai_cacheable|besteffort_heavy|medium:
+    budget_usd: 2.265709
+    static_A_usd: 62.759597
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 506.0
+    cache_level_mb: 512
+  ai_cacheable|besteffort_heavy|small:
+    budget_usd: 2.462825
+    static_A_usd: 62.711233
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 256.0
+    cache_level_mb: 256
+  ai_cacheable|premium_heavy|large:
+    budget_usd: 4.159879
+    static_A_usd: 62.853366
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 1005.87
+    cache_level_mb: 1024
+  ai_cacheable|premium_heavy|medium:
+    budget_usd: 4.6
+    static_A_usd: 62.914647
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 509.73
+    cache_level_mb: 512
+  ai_cacheable|premium_heavy|small:
+    budget_usd: 5.039797
+    static_A_usd: 62.89954
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 255.87
+    cache_level_mb: 256
+  ai_cacheable|uniform|large:
+    budget_usd: 4.630691
+    static_A_usd: 62.85961
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 935.07
+    cache_level_mb: 1024
+  ai_cacheable|uniform|medium:
+    budget_usd: 5.098188
+    static_A_usd: 62.816455
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 510.8
+    cache_level_mb: 512
+  ai_cacheable|uniform|small:
+    budget_usd: 5.534292
+    static_A_usd: 62.837529
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 255.87
+    cache_level_mb: 256
+  ai_cacheable|whale|large:
+    budget_usd: 4.53498
+    static_A_usd: 73.686275
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 689.47
+    cache_level_mb: 1024
+  ai_cacheable|whale|medium:
+    budget_usd: 4.390336
+    static_A_usd: 73.887816
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 493.33
+    cache_level_mb: 512
+  ai_cacheable|whale|small:
+    budget_usd: 4.899932
+    static_A_usd: 73.797169
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 254.8
+    cache_level_mb: 256
+  ai_uncacheable|besteffort_heavy|large:
+    budget_usd: 3.235894
+    static_A_usd: 35.89704
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 304.8
+    cache_level_mb: 512
+  ai_uncacheable|besteffort_heavy|medium:
+    budget_usd: 3.247644
+    static_A_usd: 35.881259
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 311.6
+    cache_level_mb: 512
+  ai_uncacheable|besteffort_heavy|small:
+    budget_usd: 3.128346
+    static_A_usd: 36.091109
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 240.93
+    cache_level_mb: 256
+  ai_uncacheable|premium_heavy|large:
+    budget_usd: 3.557743
+    static_A_usd: 36.124404
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 548.13
+    cache_level_mb: 1024
+  ai_uncacheable|premium_heavy|medium:
+    budget_usd: 3.428007
+    static_A_usd: 36.234274
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 487.07
+    cache_level_mb: 512
+  ai_uncacheable|premium_heavy|small:
+    budget_usd: 2.993447
+    static_A_usd: 36.104352
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 254.93
+    cache_level_mb: 256
+  ai_uncacheable|uniform|large:
+    budget_usd: 3.448013
+    static_A_usd: 35.915975
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 158.8
+    cache_level_mb: 256
+  ai_uncacheable|uniform|medium:
+    budget_usd: 3.416233
+    static_A_usd: 35.96742
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 144.0
+    cache_level_mb: 256
+  ai_uncacheable|uniform|small:
+    budget_usd: 3.068631
+    static_A_usd: 36.037526
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 252.13
+    cache_level_mb: 256
+  ai_uncacheable|whale|large:
+    budget_usd: 3.665844
+    static_A_usd: 41.865519
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 232.27
+    cache_level_mb: 256
+  ai_uncacheable|whale|medium:
+    budget_usd: 3.678296
+    static_A_usd: 42.48566
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 231.73
+    cache_level_mb: 256
+  ai_uncacheable|whale|small:
+    budget_usd: 2.972172
+    static_A_usd: 42.209879
+    static_replicas_per_tenant: 1
+    budget_infeasible: true
+    jcac_v2_mean_cache_mb: 254.67
+    cache_level_mb: 256
+  crud_bursty|besteffort_heavy|large:
+    budget_usd: 0.391507
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 3
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_bursty|besteffort_heavy|medium:
+    budget_usd: 0.387853
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 3
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_bursty|besteffort_heavy|small:
+    budget_usd: 0.37428
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 3
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_bursty|premium_heavy|large:
+    budget_usd: 0.43388
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 4
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_bursty|premium_heavy|medium:
+    budget_usd: 0.441107
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 4
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_bursty|premium_heavy|small:
+    budget_usd: 0.379453
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 3
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_bursty|uniform|large:
+    budget_usd: 0.371507
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 3
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_bursty|uniform|medium:
+    budget_usd: 0.371267
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 3
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_bursty|uniform|small:
+    budget_usd: 0.370467
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 3
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_bursty|whale|large:
+    budget_usd: 0.466333
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 4
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_bursty|whale|medium:
+    budget_usd: 0.420813
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 4
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_bursty|whale|small:
+    budget_usd: 0.363373
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 3
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|besteffort_heavy|large:
+    budget_usd: 0.257667
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 2
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|besteffort_heavy|medium:
+    budget_usd: 0.257667
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 2
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|besteffort_heavy|small:
+    budget_usd: 0.257667
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 2
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|premium_heavy|large:
+    budget_usd: 0.257667
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 2
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|premium_heavy|medium:
+    budget_usd: 0.257667
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 2
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|premium_heavy|small:
+    budget_usd: 0.257667
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 2
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|uniform|large:
+    budget_usd: 0.257667
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 2
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|uniform|medium:
+    budget_usd: 0.257667
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 2
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|uniform|small:
+    budget_usd: 0.257667
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 2
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|whale|large:
+    budget_usd: 0.27252
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 3
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|whale|medium:
+    budget_usd: 0.273027
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 3
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128
+  crud_steady|whale|small:
+    budget_usd: 0.273187
+    static_A_usd: 0.013333
+    static_replicas_per_tenant: 3
+    budget_infeasible: false
+    jcac_v2_mean_cache_mb: 128.0
+    cache_level_mb: 128

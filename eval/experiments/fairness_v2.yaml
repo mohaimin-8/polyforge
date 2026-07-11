@@ -1,0 +1,17 @@
+# Phase 4 (v2): the fairness γ-ablation re-run under noisy-neighbor
+# interference injection — the W32 signal shape the γ-term was designed
+# for, absent from every v1 experiment (RESULTS.md limitation).
+# Same slice as the v1 ablations (medium cluster, 5 workloads, 4 mixes,
+# 5 reps); all reps keep timeseries so worst-tenant p95 is computable.
+name: fairness_v2
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, jcac_nofairness]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [medium]
+output: eval/results/fairness_v2.duckdb
+retries: 2
+interference: true
+timeseries_reps: 5

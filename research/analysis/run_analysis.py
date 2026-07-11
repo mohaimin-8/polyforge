@@ -211,6 +211,22 @@ def main() -> None:
     else:
         print("advanced.py skipped: run forecasters.yaml + realism.yaml first")
 
+    # v2 pre-registered analysis (PREREG_V2.md) once the v2 matrix exists.
+    import analysis_v2
+
+    if analysis_v2.V2_DB.exists():
+        analysis_v2.main()
+    else:
+        print("analysis_v2.py skipped: run experiments/matrix_v2.yaml first")
+
+    # v2 Phase 4 fairness γ-ablation under interference injection.
+    import fairness_v2
+
+    if fairness_v2.DB.exists():
+        fairness_v2.main()
+    else:
+        print("fairness_v2.py skipped: run experiments/fairness_v2.yaml first")
+
 
 if __name__ == "__main__":
     main()

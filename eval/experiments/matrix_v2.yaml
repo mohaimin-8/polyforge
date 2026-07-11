@@ -1,0 +1,15 @@
+# v2 headline matrix (PREREG_V2.md §2 — pre-registered before any v2 run):
+#   7 systems x 5 workload classes x 4 tenant mixes x 3 cluster sizes x 5 reps
+#   = 2,100 runs over the same 300 blocked cells as full.yaml.
+# Identical to full.yaml except: + jcac_v2, new output DB (v1 DB never reopened).
+name: matrix_v2
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, hpa, keda, firm, static, gptcache, jcac_v2]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_v2.duckdb
+retries: 2
+timeseries_reps: 1

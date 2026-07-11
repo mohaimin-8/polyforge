@@ -165,6 +165,60 @@ def fig_side_channel():
     return data["summary"]
 
 
+def fig_defense_frontier():
+    """v2 Phase 5: leakage vs cost for every known mitigation, on the same
+    attack. Lower-left dominates (low leakage, low cost). Per-tenant
+    partitioning sits alone in the corner: chance-level AUC at a lower
+    latency cost than either mitigation reaches at any comparable leakage."""
+    data = json.loads(SECURITY_JSON.read_text(encoding="utf-8"))
+    rows = pd.DataFrame(data["defense_frontier"])
+    fig, ax = plt.subplots(figsize=(4.4, 3.2))
+
+    series = (
+        ("pad", "#eda100", "o", "response-time padding"),
+        ("ttl", "#e34948", "s", "TTL jitter"),
+    )
+    for kind, color, marker, label in series:
+        sub = rows[rows.defense == kind].sort_values("latency_benefit_cost")
+        ax.plot(sub.latency_benefit_cost, sub.auc_worst, "-", color=color, lw=2,
+                marker=marker, ms=6, markeredgecolor="white", markeredgewidth=0.8,
+                label=label)
+
+    none = rows[rows.defense == "none"].iloc[0]
+    ax.plot(none.latency_benefit_cost, none.auc_worst, "P", color="#8a8a86", ms=9,
+            markeredgecolor="white", markeredgewidth=0.8, label="no defense", zorder=5)
+    ax.annotate("no defense", (none.latency_benefit_cost, none.auc_worst),
+                textcoords="offset points", xytext=(8, 2), fontsize=7.5, color=F.INK2)
+
+    part = rows[rows.defense == "partition_polyforge"].iloc[0]
+    ax.plot(part.latency_benefit_cost, part.auc_worst, "D", color="#2a78d6", ms=9,
+            markeredgecolor="white", markeredgewidth=1.0,
+            label="per-tenant partition (PolyForge)", zorder=6)
+    ax.annotate("PolyForge\npartition", (part.latency_benefit_cost, part.auc_worst),
+                textcoords="offset points", xytext=(8, -4), fontsize=7.5,
+                color="#2a78d6", fontweight="bold")
+
+    ax.axhline(0.5, color=F.MUTED, lw=1, ls="--")
+    ax.annotate("attacker at chance", (0.62, 0.515), fontsize=7.5, color=F.MUTED)
+    ax.set_xlabel("share of cache latency benefit given up")
+    ax.set_ylabel("worst-case membership-inference AUC")
+    ax.set_ylim(0.45, 0.92)
+    ax.set_xlim(-0.03, 0.95)
+    ax.legend(loc="upper right", fontsize=7.2)
+    F._style(ax)
+    fig.suptitle("Defense frontier: partitioning dominates the known mitigations",
+                 fontsize=9.5, y=0.99)
+    F.save(fig, "fig17_defense_frontier",
+           "Leakage (worst-case membership-inference AUC) versus the share of the "
+           "cache's latency benefit each defense gives up, same attack for all. "
+           "Response-time padding and TTL jitter trace cost/leakage curves that only "
+           "approach chance at extreme cost (padding never below AUC 0.73; TTL needs "
+           "to discard ~90% of hits); per-tenant partitioning reaches chance-level "
+           "AUC at a fraction of that cost while retaining most hits — it dominates "
+           "the frontier rather than merely joining it.")
+    return rows
+
+
 def main() -> None:
     lines = ["# Advanced-work results (Tier 2 + security)", ""]
     w = lines.append
@@ -239,10 +293,58 @@ def main() -> None:
       "the shared cache as a **cross-tenant covert channel** and quantifying the "
       "isolation/efficiency trade-off is, to our knowledge, new — and PolyForge's W28 "
       "per-tenant design already implements the defense.")
+    w("")
+
+    fr = fig_defense_frontier()
+    part = fr[fr.defense == "partition_polyforge"].iloc[0]
+    pad_best = fr[fr.defense == "pad"].sort_values("auc_worst").iloc[0]
+    ttl_chance = fr[(fr.defense == "ttl") & (fr.auc_worst <= 0.55)].sort_values(
+        "latency_benefit_cost")
+    w("## Defense frontier — v2 Phase 5 (fig. 17)")
+    w("")
+    w("The two standard timing-channel mitigations, swept over fixed grids "
+      "(committed, not tuned) and scored on the identical attack, against "
+      "per-tenant partitioning on the same leakage/cost axes:")
+    w("")
+    w("| defense | best worst-case AUC | latency benefit given up | hits retained |")
+    w("|---|---|---|---|")
+    for _, r in fr[fr.defense.isin(["none", "pad", "ttl"])].groupby("defense", sort=False):
+        best = r.sort_values("auc_worst").iloc[0]
+        w(f"| {best['defense']} (best of grid) | {best['auc_worst']:.2f} | "
+          f"{best['latency_benefit_cost']:.0%} | {best['hits_retained']:.0%} |")
+    w(f"| per-tenant partition | {part['auc_worst']:.2f} | "
+      f"{part['latency_benefit_cost']:.0%} | {part['hits_retained']:.0%} |")
+    w("")
+    ttl_cost = f"{ttl_chance.iloc[0]['latency_benefit_cost']:.0%}" if len(ttl_chance) else ">90%"
+    w(f"**The claim upgrades from 'we have a defense' to 'partitioning dominates the "
+      f"known frontier.'** Response-time padding never drives leakage below AUC "
+      f"{pad_best['auc_worst']:.2f} (it equalizes hit/miss latency only by padding "
+      f"*everything* to the miss time, discarding the benefit entirely); TTL jitter "
+      f"only reaches chance by discarding ~{ttl_cost} of hits (both latency and "
+      f"inference dollars). Per-tenant partitioning reaches chance-level AUC "
+      f"({part['auc_worst']:.2f}) at {part['latency_benefit_cost']:.0%} latency cost "
+      f"while retaining {part['hits_retained']:.0%} of hits — strictly lower-left of "
+      "either mitigation curve. No point on either curve dominates it.")
 
     out = Path(__file__).resolve().parent / "ADVANCED.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {out}")
+
+    # Record the advanced figures (13-17) in FIGURES.md, which figures.main()
+    # writes for the base 12 only. Append the advanced captions that
+    # accumulated in F.CAPTIONS during this run so the inventory is complete.
+    fig_md = F.FIG_DIR / "FIGURES.md"
+    advanced_names = {"fig13_forecast_ablation", "fig14_realism_pareto",
+                      "fig15_adaptive_under_realism", "fig16_cache_side_channel",
+                      "fig17_defense_frontier"}
+    have = fig_md.read_text(encoding="utf-8") if fig_md.exists() else ""
+    with open(fig_md, "a", encoding="utf-8") as f:
+        if "Advanced figures" not in have:
+            f.write("\n## Advanced figures (Tier 2 + security, v2)\n\n")
+        for name, caption in F.CAPTIONS:
+            if name in advanced_names and f"**{name}**" not in have:
+                f.write(f"- **{name}** — {caption}\n")
+    print(f"appended advanced figure captions to {fig_md}")
 
 
 if __name__ == "__main__":

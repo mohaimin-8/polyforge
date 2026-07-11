@@ -1,0 +1,15 @@
+scenario,warm_fraction,auc,leak_bits_per_probe
+shared,0.05,0.5149,0.0006
+per_tenant,0.05,0.4973,0.0
+shared,0.1,0.5355,0.0036
+per_tenant,0.1,0.4973,0.0
+shared,0.2,0.5751,0.0163
+per_tenant,0.2,0.4973,0.0
+shared,0.35,0.6417,0.0587
+per_tenant,0.35,0.4973,0.0
+shared,0.5,0.7039,0.1235
+per_tenant,0.5,0.4973,0.0
+shared,0.7,0.7921,0.2625
+per_tenant,0.7,0.4973,0.0
+shared,0.9,0.8772,0.4627
+per_tenant,0.9,0.4973,0.0

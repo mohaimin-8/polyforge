@@ -156,6 +156,17 @@ SYSTEMS: dict[str, SystemSpec] = {
         "jcac", params={"forecast_method": "holt", "adaptive_capacity": True},
         description="PolyForge v2: Holt forecast + capacity self-calibration (PREREG_V2.md)",
     ),
+    # Iso-cost baselines (PREREG_V2 §5): the `isocost` marker is resolved
+    # per run by harness.isocost from budgets derived off jcac_v2's realized
+    # spend in the completed matrix_v2 (eval/baselines/isocost.py).
+    "static_isocost": SystemSpec(
+        "static", params={"isocost": "static"}, lru_eviction=True,
+        description="Static posture pinned at PolyForge v2's realized per-cell budget (ceiling)",
+    ),
+    "cache_isocost": SystemSpec(
+        "gptcache", params={"isocost": "cache"}, lru_eviction=True,
+        description="GPTCache posture, cache pinned at PolyForge v2's realized cache spend (ceiling)",
+    ),
     # --- W36 ablations (PolyForge minus one contribution) ----------------
     "jcac_noclassifier": SystemSpec(
         "jcac", blind_classifier=True,

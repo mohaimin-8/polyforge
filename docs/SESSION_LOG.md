@@ -7,6 +7,110 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-11 (session 13) — v2 Phases 1–5 + 8: the full segment-win push, executed under pre-registration
+
+Milestone status: on the user's explicit "full power, beat all 5 segments"
+override of the one-slice cadence. Phases 1, 2, 4, 5, 8 and the local half of
+Phase 3 complete; all engineering built and locally verified. **2,900 new runs
+(2,100 + 600 + 200), 100% valid, zero failures.** Nothing here touches the
+immutable v1 headline; every result is additive and each "win" is reported as
+measured, including the two honest nulls.
+
+### What was built and found, by segment
+
+**Phase 1 — v2 headline matrix (2,100 runs, `matrix_v2.yaml`).** `jcac_v2`
+(Holt + adaptive_capacity, the two mechanisms session 11 showed each help)
+run over the same 300 blocked cells as the v1 matrix. `analysis_v2.py` →
+`RESULTS_V2.md` executes the pre-registered H1/H2. **H1 FAILs as measured**:
+v2's SLO violation is at *parity* with HPA/KEDA, not significantly below —
+though at −43%/−48% cost — so per prereg §6 the null is published and v1 stays
+the headline system. **H2 PASSes**: v2 is −11% cost vs v1 (p=4e-36) with no
+large-effect regression. v2 does beat FIRM on SLO (p=2e-19). The honest read:
+combining the two forecast/calibration mechanisms buys cost, not the SLO
+segment — which the pre-registration was written precisely to be able to say.
+
+**Phase 2 — iso-cost baselines + gate v2 (600 runs, `isocost.yaml`).**
+`static_isocost` / `cache_isocost` pinned at budgets derived from v2's own
+realized per-cell spend (`eval/baselines/isocost.py`, ceiling rounding strict
+against PolyForge; resolved per run by `eval/harness/isocost.py`). Making
+`static` iso-cost **flips its gate row from a 1/5 loss to a 3/5 PASS** — its
+v1 SLO/Jain "wins" were bought with 12× overspend. The overall gate stays FAIL
+because `cache_isocost` still outspends ~36× (36/60 cells are budget-infeasible
+even at 1 replica — the honest quantification of the structural confound).
+
+**Phase 4 — fairness γ-term made testable (200 runs, `fairness_v2.yaml`).**
+Added noisy-neighbor interference injection to `simulate.run`: a tenant serving
+>2× its fair share steals up to 50% of co-tenants' capacity (billing nominal),
+and JCAC sees the observable detector score. This is the W32 signal v1
+documented as absent. Result is the **negative branch, robustly**: even in the
+whale-only subgroup where injection fires, γ-removal shows no significant
+degradation (all p>0.1) and slightly *helps* SLO — the joint cost/SLO optimizer
+already absorbs interference. The term is dropped from claims; the segment is
+resolved either way. `fairness_v2.py` → `FAIRNESS_V2.md`, worst-tenant p95 added.
+
+**Phase 5 — security defense frontier (fig. 17).** Extended
+`cache_side_channel.py` with response-time padding and TTL jitter, swept on
+fixed grids against the same attack. **Per-tenant partitioning dominates the
+frontier**: chance-level AUC (0.50) at 24% latency cost retaining 76% of hits —
+strictly lower-left of both mitigations (padding never below AUC 0.73; TTL
+needs to discard ~90% of hits to reach chance). Claim upgrades from "we have a
+defense" to "partitioning dominates the known frontier."
+
+**Phase 3a — BurstGPT pipeline + forecast win.** `research/traces/etl_burstgpt.py`
+(real BurstGPT schema + `--synthetic` reproducing daily periodicity and
+heavy-tailed tokens, same pattern as the Azure ETL). `forecast_trace.py` buckets
+the trace hourly and re-runs the four forecasters: the seasonal detector locks a
+**24-bucket daily period (autocorr 0.85)** and seasonal — neutral on synthetic
+noise in session 11 — now **cuts one-step RMSE 44.8% vs trend** (Holt is +35%
+*worse*, chasing the diurnal ramp). Exactly the V2_README prediction, and the
+strongest clean segment result of the session.
+
+**Phase 3b — semantic-cache protocol.** `semantic_cache_eval.py`: insert-first-
+half / query-second-half / threshold-sweep with a pluggable embedder
+(all-MiniLM-L6-v2 when installed, dependency-free char-n-gram fallback
+otherwise) and exact cosine NN. Reports fixed-vs-adaptive hit-rate curves and
+dollar-weighted savings (the metric cache-only papers can't report). Runs
+offline on synthetic conversations; pointable at real LMSYS + MiniLM with an HF
+token.
+
+**Phase 8 — theory.** `THEORY_V2.md`: Prop 1 (two-sweep coordinate descent over
+the finite lattice → block-coordinate/unilateral-move optimum, with an explicit
+note it is *not* the global optimum under the non-separable Jain coupling) and
+Prop 2 (calibration scale forward-invariant in [0.5,1], humble-only, contracts
+to 1 in ≤25 agreeing steps). Both proved by construction, line-referenced to
+`controller.py`.
+
+### How it was verified
+
+- **68/68** Python tests pass (`research/jcac_sim`, `eval/tests`,
+  `research/security`), including 8 new v2 tests: interference scoring/gate,
+  capacity theft through `evaluate_step`, injection no-op without a dominant
+  tenant, and the two iso-cost baseline controllers.
+- Every new analysis module was run to completion and its report inspected;
+  fig. 17 was eyeballed for layout, not just generated. The affine-cost identity
+  behind `static_isocost` was checked against the simulator to the cent.
+- No local Docker/GPU/HF-gated work was claimed: Phase 3 real-dataset replays,
+  Phase 6 calibration, and Phase 7 live run remain, and are marked `[~]` in
+  V2_README with the exact blocker.
+
+### Deliberate deviations (surface, don't "fix")
+
+- Two pre-registered/accepted **nulls** are headline outcomes, not failures: H1
+  (SLO parity) and the γ-term (dropped). This is the pre-registration working.
+- The Phase 3b fallback embedder yields *lexical*, not semantic, hit rates —
+  labeled inline; real numbers need the gated dataset + deps.
+- Synthetic traces (`out/*.csv.gz`) stay gitignored like the existing ones; the
+  ETL script is the committed artifact.
+
+### Immediate next tasks
+
+1. Push (prereg timestamp + this work). Phase 0 commit f8aa8e6 is still local.
+2. Real-dataset halves of Phase 3 (BurstGPT 10M download; LMSYS HF token + install
+   sentence-transformers/faiss) — pipelines are committed and waiting.
+3. Phase 6 calibration (CPU llama.cpp / free-GPU vLLM) and Phase 7 live kind run
+   (Docker VM) — the only remaining phases, both needing environments this laptop
+   lacks. Phase 9 hardening (CI smoke jobs, `run_v2.py` dispatcher, RELATED_WORK.md).
+
 ## 2026-07-11 (session 12) — v2 Phase 0: pre-registration committed before any v2 run
 
 Milestone status: v2 phase per `docs/V2_README.md` begun. Phase 0 complete;

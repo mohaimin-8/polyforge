@@ -1,0 +1,14 @@
+# Pipeline smoke ONLY (not a results experiment): tiny 7-system fixture to
+# verify analysis_v2.py end-to-end before the pre-registered matrix_v2
+# completes. Never cited; output DB is disposable.
+name: smoke_v2_pipeline
+backend: sim
+steps: 10
+reps: 2
+systems: [jcac, hpa, keda, firm, static, gptcache, jcac_v2]
+workloads: [ai_cacheable]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/smoke_v2_pipeline.duckdb
+retries: 2
+timeseries_reps: 0

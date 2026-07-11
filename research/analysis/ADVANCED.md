@@ -29,3 +29,16 @@ A shared semantic cache leaks tenant prompt membership at AUC 0.88 from response
 - **Cost of isolation**: naive equal splitting loses 29% of the aggregate hit rate; the joint planner's demand-proportional sizing cuts that to 24% (recovering 18% of the penalty). Security and efficiency are not in opposition when the controller sizes caches by demand.
 
 This is a novel framing: prior semantic-cache work optimizes hit rate; treating the shared cache as a **cross-tenant covert channel** and quantifying the isolation/efficiency trade-off is, to our knowledge, new — and PolyForge's W28 per-tenant design already implements the defense.
+
+## Defense frontier — v2 Phase 5 (fig. 17)
+
+The two standard timing-channel mitigations, swept over fixed grids (committed, not tuned) and scored on the identical attack, against per-tenant partitioning on the same leakage/cost axes:
+
+| defense | best worst-case AUC | latency benefit given up | hits retained |
+|---|---|---|---|
+| none (best of grid) | 0.88 | 0% | 100% |
+| pad (best of grid) | 0.73 | 28% | 100% |
+| ttl (best of grid) | 0.53 | 90% | 10% |
+| per-tenant partition | 0.50 | 24% | 76% |
+
+**The claim upgrades from 'we have a defense' to 'partitioning dominates the known frontier.'** Response-time padding never drives leakage below AUC 0.73 (it equalizes hit/miss latency only by padding *everything* to the miss time, discarding the benefit entirely); TTL jitter only reaches chance by discarding ~90% of hits (both latency and inference dollars). Per-tenant partitioning reaches chance-level AUC (0.50) at 24% latency cost while retaining 76% of hits — strictly lower-left of either mitigation curve. No point on either curve dominates it.

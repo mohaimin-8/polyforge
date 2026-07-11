@@ -32,6 +32,10 @@ def execute(run: RunSpec) -> dict:
 
     params = dict(tuned_params().get(spec.controller, {}))
     params.update(spec.params)
+    if "isocost" in params:
+        from .isocost import resolve as isocost_resolve
+
+        params = isocost_resolve(params, run)
     if spec.seeded:
         params["seed"] = run.seed
 
@@ -53,6 +57,7 @@ def execute(run: RunSpec) -> dict:
         plan_demand_transform=global_mix_transform if spec.blind_classifier else None,
         miss_cost_factor=lru_miss_cost_factor() if spec.lru_eviction else 1.0,
         transition_costs=run.transition_costs,
+        interference_injection=run.interference,
     )
     wall_s = time.time() - started
 

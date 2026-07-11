@@ -30,6 +30,7 @@ from model import (
     AI_KINDS,
     CACHEABLE_FRACTION,
     CRUD_KINDS,
+    REPLICA_CAPACITY_WU,
     Demand,
     TenantConfig,
     TenantState,
@@ -164,6 +165,52 @@ def _percentile(values: list[float], q: float) -> float:
     return ordered[min(len(ordered) - 1, int(q * (len(ordered) - 1) + 0.5))]
 
 
+# Noisy-neighbor interference (v2 Phase 4). A tenant that *serves* more
+# than twice its fair share of the cluster's executed work saturates shared
+# node resources; every co-located tenant loses serving capacity in
+# proportion. Constants are fixed by the W32 signal shape, not tuned:
+# the gate is 2× fair share, the worst-case capacity cut is 50%.
+INTERFERENCE_GATE_FAIR_SHARES = 2.0
+INTERFERENCE_MAX_CUT = 0.5
+
+
+def interference_scores(
+    states: dict[str, TenantState], demands: dict[str, Demand]
+) -> dict[str, float]:
+    """Per-tenant noisy-neighbor score in [0, 1] from *observable* signals:
+    executed work = min(offered work, replica capacity). Only the dominant
+    tenant is flagged, and only past the fair-share gate — the same shape
+    the W32 eBPF-side detector emits. Throttling the whale's resources
+    caps its executed work, so a controller acting on this score causally
+    reduces the interference (unlike raw demand, which is exogenous)."""
+    served = {
+        tid: min(d.work_units(states[tid].cache_mb),
+                 states[tid].replicas * REPLICA_CAPACITY_WU)
+        for tid, d in demands.items()
+    }
+    total = sum(served.values())
+    n = len(served)
+    if total <= 0.0 or n < 2:
+        return {}
+    dom = max(served, key=lambda t: served[t])
+    share = served[dom] / total
+    gate = INTERFERENCE_GATE_FAIR_SHARES / n
+    if share <= gate or gate >= 1.0:
+        return {}
+    return {dom: min(1.0, (share - gate) / (1.0 - gate))}
+
+
+def interfered_state(serving: TenantState, theta: float) -> TenantState:
+    """A victim's serving capacity during a neighbor's burst: up to
+    INTERFERENCE_MAX_CUT of its replicas are effectively stolen (whole
+    replicas — contention takes cores, not fractions). Billing is *not*
+    reduced: you pay for the replicas you asked for."""
+    replicas = max(1, int(serving.replicas * (1.0 - INTERFERENCE_MAX_CUT * theta)))
+    if replicas == serving.replicas:
+        return serving
+    return TenantState(replicas=replicas, cache_mb=serving.cache_mb, tier=serving.tier)
+
+
 def effective_state(prev: TenantState, nominal: TenantState) -> TenantState:
     """What actually serves this interval under reconfiguration realism:
     replicas added this step are still starting up (serve at the previous
@@ -193,6 +240,7 @@ def run(
     plan_demand_transform=None,
     miss_cost_factor: float = 1.0,
     transition_costs: bool = False,
+    interference_injection: bool = False,
 ) -> RunResult:
     """Replay `buckets` under one controller.
 
@@ -211,6 +259,12 @@ def run(
       for it and benefit one step later. Scale-downs are instant both
       ways. Controllers are not told (no controller sees the lag), so
       thrashing is punished and hysteresis finally earns its keep.
+    - `interference_injection` (v2 Phase 4): noisy-neighbor realism. When
+      one tenant's *executed* work exceeds twice its fair share, every
+      other tenant loses serving capacity in proportion (billing stays
+      nominal). The JCAC controller — and only JCAC, whose plan() accepts
+      it — receives the observable detector score each step, which is what
+      finally makes the γ-term testable in the sim (RESULTS.md limitation).
     """
     configs = configs or default_configs(tenant_ids)
     if controller_name == "jcac":
@@ -235,7 +289,10 @@ def run(
     for step, demands in enumerate(horizon):
         # Controller decides on this bucket's observed demand...
         seen = plan_demand_transform(demands) if plan_demand_transform else demands
-        plans = ctl.plan(states, seen)
+        if interference_injection and isinstance(ctl, JCACController):
+            plans = ctl.plan(states, seen, interference=interference_scores(states, seen))
+        else:
+            plans = ctl.plan(states, seen)
         prev_states, states = states, {
             tid: (p.state if hasattr(p, "state") else p) for tid, p in plans.items()
         }
@@ -243,6 +300,8 @@ def run(
         if step + 1 >= len(horizon):
             break
         actual = horizon[step + 1]
+        inj = interference_scores(states, actual) if interference_injection else {}
+        inj_dom, inj_theta = (next(iter(inj.items())) if inj else (None, 0.0))
         satisfactions = []
         realized: dict[str, float] = {}
         for tid in tenant_ids:
@@ -250,9 +309,11 @@ def run(
             serving = nominal
             if transition_costs:
                 serving = effective_state(prev_states[tid], nominal)
+            if inj_theta > 0.0 and tid != inj_dom:
+                serving = interfered_state(serving, inj_theta)
             m = evaluate_step(configs[tid], serving, actual[tid])
             cost = miss_cost_factor * m.cost_tier_usd
-            if transition_costs and serving != nominal:
+            if serving != nominal:
                 # Billing follows the nominal configuration immediately.
                 cost += evaluate_step(configs[tid], nominal, actual[tid]).cost_infra_usd
             else:

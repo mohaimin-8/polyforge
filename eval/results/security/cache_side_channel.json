@@ -1,0 +1,209 @@
+{
+  "summary": {
+    "attack": {
+      "shared_cache_max_auc": 0.8772,
+      "per_tenant_max_auc": 0.4973,
+      "auc_reduction": 1.0072,
+      "note": "AUC 0.5 is chance; per-tenant isolation returns the attacker to chance."
+    },
+    "isolation_cost": {
+      "total_mb": 4096.0,
+      "n_tenants": 8,
+      "shared_hit_rate": 0.8,
+      "equal_split_hit_rate": 0.5667,
+      "polyforge_hit_rate": 0.608,
+      "naive_isolation_penalty": 0.2917,
+      "polyforge_penalty": 0.24,
+      "penalty_recovered": 0.1772
+    },
+    "headline": "A shared semantic cache leaks tenant prompt membership at AUC 0.88 from response time alone; PolyForge's per-tenant cache returns the attacker to chance (AUC 0.50). Naive equal-split isolation costs 29% of the aggregate hit rate; PolyForge's demand-proportional sizing recovers 18% of that penalty."
+  },
+  "attack_rows": [
+    {
+      "scenario": "shared",
+      "warm_fraction": 0.05,
+      "auc": 0.5149,
+      "leak_bits_per_probe": 0.0006
+    },
+    {
+      "scenario": "per_tenant",
+      "warm_fraction": 0.05,
+      "auc": 0.4973,
+      "leak_bits_per_probe": 0.0
+    },
+    {
+      "scenario": "shared",
+      "warm_fraction": 0.1,
+      "auc": 0.5355,
+      "leak_bits_per_probe": 0.0036
+    },
+    {
+      "scenario": "per_tenant",
+      "warm_fraction": 0.1,
+      "auc": 0.4973,
+      "leak_bits_per_probe": 0.0
+    },
+    {
+      "scenario": "shared",
+      "warm_fraction": 0.2,
+      "auc": 0.5751,
+      "leak_bits_per_probe": 0.0163
+    },
+    {
+      "scenario": "per_tenant",
+      "warm_fraction": 0.2,
+      "auc": 0.4973,
+      "leak_bits_per_probe": 0.0
+    },
+    {
+      "scenario": "shared",
+      "warm_fraction": 0.35,
+      "auc": 0.6417,
+      "leak_bits_per_probe": 0.0587
+    },
+    {
+      "scenario": "per_tenant",
+      "warm_fraction": 0.35,
+      "auc": 0.4973,
+      "leak_bits_per_probe": 0.0
+    },
+    {
+      "scenario": "shared",
+      "warm_fraction": 0.5,
+      "auc": 0.7039,
+      "leak_bits_per_probe": 0.1235
+    },
+    {
+      "scenario": "per_tenant",
+      "warm_fraction": 0.5,
+      "auc": 0.4973,
+      "leak_bits_per_probe": 0.0
+    },
+    {
+      "scenario": "shared",
+      "warm_fraction": 0.7,
+      "auc": 0.7921,
+      "leak_bits_per_probe": 0.2625
+    },
+    {
+      "scenario": "per_tenant",
+      "warm_fraction": 0.7,
+      "auc": 0.4973,
+      "leak_bits_per_probe": 0.0
+    },
+    {
+      "scenario": "shared",
+      "warm_fraction": 0.9,
+      "auc": 0.8772,
+      "leak_bits_per_probe": 0.4627
+    },
+    {
+      "scenario": "per_tenant",
+      "warm_fraction": 0.9,
+      "auc": 0.4973,
+      "leak_bits_per_probe": 0.0
+    }
+  ],
+  "warm_grid": [
+    0.05,
+    0.1,
+    0.2,
+    0.35,
+    0.5,
+    0.7,
+    0.9
+  ],
+  "defense_frontier": [
+    {
+      "defense": "none",
+      "param": 0.0,
+      "auc_worst": 0.8772,
+      "latency_benefit_cost": 0.0,
+      "hits_retained": 1.0
+    },
+    {
+      "defense": "pad",
+      "param": 50.0,
+      "auc_worst": 0.8778,
+      "latency_benefit_cost": 0.0012,
+      "hits_retained": 1.0
+    },
+    {
+      "defense": "pad",
+      "param": 100.0,
+      "auc_worst": 0.8778,
+      "latency_benefit_cost": 0.0129,
+      "hits_retained": 1.0
+    },
+    {
+      "defense": "pad",
+      "param": 200.0,
+      "auc_worst": 0.8778,
+      "latency_benefit_cost": 0.0515,
+      "hits_retained": 1.0
+    },
+    {
+      "defense": "pad",
+      "param": 400.0,
+      "auc_worst": 0.8778,
+      "latency_benefit_cost": 0.1287,
+      "hits_retained": 1.0
+    },
+    {
+      "defense": "pad",
+      "param": 800.0,
+      "auc_worst": 0.7265,
+      "latency_benefit_cost": 0.2831,
+      "hits_retained": 1.0
+    },
+    {
+      "defense": "ttl",
+      "param": 0.1,
+      "auc_worst": 0.844,
+      "latency_benefit_cost": 0.1,
+      "hits_retained": 0.9
+    },
+    {
+      "defense": "ttl",
+      "param": 0.25,
+      "auc_worst": 0.7876,
+      "latency_benefit_cost": 0.25,
+      "hits_retained": 0.75
+    },
+    {
+      "defense": "ttl",
+      "param": 0.5,
+      "auc_worst": 0.6855,
+      "latency_benefit_cost": 0.5,
+      "hits_retained": 0.5
+    },
+    {
+      "defense": "ttl",
+      "param": 0.75,
+      "auc_worst": 0.58,
+      "latency_benefit_cost": 0.75,
+      "hits_retained": 0.25
+    },
+    {
+      "defense": "ttl",
+      "param": 0.9,
+      "auc_worst": 0.5273,
+      "latency_benefit_cost": 0.9,
+      "hits_retained": 0.1
+    },
+    {
+      "defense": "partition_equal",
+      "param": 0.0,
+      "auc_worst": 0.4973,
+      "latency_benefit_cost": 0.2917,
+      "hits_retained": 0.7083
+    },
+    {
+      "defense": "partition_polyforge",
+      "param": 0.0,
+      "auc_worst": 0.4973,
+      "latency_benefit_cost": 0.24,
+      "hits_retained": 0.76
+    }
+  ]
+}
