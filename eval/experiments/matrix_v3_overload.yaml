@@ -1,0 +1,18 @@
+# v3 overload matrix (PREREG_V3.md — pre-registered before any v3 run):
+#   5 systems x 4 overload/control classes x 4 tenant mixes x 3 cluster
+#   sizes x 5 reps = 1,200 runs.
+# Same engine semantics as the v1/v2 headline (no transition costs, no
+# interference injection): the only thing that changes vs matrix_v2 is the
+# demand regime. Systems are the frozen, already-committed specs; baselines
+# keep their tuned.yaml parameters (TUNING.md).
+name: matrix_v3_overload
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, jcac_seasonal, hpa, keda, firm]
+workloads: [flash_crud, flash_ai, spike_agentic, ramp_gentle]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_v3.duckdb
+retries: 2
+timeseries_reps: 1

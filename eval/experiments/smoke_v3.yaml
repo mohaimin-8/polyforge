@@ -1,0 +1,14 @@
+# v3 pipeline smoke (PREREG_V3.md §6): mechanics only — runs complete and
+# are marked valid. Separate DB, separate experiment name (disjoint
+# run_ids); its metrics never enter any analysis and gate nothing.
+name: smoke_v3
+backend: sim
+steps: 120
+reps: 1
+systems: [jcac, jcac_seasonal, hpa, keda, firm]
+workloads: [flash_crud, spike_agentic]
+tenant_mixes: [uniform]
+cluster_sizes: [medium]
+output: eval/results/smoke_v3.duckdb
+retries: 1
+timeseries_reps: 1

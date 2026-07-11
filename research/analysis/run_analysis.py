@@ -227,6 +227,14 @@ def main() -> None:
     else:
         print("fairness_v2.py skipped: run experiments/fairness_v2.yaml first")
 
+    # v3 pre-registered overload-matrix analysis (PREREG_V3.md).
+    import analysis_v3
+
+    if analysis_v3.V3_DB.exists():
+        analysis_v3.main()
+    else:
+        print("analysis_v3.py skipped: run experiments/matrix_v3_overload.yaml first")
+
 
 if __name__ == "__main__":
     main()

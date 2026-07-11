@@ -66,6 +66,43 @@ WORKLOAD_CLASSES = {
         shape="bursty",
         crud_base_ms=70.0,
     ),
+    # --- v3 overload classes (PREREG_V3.md §3) ---------------------------
+    # The v1/v2 classes above never need more than ~2-3 replicas per tenant,
+    # so the ±2-replicas-per-interval actuation clamp never binds and every
+    # controller that reacts within one interval ties on SLO. These four
+    # classes are sized (from the model constants, not from trial runs) so
+    # the burst-onset replica climb exceeds what one interval of actuation
+    # can deliver — the regime where proactive forecasting is structural,
+    # not incremental. Amplitude derivations are frozen in PREREG_V3.md.
+    "flash_crud": WorkloadClass(
+        name="flash_crud",
+        base_rps={"crud_read": 60.0, "crud_write": 10.0},
+        shape="flash",
+        crud_base_ms=40.0,
+    ),
+    "flash_ai": WorkloadClass(
+        name="flash_ai",
+        base_rps={"chat": 5.0, "embed": 3.0, "crud_read": 10.0},
+        shape="flash",
+        crud_base_ms=50.0,
+    ),
+    "spike_agentic": WorkloadClass(
+        name="spike_agentic",
+        base_rps={"agent": 1.5, "embed": 1.0, "crud_read": 5.0},
+        shape="spike",
+        crud_base_ms=60.0,
+    ),
+    # Control cell: identical demand envelope to flash_crud (0.5x-6.0x) but
+    # reached at a slope actuation can follow (<0.4 replicas/step), so the
+    # predicted outcome is a tie — the specificity check that any v3 win
+    # comes from the actuation-binding regime and not from a generically
+    # favorable world.
+    "ramp_gentle": WorkloadClass(
+        name="ramp_gentle",
+        base_rps={"crud_read": 60.0, "crud_write": 10.0},
+        shape="slowwave",
+        crud_base_ms=40.0,
+    ),
 }
 
 
@@ -127,6 +164,18 @@ def _shape_factor(shape: str, step: int, phase: float) -> float:
     if shape == "bursty":
         pos = ((step / 24.0) + phase / (2.0 * math.pi)) % 1.0
         return 2.5 if pos < (1.0 / 3.0) else 0.25
+    # v3 overload shapes (PREREG_V3.md §3). Periods sit inside the seasonal
+    # detector's scan range (lags 8-48) so a period-aware forecaster *can*
+    # lock on — whether that translates into an SLO win is what the v3
+    # matrix measures.
+    if shape == "flash":  # recurring flash crowd: 5-step 6x burst every 16
+        pos = ((step / 16.0) + phase / (2.0 * math.pi)) % 1.0
+        return 6.0 if pos < (5.0 / 16.0) else 0.5
+    if shape == "spike":  # short hard spike: 2-step 8x burst every 12
+        pos = ((step / 12.0) + phase / (2.0 * math.pi)) % 1.0
+        return 8.0 if pos < (2.0 / 12.0) else 0.6
+    if shape == "slowwave":  # same 0.5x-6.0x envelope as flash, gentle slope
+        return 3.25 + 2.75 * math.sin(2.0 * math.pi * (step / 40.0) + phase)
     raise ValueError(f"unknown shape {shape!r}")
 
 

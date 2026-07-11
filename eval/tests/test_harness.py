@@ -268,3 +268,64 @@ class TestClusterBackend:
         assert "kind create" in joined and "helm install" in joined
         assert "k6 run" in joined
         assert joined[-1] == "kind delete"  # deterministic teardown
+
+
+class TestV3OverloadCells:
+    """PREREG_V3 §3 structural guarantees: the overload classes are defined
+    by arithmetic on the committed model constants, and these tests pin
+    that arithmetic so a drive-by constant change cannot silently unmake
+    the regime the v3 matrix claims to measure."""
+
+    @staticmethod
+    def _wu(cls, factor: float) -> float:
+        import model  # research/jcac_sim via harness sys.path
+
+        return sum(rate * factor * model.WORK_UNITS[k] for k, rate in cls.base_rps.items())
+
+    def test_flash_burst_outruns_the_actuation_clamp(self):
+        import math
+
+        import model
+
+        cls = workloads.WORKLOAD_CLASSES["flash_crud"]
+        need = lambda f: math.ceil(self._wu(cls, f) / (model.REPLICA_CAPACITY_WU * 0.85))
+        # Burst onset requires a climb beyond two intervals of the shared
+        # +-2 clamp: any purely reactive policy spends >= 2 scored
+        # intervals under-provisioned, every cycle.
+        assert need(6.0) - need(0.5) > 4
+
+    def test_ramp_gentle_never_binds_the_clamp(self):
+        import model
+
+        cls = workloads.WORKLOAD_CLASSES["ramp_gentle"]
+        factors = [workloads._shape_factor("slowwave", s, 0.0) for s in range(121)]
+        max_delta_wu = max(
+            abs(self._wu(cls, factors[i + 1]) - self._wu(cls, factors[i]))
+            for i in range(120)
+        )
+        # Steepest per-step demand change stays well inside one interval of
+        # actuation, so reactive controllers can track it: the control cell.
+        assert max_delta_wu < 2 * model.REPLICA_CAPACITY_WU * 0.85
+
+    def test_seasonal_locks_on_flash_cells_under_poisson_jitter(self):
+        import math
+
+        import simulate
+        from controller import Forecast
+
+        _, buckets, _, _ = workloads.build("flash_crud", "uniform", "medium", seed=7, steps=120)
+        series = [b["t00"] for b in simulate.jitter_buckets(buckets, seed=99)]
+        rmse = {}
+        for method in ("seasonal", "trend"):
+            f, sq, n = Forecast(method=method), 0.0, 0
+            for t in range(len(series) - 1):
+                f.observe(series[t])
+                if t >= 48:  # past the detector's 2-period lock threshold
+                    pred = f.horizon()[0].rps.get("crud_read", 0.0)
+                    actual = series[t + 1].rps.get("crud_read", 0.0)
+                    sq += (pred - actual) ** 2
+                    n += 1
+            rmse[method] = math.sqrt(sq / n)
+        # On a locked square wave the period-aware forecast must beat the
+        # trend fallback decisively, jitter included.
+        assert rmse["seasonal"] < 0.5 * rmse["trend"]
