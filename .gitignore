@@ -7,6 +7,8 @@ tmp/
 data/*.db
 data/*.db-*
 research/traces/out/
+# Raw public datasets are downloaded, never committed (BurstGPT CSVs, LMSYS parquet).
+research/traces/data/
 __pycache__/
 # Raw result databases are archived via Zenodo (eval/scripts/archive_zenodo.py);
 # git carries the run-level CSV exports, figures, and logs instead.

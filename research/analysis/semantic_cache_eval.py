@@ -184,6 +184,16 @@ def main() -> None:
           "and pass `--conversations` for the headline semantic numbers "
           "(anchors: InstCache 51.34%, SCALM +63% vs GPTCache).")
         w("")
+    elif not args.conversations:
+        w("> **Real encoder on synthetic prompts**: the synthetic set's "
+          "duplicate structure was designed to exercise *lexical* "
+          "discrimination; a semantic encoder correctly collapses its "
+          "template families, so hit rates saturate near 1.0. This run "
+          "verifies the full semantic pipeline end-to-end; the absolute "
+          "numbers comparable to the published anchors (InstCache 51.34%, "
+          "SCALM +63% vs GPTCache) require `--conversations` on the real "
+          "LMSYS-Chat-1M parquet (gated: needs an HF account + accept).")
+        w("")
     w(f"Dollar model: a hit avoids one mid-tier call at "
       f"${CALL_PRICE_USD:.4f}; savings = hit-rate × price × queries.")
     w("")
