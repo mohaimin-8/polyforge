@@ -190,12 +190,12 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
          "--namespace", "polyforge", "--create-namespace", "--wait", "--timeout", "300s",
          *set_flags],
         ["kubectl", "--namespace", "polyforge", "rollout", "status",
-         "deployment/polyforge", "--timeout=180s"],
+         "deployment/polyforge-control-plane", "--timeout=180s"],
         ["k6", "run", "--summary-export", str(workdir / "k6-summary.json"),
          str(workdir / "replay.js")],
         # The pod's rootfs is read-only and distroless has no tar (kubectl cp
         # needs it), so the export streams to stdout and execute() captures it.
-        ["kubectl", "--namespace", "polyforge", "exec", "deploy/polyforge", "--",
+        ["kubectl", "--namespace", "polyforge", "exec", "deploy/polyforge-control-plane", "--",
          "/control-plane", "eval-export", "--format=json", "--out=-"],
         ["kind", "delete", "cluster", "--name", CLUSTER_NAME],
     ]
@@ -265,7 +265,7 @@ class ReplicaSampler(threading.Thread):
         while not self._halt.is_set():
             proc = subprocess.run(
                 ["kubectl", "--namespace", "polyforge", "get",
-                 "deployment/polyforge", "-o", "jsonpath={.status.replicas}"],
+                 "deployment/polyforge-control-plane", "-o", "jsonpath={.status.replicas}"],
                 capture_output=True, text=True, timeout=30)
             if proc.returncode == 0 and proc.stdout.strip().isdigit():
                 self.samples.append(int(proc.stdout.strip()))
@@ -309,7 +309,7 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                     # meter replicas while k6 replays the demand buckets.
                     portforward = subprocess.Popen(
                         ["kubectl", "--namespace", "polyforge", "port-forward",
-                         "service/polyforge", f"{LOCAL_PORT}:80"],
+                         "service/polyforge-control-plane", f"{LOCAL_PORT}:80"],
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     base = f"http://127.0.0.1:{LOCAL_PORT}"
                     _wait_http(base + "/healthz")

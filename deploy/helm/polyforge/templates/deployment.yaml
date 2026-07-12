@@ -22,6 +22,11 @@ spec:
         prometheus.io/port: "8080"
         prometheus.io/path: /metrics
     spec:
+      # The distroless image runs as 65532 (nonroot); without fsGroup the
+      # SQLite emptyDir is root-owned and the store cannot be created —
+      # the pod crash-loops on a read-only-looking /data.
+      securityContext:
+        fsGroup: 65532
       containers:
         - name: control-plane
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
