@@ -211,6 +211,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PATCH /v1/tenants/{tenant_id}/projects/{project_id}", s.updateProject)
 	s.mux.HandleFunc("DELETE /v1/tenants/{tenant_id}/projects/{project_id}", s.deleteProject)
 	s.mux.HandleFunc("POST /v1/telemetry", s.ingestTelemetry)
+	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/workloads/replay", s.replayWorkload)
 	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/telemetry/features", s.telemetryFeatures)
 	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/workload-profile", s.workloadProfile)
 	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/policy-recommendation", s.policyRecommendation)

@@ -5,7 +5,11 @@ metadata:
   labels:
     {{- include "polyforge.labels" . | nindent 4 }}
 spec:
+  {{- if not .Values.autoscaling.hpa.enabled }}
+  # With the HPA enabled the autoscaler owns this field; setting it here
+  # would fight the HPA on every helm upgrade.
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "polyforge.selectorLabels" . | nindent 6 }}
@@ -31,10 +35,17 @@ spec:
                 secretKeyRef:
                   name: {{ include "polyforge.name" . }}
                   key: admin-key
+            {{- if .Values.postgres.adminURL }}
             - name: POLYFORGE_POSTGRES_ADMIN_URL
               value: {{ .Values.postgres.adminURL | quote }}
             - name: POLYFORGE_POSTGRES_APP_URL
               value: {{ .Values.postgres.appURL | quote }}
+            {{- else }}
+            # SQLite mode (eval kind clusters run self-contained pods): the
+            # root filesystem is read-only, so the store lives on an emptyDir.
+            - name: POLYFORGE_DB_PATH
+              value: /data/polyforge.db
+            {{- end }}
             {{- if .Values.redis.url }}
             - name: POLYFORGE_REDIS_URL
               value: {{ .Values.redis.url | quote }}
@@ -60,3 +71,13 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
+          {{- if not .Values.postgres.adminURL }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          {{- end }}
+      {{- if not .Values.postgres.adminURL }}
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- end }}

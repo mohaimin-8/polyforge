@@ -559,6 +559,60 @@ paths:
           $ref: "#/components/responses/RateLimited"
         "500":
           $ref: "#/components/responses/InternalError"
+  /v1/tenants/{tenant_id}/workloads/replay:
+    post:
+      summary: Replay one evaluation workload request
+      description: >-
+        Evaluation data plane (cluster backend): burns CPU proportional to
+        the declared kind's work units so real autoscalers observe genuine
+        load, and records the request's telemetry so eval-export can compute
+        run metrics. Kinds mirror the workload taxonomy of the simulator's
+        work-unit table.
+      operationId: replayWorkload
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind:
+                  type: string
+                  enum: [crud_read, crud_write, batch, embed, chat, agent]
+                run:
+                  type: string
+                  description: Run identifier, echoed back for correlation.
+      responses:
+        "202":
+          description: Request replayed and recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, latency_ms]
+                properties:
+                  kind:
+                    type: string
+                  run:
+                    type: string
+                  latency_ms:
+                    type: number
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/tenants/{tenant_id}/telemetry/features:
     get:
       summary: Query aggregated classifier features for a tenant

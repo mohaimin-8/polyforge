@@ -82,12 +82,22 @@ invalid runs keep their error strings in `runs` and never reach analysis.
      component is injected via `--infra-cost-usd` because replica-hours are
      not visible in-pod; wiring that flag from the harness lands with the
      first live run.
-  2. Helm values used by `HELM_VALUES_BY_SYSTEM` (planner/classifier
-     toggles, `cache.policy`, autoscaling modes) wired into the chart —
-     **open**.
-  3. `/v1/workloads/replay` data-plane endpoint plus per-tenant JWT
-     provisioning for the generated k6 script (`TOKEN_${tenant}` env) —
-     **open**; the k6 step will surface this first.
+  2. Helm values used by `HELM_VALUES_BY_SYSTEM` wired into the chart —
+     **partial (session 16d)**: `autoscaling.hpa.*` is a real
+     autoscaling/v2 HPA (metrics-server installed per run), the eval base
+     values run the pod self-contained (SQLite on emptyDir, no ingress,
+     limiter opened), and the hpa arm is runnable end-to-end
+     (`experiments/phase7_smoke.yaml`). Still open: the planner/operator
+     deployment for the `jcac` arm, KEDA/FIRM arms, `cache.policy` — until
+     the planner half lands, running "jcac" live would mislabel a bare
+     fixed-replica deployment as PolyForge, so don't.
+  3. `/v1/tenants/{tenant_id}/workloads/replay` data-plane endpoint —
+     **DONE (session 16d)**: burns CPU per the sim's work-unit table so
+     real autoscalers see genuine load, records telemetry for eval-export;
+     `execute()` provisions tenants + API keys via the chart's admin
+     Secret, exports `TOKEN_<tenant>` to k6 over a port-forward, meters
+     replica-seconds during the load window, and injects the infra cost
+     into eval-export (closing point 1's flag wiring).
 
 ## Latency metric note (deliberate deviation)
 

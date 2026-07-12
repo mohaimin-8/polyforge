@@ -1,0 +1,17 @@
+# Phase 7 stage-1 smoke: prove the live pipeline end-to-end on ONE arm.
+# hpa only — the jcac arm needs the operator/planner deployed (integration
+# point 2's planner half, eval/README.md), and running "jcac" as a bare
+# fixed-replica deployment would mislabel a static posture as PolyForge.
+# ai_cacheable so the replay endpoint's CPU burn (chat=20ms/req) gives the
+# real HPA a signal worth scaling on. 30 steps x 10 s = 5 min of load.
+name: phase7_smoke
+backend: cluster
+steps: 30
+reps: 1
+systems: [hpa]
+workloads: [ai_cacheable]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/phase7_smoke.duckdb
+retries: 0
+timeseries_reps: 0

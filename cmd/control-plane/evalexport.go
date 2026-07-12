@@ -82,7 +82,7 @@ func evalExport(args []string) int {
 		return 2
 	}
 	if *format != "json" || *out == "" {
-		fmt.Fprintln(os.Stderr, "usage: control-plane eval-export --format=json --out=PATH [--infra-cost-usd=X]")
+		fmt.Fprintln(os.Stderr, "usage: control-plane eval-export --format=json --out=PATH|- [--infra-cost-usd=X]")
 		return 2
 	}
 
@@ -101,11 +101,20 @@ func evalExport(args []string) int {
 		fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
 		return 1
 	}
-	if err := os.WriteFile(*out, append(payload, '\n'), 0o644); err != nil {
+	// "-" streams to stdout: the eval pod's root filesystem is read-only and
+	// the distroless image has no tar for `kubectl cp`, so the harness
+	// captures the exec step's stdout instead. Status goes to stderr so the
+	// payload stays parseable.
+	if *out == "-" {
+		if _, err := os.Stdout.Write(append(payload, '\n')); err != nil {
+			fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
+			return 1
+		}
+	} else if err := os.WriteFile(*out, append(payload, '\n'), 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
 		return 1
 	}
-	fmt.Printf("eval-export: %d events across %d tenants -> %s\n", doc.NEvents, doc.NTenants, *out)
+	fmt.Fprintf(os.Stderr, "eval-export: %d events across %d tenants -> %s\n", doc.NEvents, doc.NTenants, *out)
 	return 0
 }
 

@@ -37,3 +37,12 @@ ingress:
 rateLimit:
   requestsPerMinute: 600
   burst: 60
+
+# Eval-harness autoscaling arms (eval/harness/cluster_backend.py). Off by
+# default: production scaling belongs to the operator, not raw HPA.
+autoscaling:
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilization: 60
