@@ -68,7 +68,9 @@ invalid runs keep their error strings in `runs` and never reach analysis.
 - **`sim`** (verified) — replays through `research/jcac_sim`, the shared
   system model every controller is scored against. Runs anywhere; this is
   what produced the committed result databases.
-- **`cluster`** (code-complete, **not yet verified**) — provisions a kind
+- **`cluster`** (**verified live, hpa arm** — session 16d smoke: valid run,
+  metrics match the replay burn exactly; jcac arm gated on the operator
+  wiring) — provisions a kind
   cluster per run, deploys the Helm chart variant, replays demand with a
   generated k6 script, and collects metrics from the control plane.
   Requires Docker/kind/kubectl/helm/k6 (`harness.cluster_backend.preflight()`

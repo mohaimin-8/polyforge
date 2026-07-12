@@ -155,25 +155,37 @@ model GPT-3.5/4, request/response tokens).
       Phase 3b deps + gated dataset; the attack/defense code is dataset-agnostic and
       ready to point at it.
 
-## Phase 6 — Empirical calibration (1–2 sessions; free GPU optional)
+## Phase 6 — Empirical calibration — DONE (session 16b/16d, as measured)
 
-- [ ] CPU path (this machine): llama.cpp or Ollama with a 0.5–1B model; measure
-      latency-vs-concurrency → recalibrate congestion factor `g(ρ)`.
-- [ ] GPU path (Kaggle ~30 GPU-h/week or Colab free T4): vLLM serving Qwen2.5 at
-      0.5B/3B/7B; measure per-tier latency + tokens/sec → empirical tier
-      latency/price table replacing assumed constants.
-- [ ] Acceptance: the thesis sentence "the simulator's latency model is calibrated to
-      measured inference-server behavior" is true, with the measurement script committed.
+- [x] CPU path: llama.cpp llama-server + Qwen2.5-0.5B Q4, open-loop Poisson
+      (`research/calibration/measure_congestion.py` → `CALIBRATION.md`):
+      g(ρ)=1/(1−ρ) holds to first order (fitted a=0.86; R² of a=1: 0.857),
+      deviation conservative against lean operation; p95/mean 1.59–2.41 vs
+      the assumed flat 1.4. Constants unchanged (bit-reproducibility).
+- [x] GPU path (Kaggle free kernel, deviation: transformers not vLLM — free
+      pool's GPU arch not vLLM-guaranteed; documented): per-tier table in
+      `TIER_BENCH.md`/`tier_bench.csv` — ordering confirmed, 7B row is a
+      disclosed CPU-offload upper bound; 1:10:100 price table framed as
+      market pricing, not GPU-seconds.
+- [x] Acceptance met: the calibration sentence is true and both measurement
+      scripts + raw outputs are committed.
 
-## Phase 7 — Live ordinal confirmation (stretch; needs Docker-capable machine)
+## Phase 7 — Live ordinal confirmation (stretch) — pipeline VERIFIED live (16d); ordinal figure pending
 
-- [ ] Environment: Oracle Cloud Always Free ARM VM / GitHub Codespaces / university box
-      (local machine cannot run Docker). The cluster backend is already code-complete
-      behind its preflight.
-- [ ] kind + metrics-server + real HPA + real KEDA; operator applies PolyForge plans;
-      k6/Locust replays a BurstGPT slice; 3 tenants, ~1 hour, PolyForge vs HPA.
-- [ ] Acceptance: one figure showing the sim's *ranking* reproduces against the real
-      autoscaler binaries. Absolutes are not claimed.
+- [x] Environment: GitHub Codespaces via `.devcontainer/` (docker-in-docker,
+      kind, k6, helm); preflight satisfied in one click.
+- [x] First-ever cluster-backend execution: `experiments/phase7_smoke.yaml`
+      (hpa arm, 30 steps) recorded **valid with sane metrics** — ai p95
+      20.008 ms vs the 20 ms replay burn, crud p95 1.009 ms vs 1 ms, infra
+      cost injected from live replica metering. Five blockers found and
+      fixed on the way (helm path, undeployable chart: runAsNonRoot named
+      user, root-owned emptyDir, wrong workload names, missing API-key
+      bootstrap) — the chart had never been schedulable before.
+- [ ] Remaining for the acceptance figure: wire the operator/planner arm
+      (eval/README.md integration point 2's jcac half; running "jcac" live
+      before then would mislabel a fixed-replica pod), then the PolyForge
+      vs HPA ordinal slice (`experiments/phase7_live.yaml`). Absolutes are
+      not claimed either way.
 
 ## Phase 8 — One-page theory (1 session, writing-adjacent) — DONE (session 13)
 

@@ -13,9 +13,10 @@ it (retry, then `failed`). Requires Docker, kind, kubectl, helm, and k6 on
 PATH; `preflight()` reports exactly what is missing instead of crashing
 mid-provision.
 
-Status: code-complete but NOT verified on a live cluster — this machine
-has no Docker (see docs/SESSION_LOG.md). The sim backend is the verified
-path; first cluster execution happens on the W35a cloud box.
+Status: VERIFIED live for the hpa arm (session 16d, GitHub Codespace):
+phase7_smoke.yaml recorded a valid run with metrics matching the replay
+endpoint's physics. The jcac arm stays gated until the operator/planner
+is wired into the chart (eval/README.md integration point 2).
 """
 
 from __future__ import annotations

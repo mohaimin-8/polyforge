@@ -7,6 +7,60 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-12 (session 16d) — Phase 6 complete (GPU tier table measured); Phase 7's pipeline verified on a real cluster
+
+Milestone status: "do phase 6 and 7 properly." Phase 6 is now fully done —
+both measurement halves are committed with raw data. Phase 7 crossed from
+"never executed" to "verified live" for the hpa arm; the ordinal figure
+awaits only the operator/planner chart wiring.
+
+### Phase 6 GPU half — measured on a free Kaggle GPU kernel
+
+Six kernel versions to a clean run, each failure a committed fix: no phone
+verification (no GPU/internet — user verified), P100 pool vs modern torch
+(no sm_60 kernels → pinned cu118 fallback), transformers/torch ABI skew
+(pinned contemporaries), broken torchvision import (removed — absent is
+fine, broken is fatal). `TIER_BENCH.md` + `tier_bench.csv`: small
+1242 ms / 38.7 tok/s, mid 1883 ms / 25.5 tok/s, large 20 665 ms / 2.3 tok/s
+(disclosed CPU-offload upper bound). Tier ordering confirmed; the 1:10:100
+price table is market pricing, not GPU-seconds — framed, constants
+unchanged. Engine deviation (transformers, not vLLM) documented in-file.
+
+### Phase 7 — the first cluster-backend execution in the project's history
+
+GitHub Codespace (`.devcontainer/` + sshd), driven end-to-end over `gh`.
+**Five blockers found and fixed, every one committed the moment it was
+understood:**
+1. helm chart path was cwd-relative → parsed as a repo name (8d77770);
+2. the chart was *undeployable since W10*: runAsNonRoot cannot verify
+   distroless's named user → CreateContainerConfigError (17db05b);
+3. the SQLite emptyDir was root-owned for a 65532 pod → fsGroup (0ae10a3);
+4. every harness step addressed deployment/service `polyforge` while the
+   chart names them `polyforge-control-plane` (0ae10a3);
+5. no HTTP path could mint a fresh tenant's first API key — bootstrap gap
+   closed: the admin key (which already gates tenant creation) may create
+   keys (25d3bfd, unit-tested).
+
+**Attempt 5: `ok: true` — a valid live run with sane physics.** hpa arm,
+ai_cacheable, 30 steps: ai p95 20.008 ms against the replay endpoint's
+20 ms chat burn, crud p95 1.009 ms against 1 ms, zero violations against
+standard-class targets, infra cost injected from live replica metering.
+The eval-export numbers are exactly what the load's construction predicts,
+which is the strongest validity check a smoke can give.
+
+Honesty gates kept: the jcac arm was never run live — the operator/planner
+is not in the chart yet, and a fixed-replica pod must not be recorded
+under PolyForge's name. That wiring plus the PolyForge-vs-HPA ordinal
+slice is what remains of Phase 7's acceptance figure.
+
+### Verification
+
+Local gates green throughout (gofmt/vet/full go test incl. the new
+bootstrap test, pytest 31/31); every fix pushed with green CI. The live
+verification itself ran on kind v0.29 / metrics-server / autoscaling/v2
+inside the Codespace; the smoke DuckDB stays in the Codespace (results are
+environment-bound smoke evidence, not campaign data).
+
 ## 2026-07-12 (session 16c) — Phase B: the cache headline on real LMSYS-Chat-1M; the last open segment closes
 
 Milestone status: user provided the HF token; the LMSYS-Chat-1M gate was
