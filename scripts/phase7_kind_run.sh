@@ -32,9 +32,13 @@ docker build -t polyforge/control-plane:dev .
 
 echo "== run =="
 if [[ "${1:-}" == "--full" ]]; then
+    # The full ordinal slice includes the jcac arm — do NOT run it until the
+    # planner/operator is wired into the chart (eval/README.md point 2), or
+    # a bare fixed-replica pod gets recorded under PolyForge's name.
     (cd eval && python -m harness.runner experiments/phase7_live.yaml --workers 1)
+    echo "== done — results in eval/results/phase7_live.duckdb =="
 else
-    (cd eval && python -m harness.runner experiments/phase7_live.yaml --workers 1 --limit 1)
+    # Smoke: the hpa-only spec — every arm in it is honestly wired today.
+    (cd eval && python -m harness.runner experiments/phase7_smoke.yaml --workers 1)
+    echo "== done — results in eval/results/phase7_smoke.duckdb =="
 fi
-
-echo "== done — results in eval/results/phase7_live.duckdb =="
