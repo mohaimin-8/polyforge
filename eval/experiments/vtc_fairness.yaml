@@ -1,0 +1,16 @@
+# VTC-replica fairness comparison (PREREG_VTC.md — pre-registered before
+# any run): jcac vs the tuned VTC-style least-weighted-service-first pool
+# divider, on the exact Phase 4 fairness slice with interference injection.
+# All reps keep timeseries so worst-tenant p95/violation are computable.
+name: vtc_fairness
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, vtc_replica]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [medium]
+output: eval/results/vtc_fairness.duckdb
+retries: 2
+interference: true
+timeseries_reps: 5

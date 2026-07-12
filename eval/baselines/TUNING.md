@@ -26,6 +26,7 @@ it automatically.
 | keda | rps_per_replica ∈ {2…16} | **2.0** | 0.573 | — (no universal default) |
 | gptcache | target_rho ∈ {0.3…0.8} | **0.3** | 7.362 | 7.58 (0.4-edge of first sweep) |
 | firm | lr × ε × w_slo (27 combos) | **lr=0.1, ε=0.1, w_slo=4** | 0.619 | 0.632 (lr=.3, ε=.1, w_slo=2) |
+| vtc_replica | target_rho ∈ {0.3…0.8} (session 15, `--only` merge; frozen rows untouched) | **0.3** | 0.555 | 0.628 (0.8) |
 | static | — (no knob: over-provisioned to `replica_max` by definition) | — | — | — |
 
 ## Why the utilization grids are bounded below at 0.3

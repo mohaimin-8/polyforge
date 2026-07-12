@@ -426,3 +426,44 @@ class SimulateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VTCReplicaTests(unittest.TestCase):
+    """VTC-replica (session 15): least-weighted-service-first pool division
+    with the shared actuation guardrails."""
+
+    def _mk(self, budgets=(5.0, 5.0), pool=6, rho=0.5):
+        configs = {
+            f"t{i}": TenantConfig(tenant_id=f"t{i}", hourly_budget_usd=b, replica_max=8)
+            for i, b in enumerate(budgets)
+        }
+        ctl = baselines.VTCReplicaController(configs, target_rho=rho)
+        ctl.set_limits(ClusterLimits(replicas=pool))
+        return configs, ctl
+
+    def test_least_served_tenant_wins_the_contended_pool(self):
+        _, ctl = self._mk(pool=6)
+        states = {"t0": TenantState(replicas=4), "t1": TenantState(replicas=1)}
+        # t0 has already consumed far more service than t1.
+        ctl.counters = {"t0": 1000.0, "t1": 0.0}
+        big = demand({"crud_read": 400.0})  # needs 8 at rho=0.5 -> pool contends
+        plans = ctl.plan(states, {"t0": big, "t1": big})
+        # The starved tenant is granted first (clamped +2); the whale is not.
+        self.assertEqual(plans["t1"].replicas, 3)
+        self.assertLessEqual(plans["t0"].replicas, 4)
+
+    def test_moves_respect_the_shared_clamp(self):
+        _, ctl = self._mk(pool=16)
+        states = {"t0": TenantState(replicas=1), "t1": TenantState(replicas=1)}
+        big = demand({"crud_read": 400.0})
+        plans = ctl.plan(states, {"t0": big, "t1": big})
+        for p in plans.values():
+            self.assertLessEqual(abs(p.replicas - 1), 2)
+
+    def test_budget_weights_slow_the_paying_tenants_counter(self):
+        _, ctl = self._mk(budgets=(10.0, 1.0), pool=4)
+        states = {"t0": TenantState(replicas=2), "t1": TenantState(replicas=2)}
+        same = demand({"crud_read": 100.0})
+        ctl.plan(states, {"t0": same, "t1": same})
+        # Same served work, 10x budget -> 10x slower counter accrual.
+        self.assertAlmostEqual(ctl.counters["t1"] / ctl.counters["t0"], 10.0, places=6)

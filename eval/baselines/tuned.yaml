@@ -11,3 +11,5 @@ hpa:
   target_rho: 0.3
 keda:
   rps_per_replica: 2.0
+vtc_replica:
+  target_rho: 0.3

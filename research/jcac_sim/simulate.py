@@ -272,6 +272,10 @@ def run(
                              **(controller_params or {}))
     else:
         ctl = baselines.make_baseline(controller_name, configs, **(controller_params or {}))
+        # Pool-dividing baselines (VTC-replica) need the shared cluster
+        # limits; controllers without the hook are untouched.
+        if hasattr(ctl, "set_limits") and limits is not None:
+            ctl.set_limits(limits)
 
     if jitter_seed is not None:
         buckets = jitter_buckets(buckets, jitter_seed)

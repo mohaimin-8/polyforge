@@ -124,6 +124,10 @@ SYSTEMS: dict[str, SystemSpec] = {
         "firm", lru_eviction=True, seeded=True,
         description="FIRM-replica: RL replica controller (OSDI '20 re-impl.)",
     ),
+    "vtc_replica": SystemSpec(
+        "vtc_replica", lru_eviction=True,
+        description="VTC-replica: least-weighted-service-first fair pool division (OSDI '24 re-impl.)",
+    ),
     "static": SystemSpec(
         "static", params={"overprovisioned": True}, lru_eviction=True,
         description="Static over-provisioned to peak: never violates, always pays",

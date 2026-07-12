@@ -312,6 +312,79 @@ class GPTCacheLRUController:
         return current
 
 
+class VTCReplicaController:
+    """Re-implementation of VTC's fair scheduler (Sheng et al., OSDI '24)
+    restricted to the replica knob — hence "VTC-replica", the same
+    reduction shape as FIRM-replica.
+
+    VTC serves the client with the smallest *virtual token counter*
+    (accumulated weighted service) first, dividing a fixed serving
+    capacity fairly. At simulator scale the fixed capacity is the shared
+    cluster replica pool, service is executed work (the same observable
+    `interference_scores` uses), and weights are the tenants' budgets —
+    the pricing analog of VTC's client weights:
+
+    1. On every plan, each tenant's counter accrues the work it is about
+       to receive under the standing allocation:
+       min(offered work, replicas x capacity) / budget.
+    2. Replicas are then re-divided: everyone gets replica_min, and the
+       remaining pool is granted in ascending-counter order (least served
+       first, VTC's rule) up to each tenant's utilization-target need.
+    3. Moves pass the same +-2-per-interval clamp and `apply_action`
+       guardrails every other controller obeys.
+
+    Cache and tier stay fixed: like FIRM, VTC allocates serving capacity
+    and has no concept of a semantic cache or a model tier. `target_rho`
+    is the one tunable (W34 grid). The cluster pool arrives via
+    `set_limits` (the engine calls it when the controller exposes it);
+    without limits the pool is the sum of per-tenant maxima, i.e. the
+    constraint simply never binds.
+    """
+
+    name = "vtc_replica"
+
+    def __init__(self, configs: dict[str, TenantConfig], target_rho: float = 0.6):
+        self.configs = configs
+        self.target_rho = target_rho
+        self.counters = {tid: 0.0 for tid in configs}
+        self._pool: int | None = None
+
+    def set_limits(self, limits) -> None:
+        self._pool = int(limits.replicas)
+
+    def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
+        pool = self._pool if self._pool is not None else sum(
+            c.replica_max for c in self.configs.values())
+
+        needs = {}
+        for tid, state in states.items():
+            config = self.configs[tid]
+            offered = demands.get(tid, Demand()).work_units(state.cache_mb)
+            served = min(offered, state.replicas * REPLICA_CAPACITY_WU)
+            weight = max(config.hourly_budget_usd, 1e-9)
+            self.counters[tid] += served / weight
+            need = math.ceil(offered / (REPLICA_CAPACITY_WU * self.target_rho)) if offered > 0 else 0
+            needs[tid] = max(config.replica_min, min(config.replica_max, need))
+
+        # Everyone keeps its floor; the rest of the pool goes least-served
+        # first (ascending virtual counter), VTC's service order.
+        grant = {tid: self.configs[tid].replica_min for tid in states}
+        remaining = pool - sum(grant.values())
+        for tid in sorted(states, key=lambda t: (self.counters[t], t)):
+            if remaining <= 0:
+                break
+            extra = min(needs[tid] - grant[tid], remaining)
+            if extra > 0:
+                grant[tid] += extra
+                remaining -= extra
+
+        out = {}
+        for tid, state in states.items():
+            delta = max(-2, min(2, grant[tid] - state.replicas))
+            out[tid] = apply_action(self.configs[tid], state, delta, state.cache_mb, state.tier)
+        return out
+
+
 BASELINES = (
     StaticController,
     HPAController,
@@ -319,6 +392,7 @@ BASELINES = (
     LayeredController,
     FIRMReplicaController,
     GPTCacheLRUController,
+    VTCReplicaController,
 )
 
 
