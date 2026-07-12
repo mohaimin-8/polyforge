@@ -76,6 +76,12 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
+            # The distroless :nonroot tag sets a *named* user, which the
+            # kubelet cannot verify against runAsNonRoot ("non-numeric user
+            # (nonroot)... CreateContainerConfigError") — the numeric UID is
+            # required for the pod to start at all. 65532 = distroless nonroot.
+            runAsUser: 65532
+            runAsGroup: 65532
           {{- if not .Values.postgres.adminURL }}
           volumeMounts:
             - name: data
