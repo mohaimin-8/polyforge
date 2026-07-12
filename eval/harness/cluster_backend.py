@@ -34,6 +34,12 @@ REQUIRED_TOOLS = ("docker", "kind", "kubectl", "helm", "k6")
 CLUSTER_NAME = "polyforge-eval"  # fixed: teardown is idempotent by name
 NODES_BY_SIZE = {"small": 2, "medium": 4, "large": 6}
 
+# The chart's default image (deploy/helm/polyforge/values.yaml). The image is
+# built locally by scripts/phase7_kind_run.sh and side-loaded into the kind
+# nodes — it is not published to any registry, so without the explicit
+# `kind load` step every pod would sit in ImagePullBackOff.
+CONTROL_PLANE_IMAGE = "polyforge/control-plane:dev"
+
 # Ablation/baseline toggles the chart understands (deploy/helm/polyforge).
 HELM_VALUES_BY_SYSTEM = {
     "jcac": {"planner.enabled": "true", "classifier.enabled": "true"},
@@ -119,6 +125,7 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         ["kind", "delete", "cluster", "--name", CLUSTER_NAME],  # idempotent pre-clean
         ["kind", "create", "cluster", "--name", CLUSTER_NAME,
          "--config", str(workdir / "kind.yaml"), "--wait", "120s"],
+        ["kind", "load", "docker-image", CONTROL_PLANE_IMAGE, "--name", CLUSTER_NAME],
         ["helm", "install", "polyforge", "deploy/helm/polyforge",
          "--namespace", "polyforge", "--create-namespace", "--wait", "--timeout", "300s",
          *set_flags],

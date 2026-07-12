@@ -266,6 +266,10 @@ class TestClusterBackend:
         joined = [" ".join(c[:2]) for c in plan]
         assert joined[0] == "kind delete"  # idempotent pre-clean
         assert "kind create" in joined and "helm install" in joined
+        # The locally built image must be side-loaded after the cluster
+        # exists and before helm references it, or pods ImagePullBackOff.
+        assert joined.index("kind load") == joined.index("kind create") + 1
+        assert joined.index("kind load") < joined.index("helm install")
         assert "k6 run" in joined
         assert joined[-1] == "kind delete"  # deterministic teardown
 

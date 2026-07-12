@@ -72,12 +72,22 @@ invalid runs keep their error strings in `runs` and never reach analysis.
   cluster per run, deploys the Helm chart variant, replays demand with a
   generated k6 script, and collects metrics from the control plane.
   Requires Docker/kind/kubectl/helm/k6 (`harness.cluster_backend.preflight()`
-  tells you what is missing). Two integration points must land before the
-  first live run, both on the W35a cloud box:
-  1. `control-plane eval-export` — CLI that dumps the run's metrics in the
-     schema above (the backend's step 6);
+  tells you what is missing). A Docker-capable environment is one click away:
+  `.devcontainer/` gives GitHub Codespaces every preflight tool, and
+  `scripts/phase7_kind_run.sh` is the whole runbook (build image → side-load
+  into kind → run `experiments/phase7_live.yaml`). Integration-point status
+  for the first live run:
+  1. `control-plane eval-export` — **DONE** (session 16b, unit-tested):
+     dumps the pod's observed metrics in the schema above. The infra-cost
+     component is injected via `--infra-cost-usd` because replica-hours are
+     not visible in-pod; wiring that flag from the harness lands with the
+     first live run.
   2. Helm values used by `HELM_VALUES_BY_SYSTEM` (planner/classifier
-     toggles, `cache.policy`, autoscaling modes) wired into the chart.
+     toggles, `cache.policy`, autoscaling modes) wired into the chart —
+     **open**.
+  3. `/v1/workloads/replay` data-plane endpoint plus per-tenant JWT
+     provisioning for the generated k6 script (`TOKEN_${tenant}` env) —
+     **open**; the k6 step will surface this first.
 
 ## Latency metric note (deliberate deviation)
 

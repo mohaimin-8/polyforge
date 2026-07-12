@@ -38,6 +38,12 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "-healthcheck" {
 		os.Exit(healthcheck())
 	}
+	// eval-export dumps this pod's observed run metrics in the harness
+	// schema (eval/README.md, cluster backend step 6). A subcommand, not a
+	// server mode: the harness execs it inside the running pod.
+	if len(os.Args) > 1 && os.Args[1] == "eval-export" {
+		os.Exit(evalExport(os.Args[2:]))
+	}
 
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: envLogLevel("POLYFORGE_LOG_LEVEL", slog.LevelInfo)}))
 

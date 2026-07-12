@@ -1,0 +1,21 @@
+# Phase 7 live ordinal slice (V2_README Phase 7): PolyForge vs HPA on a real
+# kind cluster with real autoscaler binaries. The claim this feeds is
+# *ordinal only* — does the sim's ranking reproduce live? Absolutes are
+# never compared across substrates (ground rule 4).
+#
+#   2 systems x 2 workload classes x 1 mix x 1 size x 3 reps = 12 runs
+#   ~120 steps x 10 s = 20 min of load per run -> plan a half-day wall.
+#
+# Run via scripts/phase7_kind_run.sh on a Docker-capable machine (the
+# .devcontainer/ gives GitHub Codespaces everything preflight needs).
+name: phase7_live
+backend: cluster
+steps: 120
+reps: 3
+systems: [jcac, hpa]
+workloads: [crud_bursty, ai_cacheable]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/phase7_live.duckdb
+retries: 1
+timeseries_reps: 1
