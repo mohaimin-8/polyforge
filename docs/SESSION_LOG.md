@@ -7,6 +7,76 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-12 (session 16b) — Phase 6 CPU calibration measured; Phase 7 reduced to one command
+
+Milestone status: user asked for Phases 6 and 7. Phase 6's CPU path — the
+half designed for this machine — is **measured and done**; its GPU path is
+scripted for a user-run free T4. Phase 7's code blockers are gone and the
+whole live run is now one command in a Docker-capable environment; the run
+itself still needs that environment (this laptop has none).
+
+### Phase 6 — congestion model calibrated against a real inference server
+
+`research/calibration/measure_congestion.py`: llama.cpp llama-server (CPU),
+Qwen2.5-0.5B Q4_K_M, 4 decode slots, fixed 48-token completions, prompt
+caching defeated, open-loop Poisson arrivals so ρ is a controlled factor.
+**As measured (`CALIBRATION.md`): the sim's g(ρ)=1/(1−ρ) holds to first
+order — fitted exponent a=0.86 vs the asserted a=1, R² of the a=1 model
+0.857.** The deviation is *conservative against the lean system*: at
+ρ=0.84 the model predicts 6.4× inflation, the batching server delivers
+3.7× — so the sim overtaxes exactly the high-utilization regime JCAC's
+cost-lean postures live in, while over-provisioned baselines sit at low ρ
+where the model is accurate. The cost wins were not bought with a rosy
+congestion model. Measured p95/mean is 1.59–2.41 vs the sim's flat 1.4 —
+an underestimate of tails that applies to every system through the same
+estimator, noted for the limitations chapter. ρ≥0.95 (the capped quadratic
+overload branch) is deliberately uncalibrated: no finite-time steady state
+exists there; it is an optimizer-gradient device and documented as such.
+
+Measurement integrity trail: the first full sweep was **discarded** — the
+Go/pytest suites ran concurrently on the same cores and pass-1/pass-2
+disagreed up to 3.5× at ρ=0.92. The protocol gained shuffled two-pass
+levels and pre/post capacity measurement, and the committed numbers come
+from a rerun on an idle machine (pre/post μ within 1.6%). `model.py`
+constants are unchanged; committed matrices stay bit-reproducible.
+
+GPU path: `kaggle_tier_bench.py` (vLLM, Qwen 0.5B/3B/7B-AWQ on a free T4)
+is ready; it is user-run because it needs a Kaggle/Colab login.
+
+### Phase 7 — from "environment-blocked" to "one command"
+
+- `control-plane eval-export` (integration point 1) implemented and
+  unit-tested: harness-schema metrics from the pod's telemetry store, SLO
+  targets and tier prices mirroring `model.py`; infra cost injected via
+  `--infra-cost-usd` (replica-hours are invisible in-pod), exported as a
+  separate component.
+- Real orchestration bug fixed: `command_plan` never side-loaded the
+  locally built image into kind — every pod would have hit
+  ImagePullBackOff on the first live run. `kind load docker-image` step
+  added and pinned by test.
+- `.devcontainer/` + `scripts/phase7_bootstrap.sh` give GitHub Codespaces
+  every preflight tool; `scripts/phase7_kind_run.sh` is the runbook;
+  `eval/experiments/phase7_live.yaml` is the 12-run ordinal slice
+  (dry-run verified). Integration points 2 (chart toggles) and 3
+  (`/v1/workloads/replay` + k6 tenant tokens) stay open, documented in
+  eval/README.md — they are the first live session's work, as the roadmap
+  always said.
+
+### How it was verified
+
+All local gates green (gofmt, vet, full go test, harness pytest 31/31,
+phase7 dry-run). **CI run 29194999487 on 839decc: success on all five
+jobs — and its PostgreSQL 18 service executed the session-16 Postgres
+truncation and RLS tests for the first time. The Postgres path of ADR 0016
+is now proven, not assumed.**
+
+### Still blocked, and by what
+
+- **Phase B / cache headline:** the LMSYS-Chat-1M gate — user HF token.
+- **Phase 6 GPU half:** user-run Kaggle/Colab session (script committed).
+- **Phase 7 execution:** a Docker-capable machine; a free GitHub Codespace
+  on this repo now satisfies preflight out of the box.
+
 ## 2026-07-12 (session 16) — gap-closing: truncation disclosure (ADR 0016), a latent time-encoding bug, and the J weight-sensitivity sweep
 
 Milestone status: user override ("do the remaining work that fully solves").

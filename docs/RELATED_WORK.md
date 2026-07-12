@@ -79,10 +79,10 @@ transfer** and is published as such — `FORECAST_TRACE_REAL.md`).
 
 | Gap vs literature | Severity | Status |
 |---|---|---|
-| Sim substrate vs their live GPU fleets | High (framing) | Mitigated: real-trace demand (10.63M req) drives the sim; ranking-only claims; Phase 6 calibration (free GPU) + Phase 7 live kind run (Docker VM) close it further — both environment-blocked, neither changes decision-quality claims |
+| Sim substrate vs their live GPU fleets | High (framing) | Mitigated and shrinking: real-trace demand (10.63M req) drives the sim; ranking-only claims. **Phase 6 CPU half DONE (session 16b,** `research/calibration/CALIBRATION.md`**):** measured llama-server congestion supports g(ρ)=1/(1−ρ) to first order (fitted a=0.86; R² of a=1: 0.857) and the deviation is conservative against lean (JCAC-like) operation. GPU tier table scripted (user-run T4). Phase 7 live kind run is now one command in a Codespace (eval-export landed; chart toggles + replay endpoint remain, documented) |
 | No VTC-style empirical baseline | Medium | **Closing now**: token-fair water-filling controller (`vtc_replica`), tuned per TUNING.md, pre-registered comparison under interference injection |
 | Real-LMSYS cache headline | Medium | Encoder + protocol live; blocked only on the gated dataset (user HF account) |
-| p95 not p99 | Low | Deliberate deviation, documented; honest fix requires Phase 6 measured latency distributions, not an invented constant |
+| p95 not p99 | Low | Deliberate deviation, documented. First measured distribution exists (session 16b): p95/mean 1.59–2.41 on a real CPU inference server vs the sim's flat 1.4 — a tail underestimate that is symmetric across systems (all share the estimator). Full p99 fix still awaits per-tier GPU distributions (`kaggle_tier_bench.py`) |
 | Real-demand cost significance | Low | First sample directional (n=16); pre-registered n=96 second sample running |
 | Production scale (SageServe's 10M served requests) | Conceded | Out of scope per V2_README; demand-side 10.63M replay is the honest analog at decision level |
 | Proven scheduling bounds (VTC 2×) | Conceded | Props 1–2 with stated scope; no stronger claim made |

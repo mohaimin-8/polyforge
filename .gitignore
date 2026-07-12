@@ -9,6 +9,9 @@ data/*.db-*
 research/traces/out/
 # Raw public datasets are downloaded, never committed (BurstGPT CSVs, LMSYS parquet).
 research/traces/data/
+# Calibration assets (llama.cpp binaries + GGUF model) are re-downloadable;
+# the measurement script and its outputs are what git carries.
+research/calibration/data/
 __pycache__/
 .pytest_cache/
 # Raw result databases are archived via Zenodo (eval/scripts/archive_zenodo.py);
