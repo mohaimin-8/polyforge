@@ -1,38 +1,60 @@
-"""Phase 6 (GPU path): per-tier latency/throughput table on a free T4.
+"""Phase 6 (GPU path): per-tier latency/throughput table on a free Kaggle GPU.
 
-USER-RUN: paste this file into a Kaggle notebook (Settings -> Accelerator ->
-GPU T4 x2, or Colab free T4) and run it. It needs no secrets and no gated
-models. Bring back `tier_bench.csv`; `CALIBRATION.md` then gains the
-empirical tier table replacing the assumed TIER_BASE_LATENCY_MS /
-TIER_COST_USD_PER_REQ *shape* checks in research/jcac_sim/model.py.
+Runs as a Kaggle *script kernel* (pushed via `kaggle kernels push`, GPU +
+internet enabled) and writes `tier_bench.csv` as the kernel's output.
 
 What it measures, per tier stand-in:
     small -> Qwen/Qwen2.5-0.5B-Instruct
     mid   -> Qwen/Qwen2.5-3B-Instruct
-    large -> Qwen/Qwen2.5-7B-Instruct (AWQ 4-bit; fp16 does not fit a T4)
-- time-to-last-token for a fixed 48-token completion (matches the CPU-path
-  request shape), sequential n=25 after 3 warmups -> mean/p95 latency
+    large -> Qwen/Qwen2.5-7B-Instruct  (fp16, sharded across both T4s)
+- time-to-last-token for a fixed 48-token completion (same request shape as
+  the CPU-path congestion calibration), sequential n=25 after 3 warmups
 - single-stream decode tokens/sec
-The tier *price* ratio the sim assumes (1 : 10 : 100 per request) can then be
-sanity-checked against measured GPU-seconds per request times a rented-GPU
-$/s — that arithmetic lives in CALIBRATION.md, not here.
+The sim's tier constants this checks: TIER_BASE_LATENCY_MS's ordering/ratios
+and TIER_COST_USD_PER_REQ's 1:10:100 shape (via measured GPU-seconds per
+request x a rented-GPU $/s — that arithmetic lands in CALIBRATION.md).
 
-Setup cell (run first, ~3 min):
-    !pip install -q vllm
+Deliberate deviation from V2_README's Phase 6 wording ("vLLM serving"):
+the engine is Hugging Face transformers, not vLLM — Kaggle images ship
+torch+transformers preinstalled, while vLLM needs a pip install and has
+GPU-architecture constraints the free pool does not guarantee. The
+measurand (single-stream per-tier latency/throughput shape) is unchanged;
+absolute serving-optimized numbers would be lower for every tier alike.
 
-Then run this file. Runtime ~20-30 min total (model downloads dominate).
+A tier that fails (e.g. OOM if the pool hands out a single small GPU)
+records an error row instead of aborting the run — a partial table is
+still a measurement.
 """
 
 from __future__ import annotations
 
 import csv
+import gc
+import os
 import statistics
+import subprocess
+import sys
 import time
 
+import torch
+
+# The free pool may grant a P100 (compute 6.0): current torch wheels ship no
+# sm_60 kernels ("no kernel image is available" — run 2 of this kernel).
+# Fall back once to the cu118 build that still carries them, then re-exec.
+if torch.cuda.is_available() and torch.cuda.get_device_capability(0)[0] < 7 \
+        and not os.environ.get("TIER_BENCH_REEXEC"):
+    print("pre-sm_70 GPU granted:", torch.cuda.get_device_name(0),
+          "- installing cu118 torch and re-executing")
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q",
+                    "torch==2.4.1", "--index-url",
+                    "https://download.pytorch.org/whl/cu118"], check=True)
+    os.environ["TIER_BENCH_REEXEC"] = "1"
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
 TIERS = {
-    "small": ("Qwen/Qwen2.5-0.5B-Instruct", {}),
-    "mid": ("Qwen/Qwen2.5-3B-Instruct", {}),
-    "large": ("Qwen/Qwen2.5-7B-Instruct-AWQ", {"quantization": "awq"}),
+    "small": "Qwen/Qwen2.5-0.5B-Instruct",
+    "mid": "Qwen/Qwen2.5-3B-Instruct",
+    "large": "Qwen/Qwen2.5-7B-Instruct",
 }
 N_PREDICT = 48
 WARMUP = 3
@@ -44,44 +66,68 @@ PROMPT = (
 )
 
 
-def bench_tier(name: str, model: str, extra: dict) -> dict:
-    from vllm import LLM, SamplingParams
+def bench_tier(name: str, model_id: str) -> dict:
+    from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    llm = LLM(model=model, max_model_len=2048, gpu_memory_utilization=0.85, **extra)
-    params = SamplingParams(temperature=0.0, max_tokens=N_PREDICT, ignore_eos=True)
-    for i in range(WARMUP):
-        llm.generate([f"[warm {i}] {PROMPT}"], params, use_tqdm=False)
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_id, torch_dtype=torch.float16, device_map="auto"
+    )
+    model.eval()
+    inputs = tokenizer(PROMPT, return_tensors="pt").to(model.device)
+
+    def generate() -> None:
+        with torch.no_grad():
+            model.generate(
+                **inputs,
+                max_new_tokens=N_PREDICT,
+                min_new_tokens=N_PREDICT,  # fixed length: homogeneous requests
+                do_sample=False,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+        torch.cuda.synchronize()
+
+    for _ in range(WARMUP):
+        generate()
     latencies = []
-    for i in range(RUNS):
+    for _ in range(RUNS):
         t0 = time.perf_counter()
-        llm.generate([f"[req {i}] {PROMPT}"], params, use_tqdm=False)
+        generate()
         latencies.append(time.perf_counter() - t0)
     latencies.sort()
     mean = statistics.fmean(latencies)
     row = {
-        "tier": name, "model": model, "n": RUNS,
+        "tier": name, "model": model_id, "n": RUNS, "error": "",
         "mean_ms": round(mean * 1000, 1),
         "p95_ms": round(latencies[max(0, round(0.95 * RUNS) - 1)] * 1000, 1),
         "tokens_per_s": round(N_PREDICT / mean, 2),
     }
-    del llm  # free VRAM before the next tier
-    import gc, torch
+    del model
     gc.collect()
     torch.cuda.empty_cache()
     return row
 
 
 def main() -> None:
+    print("cuda devices:", torch.cuda.device_count(),
+          [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())])
     rows = []
-    for name, (model, extra) in TIERS.items():
-        print(f"benchmarking {name} = {model} ...")
-        rows.append(bench_tier(name, model, extra))
+    for name, model_id in TIERS.items():
+        print(f"benchmarking {name} = {model_id} ...")
+        try:
+            rows.append(bench_tier(name, model_id))
+        except Exception as exc:  # partial table beats no table
+            gc.collect()
+            torch.cuda.empty_cache()
+            rows.append({"tier": name, "model": model_id, "n": 0,
+                         "error": f"{type(exc).__name__}: {exc}"[:300],
+                         "mean_ms": "", "p95_ms": "", "tokens_per_s": ""})
         print(rows[-1])
     with open("tier_bench.csv", "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=rows[0].keys())
         writer.writeheader()
         writer.writerows(rows)
-    print("wrote tier_bench.csv — download it and hand it back to the repo")
+    print("wrote tier_bench.csv")
 
 
 if __name__ == "__main__":

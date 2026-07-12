@@ -182,7 +182,11 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
                '"value":"--kubelet-insecure-tls"}]'],
         ["kubectl", "--namespace", "kube-system", "rollout", "status",
          "deployment/metrics-server", "--timeout=180s"],
-        ["helm", "install", "polyforge", "deploy/helm/polyforge",
+        # Absolute chart path: the runner's cwd is eval/, and a relative
+        # path that does not exist makes helm parse "deploy/..." as a repo
+        # reference ("repo deploy not found" — first live smoke, session 16d).
+        ["helm", "install", "polyforge",
+         str(Path(__file__).resolve().parents[2] / "deploy" / "helm" / "polyforge"),
          "--namespace", "polyforge", "--create-namespace", "--wait", "--timeout", "300s",
          *set_flags],
         ["kubectl", "--namespace", "polyforge", "rollout", "status",
