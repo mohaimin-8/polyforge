@@ -24,7 +24,7 @@ context, not results.
 | **SLO** | **Closed honestly — iso-attainment framing** | Violation parity with tuned HPA/KEDA at −43…−48% cost (v2, H1 FAIL); beats FIRM (p=2e-19). Overload regime: reactive scalers buy attainment at 3.2–3.4× spend (v3, H1′ FAIL); forecast mechanism confirmed (H2′ PASS, p=6e-4); spike-class exploratory win (p=5e-5, d_z=0.57, −46% cost). Stopping rule: no further confirmatory attempts | `RESULTS_V2.md`, `RESULTS_V3.md` |
 | **Fairness** | **WON — two dedicated baselines beaten** | Beats FIRM on Jain (d_z=1.0, p=4.5e-47); beats the tuned VTC-replica **on Jain itself** (0.9705 vs 0.9599, p=1.5e-6) at −35% cost and −36% worst-tenant p95 (HV1+HV2 PASS). Own γ-term honestly nulled under injected interference | `VTC_FAIRNESS.md`, `FAIRNESS_V2.md` |
 | **Forecasting** | **WON — on real data** | On the real 10.63M-request BurstGPT trace, damped Holt (jcac_v2's forecaster) cuts one-step RMSE −26.9% vs the trend default (segment 1); the synthetic stand-in's −44.8% seasonal prediction **does not transfer** and is published as such; seasonal's mechanism is confirmed only where real periodicity exists (v3 H2′) | `FORECAST_TRACE_REAL.md`, `FORECAST_TRACE.md`, `RESULTS_V3.md` |
-| **Cache** | **OPEN — pipeline proven, headline pending** | Full semantic pipeline (MiniLM, adaptive sizing, $-weighted savings) runs end-to-end; adaptive beats fixed sizing (+4% at threshold 0.85 on synthetic). Numbers comparable to InstCache/SCALM require the gated LMSYS-Chat-1M dataset (blocked on HF token) | `SEMANTIC_CACHE.md` |
+| **Cache** | **CLOSED — real-data headline measured** | On real LMSYS-Chat-1M (200k-turn reservoir sample, MiniLM, exact NN): adaptive semantic hit rate **29.6% @ cosine 0.85, 48.8% @ 0.70** (InstCache's 51.34% anchor is their different protocol on the same dataset — placed beside, never head-to-head); adaptive beats a non-strawman fixed cache at 10% of inserted by **+93%** (29.6 vs 15.3); **$0.296 saved/1k queries** at mid-tier pricing; empirical h(K): hmax 0.285, K_half ≈ 6.6k entries (~19 MB) — the sim's assumed curve was optimistic, documented, constants unchanged | `SEMANTIC_CACHE.md` |
 | **Security** (uncontested novelty) | **WON — frontier dominance** | Shared semantic cache leaks prompt membership at AUC 0.88 from timing alone; per-tenant partitioning returns the attacker to chance (0.50) at 24% latency cost with 76% hits kept — strictly dominating padding (never < 0.73) and TTL jitter (chance only at ~90% hit loss) | `ADVANCED.md` (figs 16–17) |
 
 Composite objective J (cost + 2·violation + 0.5·(1−Jain), the objective every baseline
@@ -73,12 +73,17 @@ the whale-only subgroup where the injection actually fires — negative result p
 term dropped from claims (stays in the system as a configurable weight).
 → `FAIRNESS_V2.md`
 
-### 5. Semantic-cache protocol — pipeline verification (Phase 3b)
+### 5. Semantic-cache protocol — pipeline verification, then the real-LMSYS headline (Phase 3b + B)
 
 Real MiniLM encoder end-to-end; synthetic prompt set saturates under a semantic encoder
-(its duplicate structure is lexical by design — documented caveat). Adaptive sizing
-beats fixed at every threshold; $-weighted savings is the axis cache-only papers don't
-report. Headline numbers await gated LMSYS-Chat-1M. → `SEMANTIC_CACHE.md`
+(its duplicate structure is lexical by design — documented caveat). **Real headline
+(session 16c):** feasibility amendments committed *before* the gated download (31c73c7 —
+seeded reservoir sample n=200,000 of 2,015,645 user turns, block-wise exact NN verified
+bit-identical on synthetic, supplementary 10%-fixed baseline). As measured: adaptive
+29.6% @ 0.85 / 48.8% @ 0.70; adaptive +93% vs the 10%-fixed baseline; $0.296/1k queries;
+empirical h(K) fit hmax 0.285, K_half 6,569 entries. Adopting empirical h(c) constants
+in `model.py` requires a new pre-registration (session 16b precedent).
+→ `SEMANTIC_CACHE.md`
 
 ### 6. Forecast ablations — synthetic stand-in vs real trace (Phase 3a + C)
 
@@ -135,7 +140,7 @@ buy a large fairness win — jcac is *more* fair on Jain (0.9705 vs 0.9599, p=1.
 | SLO | parity at −43…−48% cost (v2); mechanism p=6e-4 (v3 H2′) | any "beats HPA/KEDA on violation" claim | H1 and H1′ both FAILED; only the iso-attainment framing and the mechanism are claimable |
 | Fairness | Jain 0.9705 vs VTC 0.9599 (p=1.5e-6) + FIRM d_z=1.0 | γ-ablation | the γ-term itself is a published null |
 | Security | AUC 0.88 → 0.50 at 24% latency / 76% hits kept | — | frontier table in `ADVANCED.md` |
-| Cache hit-rate headline | *(pending LMSYS)* | synthetic 1.000 saturation | synthetic saturates under a real encoder; documented caveat |
+| Cache hit-rate headline | **29.6% @ 0.85 (48.8% @ 0.70), real LMSYS, +93% vs 10%-fixed** | synthetic 1.000 saturation; the +594% vs 200-entry fixed | synthetic saturates under a real encoder (caveat); the 200-entry fixed point is a strawman at 100k inserted — cite the 10%-fixed comparison |
 
 ## Honest-nulls ledger
 

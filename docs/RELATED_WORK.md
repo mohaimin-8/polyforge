@@ -55,13 +55,17 @@ against baselines tuned on the paper's own objective — a deliberately higher b
 (TUNING.md).
 
 **Cache.** Published: GPTCache 61.6–68.8% hit on its benchmark; InstCache 51.34% on
-LMSYS; SCALM +63% hit vs GPTCache; MeanCache federated user-side caching. PolyForge:
-+83% hit vs fixed sizing in-matrix (0.106 vs 0.058), and the metric none of the
-cache-only papers can produce — **dollar-weighted savings per tenant tier** — plus
-the side-channel result that shared semantic caches leak membership at AUC 0.88 and
-per-tenant partitioning restores chance at 24% latency cost, dominating
-padding/TTL-jitter defenses. Real-LMSYS hit-rate protocol is committed and
-encoder-live; the absolute number awaits the gated dataset.
+LMSYS; SCALM +63% hit vs GPTCache; MeanCache federated user-side caching. PolyForge,
+**measured on the same LMSYS-Chat-1M dataset** (200k-turn seeded sample, MiniLM,
+exact NN; `SEMANTIC_CACHE.md`): adaptive semantic hit rate **48.8% at cosine 0.70 /
+29.6% at 0.85** — same order as InstCache's 51.34% under a different mechanism
+(they pre-populate predicted instructions; we cache observed prompts) — with
+**+93% over a fixed cache at 10% of the working set**, and the metric none of the
+cache-only papers can produce: **dollar-weighted savings per tenant tier**
+($0.296/1k queries at mid-tier). In-matrix: +83% hit vs fixed sizing (0.106 vs
+0.058). Plus the side-channel result that shared semantic caches leak membership at
+AUC 0.88 and per-tenant partitioning restores chance at 24% latency cost, dominating
+padding/TTL-jitter defenses.
 
 **Fairness.** Published: VTC establishes the service-fairness definition and a 2×
 bound, Equinox cuts worst-case service gaps −42% vs VTC, D²LPM adds locality (2.87×
@@ -81,7 +85,7 @@ transfer** and is published as such — `FORECAST_TRACE_REAL.md`).
 |---|---|---|
 | Sim substrate vs their live GPU fleets | High (framing) | Mitigated and shrinking: real-trace demand (10.63M req) drives the sim; ranking-only claims. **Phase 6 CPU half DONE (session 16b,** `research/calibration/CALIBRATION.md`**):** measured llama-server congestion supports g(ρ)=1/(1−ρ) to first order (fitted a=0.86; R² of a=1: 0.857) and the deviation is conservative against lean (JCAC-like) operation. GPU tier table scripted (user-run T4). Phase 7 live kind run is now one command in a Codespace (eval-export landed; chart toggles + replay endpoint remain, documented) |
 | No VTC-style empirical baseline | Medium | **Closing now**: token-fair water-filling controller (`vtc_replica`), tuned per TUNING.md, pre-registered comparison under interference injection |
-| Real-LMSYS cache headline | Medium | Encoder + protocol live; blocked only on the gated dataset (user HF account) |
+| Real-LMSYS cache headline | ~~Medium~~ | **CLOSED (session 16c):** measured on the gated dataset — 29.6% @ 0.85 / 48.8% @ 0.70, +93% vs 10%-fixed, $-weighted savings attached; pre-run feasibility amendment committed before download (31c73c7) |
 | p95 not p99 | Low | Deliberate deviation, documented. First measured distribution exists (session 16b): p95/mean 1.59–2.41 on a real CPU inference server vs the sim's flat 1.4 — a tail underestimate that is symmetric across systems (all share the estimator). Full p99 fix still awaits per-tier GPU distributions (`kaggle_tier_bench.py`) |
 | Real-demand cost significance | Low | First sample directional (n=16); pre-registered n=96 second sample running |
 | Production scale (SageServe's 10M served requests) | Conceded | Out of scope per V2_README; demand-side 10.63M replay is the honest analog at decision level |

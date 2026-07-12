@@ -12,7 +12,7 @@ zero in a defense — every lever below is a *new pre-registered experiment* or 
 |---|---|---|---|
 | **Cost** | **WON** (on substrate) | −43%/−48% vs tuned HPA/KEDA, p<1e-33, dz 0.8–1.1; wins cost vs all 5 baselines at large effect | real-BurstGPT restatement (download only) |
 | **SLO** | **NOT WON** — honest null | H1 FAIL: violation parity with HPA/KEDA (at −43…−48% cost); beats FIRM p=2e-19 | the pre-registered *overload cells* lever was never run |
-| **Cache** | **PARTIAL** | +83% vs fixed sim (0.106 vs 0.058); large-effect hit-rate wins vs scalers; loses hit rate to cache-max iso-cost | the InstCache/SCALM-comparable number: real LMSYS-Chat-1M + real embedder |
+| **Cache** | **CLOSED (16c)** | real LMSYS: 29.6% @ 0.85 / 48.8% @ 0.70, +93% vs 10%-fixed, $0.296/1k; h(K) fit done | — (was: the real-LMSYS number; delivered) |
 | **Fairness** | **WON vs FIRM**; γ null | Jain 0.969 vs 0.929, p=7e-44, dz=0.95; γ-ablation null under injection (dropped from claims) | optional: VTC-style baseline for the scoreboard's actual target |
 | **Forecasting** | **WON** | seasonal −44.8% RMSE vs trend on daily periodicity (autocorr 0.85), exactly as predicted | pointer run on real trace (same download as Cost) |
 
@@ -65,21 +65,28 @@ same experiment: **new cells, not new tuning.**
   spend, and PolyForge alone respects shared-cluster capacity limits. Chiron's
   "+90%" stays an "up to" on their own substrate (ground rule 4).
 
-## Phase B — Cache headline on real LMSYS-Chat-1M (1 session + user unblock)
+## Phase B — Cache headline on real LMSYS-Chat-1M — DONE (session 16c, as measured)
 
-- [ ] **USER:** Hugging Face account, accept the LMSYS-Chat-1M gate, provide token;
-      `pip install sentence-transformers` (CPU is fine for MiniLM).
-- [ ] Run the *committed, unchanged* protocol:
-      `semantic_cache_eval.py --conversations lmsys-chat-1m/*.parquet` with
-      `all-MiniLM-L6-v2`. The protocol was frozen before the data was seen — that is
-      the pre-registration.
-- [ ] Report: hit-rate curve (fixed vs adaptive) on the same dataset InstCache
-      reports 51.34% on, **plus dollar-weighted savings** — the metric no cache-only
-      paper can produce, and the segment's unique win condition.
-- [ ] Feed the empirical `h(c)` fit into `model.py` (Phase 3b completion); rerun the
-      affected figure only.
-- [ ] Acceptance: a real-dataset semantic hit-rate number exists next to the
-      InstCache/SCALM anchors (their shape, our substrate), with $-savings attached.
+- [x] **USER:** token provided 2026-07-12; gate accepted; sentence-transformers
+      already installed (session 14).
+- [x] Protocol run with one *declared pre-run amendment* (commit 31c73c7, pushed
+      **before** the gated download): the committed protocol is infeasible at full
+      scale (2M+ turns → ~40 TB dense similarity matrix), so — seeded reservoir
+      sample n=200,000 of 2,015,645 user turns; block-wise exact NN (verified
+      bit-identical on synthetic); supplementary 10%-fixed baseline so the fixed
+      point is not a strawman. Semantics unchanged; the amendment chain is the
+      pre-registration's honest continuation.
+- [x] Reported (`SEMANTIC_CACHE.md`): adaptive **29.6% @ cosine 0.85 / 48.8% @
+      0.70** on the dataset InstCache reports 51.34% on (their mechanism differs —
+      beside, not head-to-head); **+93% vs 10%-fixed** (15.3%); **$0.296/1k queries**
+      at mid-tier pricing.
+- [x] Empirical `h(K)` measured and fitted (hmax 0.285, K_half 6,569 entries ≈ 19 MB):
+      Phase 3b complete. *Deliberate deviation from this plan's wording:* the fit is
+      documented next to the sim's assumed curve but NOT fed into `model.py` —
+      mutating committed constants breaks bit-reproducibility; adopting them is a new
+      pre-registered experiment (session 16b calibration precedent).
+- [x] Acceptance met: a real-dataset semantic hit-rate number sits next to the
+      InstCache/SCALM anchors with $-savings attached.
 
 ## Phase C — Cost & forecasting real-trace restatement — forecasting half DONE (session 14)
 

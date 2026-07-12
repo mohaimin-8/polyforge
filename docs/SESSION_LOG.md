@@ -7,6 +7,58 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-12 (session 16c) — Phase B: the cache headline on real LMSYS-Chat-1M; the last open segment closes
+
+Milestone status: user provided the HF token; the LMSYS-Chat-1M gate was
+already accepted on their account. The five contested segments now all have
+real-data resolutions.
+
+### The measurement
+
+The committed protocol needed a feasibility amendment before it could touch
+the real dataset: 2M+ user turns make its dense query×inserted similarity
+matrix ~40 TB. The amendment (seeded reservoir sample n=200,000; block-wise
+exact NN over recency-ordered vectors — verified bit-identical on the
+synthetic set; a supplementary fixed baseline at 10% of inserted so the
+committed 200-entry point isn't a strawman at scale; the Phase 3b h(K)
+ladder) was **committed and pushed (31c73c7) before a byte of the gated
+data was downloaded** — the pre-registration chain holds.
+
+As measured (`SEMANTIC_CACHE.md`, 200,000 of 2,015,645 user turns, MiniLM,
+exact cosine NN):
+
+- **Adaptive hit rate 29.6% @ cosine 0.85, 48.8% @ 0.70** — the same order
+  as InstCache's 51.34% on this dataset, under a different mechanism
+  (they pre-populate predicted instructions; we cache observed prompts).
+  Beside the anchor, never head-to-head (ground rule 4).
+- **Adaptive +93% vs the 10%-fixed baseline** (29.6 vs 15.3). The committed
+  200-entry point reads +594% but is a strawman at 100k inserted — the
+  amendment exists precisely so we don't have to cite it.
+- **$0.296 saved per 1k queries** at mid-tier pricing — the dollar axis no
+  cache-only paper reports.
+- **h(K) fit: hmax=0.285, K_half=6,569 entries (~19 MB at ~3 KB/entry).**
+  The sim's assumed curve (max 0.85, half-point 256 MB) is *optimistic* on
+  real traffic — real prompts saturate earlier and lower. Documented next
+  to the assumption; `model.py` constants unchanged (bit-reproducibility;
+  adopting empirical h(c) = new prereg, session 16b precedent). This is a
+  deliberate deviation from the plan's "feed into model.py" wording,
+  surfaced here rather than silently applied.
+
+### Environment note
+
+pyarrow was absent (known from the BurstGPT session) — installed for
+parquet reads. The HF token lives in the standard local credential cache
+(`~/.cache/huggingface/token`), never in the repo.
+
+### Scoreboard after this session
+
+Cost WON (synthetic + real, confirmatory) · SLO closed-honest (iso-attainment
++ mechanism + spike-class exploratory) · Fairness WON (FIRM + VTC-replica) ·
+Forecasting WON (Holt on real trace) · **Cache CLOSED (real-LMSYS headline +
+adaptive win + $-axis)** · Security WON (frontier). Remaining work is
+environment/user-bound (Phase 6 GPU half on a T4, Phase 7 execution in a
+Codespace, Phase 9 hardening) — and the thesis document itself.
+
 ## 2026-07-12 (session 16b) — Phase 6 CPU calibration measured; Phase 7 reduced to one command
 
 Milestone status: user asked for Phases 6 and 7. Phase 6's CPU path — the
