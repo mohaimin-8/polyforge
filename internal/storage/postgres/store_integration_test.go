@@ -112,6 +112,68 @@ func TestPostgresFeaturesAreTenantScopedByRowLevelSecurity(t *testing.T) {
 	}
 }
 
+func TestPostgresFeaturesReportTruncationAtEventCap(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	store := openIntegrationStore(t, ctx)
+
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	alpha := "trunc-alpha-" + suffix
+	t.Cleanup(func() {
+		_, _ = store.admin.Exec(context.Background(), `DELETE FROM tenants WHERE id = $1`, alpha)
+	})
+	if _, err := store.CreateTenant(ctx, tenant.Tenant{ID: alpha, Name: "Alpha"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// MaxFeatureEvents+1 events, 1 ms apart, generated server-side in one
+	// statement. telemetry_events FORCEs row-level security, so the insert
+	// must run inside the tenant transaction context like any app write.
+	base := time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Second)
+	_, err := withTenantTx(ctx, store.app, alpha, func(tx pgx.Tx) (struct{}, error) {
+		_, err := tx.Exec(ctx, `
+			INSERT INTO telemetry_events(
+				tenant_id, service, timestamp, rps_window, payload_bytes, latency_ms,
+				cache_hit, embedding_density, model_tier, child_spans
+			)
+			SELECT $1, 'api', $2::timestamptz + g.i * interval '1 millisecond',
+				0, 0, g.i, false, 0, 'small', 0
+			FROM generate_series(0, $3) AS g(i)
+		`, alpha, base, telemetry.MaxFeatureEvents)
+		return struct{}{}, err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	set, err := store.Features(ctx, alpha, telemetry.FeatureQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !set.Truncated {
+		t.Fatal("expected Truncated=true when the window holds MaxFeatureEvents+1 events")
+	}
+	if len(set.Items) != 1 || set.Items[0].EventCount != telemetry.MaxFeatureEvents {
+		t.Fatalf("expected exactly MaxFeatureEvents aggregated events, got %+v", set.Items)
+	}
+	// ORDER BY timestamp means the newest event is the one that gets cut.
+	wantLast := base.Add(time.Duration(telemetry.MaxFeatureEvents-1) * time.Millisecond)
+	if !set.Items[0].LastEventTimestamp.Equal(wantLast) {
+		t.Fatalf("expected the earliest prefix to survive (last=%v), got last=%v", wantLast, set.Items[0].LastEventTimestamp)
+	}
+
+	bounded, err := store.Features(ctx, alpha, telemetry.FeatureQuery{Since: base, Until: base.Add(time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bounded.Truncated {
+		t.Fatal("expected Truncated=false for a window under the cap")
+	}
+	if len(bounded.Items) != 1 || bounded.Items[0].EventCount != 1000 {
+		t.Fatalf("expected the 1-second window to admit exactly 1000 events, got %+v", bounded.Items)
+	}
+}
+
 func TestPostgresRowLevelIsolation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

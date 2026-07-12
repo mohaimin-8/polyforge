@@ -1091,7 +1091,7 @@ components:
           minimum: 0
     TelemetryFeatureSet:
       type: object
-      required: [tenant_id, since, until, items]
+      required: [tenant_id, since, until, items, truncated]
       properties:
         tenant_id:
           $ref: "#/components/schemas/ResourceID"
@@ -1105,6 +1105,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryFeatureRow"
+        truncated:
+          type: boolean
+          description: >-
+            True when the window matched more than the 10,000-event cap.
+            Aggregates then cover only the earliest 10,000 events of
+            [since, until), so percentiles and averages describe a prefix of
+            the window, not the window. Narrow the window or filter by
+            service to obtain an untruncated measurement.
     TelemetryFeatureRow:
       type: object
       required:

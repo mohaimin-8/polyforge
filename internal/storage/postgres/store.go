@@ -540,7 +540,7 @@ func (s *Store) Features(ctx context.Context, tenantID string, query telemetry.F
 			args = append(args, query.Service)
 			sqlQuery += fmt.Sprintf(` AND service = $%d`, len(args))
 		}
-		args = append(args, telemetry.MaxFeatureEvents)
+		args = append(args, telemetry.MaxFeatureEvents+1)
 		sqlQuery += fmt.Sprintf(` ORDER BY timestamp LIMIT $%d`, len(args))
 
 		rows, err := tx.Query(ctx, sqlQuery, args...)
@@ -560,7 +560,10 @@ func (s *Store) Features(ctx context.Context, tenantID string, query telemetry.F
 		if err := rows.Err(); err != nil {
 			return telemetry.FeatureSet{}, err
 		}
-		return telemetry.BuildFeatureSet(tenantID, query, events), nil
+		events, truncated := telemetry.ClampFeatureEvents(events)
+		set := telemetry.BuildFeatureSet(tenantID, query, events)
+		set.Truncated = truncated
+		return set, nil
 	})
 }
 

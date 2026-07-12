@@ -362,3 +362,140 @@ func TestFeaturesAggregatesWithinWindowAndTenant(t *testing.T) {
 		t.Fatalf("expected ErrTenantNotFound for unknown tenant, got %v", err)
 	}
 }
+
+func TestMigrateNormalizesLegacyTimestampEncoding(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "polyforge.db")
+	store, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = store.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
+
+	// Rows as an older build wrote them: RFC3339Nano trims trailing zeros, so
+	// whole seconds carry no fraction and these strings mis-sort against the
+	// fixed-width form ("…00.5Z" < "…00Z" as TEXT).
+	legacy := []struct {
+		encoded string
+		latency float64
+	}{
+		{"2026-01-01T12:00:00Z", 1},
+		{"2026-01-01T12:00:00.5Z", 2},
+		{"2026-01-01T12:00:01Z", 3}, // exactly at until: must stay excluded
+	}
+	for _, row := range legacy {
+		if _, err := store.db.ExecContext(ctx, `
+			INSERT INTO telemetry_events(
+				tenant_id, service, timestamp, rps_window, payload_bytes, latency_ms,
+				cache_hit, embedding_density, model_tier, child_spans
+			)
+			VALUES ('alpha', 'api', ?, 0, 0, ?, 0, 0, 'small', 0)
+		`, row.encoded, row.latency); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reopening runs migrate, which pads legacy encodings in place.
+	store, err = Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	since := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	set, err := store.Features(ctx, "alpha", telemetry.FeatureQuery{Since: since, Until: since.Add(time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(set.Items) != 1 || set.Items[0].EventCount != 2 {
+		t.Fatalf("expected the [00.0s, 01.0s) window to admit exactly the 00.0 and 00.5 events, got %+v", set.Items)
+	}
+	if !set.Items[0].LastEventTimestamp.Equal(since.Add(500 * time.Millisecond)) {
+		t.Fatalf("fractional legacy timestamp did not survive normalization: %+v", set.Items[0])
+	}
+
+	events, err := store.RecentByTenant(ctx, "alpha", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []time.Time{since, since.Add(500 * time.Millisecond), since.Add(time.Second)}
+	if len(events) != len(want) {
+		t.Fatalf("expected %d events, got %+v", len(want), events)
+	}
+	for i, event := range events {
+		if !event.Timestamp.Equal(want[i]) {
+			t.Fatalf("event %d: expected %v, got %v", i, want[i], event.Timestamp)
+		}
+	}
+}
+
+func TestFeaturesReportTruncationAtEventCap(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "polyforge.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	_, _ = store.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
+	base := time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Second)
+
+	// MaxFeatureEvents+1 events, 1 ms apart, batched in one transaction so the
+	// test stays fast under WAL.
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO telemetry_events(
+			tenant_id, service, timestamp, rps_window, payload_bytes, latency_ms,
+			cache_hit, embedding_density, model_tier, child_spans
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i <= telemetry.MaxFeatureEvents; i++ {
+		at := base.Add(time.Duration(i) * time.Millisecond)
+		if _, err := stmt.ExecContext(ctx, "alpha", "api", encodeTime(at), 0.0, 0, float64(i), 0, 0.0, "small", 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := stmt.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	set, err := store.Features(ctx, "alpha", telemetry.FeatureQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !set.Truncated {
+		t.Fatal("expected Truncated=true when the window holds MaxFeatureEvents+1 events")
+	}
+	if len(set.Items) != 1 || set.Items[0].EventCount != telemetry.MaxFeatureEvents {
+		t.Fatalf("expected exactly MaxFeatureEvents aggregated events, got %+v", set.Items)
+	}
+	// ORDER BY timestamp means the newest event is the one that gets cut.
+	wantLast := base.Add(time.Duration(telemetry.MaxFeatureEvents-1) * time.Millisecond)
+	if !set.Items[0].LastEventTimestamp.Equal(wantLast) {
+		t.Fatalf("expected the earliest prefix to survive (last=%v), got last=%v", wantLast, set.Items[0].LastEventTimestamp)
+	}
+
+	bounded, err := store.Features(ctx, "alpha", telemetry.FeatureQuery{Since: base, Until: base.Add(time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bounded.Truncated {
+		t.Fatal("expected Truncated=false for a window under the cap")
+	}
+	if len(bounded.Items) != 1 || bounded.Items[0].EventCount != 1000 {
+		t.Fatalf("expected the 1-second window to admit exactly 1000 events, got %+v", bounded.Items)
+	}
+}

@@ -7,6 +7,92 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-12 (session 16) — gap-closing: truncation disclosure (ADR 0016), a latent time-encoding bug, and the J weight-sensitivity sweep
+
+Milestone status: user override ("do the remaining work that fully solves").
+Sessions 14–15 recorded themselves in their plan/prereg/results commits rather
+than here; this entry resumes the log. Everything below was done in one
+session; no simulator campaign was run and no closed campaign file was touched.
+
+### What was built
+
+**1. `MaxFeatureEvents` truncation is now disclosed, not silent (ADR 0016).**
+The session-13-era open decision is resolved: `FeatureSet` gains a required
+`truncated` boolean, surfaced verbatim over HTTP and required by the OpenAPI
+schema. Detection is exact — each store selects `MaxFeatureEvents+1` rows and
+the overflow row proves truncation before being discarded — and lives in one
+shared helper (`telemetry.ClampFeatureEvents`), so the three stores cannot
+drift on which prefix survives. The in-memory store now also selects in
+timestamp order, matching the SQL stores' `ORDER BY timestamp` exactly (the
+new unit test inserts the newest event first to catch insertion-order drift).
+
+**2. A latent window-correctness bug, found and fixed.** Writing the
+truncation test with sub-second timestamps exposed that `encodeTime` in the
+SQLite store used `RFC3339Nano`, which trims trailing zeros — and TEXT-encoded
+time columns compare lexicographically in every window bound and `ORDER BY`.
+`"…43.001Z" < "…43Z"` as strings, so a `since` at a whole second silently
+excluded same-second fractional events from the analytical path. No prior
+test used fractional timestamps, which is why five milestones of green suites
+never caught it. Fix: `encodeTime` now emits a fixed 9-digit fraction (string
+order ≡ chronological order), and `migrate()` pads legacy rows in place
+(idempotent, length-guarded, all nine time columns). The regression test
+covers the nastiest edge: a legacy whole-second row exactly at `until` must
+stay excluded from the half-open window after a mixed-format reopen.
+
+**3. Composite-J weight-sensitivity sweep — declared exploratory, run once.**
+`sensitivity_j.py` freezes its grid in the docstring before execution
+(w_v ∈ {0, 0.5, 1, 2, 4} × w_f ∈ {0, 0.25, 0.5, 1, 2}, cost ≡ 1) and re-reads
+the five closed campaign sources read-only; cost_norm is recovered from each
+campaign's own J by exact algebra, never re-derived. Validation: the
+pre-registered cells reproduce the published numbers exactly (v1 gptcache
+p=4.6e-25, v2 p=6.7e-25, VTC p=3.3e-19, replay p=5.5e-05). Result
+(`SENSITIVITY_J.md`): **the paired ΔJ direction never flips in any of the 425
+cells; 416/425 keep p<0.01.** All 9 exceptions sit at w_v=4 — double the
+pre-registered violation weight — and lose only significance, exactly where
+the disclosed +0.07 violation trade predicts fragility. This is
+threats-to-validity context, not a new claim; the (2, 0.5) numbers remain the
+only citable ones.
+
+**4. Scope hygiene.** `docs/RELATED_WORK.md` gap table gains two rows: the
+explicit descope of `etl_azure_functions.py`/`etl_alibaba_v2018.py` (FaaS/VM
+traces, not LLM-serving demand; kept as tooling, any future use needs a new
+prereg — `etl_lmsys_chat1m.py` is *not* descoped, it is Phase B) and the
+weight-sensitivity mitigation. `V3_SEGMENT_WIN_PLAN.md` brought current:
+Phase D marked DONE (VTC HV1+HV2 PASS), the powered n=96 replay recorded with
+the −70%-is-citable pointer, the stale unpushed-commits warning resolved.
+
+### How it was verified
+
+```text
+gofmt -l .                              -> clean
+go vet ./...                            -> pass
+go test ./... -count=1                  -> pass (all packages)
+npx @redocly/cli lint api/openapi.yaml  -> valid
+python sensitivity_j.py                 -> wrote SENSITIVITY_J.md (416/425)
+```
+
+Not verified locally: `TestPostgresFeaturesReportTruncationAtEventCap` (and
+the pre-existing RLS tests) **skip** without Docker. They compile and vet;
+CI's PostgreSQL service is the first environment that will execute them.
+Treat the Postgres truncation path as unproven until a CI run is green.
+
+### Still blocked, unchanged
+
+- **Phase B (cache headline, the last open segment):** hard-blocked on the
+  user — HF account, LMSYS-Chat-1M gate acceptance, token, then
+  `pip install sentence-transformers`. No token exists on this machine
+  (checked env vars and HF cache paths); nothing was faked.
+- **Phase 6 (GPU calibration) / Phase 7 (live kind run):** environment-blocked
+  (no GPU, no Docker). These are the only levers left against the sim-substrate
+  gap and the p95→p99 deviation.
+
+### Immediate next tasks
+
+1. Commit and push; confirm green CI (proves the Postgres truncation test).
+2. User unblocks Phase B → run the frozen `semantic_cache_eval.py` protocol.
+3. Session-19 slice from the plan: README v2/v3/replay numbers + Phase 9
+   hardening; then thesis writing (thesis/report and thesis/slides are empty).
+
 ## 2026-07-11 (session 13) — v2 Phases 1–5 + 8: the full segment-win push, executed under pre-registration
 
 Milestone status: on the user's explicit "full power, beat all 5 segments"

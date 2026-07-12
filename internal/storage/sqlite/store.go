@@ -138,6 +138,29 @@ func (s *Store) migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, `UPDATE api_keys SET scope = 'full' WHERE scope IS NULL OR scope = ''`); err != nil {
 		return err
 	}
+	// Rows written before encodeTime used a fixed-width fraction carry trimmed
+	// RFC3339Nano strings, which mis-sort against the fixed-width form in TEXT
+	// comparisons (window bounds and ORDER BY). Pad them once, in place.
+	for _, tc := range []struct{ table, column string }{
+		{"tenants", "created_at"},
+		{"projects", "created_at"},
+		{"projects", "updated_at"},
+		{"api_keys", "created_at"},
+		{"api_keys", "revoked_at"},
+		{"telemetry_events", "timestamp"},
+		{"outbox", "occurred_at"},
+		{"outbox", "published_at"},
+		{"sagas", "updated_at"},
+	} {
+		stmt := `UPDATE ` + tc.table + ` SET ` + tc.column + ` = substr(` + tc.column + `, 1, 19)
+			|| '.' || substr(CASE WHEN length(` + tc.column + `) > 21
+				THEN substr(` + tc.column + `, 21, length(` + tc.column + `) - 21) ELSE '' END
+				|| '000000000', 1, 9) || 'Z'
+			WHERE ` + tc.column + ` IS NOT NULL AND length(` + tc.column + `) <> 30`
+		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -682,7 +705,7 @@ func (s *Store) Features(ctx context.Context, tenantID string, query telemetry.F
 		args = append(args, query.Service)
 	}
 	sqlQuery += ` ORDER BY timestamp LIMIT ?`
-	args = append(args, telemetry.MaxFeatureEvents)
+	args = append(args, telemetry.MaxFeatureEvents+1)
 
 	rows, err := s.db.QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
@@ -701,7 +724,10 @@ func (s *Store) Features(ctx context.Context, tenantID string, query telemetry.F
 	if err := rows.Err(); err != nil {
 		return telemetry.FeatureSet{}, err
 	}
-	return telemetry.BuildFeatureSet(tenantID, query, events), nil
+	events, truncated := telemetry.ClampFeatureEvents(events)
+	set := telemetry.BuildFeatureSet(tenantID, query, events)
+	set.Truncated = truncated
+	return set, nil
 }
 
 type rowScanner interface {
@@ -780,8 +806,13 @@ func scanTelemetry(row rowScanner) (telemetry.Event, error) {
 	return e, err
 }
 
+// encodeTime must produce fixed-width strings: every WHERE range and ORDER BY
+// on a time column compares TEXT lexicographically, and RFC3339Nano's trailing-
+// zero trimming breaks that ("…43.001Z" sorts before "…43Z"). A fixed 9-digit
+// fraction makes string order equal chronological order; migrate() rewrites
+// rows written by older builds into this width.
 func encodeTime(t time.Time) string {
-	return t.UTC().Format(time.RFC3339Nano)
+	return t.UTC().Format("2006-01-02T15:04:05.000000000Z07:00")
 }
 
 func decodeTime(s string) (time.Time, error) {

@@ -104,20 +104,27 @@ same experiment: **new cells, not new tuning.**
       one. ET1 confirms Holt > trend on real shape (d_z=−0.62); ET2 confirms
       seasonal ≈ trend under weak periodicity. A higher-powered replay (more
       windows) is permitted only as a new pre-registration in a new file.
+- [x] Powered second replay — DONE as measured (session 15, `PREREG_TRACE2.md`
+      committed+pushed b09a492 before the run; `RESULTS_TRACE2.md`, commit
+      cb96dfd). **HT2 PASS with disclosure** at n=96 independent seeds: J beats
+      HPA/KEDA/FIRM at p ≤ 5.5e-05, **cost −70%** (p ≤ 4.3e-06), violation
+      trade +0.07 disclosed as pre-registered. The real-demand headline is now
+      confirmatory; samples never pooled. **−70% is the citable number**, not
+      the n=16 sample's −76% (see RESULTS_MASTER.md disambiguation).
 - [x] Acceptance (forecasting): the segment's numbers are pointable at a real
       public trace, including the parts that contradicted the stand-in.
 
-## Phase D — Fairness strengthening (optional, 1 session)
+## Phase D — Fairness strengthening — DONE (session 15, as measured)
 
 The segment is already resolved (Jain win vs FIRM at dz=0.95; γ honestly nulled).
 The scoreboard's named target is VTC's *empirical* side:
-- [ ] Implement a VTC-style token-weighted fair scheduler as a baseline SystemSpec
-      (service ordered by accumulated weighted tokens — their published mechanism,
-      tuned per TUNING.md rules); pre-register the comparison (Jain + worst-tenant
-      p95 under the Phase 4 interference injection).
-- [ ] Either outcome is reportable: if VTC-style wins Jain but pays cost/SLO, the
-      composite J and the "joint control absorbs interference" finding both stand.
-- [ ] Do **not** resurrect the γ-term; the null is published.
+- [x] `vtc_replica` implemented and tuned per TUNING.md (commit acb792b);
+      comparison pre-registered in `PREREG_VTC.md` before the run.
+- [x] Outcome as measured (`VTC_FAIRNESS.md`, commit bfb70fc): **HV1 PASS,
+      HV2 PASS** — jcac beats the dedicated fair divider on composite J
+      (d_z=−1.12, p=3e-19) *and on Jain itself* (0.9705 vs 0.9599, p=1.5e-6)
+      at −35% cost, −36% worst-tenant p95.
+- [x] γ-term not resurrected; the null stands.
 
 ## Sequencing (one bounded slice per session)
 
@@ -130,8 +137,8 @@ The scoreboard's named target is VTC's *empirical* side:
 | 18 | Phase C downloads + trace reruns | network (multi-GB) |
 | 19 | Phase D and/or Phase 9 hardening + README v2/v3 numbers | — |
 
-Also outstanding from v2: commits `f8aa8e6`+`1388a59` are **unpushed** — push before
-anything else touches the tree.
+~~Also outstanding from v2: commits `f8aa8e6`+`1388a59` are unpushed.~~ Resolved:
+all work through `cb96dfd` is pushed, CI green (session 15).
 
 ## What this plan will not do
 

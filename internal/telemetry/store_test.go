@@ -108,6 +108,68 @@ func TestNormalizeFeatureQueryRepairsInvertedWindow(t *testing.T) {
 	}
 }
 
+func TestClampFeatureEvents(t *testing.T) {
+	atCap := make([]Event, MaxFeatureEvents)
+	kept, truncated := ClampFeatureEvents(atCap)
+	if truncated || len(kept) != MaxFeatureEvents {
+		t.Fatalf("exactly MaxFeatureEvents must not report truncation, got truncated=%v len=%d", truncated, len(kept))
+	}
+
+	overCap := make([]Event, MaxFeatureEvents+1)
+	overCap[0].Service = "first"
+	kept, truncated = ClampFeatureEvents(overCap)
+	if !truncated || len(kept) != MaxFeatureEvents {
+		t.Fatalf("MaxFeatureEvents+1 must clamp and report truncation, got truncated=%v len=%d", truncated, len(kept))
+	}
+	if kept[0].Service != "first" {
+		t.Fatal("clamp must keep the head of the slice, not the tail")
+	}
+}
+
+func TestStoreFeaturesReportsTruncation(t *testing.T) {
+	ctx := context.Background()
+	store := NewStore(MaxFeatureEvents + 10)
+	base := time.Now().UTC().Add(-5 * time.Minute)
+
+	// The newest event is inserted first: if selection clamped in insertion
+	// order instead of timestamp order, it would survive and the assertion on
+	// LastEventTimestamp below would catch the drift from the SQL stores.
+	newest := Event{TenantID: "alpha", Service: "api", Timestamp: base.Add(time.Duration(MaxFeatureEvents) * time.Millisecond)}
+	if _, err := store.Add(ctx, newest); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < MaxFeatureEvents; i++ {
+		event := Event{TenantID: "alpha", Service: "api", Timestamp: base.Add(time.Duration(i) * time.Millisecond)}
+		if _, err := store.Add(ctx, event); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	set, err := store.Features(ctx, "alpha", FeatureQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !set.Truncated {
+		t.Fatal("expected Truncated=true when the window holds MaxFeatureEvents+1 events")
+	}
+	if len(set.Items) != 1 || set.Items[0].EventCount != MaxFeatureEvents {
+		t.Fatalf("expected exactly MaxFeatureEvents aggregated events, got %+v", set.Items)
+	}
+	wantLast := base.Add(time.Duration(MaxFeatureEvents-1) * time.Millisecond)
+	if !set.Items[0].LastEventTimestamp.Equal(wantLast) {
+		t.Fatalf("expected the earliest-by-timestamp prefix to survive (last=%v), got last=%v", wantLast, set.Items[0].LastEventTimestamp)
+	}
+
+	// A window that admits fewer than the cap must not report truncation.
+	bounded, err := store.Features(ctx, "alpha", FeatureQuery{Since: base, Until: base.Add(time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bounded.Truncated {
+		t.Fatal("expected Truncated=false for a window under the cap")
+	}
+}
+
 func TestStoreFeaturesRespectsTenantAndCapacity(t *testing.T) {
 	ctx := context.Background()
 	store := NewStore(10)

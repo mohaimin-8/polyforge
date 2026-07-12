@@ -87,6 +87,8 @@ transfer** and is published as such — `FORECAST_TRACE_REAL.md`).
 | Production scale (SageServe's 10M served requests) | Conceded | Out of scope per V2_README; demand-side 10.63M replay is the honest analog at decision level |
 | Proven scheduling bounds (VTC 2×) | Conceded | Props 1–2 with stated scope; no stronger claim made |
 | Locality/prefix-cache scheduling (D²LPM) | Not claimed | Different layer (kernel/batch scheduling); noted as future work |
+| Single real demand trace (BurstGPT) | Conceded (scoped) | **Explicit descope (session 16):** `etl_azure_functions.py` / `etl_alibaba_v2018.py` stay in the tree as tooling, but no thesis claim uses them — Azure Functions and Alibaba 2018 are FaaS/VM traces, not LLM-serving demand, so replaying them would test a regime the thesis does not claim. Any future use requires a new pre-registration. `etl_lmsys_chat1m.py` is NOT descoped — it is the committed Phase B protocol |
+| Objective weights are self-chosen | Low (mitigated) | Baselines tuned on the same J (TUNING.md); exploratory weight-sensitivity sweep (`SENSITIVITY_J.md`, declared before run): direction never flips in 425 perturbed cells across all 5 campaigns, 416/425 keep p<0.01; the 9 exceptions sit at w_v=4 (2× the pre-registered violation weight) and lose only significance, consistent with the disclosed violation trade |
 
 **What no surveyed system has, PolyForge has:** joint three-knob cross-layer control,
 per-tenant dollar accounting with budget guardrails, a security evaluation of the

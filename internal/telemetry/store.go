@@ -38,6 +38,11 @@ type FeatureSet struct {
 	Since    time.Time    `json:"since"`
 	Until    time.Time    `json:"until"`
 	Items    []FeatureRow `json:"items"`
+	// Truncated reports that the window matched more than MaxFeatureEvents
+	// events, so every aggregate below covers only the earliest
+	// MaxFeatureEvents events of [since, until) — a prefix measurement, not
+	// the window. See docs/adr/0016.
+	Truncated bool `json:"truncated"`
 }
 
 type FeatureRow struct {
@@ -115,12 +120,26 @@ func (s *Store) Features(_ context.Context, tenantID string, query FeatureQuery)
 	for _, event := range s.events {
 		if featureEventMatches(event, tenantID, query) {
 			events = append(events, event)
-			if len(events) >= MaxFeatureEvents {
-				break
-			}
 		}
 	}
-	return BuildFeatureSet(tenantID, query, events), nil
+	sort.SliceStable(events, func(i, j int) bool { return events[i].Timestamp.Before(events[j].Timestamp) })
+	events, truncated := ClampFeatureEvents(events)
+	set := BuildFeatureSet(tenantID, query, events)
+	set.Truncated = truncated
+	return set, nil
+}
+
+// ClampFeatureEvents bounds an already-matched, timestamp-ordered candidate
+// slice at MaxFeatureEvents and reports whether anything was cut. Every
+// Features implementation selects in timestamp order and clamps here, so
+// which prefix of the window survives the cap cannot drift between backends.
+// SQL stores pass MaxFeatureEvents+1 as their LIMIT: the overflow row is the
+// proof of truncation and is discarded before aggregation.
+func ClampFeatureEvents(events []Event) ([]Event, bool) {
+	if len(events) <= MaxFeatureEvents {
+		return events, false
+	}
+	return events[:MaxFeatureEvents], true
 }
 
 func NormalizeFeatureQuery(query FeatureQuery) FeatureQuery {

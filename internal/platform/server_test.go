@@ -517,6 +517,32 @@ func TestTelemetryFeaturesEndpointAggregatesPerService(t *testing.T) {
 			}
 		}
 	})
+
+	// The OpenAPI schema requires the truncated flag on every response, so
+	// assert the wire shape rather than the decoded struct's zero value.
+	t.Run("response always carries the truncated flag", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, server.URL+"/v1/tenants/alpha/telemetry/features", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("X-PolyForge-API-Key", alphaKey.Secret)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		var raw map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+			t.Fatal(err)
+		}
+		truncated, present := raw["truncated"]
+		if !present {
+			t.Fatal("expected the truncated field on every feature response")
+		}
+		if truncated != false {
+			t.Fatalf("expected truncated=false below the event cap, got %v", truncated)
+		}
+	})
 }
 
 // TestReadOnlyScopeIsEnforced is the roadmap's W7 verification gate:
