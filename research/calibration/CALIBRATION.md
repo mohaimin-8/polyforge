@@ -37,5 +37,5 @@ Scope and honesty:
   stay bit-reproducible. If a future campaign adopts a recalibrated g, it
   must do so as a new pre-registered experiment.
 
-GPU path (per-tier latency/price table) is prepared in
-`kaggle_tier_bench.py` and awaits a free Kaggle/Colab T4 session (user-run).
+GPU path (per-tier latency table): measured — see `TIER_BENCH.md`
+and `tier_bench.csv` (`kaggle_tier_bench.py`, free Kaggle GPU kernel).

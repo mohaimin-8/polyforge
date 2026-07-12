@@ -48,6 +48,15 @@ if torch.cuda.is_available() and torch.cuda.get_device_capability(0)[0] < 7 \
     subprocess.run([sys.executable, "-m", "pip", "install", "-q",
                     "torch==2.4.1", "--index-url",
                     "https://download.pytorch.org/whl/cu118"], check=True)
+    # The image's transformers/accelerate are built against current torch;
+    # pin the contemporaries of 2.4.1 or Qwen2's module import fails.
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q",
+                    "transformers==4.46.3", "accelerate==1.1.1"], check=True)
+    # The image's torchvision/torchaudio are ABI-bound to the *newer* torch
+    # ("operator torchvision::nms does not exist"). transformers treats an
+    # absent torchvision as fine and a broken one as fatal — remove them.
+    subprocess.run([sys.executable, "-m", "pip", "uninstall", "-q", "-y",
+                    "torchvision", "torchaudio"], check=False)
     os.environ["TIER_BENCH_REEXEC"] = "1"
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
