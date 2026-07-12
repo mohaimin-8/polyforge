@@ -24,6 +24,32 @@ Dependencies are optional and degrade honestly:
 
     python semantic_cache_eval.py                    # synthetic + fallback
     python semantic_cache_eval.py --conversations lmsys-chat-1m/*.parquet
+
+AMENDMENT (2026-07-12, session 16c — declared and committed BEFORE the gated
+dataset was downloaded; no result had been seen when this was frozen):
+the committed protocol is computationally infeasible at full LMSYS scale —
+2M+ user turns make the dense query x inserted similarity matrix ~40 TB and
+a CPU encode of every turn takes hours. Feasibility amendments, none of
+which change the protocol's semantics:
+  1. `--sample N` (LMSYS run declared at N=200,000): a seed-deterministic
+     reservoir sample of user turns drawn streaming across all parquet
+     files. Sampling is uniform over the dataset, so the hit-rate estimand
+     ("does a random query find a near-duplicate among the inserted set")
+     is unchanged; only its sample size is bounded.
+  2. Exact cosine NN is computed block-wise over recency-ordered inserted
+     vectors with a running max — identical numbers to the dense matmul,
+     bounded memory, and one pass yields the nearest-similarity at every
+     FIFO cache size simultaneously (a FIFO cache of size K is the last-K
+     suffix).
+  3. The committed fixed-cache point (200 entries) stays, and a
+     supplementary fixed point at 10% of inserted entries is added —
+     200/100,000 alone would strawman the fixed baseline (the committed
+     synthetic default was 200/2,000 = 10%).
+  4. Phase 3b completion: hit rate at the 0.85 operating threshold across
+     a ladder of cache sizes, with the saturating fit
+     h(K) = hmax*K/(K+K_half) reported in ENTRIES (the sim's h(c) is over
+     MB; the entries->MB mapping needs a bytes-per-entry estimate and is
+     stated, not silently assumed).
 """
 
 from __future__ import annotations
@@ -117,35 +143,72 @@ def synthetic_prompts(seed: int, n: int = 4000, templates: int = 300,
     return prompts
 
 
-def load_lmsys_prompts(pattern: str) -> list[str]:
+def load_lmsys_prompts(pattern: str, sample: int | None = None, seed: int = 42) -> list[str]:
+    """User turns from the parquet files; with `sample`, a seed-deterministic
+    reservoir sample drawn streaming (one file in memory at a time), uniform
+    over every user turn in the dataset."""
     import pandas as pd
 
     paths = sorted(glob.glob(pattern))
     if not paths:
         raise SystemExit(f"no parquet matched {pattern}")
-    frames = [pd.read_parquet(p) for p in paths]
-    prompts = []
-    for df in frames:
+    rng = np.random.default_rng(seed)
+    reservoir: list[str] = []
+    seen = 0
+    for path in paths:
+        df = pd.read_parquet(path)
         for convo in df["conversation"]:
             for msg in convo:
-                if msg.get("role") == "user" and msg.get("content"):
-                    prompts.append(msg["content"])
-    return prompts
+                if msg.get("role") != "user" or not msg.get("content"):
+                    continue
+                text = msg["content"]
+                seen += 1
+                if sample is None:
+                    reservoir.append(text)
+                elif len(reservoir) < sample:
+                    reservoir.append(text)
+                else:
+                    j = int(rng.integers(seen))
+                    if j < sample:
+                        reservoir[j] = text
+        del df
+    if sample is not None:
+        # Restore a uniformly random order (reservoir replacement preserves
+        # uniformity of membership, not of position).
+        rng.shuffle(reservoir)
+        print(f"reservoir: {len(reservoir)} of {seen} user turns (seed {seed})")
+    return reservoir
 
 
 # --- protocol ----------------------------------------------------------
+def nearest_at_sizes(queries: np.ndarray, inserted: np.ndarray,
+                     sizes: list[int], block: int = 512) -> dict[int, np.ndarray]:
+    """Exact cosine nearest-neighbor similarity of every query against every
+    FIFO cache size in one pass. A FIFO cache of size K holds the last K
+    inserted vectors, so walking inserted blocks from most recent to oldest
+    with a running max gives nearest-vs-suffix at every K cut point —
+    numerically identical to the dense matmul, in bounded memory."""
+    sizes = sorted({min(s, len(inserted)) for s in sizes})
+    running = np.full(len(queries), -1.0)
+    out: dict[int, np.ndarray] = {}
+    covered = 0  # how many most-recent inserted vectors the running max covers
+    for size in sizes:
+        while covered < size:
+            step = min(block, size - covered)
+            blk = inserted[len(inserted) - covered - step: len(inserted) - covered]
+            np.maximum(running, (queries @ blk.T).max(axis=1), out=running)
+            covered += step
+        out[size] = running.copy()
+    return out
+
+
 def hit_rate_curve(vecs: np.ndarray, cache_size: int | None) -> dict[float, float]:
     """Insert first half, query second half; a query hits if its nearest
     inserted neighbor's cosine >= threshold. `cache_size` caps inserted
     entries with FIFO eviction (None = unbounded / fully adaptive)."""
     half = len(vecs) // 2
-    inserted = vecs[:half]
-    if cache_size is not None and cache_size < len(inserted):
-        inserted = inserted[-cache_size:]  # FIFO: keep the most recent
-    queries = vecs[half:]
-    # exact cosine NN (vectors are L2-normalized, so dot = cosine).
-    sims = queries @ inserted.T
-    nearest = sims.max(axis=1)
+    size = half if cache_size is None else min(cache_size, half)
+    nearest = nearest_at_sizes(vecs[half:], vecs[:half], [size])[size]
     return {th: float((nearest >= th).mean()) for th in THRESHOLDS}
 
 
@@ -155,11 +218,15 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--fixed-cache", type=int, default=200,
                     help="fixed cache entry cap (the naive baseline)")
+    ap.add_argument("--sample", type=int, default=None,
+                    help="seeded reservoir sample of user turns (LMSYS run "
+                         "declared at 200000 in the amendment)")
     args = ap.parse_args()
 
     if args.conversations:
-        prompts = load_lmsys_prompts(args.conversations)
-        source = f"LMSYS-Chat-1M ({len(prompts)} user turns)"
+        prompts = load_lmsys_prompts(args.conversations, args.sample, args.seed)
+        sampled = f", reservoir sample seed {args.seed}" if args.sample else ""
+        source = f"LMSYS-Chat-1M ({len(prompts)} user turns{sampled})"
     else:
         prompts = synthetic_prompts(args.seed)
         source = f"synthetic ({len(prompts)} prompts, controllable dup-rate)"
@@ -167,8 +234,20 @@ def main() -> None:
     emb = make_embedder()
     vecs = emb.encode(prompts)
 
-    adaptive = hit_rate_curve(vecs, cache_size=None)          # demand-sized
-    fixed = hit_rate_curve(vecs, cache_size=args.fixed_cache)  # naive fixed
+    # One recency-ordered pass covers the committed fixed point, the
+    # supplementary 10%-of-inserted point, the h(K) ladder, and unbounded.
+    half = len(vecs) // 2
+    supplementary = max(1, half // 10)
+    ladder = sorted({s for s in (500, 2000, 8000, 32000, 64000) if s < half}
+                    | {half, min(args.fixed_cache, half), supplementary})
+    nearest = nearest_at_sizes(vecs[half:], vecs[:half], ladder)
+
+    def curve(size: int) -> dict[float, float]:
+        return {th: float((nearest[size] >= th).mean()) for th in THRESHOLDS}
+
+    adaptive = curve(half)                            # demand-sized
+    fixed = curve(min(args.fixed_cache, half))        # committed naive fixed
+    fixed10 = curve(supplementary)                    # supplementary, 10% of inserted
 
     lines = ["# Semantic-cache hit-rate protocol (v2 Phase 3b)", ""]
     w = lines.append
@@ -214,6 +293,42 @@ def main() -> None:
       "cache-only paper cannot report: PolyForge prices each avoided call at "
       "its model tier, so a hit on an expensive tier saves more than a hit on "
       "a cheap one — hit rate and savings are not the same axis.")
+    w("")
+    if args.sample:
+        w(f"Amendment (declared pre-run, see script docstring): reservoir "
+          f"sample of {args.sample} user turns; supplementary fixed cache at "
+          f"10% of inserted ({supplementary} entries) so the fixed baseline "
+          f"is not a strawman at this scale: hit rate {fixed10[op]:.1%} at "
+          f"threshold {op} (vs adaptive {adaptive[op]:.1%}).")
+        w("")
+    # Phase 3b completion: h(K) across the FIFO ladder at the operating
+    # threshold, with the sim's saturating form fitted in ENTRIES.
+    hs = {k: float((nearest[k] >= op).mean()) for k in ladder}
+    w(f"## h(cache size) at threshold {op} — Phase 3b empirical curve")
+    w("")
+    w("| cache entries | hit rate |")
+    w("|---|---|")
+    for k in sorted(hs):
+        w(f"| {k} | {hs[k]:.3f} |")
+    w("")
+    try:
+        from scipy.optimize import curve_fit
+
+        ks = np.array(sorted(hs), dtype="float64")
+        ys = np.array([hs[k] for k in sorted(hs)])
+        (hmax, khalf), _ = curve_fit(
+            lambda k, m, h: m * k / (k + h), ks, ys,
+            p0=[max(ys.max(), 1e-3), max(float(ks.mean()), 1.0)], maxfev=10000)
+        w(f"**Saturating fit h(K) = hmax·K/(K+K_half): hmax = {hmax:.3f}, "
+          f"K_half = {khalf:.0f} entries.** The sim's h(c) uses the same form "
+          "over MB (CACHE_HIT_MAX=0.85, CACHE_HALF_MB=256); at ~3 KB per "
+          "entry (384-d float32 embedding + prompt text + metadata), "
+          f"K_half ≈ {khalf * 3 / 1024:.0f} MB equivalent. Adopting empirical "
+          "constants in model.py would be a new pre-registered experiment; "
+          "the committed matrices stay bit-reproducible (see session 16b "
+          "precedent in docs/SESSION_LOG.md).")
+    except Exception as exc:  # fit is reporting, not gating
+        w(f"(saturating fit did not converge: {exc})")
     w("")
     w("Reproduce: `python semantic_cache_eval.py` (synthetic+fallback) or "
       "`--conversations lmsys-chat-1m/*.parquet` with sentence-transformers "
