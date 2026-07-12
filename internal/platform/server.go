@@ -306,7 +306,15 @@ func (s *Server) listAPIKeys(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeFull) {
+	// Bootstrap: a tenant's first key cannot authenticate itself into
+	// existence, so the platform admin — who already gates tenant creation —
+	// may mint keys directly. Discovered by the first live cluster run: no
+	// HTTP path could ever have issued a fresh tenant's initial credential.
+	if r.Header.Get("X-PolyForge-Admin-Key") != "" {
+		if !s.authorizeAdmin(w, r) {
+			return
+		}
+	} else if !s.authorizeTenant(w, r, tenantID, tenant.ScopeFull) {
 		return
 	}
 	var input struct {
