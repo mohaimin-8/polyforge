@@ -95,9 +95,15 @@ same experiment: **new cells, not new tuning.**
       regimes (RESULTS_V3.md H2′ proves the mechanism there). Reported per
       contiguous segment (104-day collection gap = missing data, not zero demand),
       gap-inclusive numbers alongside.
-- [ ] Headline-matrix-on-BurstGPT replay — the "on 10M real requests" cost
-      restatement. Needs its own short declared protocol (slice selection, time
-      compression, tenant mapping committed before running) — next session.
+- [x] Headline-matrix-on-BurstGPT replay — DONE as measured (session 15,
+      PREREG_TRACE.md committed+pushed 717f8bd before the run; RESULTS_TRACE.md,
+      commit 01cb5ed). **HT FAIL on the p<0.01 bar at n=16 windows — but every
+      point estimate matches the v1 headline**: J 0.33 vs 0.57–0.61, cost −76%
+      vs HPA/KEDA/FIRM at violation +0.07; the effect concentrates in the
+      high-traffic collection period (J diff ≈ −0.5) and vanishes in the quiet
+      one. ET1 confirms Holt > trend on real shape (d_z=−0.62); ET2 confirms
+      seasonal ≈ trend under weak periodicity. A higher-powered replay (more
+      windows) is permitted only as a new pre-registration in a new file.
 - [x] Acceptance (forecasting): the segment's numbers are pointable at a real
       public trace, including the parts that contradicted the stand-in.
 
