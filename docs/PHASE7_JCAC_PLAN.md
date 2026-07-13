@@ -49,6 +49,19 @@ under test so the ordinal comparison cannot hand one arm more capacity.
    (12 runs ≈ 5 h wall) or a declared reduced slice (2×1×3 ≈ 2.5 h).
 3. **Figure**: paired jcac-vs-hpa live J/cost/violation vs the sim's
    ranking on the same cells — ordinal agreement only (ground rule 4).
+   Caption text, frozen now so the disclosure cannot be forgotten in a
+   late-night figure session (DEFENSE_QA §2 points here):
+
+   > Live ordinal check on a kind cluster: does the simulator's
+   > jcac-vs-HPA ranking on J/cost/violation reproduce under a real
+   > scheduler, real HPA, and real load? Absolutes are not comparable
+   > across substrates and are not compared. The live data plane burns
+   > fixed CPU per request kind, so the cache-size and model-tier knobs
+   > are inert here: this figure validates the replica-control
+   > projection of the joint controller. The cache knob's realism is
+   > carried by the LMSYS protocol (SEMANTIC_CACHE.md,
+   > CACHE_PRECISION.md), the tier knob's by the GPU tier bench
+   > (TIER_BENCH.md).
 
 Known open decisions for that session, so nothing is re-derived live:
 

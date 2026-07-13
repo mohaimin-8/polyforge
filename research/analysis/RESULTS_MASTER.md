@@ -141,6 +141,8 @@ buy a large fairness win — jcac is *more* fair on Jain (0.9705 vs 0.9599, p=1.
 | Fairness | Jain 0.9705 vs VTC 0.9599 (p=1.5e-6) + FIRM d_z=1.0 | γ-ablation | the γ-term itself is a published null |
 | Security | AUC 0.88 → 0.50 at 24% latency / 76% hits kept | — | frontier table in `ADVANCED.md` |
 | Cache hit-rate headline | **29.6% @ 0.85 (48.8% @ 0.70), real LMSYS, +93% vs 10%-fixed** | synthetic 1.000 saturation; the +594% vs 200-entry fixed | synthetic saturates under a real encoder (caveat); the 200-entry fixed point is a strawman at 100k inserted — cite the 10%-fixed comparison |
+| Effect sizes, real-demand replay | **d_z with 95% bootstrap CI** (`EFFECT_SIZES.md`, n=96 rows) | bare p-values below ~1e-6 | at hundreds of paired seeded runs, tiny p measures simulator determinism; the interval is the citable unit |
+| Planner scalability | growth exponent 1.45; p95 crosses the 3 s timeout at 128 tenants (`PLANNER_SCALING.md`) | "linear in tenants" (design intuition) | measured super-linearity is the price of the joint fairness term; past the timeout the designed fallback holds the last good plan |
 
 ## Honest-nulls ledger
 

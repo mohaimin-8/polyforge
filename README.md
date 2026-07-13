@@ -218,6 +218,10 @@ python scripts/validate_results.py experiments/full.yaml
 # Statistical analysis, figures, exploratory weight sensitivity
 cd ../research/analysis
 python run_analysis.py && python sensitivity_j.py
+python effect_sizes.py        # d_z + bootstrap CIs (the citable unit)
+python planner_scaling.py     # joint-planner latency vs tenant count
+python cache_hit_precision.py --conversations '<lmsys glob>'  # hit quality (gated data)
+python forecast_azure.py      # second real trace (run etl_azure_llm.py first)
 
 # Calibration (Phase 6): CPU congestion + GPU tier table
 cd ../calibration && python measure_congestion.py            # ~35 min
@@ -227,8 +231,9 @@ cd ../calibration && python measure_congestion.py            # ~35 min
 bash scripts/phase7_kind_run.sh
 ```
 
-Real datasets (BurstGPT v2.0, gated LMSYS-Chat-1M) are downloaded, never
-committed; the ETLs under `research/traces/` are the committed artifacts.
+Real datasets (BurstGPT v2.0, gated LMSYS-Chat-1M, Azure LLM inference
+2024) are downloaded, never committed; the ETLs under `research/traces/`
+are the committed artifacts.
 
 ## Limitations (honest boundaries)
 
