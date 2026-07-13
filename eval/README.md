@@ -85,14 +85,25 @@ invalid runs keep their error strings in `runs` and never reach analysis.
      not visible in-pod; wiring that flag from the harness lands with the
      first live run.
   2. Helm values used by `HELM_VALUES_BY_SYSTEM` wired into the chart —
-     **partial (session 16d)**: `autoscaling.hpa.*` is a real
+     **hpa + jcac wired (sessions 16d, 17)**: `autoscaling.hpa.*` is a real
      autoscaling/v2 HPA (metrics-server installed per run), the eval base
      values run the pod self-contained (SQLite on emptyDir, no ingress,
-     limiter opened), and the hpa arm is runnable end-to-end
-     (`experiments/phase7_smoke.yaml`). Still open: the planner/operator
-     deployment for the `jcac` arm, KEDA/FIRM arms, `cache.policy` — until
-     the planner half lands, running "jcac" live would mislabel a bare
-     fixed-replica deployment as PolyForge, so don't.
+     limiter opened), and the hpa arm is verified end-to-end
+     (`experiments/phase7_smoke.yaml`). The `jcac` arm (session 17,
+     not yet run live): `operator_install_plan()` installs the operator
+     chart with the planner, creates per-tenant Tenant/Policy/Budget CRs
+     mirroring the sim world, and ends with `kubectl wait
+     --for=condition=Applied` on every Policy — the honesty gate is
+     executable, so a run in which the operator never scaled the target
+     fails before any load. Capacity parity is a cell property: every arm
+     starts at the sim's initial world (2 replicas x tenants) under the
+     cell's cluster-size replica ceiling. Still open: KEDA/FIRM arms,
+     `cache.policy`.
+     **Scope disclosure for the ordinal figure**: the replay data plane
+     burns fixed CPU per request kind, so the cache-size and model-tier
+     knobs are inert live — the live jcac-vs-hpa comparison validates the
+     replica-control projection of the joint controller, and its figure
+     caption must say so (docs/DEFENSE_QA.md §2).
   3. `/v1/tenants/{tenant_id}/workloads/replay` data-plane endpoint —
      **DONE (session 16d)**: burns CPU per the sim's work-unit table so
      real autoscalers see genuine load, records telemetry for eval-export;
@@ -107,6 +118,13 @@ The roadmap says "p99 latency"; the model's latency estimator produces
 p95 (`P95_FACTOR` in `research/jcac_sim/model.py`), so the sim-backend
 metric is **p95** and is reported as such everywhere. The cluster backend
 measures real percentiles and can report both; do not silently relabel.
+
+Latency is also **request-level**, not token-level: the model does not
+represent continuous-batching dynamics (TTFT vs TPOT, heavy-tailed decode
+lengths, head-of-line blocking inside an engine). PolyForge's claims are
+scoped to portfolio-level capacity decisions; token-level latency belongs
+to the llm-d-class actuation layer underneath (docs/RELATED_WORK.md §4,
+docs/DEFENSE_QA.md §9/§11).
 
 ## Reproducing the committed results
 

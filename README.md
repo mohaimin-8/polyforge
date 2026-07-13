@@ -246,13 +246,36 @@ committed; the ETLs under `research/traces/` are the committed artifacts.
   (`eval/README.md`); measured live percentiles can report both.
 - **Cache.** The live control plane exercises per-tenant partitioning
   (the security result), not the semantic cache itself; semantic hit-rate
-  numbers come from the committed protocol on real LMSYS-Chat-1M.
+  numbers come from the committed protocol on real LMSYS-Chat-1M. Hit
+  *precision* — the probability a served hit is a correct answer — is
+  measured by its own pre-registered protocol on the same dataset
+  (`research/analysis/CACHE_PRECISION.md`); staleness/TTL is out of scope.
 - **Live cluster.** The cluster backend is verified end-to-end for the
-  HPA arm on kind; the PolyForge (operator/planner) live arm and the
-  ordinal figure are staged, not yet run — running it before the operator
-  is wired would mislabel a static deployment as PolyForge.
+  HPA arm on kind; the PolyForge (operator/planner) arm is fully wired in
+  code behind an executable actuation gate (`kubectl wait
+  --for=condition=Applied` fails the run before any load if the operator
+  never scaled the target) but has not yet run live. The eventual ordinal
+  figure exercises the replica-control projection only — the replay data
+  plane's cache/tier knobs are inert live, and the figure caption says so.
+- **Latency granularity.** Request-level p95, not token-level TTFT/TPOT:
+  continuous-batching dynamics belong to the llm-d/AIBrix-class actuation
+  layer beneath PolyForge's portfolio decisions (`docs/RELATED_WORK.md`
+  §4 maps each knob onto that layer).
+- **Fairness altitude.** Jain over per-tenant SLO satisfaction measures
+  capacity-allocation fairness at the control plane, not token-level
+  service fairness à la VTC/OSDI '24; `vtc_replica` is a replica-level
+  transplant, and the claims are scoped accordingly.
+- **Cost model.** Two economies, deliberately separable: replica-hours as
+  infrastructure ($0.048/replica-hr; metered live) and tier calls at
+  market API ratios (1:10:100). Spot/MIG/fractional-GPU levers and
+  multi-minute model pulls are out of scope; replica startup lag and cold
+  caches are modeled in the realism ablation.
 - **Fairness γ-term.** Published null: the joint controller absorbs
   interference without it; the term stays configurable, claims dropped.
+
+The hard-question companion — construct validity of the overload cells,
+p-value inflation, goalpost accusations, baseline strength, and the rest —
+is `docs/DEFENSE_QA.md`, with evidence pointers per question.
 
 ## Long-Term Target
 

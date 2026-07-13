@@ -100,7 +100,44 @@ cache layer with a defense frontier, and a fully pre-registered evaluation whose
 nulls are published next to its wins. That last row is a methodological superiority
 no performance number in this table can substitute for.
 
-## Sources (verified 2026-07-12)
+## 4. Substrate mapping — PolyForge's knobs on the 2026 serving stack
+
+The production LLM-serving stack of 2025-26 (llm-d, AIBrix, NVIDIA Dynamo,
+Kubernetes WG-Serving / Gateway API Inference Extension) actuates on
+signals PolyForge's system model does not name: queue depth, in-flight
+requests, KV-cache pressure, prefill/decode pool split, cache-aware
+routing. That is an altitude difference, not a contradiction — PolyForge
+is the *portfolio* controller above that actuation layer, and each of its
+three knobs has a direct target in it:
+
+| PolyForge knob | In the sim | 2026 actuation target |
+|---|---|---|
+| `replicas` | per-tenant capacity at 100 wu/s each | decode-pool size / vLLM pod count per tenant class (llm-d workload autoscaling, AIBrix pod autoscaler consume exactly such a target) |
+| `cache_mb` | semantic-cache budget driving h(c) | gateway semantic-cache budget; sibling of the prefix/KV-cache budgets llm-d manages hierarchically |
+| `tier` | model class at 1:10:100 call price | model routing (INFaaS-style model-less selection; AIBrix LoRA/model routing) |
+
+Two design decisions keep the mapping honest rather than aspirational:
+
+- **The demand signal is behind an interface.** The operator's
+  `planner.DemandSource` consumes per-service request rates today; a
+  token-level source (TTFT/TPOT, queue depth, KV pressure from an
+  llm-d-class engine) replaces it without touching the planner or the
+  Policy actuation path. The joint optimization is signal-agnostic.
+- **Latency claims stay request-level.** The sim's p95 is a queueing
+  estimate over request service times; it does not model
+  continuous-batching token dynamics (TTFT vs TPOT, heavy-tailed decode
+  lengths, head-of-line blocking). Claims are scoped accordingly
+  (`DEFENSE_QA.md` §2, §11), and the live path measures wall-time latency
+  that can report any percentile.
+
+What the 2026 stack does *not* do — and where PolyForge sits — is decide
+**jointly, across a tenant portfolio, in dollars**: llm-d and AIBrix
+autoscale a deployment; none of the surveyed systems trades cost, SLO,
+and cross-tenant fairness in one optimization with per-tenant budget
+guardrails. The right composition is PolyForge planning the portfolio and
+an llm-d-class data plane executing each tenant's share.
+
+## Sources (verified 2026-07-12; substrate-mapping row 2026-07-13)
 
 - SageServe (POMACS/SIGMETRICS '25): <https://dl.acm.org/doi/10.1145/3771576> · <https://arxiv.org/abs/2502.14617>
 - Chiron: <https://arxiv.org/abs/2501.08090> — up to +90% SLO attainment, +70% GPU efficiency
@@ -120,3 +157,7 @@ no performance number in this table can substitute for.
 - Semantic caching, offline→online adaptation: <https://arxiv.org/abs/2508.07675>
 - Faro (SLO-aware on-prem inference clusters): <https://arxiv.org/abs/2409.19488>
 - BurstGPT: <https://arxiv.org/abs/2401.17644> · prompt-cache audit: <https://arxiv.org/abs/2502.07776>
+- llm-d (K8s-native distributed inference; workload autoscaling, hierarchical KV offload): <https://github.com/llm-d/llm-d> · <https://llm-d.ai/docs/guide/Installation/workload-autoscaling>
+- AIBrix (ByteDance; LoRA management, SLO-aware pod autoscaling): <https://github.com/vllm-project/aibrix>
+- NVIDIA Dynamo (disaggregated prefill/decode serving): <https://github.com/ai-dynamo/dynamo>
+- Kubernetes Gateway API Inference Extension (WG-Serving): <https://github.com/kubernetes-sigs/gateway-api-inference-extension>
