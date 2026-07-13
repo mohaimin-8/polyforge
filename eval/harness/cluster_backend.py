@@ -58,7 +58,13 @@ OPERATOR_SYSTEMS = {"jcac"}
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADMIN_SECRET_NAME = "polyforge-admin"  # carries ADMIN_KEY for the operator
 
-# Ablation/baseline toggles the chart understands (deploy/helm/polyforge).
+# Ablation/baseline toggles per system. Live-wired today: the hpa row
+# (autoscaling.hpa.* is a real HPA) and the jcac row (via OPERATOR_SYSTEMS
+# -> operator chart install; the polyforge-chart planner.*/classifier.*
+# keys here are sim-era placeholders the chart ignores). The remaining
+# rows (keda/firm/cache.policy/jcac_no*) are NOT wired into any chart —
+# running them on the cluster backend deploys a plain pod under a
+# baseline's name, so keep them sim-only until their toggles exist.
 HELM_VALUES_BY_SYSTEM = {
     "jcac": {"planner.enabled": "true", "classifier.enabled": "true"},
     "hpa": {"planner.enabled": "false", "autoscaling.hpa.enabled": "true"},

@@ -166,10 +166,16 @@ one becomes available.
 ## 13. "Eight tenants is not multi-tenancy at scale."
 
 Eight tenants per cluster is the factor under study (composition, not
-population — `eval/harness/workloads.py`); the planner's action space is
-linear in tenants per candidate set and the exhaustive lattice is bounded
-(≤60 candidates/tenant/cycle), so nothing in the design caps at 8. But no
-scaling measurement beyond 8 exists, and the claim is scoped accordingly.
-A 100-tenant planner-latency microbenchmark (planner only, no cluster) is
-cheap future work that would convert this from a scoping note to a
-measured bound.
+population — `eval/harness/workloads.py`). The scaling bound is now
+*measured*, not scoped away: `research/analysis/PLANNER_SCALING.md`
+drives the deployed planner code path from 8 to 256 tenants on one
+laptop core — fitted growth exponent 1.45 (the joint fairness term
+couples tenants, so super-linearity is the measured cost of jointness),
+p95 cycle time first exceeding the operator's 3 s request timeout at
+128 tenants and the 10 s control period at 256. Two honest notes travel
+with it: past the timeout, the failure mode is the designed one (hold
+last good plan, `fallback` status — plan_runner.go), and coordination
+costs outside the planner (CR write fan-out, telemetry aggregation) are
+not covered by the microbenchmark. Scaling levers past the crossover are
+named there (planning cells, incremental fairness partial sums, faster
+inner loop).
