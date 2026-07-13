@@ -171,9 +171,15 @@ generalization *failure* is already published — the synthetic stand-in's
 seasonal-forecasting win did not transfer to the real trace
 (`FORECAST_TRACE_REAL.md`); Holt did, and the recommendation followed the
 data. FaaS/VM traces (Azure Functions, Alibaba) were considered and
-descoped as non-LLM demand (RELATED_WORK.md gap table). A second LLM
-demand trace is the single highest-value external-validity addition if
-one becomes available.
+descoped as non-LLM demand (RELATED_WORK.md gap table). The second LLM
+demand trace is now measured: the Azure LLM inference 2024 release
+(44.1M requests, two production workloads) through the identical frozen
+decomposition (`FORECAST_AZURE.md`). The mechanism boundary reproduced —
+seasonal forecasting wins only on the stream with a genuine daily cycle
+(code, −15.6% RMSE at autocorr 0.57), loses on the weakly-periodic conv
+stream, and pooling streams destroys forecastability — which is direct
+external support for per-tenant forecasting and for scoping seasonal
+claims to measured periodicity, exactly as v3 H2' bounded them.
 
 ## 13. "Eight tenants is not multi-tenancy at scale."
 

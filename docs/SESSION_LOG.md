@@ -7,6 +7,85 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-13 (session 17, round 2) — the leak-fill round: every field- and reviewer-perspective gap closable from this machine, closed
+
+Milestone status: after the morning's jcac wiring, the session pivoted
+(user directive: "fill all the leakings") to the weakness list from the
+field/reviewer audit. Everything that could be closed honestly without a
+Docker box or an account action is now measured or documented, committed,
+and pushed. Two new real-data measurements ran under frozen protocols.
+
+### New measurements (both protocols frozen + pushed pre-run)
+
+1. **Cache hit precision on real LMSYS** (`CACHE_PRECISION.md`,
+   protocol f1b2988): the correctness denominator the hit-rate segment
+   lacked. 100k answerable (prompt, response) pairs, MiniLM both sides,
+   argmax-neighbor serving. At τ=0.85: hit rate 24.1%, response-agreement
+   precision 0.313 overall / 0.443 same-model / 0.353 first-turn (ρ=0.70
+   declared pre-run), 165.5 incorrect hits per 1k queries. The τ≥0.95
+   near-duplicate row (0.338) doubles as the proxy's stochasticity
+   ceiling: 25 models + sampling temperature dominate the absolute level,
+   so the citable claims are the relative readings (precision rises as τ
+   tightens; same-model ≈ 2× cross-model). Entered into the scoreboard,
+   which-number-to-cite, and the honest-nulls ledger.
+2. **Second real LLM trace** (`FORECAST_AZURE.md`, protocol 573c197 +
+   declared pre-run amendment 399f86a — the 2023 in-repo files hold ~1 h;
+   the 2024 release assets are the one-week data): Azure LLM inference
+   2024 (44.1M requests, two production workloads) through the identical
+   BurstGPT decomposition. **The v3 H2′ mechanism boundary reproduces on
+   independent data**: seasonal wins −15.6% RMSE exactly on the stream
+   with a real daily cycle (code, autocorr 0.57 @ lag 24), loses +48.5%
+   on the weakly-periodic conv stream (persistence wins), and pooling
+   destroys forecastability (seasonal +104%) — direct external support
+   for per-tenant forecasting and for the pluggable-forecaster design;
+   across three real streams no fixed method dominates.
+
+### New engineering measurements
+
+- **Planner scaling** (`PLANNER_SCALING.md`): the deployed
+  `PlannerCore.plan` path from 8→256 tenants; fitted growth exponent
+  1.45 (jointness has a measured super-linear price — the first draft
+  template assumed linear and the data corrected it); p95 crosses the
+  3 s operator timeout at 128 tenants, the 10 s period at 256; past the
+  timeout the failure mode is the designed fallback. DEFENSE_QA §13
+  upgraded from scoping note to measured bound.
+- **Effect sizes** (`EFFECT_SIZES.md`): both real-trace campaigns
+  restated as paired d_z with 95% bootstrap CIs from the committed run
+  tables — the citable unit, displacing astronomical p-values; all n=96
+  confirmatory intervals exclude 0; the +0.07 violation trade carries
+  its own CI.
+
+### New documentation (the reviewer-perspective fills)
+
+- `docs/DEFENSE_QA.md`: 13 hard examiner questions pre-answered with
+  evidence pointers (substrate, one-axis live figure, overload-cell
+  construct validity, p-values, goalposts, fairness altitude, cache
+  quality, cost economies, 2026-stack positioning, baseline strength,
+  p95, trace scope, tenant scale).
+- `RELATED_WORK.md` §4: substrate mapping — each knob onto the
+  llm-d/AIBrix/Dynamo actuation layer; llm-d/AIBrix/Dynamo/Gateway-API
+  sources added.
+- README/eval-README: limitations gain token-level-latency, fairness
+  altitude, cost-economies, cache-quality, and live one-axis
+  disclosures; the ordinal-figure caption is frozen verbatim in
+  `PHASE7_JCAC_PLAN.md`; new scripts in the reproduction table;
+  `HELM_VALUES_BY_SYSTEM` scoped (only hpa/jcac rows are live-wired).
+
+### Verification
+
+Full gates after every chunk: gofmt/vet clean, go test 26 packages pass,
+41 Python tests pass, redocly valid, CI green through `6e97b26`. Bug
+tail on the Azure path, each fixed+committed: 2023-vs-2024 release
+mix-up (amended pre-run), tz-aware timestamp mix (naive/aware sort
+crash), curl exit-18 resume.
+
+### What remains (unchanged, all outside this machine)
+
+The jcac live session (`--jcac-smoke` then `--full` on a Docker box),
+the RELEASE_CHECKLIST account items, and the thesis document itself.
+
+---
+
 ## 2026-07-13 (session 17) — jcac live arm fully wired in code; two desk-found defects that would have burned the cluster session
 
 Milestone status: PHASE7_JCAC_PLAN.md steps 1–5 are done and locally
