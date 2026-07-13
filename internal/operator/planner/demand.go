@@ -34,11 +34,15 @@ type featureSet struct {
 
 // FeatureDemandSource derives planner demand from the control plane's
 // per-tenant feature API (W25a). Token, when set, is sent as a bearer
-// credential; the operator uses a read-scope service token.
+// credential; the operator uses a read-scope service token. AdminKey takes
+// precedence over Token: the operator reads every managed tenant's
+// features, which no single tenant-scoped credential can authorize — the
+// features endpoint accepts the platform admin key for exactly this.
 type FeatureDemandSource struct {
-	BaseURL string
-	Token   string
-	HTTP    *http.Client
+	BaseURL  string
+	Token    string
+	AdminKey string
+	HTTP     *http.Client
 }
 
 func NewFeatureDemandSource(baseURL, token string) *FeatureDemandSource {
@@ -55,7 +59,9 @@ func (f *FeatureDemandSource) TenantDemand(ctx context.Context, tenantID string)
 	if err != nil {
 		return Demand{}, false, err
 	}
-	if f.Token != "" {
+	if f.AdminKey != "" {
+		req.Header.Set("X-PolyForge-Admin-Key", f.AdminKey)
+	} else if f.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+f.Token)
 	}
 	resp, err := f.HTTP.Do(req)

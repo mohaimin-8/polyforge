@@ -273,6 +273,72 @@ class TestClusterBackend:
         assert "k6 run" in joined
         assert joined[-1] == "kind delete"  # deterministic teardown
 
+    def test_capacity_parity_is_a_cell_property_not_a_system_property(self, tmp_path):
+        """Every arm starts from the sim's initial world and faces the sim's
+        cluster-size ceiling — otherwise the live ordinal comparison would
+        hand one arm more capacity than the other."""
+        run = expand(tiny_spec())[0]  # hpa, uniform (8 tenants), small
+        plan = cluster_backend.command_plan(run, tmp_path)
+        install = next(c for c in plan if c[:2] == ["helm", "install"])
+        assert "--set=replicaCount=16" in install  # 8 tenants x sim initial 2
+        assert "--set=autoscaling.hpa.maxReplicas=24" in install  # small cap
+
+    def test_jcac_command_plan_arms_and_gates_the_operator(self, tmp_path):
+        run = expand(tiny_spec(systems=["jcac"]))[0]
+        plan = cluster_backend.command_plan(run, tmp_path)
+        flat = [" ".join(c) for c in plan]
+
+        # Both extra images are side-loaded before any helm install.
+        loads = [i for i, c in enumerate(plan) if c[:2] == ["kind", "load"]]
+        first_install = next(i for i, c in enumerate(plan) if c[:2] == ["helm", "install"])
+        assert len(loads) == 3 and max(loads) < first_install
+
+        installs = [c for c in plan if c[:2] == ["helm", "install"]]
+        assert len(installs) == 2, "control plane chart, then the operator chart"
+        operator = installs[1]
+        assert "polyforge-operator" in operator[2]
+        assert "--set=features.url=http://polyforge-control-plane.polyforge.svc:80" in operator
+        assert "--set=features.adminKeySecret.name=polyforge-admin" in operator
+        # Planner ceilings mirror the sim's small cluster (workloads.CLUSTER_SIZES).
+        assert "--set=planner.limits.replicas=24" in operator
+        assert "--set=planner.limits.cacheMB=2048" in operator
+
+        # The operator authenticates with the same admin key the chart mounts.
+        secret = next(c for c in plan if "secret" in c)
+        assert f"--from-literal=admin-key={cluster_backend.ADMIN_KEY}" in secret
+
+        # Order: operator install -> CRs -> executable actuation gate -> k6.
+        idx = {name: next(i for i, s in enumerate(flat) if name in s)
+               for name in ("polyforge-operator", "operator-crs.yaml",
+                            "--for=condition=Applied", "k6 run")}
+        assert (idx["polyforge-operator"] < idx["operator-crs.yaml"]
+                < idx["--for=condition=Applied"] < idx["k6 run"])
+
+        # hpa runs must not pay for (or depend on) any of this.
+        hpa_plan = cluster_backend.command_plan(expand(tiny_spec())[0], tmp_path)
+        assert not any("polyforge-operator" in " ".join(c) for c in hpa_plan)
+
+    def test_operator_crs_mirror_the_sim_world(self):
+        run = expand(tiny_spec(systems=["jcac"]))[0]
+        docs = cluster_backend.operator_crs(run)
+        # Policies and Budgets must precede Tenants: ensureDefaults leaves
+        # existing objects alone, so applying the eval spec first wins the
+        # race against the default per-tenant-gateway Policy.
+        assert docs.index("kind: Policy") < docs.index("kind: Tenant")
+        assert docs.index("kind: Budget") < docs.index("kind: Tenant")
+        assert docs.count("kind: Policy") == 8
+        assert docs.count("kind: Tenant") == 8
+        assert docs.count("targetDeployment: polyforge/polyforge-control-plane") == 8
+        # Sim parity: initial state 2 replicas / 128 MB / small tier; the
+        # per-tenant ceiling is the small cluster's replica_max; budgets
+        # come from the run's own tenant configs ($5/h uniform standard).
+        assert docs.count("replicas: 2") == 8
+        assert docs.count("replicaMax: 6") == 8
+        assert docs.count("cacheSizeMB: 128") == 8
+        assert docs.count("modelTier: small") == 8
+        assert docs.count("hourlyCapMilliUSD: 5000") == 8
+        assert docs.count("sloClass: standard") == 8
+
 
 class TestV3OverloadCells:
     """PREREG_V3 §3 structural guarantees: the overload classes are defined

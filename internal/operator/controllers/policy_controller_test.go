@@ -155,6 +155,105 @@ func TestPolicyMissingDeploymentRequeuesWithCondition(t *testing.T) {
 	}
 }
 
+// Shared-target aggregation: pool tenants whose Policies name the same
+// Deployment each contribute their clamped share; the Deployment gets the
+// sum. Last-writer-wins would pin a shared data plane at one tenant's
+// share — the exact failure the Phase 7 live jcac arm must not have.
+func TestPolicySharedTargetSumsContributions(t *testing.T) {
+	replicas := int32(1)
+	shared := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "polyforge", Name: "polyforge-control-plane"},
+		Spec:       appsv1.DeploymentSpec{Replicas: &replicas},
+	}
+	mk := func(name string, want, max int32) *pfv1alpha1.Policy {
+		return &pfv1alpha1.Policy{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: pfv1alpha1.PolicySpec{
+				TenantRef:        name,
+				TargetDeployment: "polyforge/polyforge-control-plane",
+				Replicas:         want,
+				ReplicaMin:       1,
+				ReplicaMax:       max,
+				CacheSizeMB:      128,
+				ModelTier:        pfv1alpha1.ModelTierSmall,
+			},
+		}
+	}
+	// bravo asks for 50 but is clamped to 6: the sum must use clamped shares.
+	c := newPolicyClient(t, mk("acme", 3, 6), mk("bravo", 50, 6), shared)
+	r := &PolicyReconciler{Client: c}
+	ctx := context.Background()
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "acme"}}); err != nil {
+		t.Fatalf("reconcile acme: %v", err)
+	}
+
+	var deploy appsv1.Deployment
+	if err := c.Get(ctx, types.NamespacedName{Namespace: "polyforge", Name: "polyforge-control-plane"}, &deploy); err != nil {
+		t.Fatal(err)
+	}
+	if deploy.Spec.Replicas == nil || *deploy.Spec.Replicas != 9 {
+		t.Errorf("shared deployment replicas = %v, want 9 (3 + clamp(50)=6)", deploy.Spec.Replicas)
+	}
+
+	var acme pfv1alpha1.Policy
+	if err := c.Get(ctx, types.NamespacedName{Name: "acme"}, &acme); err != nil {
+		t.Fatal(err)
+	}
+	if acme.Status.AppliedReplicas != 3 {
+		t.Errorf("acme applied replicas = %d, want its own share 3", acme.Status.AppliedReplicas)
+	}
+
+	// Removing a contributor shrinks the sum on the next sibling reconcile.
+	if err := c.Delete(ctx, &pfv1alpha1.Policy{ObjectMeta: metav1.ObjectMeta{Name: "bravo"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "acme"}}); err != nil {
+		t.Fatalf("reconcile after delete: %v", err)
+	}
+	if err := c.Get(ctx, types.NamespacedName{Namespace: "polyforge", Name: "polyforge-control-plane"}, &deploy); err != nil {
+		t.Fatal(err)
+	}
+	if deploy.Spec.Replicas == nil || *deploy.Spec.Replicas != 3 {
+		t.Errorf("after delete replicas = %v, want 3", deploy.Spec.Replicas)
+	}
+}
+
+// The map function must fan a Policy event out to the siblings sharing its
+// target (so a deleted contributor still triggers the sum recompute) and
+// nothing else.
+func TestPoliciesSharingTargetEnqueuesSiblingsOnly(t *testing.T) {
+	shared := func(name string) *pfv1alpha1.Policy {
+		return &pfv1alpha1.Policy{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: pfv1alpha1.PolicySpec{
+				TenantRef:        name,
+				TargetDeployment: "polyforge/polyforge-control-plane",
+				Replicas:         2, ReplicaMin: 1, ReplicaMax: 6,
+				CacheSizeMB: 128, ModelTier: pfv1alpha1.ModelTierSmall,
+			},
+		}
+	}
+	other := &pfv1alpha1.Policy{
+		ObjectMeta: metav1.ObjectMeta{Name: "loner"},
+		Spec: pfv1alpha1.PolicySpec{
+			TenantRef: "loner", // default target: its own gateway
+			Replicas:  2, ReplicaMin: 1, ReplicaMax: 6,
+			CacheSizeMB: 128, ModelTier: pfv1alpha1.ModelTierSmall,
+		},
+	}
+	a, b := shared("acme"), shared("bravo")
+	c := newPolicyClient(t, a, b, other)
+	r := &PolicyReconciler{Client: c}
+
+	reqs := r.policiesSharingTarget(context.Background(), a)
+	if len(reqs) != 1 || reqs[0].Name != "bravo" {
+		t.Errorf("requests = %v, want exactly [bravo]", reqs)
+	}
+	if got := r.policiesSharingTarget(context.Background(), other); len(got) != 0 {
+		t.Errorf("loner requests = %v, want none", got)
+	}
+}
+
 func TestPolicyExplicitTargetDeployment(t *testing.T) {
 	replicas := int32(1)
 	deploy := &appsv1.Deployment{

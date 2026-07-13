@@ -16,6 +16,19 @@ operator:
     limits:
       memory: 256Mi
 
+# Demand source for the JCAC loop: the control plane's per-tenant feature
+# API. The loop needs BOTH a planner and a demand source — with url empty
+# the operator only enforces static Policy guardrails, exactly as before.
+# The operator authenticates either with a tenant-scoped bearer token or,
+# as platform infrastructure reading every tenant's features, with the
+# platform admin key mounted from a Secret (adminKeySecret wins over token).
+features:
+  url: ""              # e.g. http://polyforge-control-plane.polyforge.svc:80
+  token: ""
+  adminKeySecret:
+    name: ""           # Secret in the release namespace carrying the admin key
+    key: admin-key
+
 # JCAC planner (W31): jointly plans replicas, cache and tier every 10 s.
 # Disabled = operator enforces static Policy guardrails only.
 planner:
@@ -30,6 +43,12 @@ planner:
   alpha: 1.0
   beta: 2.0
   gamma: 0.5
+  # Cluster-wide capacity ceilings the plan may never exceed. The eval
+  # harness overrides these per cluster size so live and sim arms face the
+  # same bounds (workloads.CLUSTER_SIZES parity).
+  limits:
+    replicas: 60
+    cacheMB: 4096
   resources:
     requests:
       cpu: 100m

@@ -508,7 +508,13 @@ func (s *Server) ingestTelemetry(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) telemetryFeatures(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.PathValue("tenant_id")
-	if !s.authorizeTenant(w, r, tenantID, tenant.ScopeRead) {
+	// The operator's demand loop reads every managed tenant's features; a
+	// tenant-scoped credential cannot cross tenants, so the operator — as
+	// platform infrastructure, not a tenant — authenticates with the admin
+	// key. Same trust argument as admin-minted first API keys: the admin
+	// key already outranks any per-tenant read key. Accepted here only;
+	// no other tenant endpoint takes the admin key.
+	if !s.isAdmin(r) && !s.authorizeTenant(w, r, tenantID, tenant.ScopeRead) {
 		return
 	}
 	if _, ok, err := s.tenants.Tenant(r.Context(), tenantID); err != nil {
@@ -630,9 +636,16 @@ func (s *Server) authorizeTenant(w http.ResponseWriter, r *http.Request, tenantI
 	return true
 }
 
-func (s *Server) authorizeAdmin(w http.ResponseWriter, r *http.Request) bool {
+// isAdmin reports whether the request carries the platform admin key. It
+// never writes a response; callers that answer 401 use authorizeAdmin.
+func (s *Server) isAdmin(r *http.Request) bool {
 	provided := r.Header.Get("X-PolyForge-Admin-Key")
-	if s.adminKey == "" || len(provided) != len(s.adminKey) || subtle.ConstantTimeCompare([]byte(provided), []byte(s.adminKey)) != 1 {
+	return s.adminKey != "" && len(provided) == len(s.adminKey) &&
+		subtle.ConstantTimeCompare([]byte(provided), []byte(s.adminKey)) == 1
+}
+
+func (s *Server) authorizeAdmin(w http.ResponseWriter, r *http.Request) bool {
+	if !s.isAdmin(r) {
 		s.writeError(w, r, http.StatusUnauthorized, tenant.ErrUnauthorized)
 		return false
 	}

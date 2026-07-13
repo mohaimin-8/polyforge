@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -34,7 +36,10 @@ const (
 // PolicyReconciler applies a Policy to the cluster: Deployment replicas,
 // per-tenant cache/model-tier ConfigMap. Replica counts are clamped to
 // [replicaMin, replicaMax] before anything is written — the guardrail lives
-// here so no plan source (human or planner) can bypass it.
+// here so no plan source (human or planner) can bypass it. When several
+// Policies name the same target Deployment (pool tenants sharing a data
+// plane), the Deployment is scaled to the sum of their clamped
+// contributions; Status.AppliedReplicas remains each tenant's own share.
 type PolicyReconciler struct {
 	client.Client
 }
@@ -63,7 +68,13 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, r.Status().Update(ctx, &policy)
 	}
 
-	if err := r.scaleDeployment(ctx, ns, name, replicas); err != nil {
+	total, err := r.sharedTargetReplicas(ctx, ns, name)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		return ctrl.Result{}, err
+	}
+
+	if err := r.scaleDeployment(ctx, ns, name, total); err != nil {
 		if apierrors.IsNotFound(err) {
 			r.setApplied(&policy, metav1.ConditionFalse, "TargetMissing",
 				fmt.Sprintf("deployment %s/%s does not exist yet", ns, name))
@@ -89,7 +100,8 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		policy.Status.LastPlanSource = pfv1alpha1.PlanSourceManual
 	}
 	r.setApplied(&policy, metav1.ConditionTrue, "Applied",
-		fmt.Sprintf("replicas=%d cacheMB=%d tier=%s", replicas, policy.Spec.CacheSizeMB, policy.Spec.ModelTier))
+		fmt.Sprintf("replicas=%d (target total %d) cacheMB=%d tier=%s",
+			replicas, total, policy.Spec.CacheSizeMB, policy.Spec.ModelTier))
 	if err := r.Status().Update(ctx, &policy); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -118,6 +130,64 @@ func splitTarget(target, tenantRef string) (ns, name string, err error) {
 		return "", "", fmt.Errorf("targetDeployment %q must be namespace/name", target)
 	}
 	return parts[0], parts[1], nil
+}
+
+// sharedTargetReplicas sums the clamped replica contribution of every
+// Policy that resolves to the same target Deployment. A tenant on its own
+// gateway keeps today's semantics (a sum of one). Pool tenants sharing a
+// data plane each contribute their clamped share, so the shared Deployment
+// is sized for all of them — last-writer-wins would let whichever tenant
+// planned last shrink capacity below the other tenants' floors.
+func (r *PolicyReconciler) sharedTargetReplicas(ctx context.Context, ns, name string) (int32, error) {
+	var list pfv1alpha1.PolicyList
+	if err := r.List(ctx, &list); err != nil {
+		return 0, fmt.Errorf("list policies: %w", err)
+	}
+	var total int32
+	for i := range list.Items {
+		p := &list.Items[i]
+		if !p.DeletionTimestamp.IsZero() {
+			continue
+		}
+		pns, pname, err := splitTarget(p.Spec.TargetDeployment, p.Spec.TenantRef)
+		if err != nil || pns != ns || pname != name {
+			continue
+		}
+		total += clampReplicas(&p.Spec)
+	}
+	return total, nil
+}
+
+// policiesSharingTarget re-enqueues the siblings of a changed or deleted
+// Policy so the shared target's sum is recomputed even when this Policy no
+// longer reconciles (deletion is the case For() alone cannot cover).
+func (r *PolicyReconciler) policiesSharingTarget(ctx context.Context, obj client.Object) []reconcile.Request {
+	policy, ok := obj.(*pfv1alpha1.Policy)
+	if !ok {
+		return nil
+	}
+	ns, name, err := splitTarget(policy.Spec.TargetDeployment, policy.Spec.TenantRef)
+	if err != nil {
+		return nil
+	}
+	var list pfv1alpha1.PolicyList
+	if err := r.List(ctx, &list); err != nil {
+		return nil
+	}
+	var reqs []reconcile.Request
+	for i := range list.Items {
+		other := &list.Items[i]
+		if other.Name == policy.Name {
+			continue // For() already enqueues the object itself
+		}
+		ons, oname, err := splitTarget(other.Spec.TargetDeployment, other.Spec.TenantRef)
+		if err == nil && ons == ns && oname == name {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: other.Name},
+			})
+		}
+	}
+	return reqs
 }
 
 func (r *PolicyReconciler) scaleDeployment(ctx context.Context, ns, name string, replicas int32) error {
@@ -179,5 +249,6 @@ func (r *PolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&pfv1alpha1.Policy{}).
 		Owns(&corev1.ConfigMap{}).
+		Watches(&pfv1alpha1.Policy{}, handler.EnqueueRequestsFromMapFunc(r.policiesSharingTarget)).
 		Complete(r)
 }

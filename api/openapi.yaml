@@ -619,11 +619,15 @@ paths:
       description: >-
         Aggregates raw telemetry into per-service feature rows over a half-open
         time window `[since, until)`. This is the feature-query path used to
-        assemble classifier training and online-inference inputs.
+        assemble classifier training and online-inference inputs, and the
+        operator's JCAC demand source. Uniquely among tenant-scoped routes it
+        also accepts the platform admin key: the operator reads every managed
+        tenant's features, which no tenant-scoped credential can authorize.
       operationId: telemetryFeatures
       security:
         - TenantAPIKey: []
         - BearerToken: []
+        - AdminKey: []
       parameters:
         - $ref: "#/components/parameters/TenantID"
         - $ref: "#/components/parameters/FeatureService"

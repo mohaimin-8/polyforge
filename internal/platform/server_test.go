@@ -518,6 +518,63 @@ func TestTelemetryFeaturesEndpointAggregatesPerService(t *testing.T) {
 		}
 	})
 
+	// The operator's demand loop authenticates as platform infrastructure:
+	// the admin key reads any tenant's features (and only this endpoint —
+	// other tenant routes must keep rejecting it).
+	t.Run("admin key reads features across tenants", func(t *testing.T) {
+		for tenantID, wantRows := range map[string]int{"alpha": 2, "bravo": 1} {
+			req, err := http.NewRequest(http.MethodGet,
+				server.URL+"/v1/tenants/"+tenantID+"/telemetry/features", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("X-PolyForge-Admin-Key", "admin-test")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var set telemetry.FeatureSet
+			if err := json.NewDecoder(resp.Body).Decode(&set); err != nil {
+				t.Fatal(err)
+			}
+			_ = resp.Body.Close()
+			if resp.StatusCode != http.StatusOK || len(set.Items) != wantRows {
+				t.Fatalf("%s via admin key: status %d rows %d, want 200/%d",
+					tenantID, resp.StatusCode, len(set.Items), wantRows)
+			}
+		}
+
+		req, err := http.NewRequest(http.MethodGet,
+			server.URL+"/v1/tenants/alpha/telemetry/features", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("X-PolyForge-Admin-Key", "wrong-admin-key")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("wrong admin key: expected 401, got %d", resp.StatusCode)
+		}
+
+		// The admin key must not leak into other tenant-scoped routes.
+		req, err = http.NewRequest(http.MethodGet, server.URL+"/v1/tenants/alpha/projects", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("X-PolyForge-Admin-Key", "admin-test")
+		resp, err = http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("admin key on /projects: expected 401, got %d", resp.StatusCode)
+		}
+	})
+
 	// The OpenAPI schema requires the truncated flag on every response, so
 	// assert the wire shape rather than the decoded struct's zero value.
 	t.Run("response always carries the truncated flag", func(t *testing.T) {

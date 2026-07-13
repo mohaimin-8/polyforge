@@ -1,0 +1,21 @@
+# Phase 7 stage-2 smoke: the first live jcac run, ONE arm, one rep.
+# Everything the jcac arm needs is wired in code (session 17): operator
+# chart install, per-tenant Tenant/Policy/Budget CRs, admin-key demand
+# plumbing, and the executable actuation gate — `kubectl wait
+# --for=condition=Applied` fails the run before any load if the operator
+# has not actually scaled the target Deployment. Expect a bug tail like
+# the hpa smoke's five; fix and commit each finding, then run the
+# phase7_live.yaml ordinal slice.
+# ai_cacheable for the same reason as the hpa smoke: chat's 20 ms burn
+# gives the demand signal real CPU consequences. 30 steps x 10 s = 5 min.
+name: phase7_jcac_smoke
+backend: cluster
+steps: 30
+reps: 1
+systems: [jcac]
+workloads: [ai_cacheable]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/phase7_jcac_smoke.duckdb
+retries: 0
+timeseries_reps: 0

@@ -139,6 +139,28 @@ func TestFeatureDemandSourceMapsRows(t *testing.T) {
 	}
 }
 
+// The platform admin key rides its own header and displaces the bearer
+// token — a bearer that is not a JWT would be rejected by the control
+// plane, so sending both would just mask a misconfiguration.
+func TestFeatureDemandSourceAdminKeyHeader(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-PolyForge-Admin-Key"); got != "platform-admin" {
+			t.Errorf("admin key header = %q", got)
+		}
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Errorf("bearer header should be absent when the admin key is set, got %q", got)
+		}
+		_, _ = w.Write([]byte(`{"items": [{"service": "chat", "avg_rps_window": 1.0, "avg_latency_ms": 100}]}`))
+	}))
+	defer server.Close()
+
+	source := NewFeatureDemandSource(server.URL, "tok")
+	source.AdminKey = "platform-admin"
+	if _, ok, err := source.TenantDemand(context.Background(), "acme"); err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+}
+
 func TestFeatureDemandSourceNoTelemetry(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"items": []}`))

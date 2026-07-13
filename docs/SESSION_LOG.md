@@ -7,6 +7,83 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-13 (session 17) — jcac live arm fully wired in code; two desk-found defects that would have burned the cluster session
+
+Milestone status: PHASE7_JCAC_PLAN.md steps 1–5 are done and locally
+tested. The only measurement left in the project is now literally one
+command on a Docker-capable machine:
+`bash scripts/phase7_kind_run.sh --jcac-smoke`, then `--full`.
+
+### Two defects found at the desk, not in the Codespace
+
+1. **The demand plumbing could never have authenticated.**
+   `FeatureDemandSource` sent its token as `Authorization: Bearer`, but
+   `authorizeTenant` treats any bearer strictly as a JWT — the operator
+   would have received 401 for every tenant, every cycle, and the JCAC
+   loop degrades by design into silent fallback: the arm would have run
+   "live" while planning nothing. Fix: the features endpoint (that
+   endpoint only) accepts the platform admin key — the same trust
+   argument as admin-minted first API keys (16d) — and the demand source
+   gained an `AdminKey` header mode. Unit tests cover: admin key reads
+   any tenant's features, wrong key is 401, and the admin key still
+   cannot touch other tenant routes.
+2. **Actuation was last-writer-wins on a shared target.** All 8 eval
+   tenants' Policies name `polyforge/polyforge-control-plane`; each
+   reconcile wrote its own tenant's replica count over everyone else's.
+   The shared Deployment would have sat at ~2 replicas against 8 tenants
+   of demand — jcac crippled by wiring, not by its planner, which is a
+   mislabeling exactly as bad as the fixed-replica one the honesty gate
+   exists to prevent. Fix: Policies resolving to the same target now sum
+   their clamped contributions (pool-tenant semantics); deletion
+   re-enqueues siblings so the sum shrinks. Status.AppliedReplicas stays
+   the tenant's own share.
+
+### What else changed
+
+- `cmd/operator`: `POLYFORGE_FEATURES_ADMIN_KEY`, and planner ceilings
+  via `POLYFORGE_PLAN_LIMIT_{REPLICAS,CACHE_MB}` (invalid values exit
+  loudly rather than silently becoming defaults).
+- Operator chart: `features.{url,token,adminKeySecret}` values feed the
+  operator env; `planner.limits.{replicas,cacheMB}` render as env.
+- Harness: `operator_install_plan()` (secret → chart install → CR apply →
+  `kubectl wait --for=condition=Applied`, the honesty gate made
+  executable), `operator_crs()` (Policy/Budget **before** Tenant to win
+  the ensureDefaults race; every number mirrored from the sim world),
+  operator/planner image side-loads for the jcac arm only.
+- Capacity parity became a cell property: every arm starts at
+  `replicaCount = tenants × 2` and is ceilinged by
+  `CLUSTER_SIZES[size].limits_replicas` (hpa `maxReplicas`, jcac planner
+  limits) — committed under test so no arm gets more cluster than another.
+- `eval/experiments/phase7_jcac_smoke.yaml` + `--jcac-smoke` runbook mode;
+  the runbook now builds all three images.
+- OpenAPI: features path documents the AdminKey scheme; lint green.
+
+### How it was verified
+
+```text
+gofmt -l .                              -> clean
+go vet ./...                            -> pass
+go test ./... -count=1                  -> pass (new: aggregation x2,
+                                           admin-key features, AdminKey header)
+python -m pytest eval/tests -q          -> 34 passed (4 new)
+python -m pytest services/planner -q    -> 7 passed
+npx @redocly/cli lint api/openapi.yaml  -> valid
+```
+
+Not verified locally: anything requiring Docker/kind/helm binaries — the
+chart renders are covered by CI's `helm lint`/`helm template` job, and the
+jcac arm itself remains **not live-verified** (that is the next session,
+by design, behind the now-executable Applied gate).
+
+### Immediate next tasks
+
+1. Push; confirm CI green (helm job validates the chart changes).
+2. The live session: `--jcac-smoke`, fix the bug tail, then `--full`
+   ordinal slice + the paired figure (PHASE7_JCAC_PLAN.md).
+3. Thesis document and slides; RELEASE_CHECKLIST human items.
+
+---
+
 ## 2026-07-13 (session 16e) — Phase 9 hardening done; jcac live arm staged and sized
 
 Milestone status: "complete everything except the thesis document."

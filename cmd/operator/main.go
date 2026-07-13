@@ -9,6 +9,7 @@ import (
 	"flag"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -36,6 +37,22 @@ var scheme = runtime.NewScheme()
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(pfv1alpha1.AddToScheme(scheme))
+}
+
+// envInt32 reads a positive int32 from the environment, exiting on a value
+// that does not parse: a typo silently falling back to the default would
+// run the planner against the wrong capacity ceiling.
+func envInt32(log *slog.Logger, name string, fallback int32) int32 {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.ParseInt(raw, 10, 32)
+	if err != nil || v <= 0 {
+		log.Error("invalid integer environment variable", "name", name, "value", raw)
+		os.Exit(1)
+	}
+	return int32(v)
 }
 
 func main() {
@@ -109,13 +126,25 @@ func main() {
 	plannerURL := os.Getenv("POLYFORGE_PLANNER_URL")
 	featuresURL := os.Getenv("POLYFORGE_FEATURES_URL")
 	if plannerURL != "" && featuresURL != "" {
+		demands := planner.NewFeatureDemandSource(featuresURL, os.Getenv("POLYFORGE_FEATURES_TOKEN"))
+		// The admin key authenticates the operator as platform
+		// infrastructure: it reads every managed tenant's features, which
+		// a tenant-scoped bearer token cannot (Phase 7 jcac live arm).
+		demands.AdminKey = os.Getenv("POLYFORGE_FEATURES_ADMIN_KEY")
 		runner := &controllers.PlanRunner{
 			Client:  mgr.GetClient(),
 			Planner: planner.NewHTTPClient(plannerURL, 3*time.Second),
-			Demands: planner.NewFeatureDemandSource(featuresURL, os.Getenv("POLYFORGE_FEATURES_TOKEN")),
+			Demands: demands,
 			Log:     log,
 			Weights: planner.Weights{Alpha: 1, Beta: 2, Gamma: 0.5},
-			Limits:  planner.Limits{CacheMB: 4096, Replicas: 60},
+			// Cluster-wide ceilings; the eval mirrors the sim's cluster
+			// sizes through these so live and sim arms face the same
+			// capacity bounds (a config typo must fail loudly, not
+			// silently become a default).
+			Limits: planner.Limits{
+				CacheMB:  envInt32(log, "POLYFORGE_PLAN_LIMIT_CACHE_MB", 4096),
+				Replicas: envInt32(log, "POLYFORGE_PLAN_LIMIT_REPLICAS", 60),
+			},
 		}
 		if natsURL := os.Getenv("POLYFORGE_NATS_URL"); natsURL != "" {
 			backbone, err := events.Connect(context.Background(), natsURL, events.BackboneConfig{})

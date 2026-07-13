@@ -1,48 +1,67 @@
 # Phase 7 remainder — the jcac live arm and the ordinal figure
 
 Written 2026-07-13 (session 16e), after the hpa arm was verified live
-(`ok: true`, physics-exact metrics — SESSION_LOG 16d). This is the exact,
-sized remainder; everything below it in the stack is already proven.
+(`ok: true`, physics-exact metrics — SESSION_LOG 16d). Updated 2026-07-13
+(session 17): **the wiring below is done in code and tested locally**;
+what remains is the live execution itself.
 
-## What is already staged (this session)
+## Done in code (session 17) — was steps 1–5
 
-- `Dockerfile.operator` and `services/planner/Dockerfile` — both images the
-  operator chart needs, mirroring the control-plane image's shape (static /
-  slim, numeric nonroot). Neither existed; GHCR has no published images.
-- The chart, CRDs (`polyforge.io_{tenants,policies,budgets,workloadprofiles}.yaml`),
-  operator binary, and planner service all exist and are unit/envtest-tested.
+1. ~~Build + side-load both images~~ — `scripts/phase7_kind_run.sh` builds
+   all three images; `command_plan` side-loads operator + planner for the
+   jcac arm only.
+2. ~~Install the operator chart~~ — `operator_install_plan()` in
+   `eval/harness/cluster_backend.py`: local repos/tags, `fullnameOverride`,
+   `features.url` at the control-plane Service, planner ceilings mirrored
+   from `workloads.CLUSTER_SIZES` (small = 24 replicas / 2048 MB).
+3. ~~Per-tenant CRs~~ — `operator_crs()` emits Policy + Budget **before**
+   Tenant (ensureDefaults leaves existing objects alone, so the eval spec
+   wins the race against the default per-tenant-gateway Policy). All
+   numbers mirror the sim: initial state 2 replicas / 128 MB / small,
+   per-tenant ceiling `replica_max`, budgets from the run's own configs.
+4. ~~Demand plumbing~~ — the features endpoint now accepts the platform
+   admin key (that endpoint only; unit-tested), `FeatureDemandSource`
+   gained an `AdminKey` header mode (the old bearer path expected a JWT —
+   a live-session-killing mismatch found at the desk), and the operator
+   chart mounts the key from a Secret the harness creates.
+5. ~~Actuation~~ — `PolicyReconciler` already scaled the target
+   Deployment, but with last-writer-wins semantics: 8 pool tenants
+   targeting the shared eval Deployment would have pinned it at ONE
+   tenant's share (~2 replicas vs ~16 needed) and invalidated the arm.
+   Policies naming the same target now **sum their clamped contributions**
+   (unit-tested, including deletion via sibling re-enqueue). The gate is
+   also executable now: `command_plan` ends the operator install with
+   `kubectl wait --for=condition=Applied` on every Policy — a run in
+   which the operator never actuated fails before k6 sends a request.
 
-## The wiring that remains (one Codespace session, honest sizing)
+Capacity parity became a cell property while wiring this: every arm gets
+`replicaCount = tenants × 2` (sim initial world) and a total-replica
+ceiling of `CLUSTER_SIZES[size].limits_replicas` (hpa via
+`autoscaling.hpa.maxReplicas`, jcac via the planner limits). Committed
+under test so the ordinal comparison cannot hand one arm more capacity.
 
-1. **Build + side-load both images** in the runbook (mirror the control-plane
-   pattern: `docker build -f Dockerfile.operator -t polyforge/operator:dev .`,
-   `kind load ...`; same for the planner).
-2. **Install the operator chart** in `command_plan` when `system == "jcac"`:
-   `helm install polyforge-operator deploy/helm/polyforge-operator` with
-   local image repos/tags and `POLYFORGE_PLANNER_URL` pointing at the
-   planner Service. CRDs land via the chart's `crds/`.
-3. **Per-tenant CRs**: the harness must create `Tenant`/`Policy` CRs for
-   each eval tenant (mirror `provision_tenants`): the plan loop plans per
-   Tenant CR and writes Policy specs (`plan_runner.go`). Schema source:
-   `internal/operator/api/v1alpha1` + `deploy/operator/` samples if present.
-4. **Demand plumbing**: `cmd/operator` enables the JCAC loop only when
-   `POLYFORGE_PLANNER_URL` *and* a demand source are set — wire the demand
-   source to the control plane's `/v1/tenants/{id}/telemetry/features`
-   (admin or per-tenant key via a Secret the harness already mints).
-5. **Actuation check**: confirm what enforces `Policy.Spec.Replicas` onto
-   the target Deployment (policy_controller) and that its target selector
-   can name `polyforge-control-plane` in the eval namespace. If Policy
-   enforcement stops at CR state, add the Deployment-scale step to the
-   policy controller — that is the only potentially non-trivial code.
-6. **First jcac live smoke** (expect a bug tail like the hpa arm's five),
-   then the ordinal slice: `experiments/phase7_live.yaml` (12 runs ≈ 5 h
-   Codespace wall) or a declared reduced slice (2×1×3 = 6 runs ≈ 2.5 h).
-7. **Figure**: paired jcac-vs-hpa live J/cost/violation vs the sim's
+## The live session that remains (one Codespace sitting)
+
+1. `bash scripts/phase7_kind_run.sh --jcac-smoke` — first live jcac run
+   (`eval/experiments/phase7_jcac_smoke.yaml`, 1 run, 5 min of load).
+   Expect a bug tail like the hpa smoke's five; commit each fix.
+2. `bash scripts/phase7_kind_run.sh --full` — the ordinal slice
+   (12 runs ≈ 5 h wall) or a declared reduced slice (2×1×3 ≈ 2.5 h).
+3. **Figure**: paired jcac-vs-hpa live J/cost/violation vs the sim's
    ranking on the same cells — ordinal agreement only (ground rule 4).
 
-## Honesty gate (unchanged)
+Known open decisions for that session, so nothing is re-derived live:
 
-`jcac` must not run live until step 5 is verified — a fixed-replica pod
-recorded under PolyForge's name would be a mislabeled baseline, which is
-worse than no figure. The hpa arm stays the only live-verified system
-until then.
+- The planner request weights are the operator's committed defaults
+  (α=1, β=2, γ=0.5) — identical to the chart's planner-args defaults, so
+  there is no divergence, but do not "tune" either side mid-session.
+- The hpa smoke (16d) ran with chart-default replicaCount=2/max=10; the
+  parity values above supersede that for the measured slice. The smoke
+  remains valid as a pipeline proof, not as a figure input.
+
+## Honesty gate (unchanged, now mechanical)
+
+`jcac` must not be recorded live unless the operator actually actuated —
+the `kubectl wait --for=condition=Applied` step enforces this before any
+load is generated. The hpa arm stays the only live-verified system until
+the jcac smoke passes.

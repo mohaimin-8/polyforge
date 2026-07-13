@@ -37,6 +37,23 @@ spec:
             - name: POLYFORGE_PLANNER_URL
               value: ""
             {{- end }}
+            - name: POLYFORGE_FEATURES_URL
+              value: {{ .Values.features.url | quote }}
+            {{- if .Values.features.token }}
+            - name: POLYFORGE_FEATURES_TOKEN
+              value: {{ .Values.features.token | quote }}
+            {{- end }}
+            {{- if .Values.features.adminKeySecret.name }}
+            - name: POLYFORGE_FEATURES_ADMIN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.features.adminKeySecret.name }}
+                  key: {{ .Values.features.adminKeySecret.key }}
+            {{- end }}
+            - name: POLYFORGE_PLAN_LIMIT_REPLICAS
+              value: {{ .Values.planner.limits.replicas | quote }}
+            - name: POLYFORGE_PLAN_LIMIT_CACHE_MB
+              value: {{ .Values.planner.limits.cacheMB | quote }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

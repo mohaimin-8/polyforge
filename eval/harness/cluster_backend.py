@@ -15,8 +15,11 @@ mid-provision.
 
 Status: VERIFIED live for the hpa arm (session 16d, GitHub Codespace):
 phase7_smoke.yaml recorded a valid run with metrics matching the replay
-endpoint's physics. The jcac arm stays gated until the operator/planner
-is wired into the chart (eval/README.md integration point 2).
+endpoint's physics. The jcac arm is wired in code (session 17: operator
+chart install, Tenant/Policy/Budget CRs, admin-key demand plumbing, and a
+`kubectl wait --for=condition=Applied` actuation gate before any load) but
+has NOT run live yet — phase7_jcac_smoke.yaml is the first thing the next
+cluster session should execute.
 """
 
 from __future__ import annotations
@@ -30,6 +33,8 @@ import threading
 import time
 from pathlib import Path
 
+from model import TenantState  # research/jcac_sim via harness sys.path
+
 from .config import RunSpec
 from . import workloads
 
@@ -42,6 +47,16 @@ NODES_BY_SIZE = {"small": 2, "medium": 4, "large": 6}
 # nodes — it is not published to any registry, so without the explicit
 # `kind load` step every pod would sit in ImagePullBackOff.
 CONTROL_PLANE_IMAGE = "polyforge/control-plane:dev"
+OPERATOR_IMAGE = "polyforge/operator:dev"
+PLANNER_IMAGE = "polyforge/planner:dev"
+
+# Systems that deploy the operator/planner control loop live. Only the full
+# jcac arm is wired for live execution; the jcac_* ablations remain sim-only
+# (V2_README Phase 7 measures the ordinal jcac-vs-hpa slice, nothing wider).
+OPERATOR_SYSTEMS = {"jcac"}
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ADMIN_SECRET_NAME = "polyforge-admin"  # carries ADMIN_KEY for the operator
 
 # Ablation/baseline toggles the chart understands (deploy/helm/polyforge).
 HELM_VALUES_BY_SYSTEM = {
@@ -162,16 +177,123 @@ HELM_EVAL_BASE_VALUES = {
 }
 
 
+def operator_crs(run: RunSpec) -> str:
+    """Tenant/Policy/Budget CR manifests for the jcac arm, one triple per
+    eval tenant, all pointed at the shared eval Deployment (the reconciler
+    sums per-tenant contributions onto it).
+
+    Order matters: Policies and Budgets come BEFORE Tenants. The tenant
+    reconciler's ensureDefaults creates missing defaults but leaves
+    existing objects alone, so applying the eval spec first wins the race
+    against a default Policy that targets a per-tenant gateway which does
+    not exist in the eval cluster.
+
+    Every number mirrors the sim so live and sim arms start from the same
+    world: initial state from model.TenantState defaults, per-tenant
+    replica ceiling and budgets from the run's own workloads.build()
+    output.
+    """
+    tenant_ids, _, configs, _ = workloads.build(
+        run.workload, run.tenant_mix, run.cluster_size, run.seed, run.steps
+    )
+    size = workloads.CLUSTER_SIZES[run.cluster_size]
+    initial = TenantState()
+    docs = []
+    for tid in tenant_ids:
+        config = configs[tid]
+        docs.append(f"""apiVersion: polyforge.io/v1alpha1
+kind: Policy
+metadata:
+  name: {tid}
+spec:
+  tenantRef: {tid}
+  targetDeployment: polyforge/polyforge-control-plane
+  replicas: {initial.replicas}
+  replicaMin: 1
+  replicaMax: {size.replica_max}
+  cacheSizeMB: {initial.cache_mb}
+  modelTier: {initial.tier}""")
+        docs.append(f"""apiVersion: polyforge.io/v1alpha1
+kind: Budget
+metadata:
+  name: {tid}
+spec:
+  tenantRef: {tid}
+  hourlyCapMilliUSD: {int(round(config.hourly_budget_usd * 1000))}
+  fairnessWeightPermille: {int(round(config.fairness_weight * 1000))}""")
+    for tid in tenant_ids:
+        config = configs[tid]
+        docs.append(f"""apiVersion: polyforge.io/v1alpha1
+kind: Tenant
+metadata:
+  name: {tid}
+spec:
+  displayName: {tid}
+  isolationMode: pool
+  sloClass: {config.slo_class}""")
+    return "\n---\n".join(docs) + "\n"
+
+
+def operator_install_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
+    """Subprocess steps that arm the live jcac control loop, executed after
+    the control plane is up and before k6 drives load. The final `kubectl
+    wait` is the honesty gate made executable: the run fails before any
+    load if the operator has not actually scaled the target Deployment
+    (Applied=True), so a fixed-replica pod can never be recorded under
+    PolyForge's name."""
+    size = workloads.CLUSTER_SIZES[run.cluster_size]
+    return [
+        ["kubectl", "--namespace", "polyforge", "create", "secret", "generic",
+         ADMIN_SECRET_NAME, f"--from-literal=admin-key={ADMIN_KEY}"],
+        ["helm", "install", "polyforge-operator",
+         str(REPO_ROOT / "deploy" / "helm" / "polyforge-operator"),
+         "--namespace", "polyforge", "--wait", "--timeout", "300s",
+         "--set=fullnameOverride=polyforge-operator",
+         "--set=operator.leaderElect=false",
+         "--set=operator.image.repository=polyforge/operator",
+         "--set=operator.image.tag=dev",
+         "--set=planner.image.repository=polyforge/planner",
+         "--set=planner.image.tag=dev",
+         "--set=features.url=http://polyforge-control-plane.polyforge.svc:80",
+         f"--set=features.adminKeySecret.name={ADMIN_SECRET_NAME}",
+         f"--set=planner.limits.replicas={size.limits_replicas}",
+         f"--set=planner.limits.cacheMB={size.limits_cache_mb}"],
+        ["kubectl", "apply", "-f", str(workdir / "operator-crs.yaml")],
+        ["kubectl", "wait", "--for=condition=Applied", "policies.polyforge.io",
+         "--all", "--timeout=180s"],
+    ]
+
+
 def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
     """The exact subprocess sequence for one run, in order. Split out so
     tests and --dry-run can inspect it without Docker."""
-    values = {**HELM_EVAL_BASE_VALUES, **HELM_VALUES_BY_SYSTEM[run.system]}
+    n_tenants = len(workloads.TENANT_MIXES[run.tenant_mix])
+    size = workloads.CLUSTER_SIZES[run.cluster_size]
+    values = {
+        **HELM_EVAL_BASE_VALUES,
+        # Capacity parity across arms is a property of the cell, not the
+        # system: every arm starts from the sim's initial world (2 replicas
+        # per tenant on the shared data plane) and may never exceed the
+        # cell's cluster-size replica ceiling — the same bounds the sim
+        # enforces via ClusterLimits.
+        "replicaCount": str(n_tenants * TenantState().replicas),
+        "autoscaling.hpa.maxReplicas": str(size.limits_replicas),
+        **HELM_VALUES_BY_SYSTEM[run.system],
+    }
     set_flags = [f"--set={k}={v}" for k, v in sorted(values.items())]
-    return [
+    live_operator = run.system in OPERATOR_SYSTEMS
+    plan = [
         ["kind", "delete", "cluster", "--name", CLUSTER_NAME],  # idempotent pre-clean
         ["kind", "create", "cluster", "--name", CLUSTER_NAME,
          "--config", str(workdir / "kind.yaml"), "--wait", "120s"],
         ["kind", "load", "docker-image", CONTROL_PLANE_IMAGE, "--name", CLUSTER_NAME],
+    ]
+    if live_operator:
+        plan += [
+            ["kind", "load", "docker-image", OPERATOR_IMAGE, "--name", CLUSTER_NAME],
+            ["kind", "load", "docker-image", PLANNER_IMAGE, "--name", CLUSTER_NAME],
+        ]
+    plan += [
         # kind ships no metrics-server; without it the HPA arm reads no CPU
         # and silently never scales. --kubelet-insecure-tls is the standard
         # kind accommodation (kubelets use self-signed certs).
@@ -187,11 +309,15 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         # path that does not exist makes helm parse "deploy/..." as a repo
         # reference ("repo deploy not found" — first live smoke, session 16d).
         ["helm", "install", "polyforge",
-         str(Path(__file__).resolve().parents[2] / "deploy" / "helm" / "polyforge"),
+         str(REPO_ROOT / "deploy" / "helm" / "polyforge"),
          "--namespace", "polyforge", "--create-namespace", "--wait", "--timeout", "300s",
          *set_flags],
         ["kubectl", "--namespace", "polyforge", "rollout", "status",
          "deployment/polyforge-control-plane", "--timeout=180s"],
+    ]
+    if live_operator:
+        plan += operator_install_plan(run, workdir)
+    plan += [
         ["k6", "run", "--summary-export", str(workdir / "k6-summary.json"),
          str(workdir / "replay.js")],
         # The pod's rootfs is read-only and distroless has no tar (kubectl cp
@@ -200,6 +326,7 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
          "/control-plane", "eval-export", "--format=json", "--out=-"],
         ["kind", "delete", "cluster", "--name", CLUSTER_NAME],
     ]
+    return plan
 
 
 ADMIN_KEY = "polyforge-kind-admin"  # deploy/helm/polyforge/values.yaml default
@@ -297,6 +424,8 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
         workdir = Path(tmp)
         (workdir / "kind.yaml").write_text(kind_config(run.cluster_size), encoding="utf-8")
         (workdir / "replay.js").write_text(k6_script(run), encoding="utf-8")
+        if run.system in OPERATOR_SYSTEMS:
+            (workdir / "operator-crs.yaml").write_text(operator_crs(run), encoding="utf-8")
 
         plan = command_plan(run, workdir)
         portforward = None
