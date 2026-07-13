@@ -4,13 +4,21 @@ Second real LLM demand trace, for external validity (DEFENSE_QA.md #12
 named this the highest-value addition; RELATED_WORK descoped Azure
 *Functions* — FaaS, not LLM — but these are LLM inference request logs).
 
-Real input: https://github.com/Azure/AzurePublicDataset
-(`data/AzureLLMInferenceTrace_conv.csv`, `_code.csv`) — one week of
-production request arrivals (Nov 2023) from two Azure OpenAI services:
-a conversation workload and a code-completion workload. Public CSV
-header: `TIMESTAMP,ContextTokens,GeneratedTokens`, ISO timestamps.
-Both files together are ~1 MB; this script downloads them into
-`data/azure-llm/` (gitignored, like every raw trace) when absent.
+Real input: https://github.com/Azure/AzurePublicDataset — the 2024
+release assets `AzureLLMInferenceTrace_{conv,code}_1week.csv` (May 10-19
+2024; the dataset behind DynamoLLM, HPCA 2025, CC-BY): production request
+arrivals from two Azure LLM services, a conversation workload and a
+code-completion workload. Public CSV header:
+`TIMESTAMP,ContextTokens,GeneratedTokens`, ISO timestamps. Downloaded
+into `data/azure-llm/` (gitignored, like every raw trace) when absent.
+
+AMENDMENT (declared 2026-07-13 before any ablation ran): the first
+committed revision fetched the 2023 in-repo files, which turn out to hold
+only ~1 hour of traffic — one hourly bucket, unusable for the frozen
+forecast protocol. The 2024 release assets are the one-week dataset the
+protocol was written for; same schema, same mapping, same constants.
+Nothing about the analysis changed — only which Azure release actually
+contains a week.
 
 Mapping to the normalized schema — deliberately identical constants to
 `etl_burstgpt.py` so the two real traces are processed in lockstep:
@@ -23,7 +31,7 @@ Mapping to the normalized schema — deliberately identical constants to
   LATENCY_MS_PER_TOKEN; payload_bytes = context_tokens *
   PAYLOAD_BYTES_PER_TOKEN (same committed constants, same clips).
 
-    python etl_azure_llm.py        # download if needed, write out/azure_llm_2023.csv.gz
+    python etl_azure_llm.py        # download if needed, write out/azure_llm_2024.csv.gz
 """
 
 from __future__ import annotations
@@ -38,9 +46,9 @@ from etl_burstgpt import LATENCY_MS_PER_TOKEN, LATENCY_PREFILL_MS, PAYLOAD_BYTES
 
 HERE = Path(__file__).resolve().parent
 RAW_DIR = HERE / "data" / "azure-llm"
-OUT = HERE / "out" / "azure_llm_2023.csv.gz"
-BASE = ("https://raw.githubusercontent.com/Azure/AzurePublicDataset/master/"
-        "data/AzureLLMInferenceTrace_")
+OUT = HERE / "out" / "azure_llm_2024.csv.gz"
+BASE = ("https://github.com/Azure/AzurePublicDataset/releases/download/"
+        "dataset-llm-2024/AzureLLMInferenceTrace_")
 WORKLOADS = ("conv", "code")
 FIELDS = ("timestamp_ms", "tenant_id", "request_kind",
           "expected_latency_ms", "payload_bytes")
@@ -48,9 +56,9 @@ FIELDS = ("timestamp_ms", "tenant_id", "request_kind",
 
 def fetch(workload: str) -> Path:
     RAW_DIR.mkdir(parents=True, exist_ok=True)
-    path = RAW_DIR / f"AzureLLMInferenceTrace_{workload}.csv"
+    path = RAW_DIR / f"AzureLLMInferenceTrace_{workload}_1week.csv"
     if not path.exists():
-        url = BASE + workload + ".csv"
+        url = BASE + workload + "_1week.csv"
         print(f"downloading {url}")
         urllib.request.urlretrieve(url, path)
     return path

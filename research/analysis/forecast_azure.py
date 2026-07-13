@@ -1,10 +1,17 @@
-"""Forecast ablation on a SECOND real LLM trace — Azure LLM inference 2023.
+"""Forecast ablation on a SECOND real LLM trace — Azure LLM inference 2024.
 
 External-validity restatement: DEFENSE_QA.md #12 names "a second LLM
 demand trace" as the highest-value external-validity addition, and the
-Azure LLM inference traces (AzurePublicDataset, Nov 2023, one week, two
-production workloads: conversation + code completion) are public and
-LLM-shaped — unlike the descoped Azure *Functions* traces.
+Azure LLM inference traces (AzurePublicDataset 2024 release, May 10-19
+2024, one week, two production workloads: conversation + code completion;
+the DynamoLLM/HPCA'25 dataset, CC-BY) are public and LLM-shaped — unlike
+the descoped Azure *Functions* traces.
+
+AMENDMENT (declared 2026-07-13 before any ablation ran): the protocol was
+frozen naming the 2023 in-repo files, which hold only ~1 hour of traffic;
+the 2024 release assets are the one-week data the protocol describes.
+Same schema, mapping, constants, and analysis — see the ETL's amendment
+note.
 
 PROTOCOL — FROZEN BEFORE THE FIRST RUN on this trace (2026-07-13,
 session 17; committed and pushed before any number was seen). It is the
@@ -48,7 +55,7 @@ from forecast_trace_real import contiguous_segments  # noqa: E402
 from simulate import load_trace_buckets  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "FORECAST_AZURE.md"
-TRACE = Path(__file__).resolve().parents[1] / "traces" / "out" / "azure_llm_2023.csv.gz"
+TRACE = Path(__file__).resolve().parents[1] / "traces" / "out" / "azure_llm_2024.csv.gz"
 INTERVAL_S = 3600
 
 
