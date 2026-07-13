@@ -7,6 +7,49 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-13 (session 16e) — Phase 9 hardening done; jcac live arm staged and sized
+
+Milestone status: "complete everything except the thesis document."
+Everything automatable is now done; the one measurement left in the whole
+project is Phase 7's jcac-vs-hpa ordinal figure, and it is deliberately
+gated, not forgotten.
+
+### Phase 9 — done (the automatable half)
+
+- **CI `trace-smoke` job**: BurstGPT ETL (synthetic, seeded) and the
+  semantic-cache protocol (synthetic + hash fallback — dependency-free by
+  design) now run on every push; a broken trace pipeline fails CI instead
+  of a future measurement session. Both steps verified locally first.
+- **README**: "Reproducing the research results" quickstart (every claim →
+  committed script) and a "Limitations (honest boundaries)" section — the
+  substrate framing, both SLO nulls, p95 deviation, cache scope, the
+  gated jcac live arm, and the γ null, stated in the project's own words.
+- **Zenodo bundle refreshed**: `polyforge-eval-artifact-2026-07-13.zip`
+  (21 files) + SHA-256 manifest + deposit.json regenerated. Upload/DOI is
+  account-bound (RELEASE_CHECKLIST §1), as are Artifact Hub, GHCR pushes,
+  the demo video, and the paid cloud smoke — human-action items by design.
+
+### Phase 7 jcac arm — staged, sized, honestly gated
+
+`Dockerfile.operator` and `services/planner/Dockerfile` now exist (neither
+did; GHCR has no published images) — the planner image preserves the repo
+layout because planner.py resolves `research/jcac_sim` relative to its own
+path. `docs/PHASE7_JCAC_PLAN.md` is the exact one-session remainder:
+operator-chart install in the harness, per-tenant Tenant/Policy CRs,
+demand plumbing (POLYFORGE_PLANNER_URL + features API), the
+Policy→Deployment actuation check (the only potentially non-trivial code),
+then the first jcac live smoke and the ordinal slice. The honesty gate
+stands: jcac does not run live until actuation is verified.
+
+### State of the whole project after this session
+
+Measured and closed: all five contested segments + security, ADR 0016,
+J-sensitivity, Phase 6 (both halves), Phase 7 hpa-arm live verification,
+Phase 9 automatable hardening. Remaining, in total: (1) the jcac live
+session per PHASE7_JCAC_PLAN.md; (2) RELEASE_CHECKLIST human items
+(Zenodo upload, Artifact Hub, GHCR, video, €10 cloud smoke); (3) the
+thesis document and slides — explicitly excluded from this push.
+
 ## 2026-07-12 (session 16d) — Phase 6 complete (GPU tier table measured); Phase 7's pipeline verified on a real cluster
 
 Milestone status: "do phase 6 and 7 properly." Phase 6 is now fully done —

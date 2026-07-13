@@ -118,6 +118,29 @@ jobs:
       - name: Security study runs (cache side channel)
         run: python research/security/cache_side_channel.py
 
+  # Phase 9: the trace pipelines must stay runnable — synthetic modes are
+  # deterministic and dependency-light, so a broken ETL fails CI, not a
+  # future measurement session. The cache protocol runs on its hash
+  # fallback here (no sentence-transformers in CI): protocol code path
+  # identical, encoder swapped, as documented in the script.
+  trace-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install harness dependencies
+        run: pip install -r eval/requirements.txt
+      - name: BurstGPT ETL (synthetic mode)
+        working-directory: research/traces
+        run: python etl_burstgpt.py --synthetic --seed 42 --out /tmp/burst_synth
+      - name: Semantic-cache protocol (synthetic + hash fallback)
+        working-directory: research/analysis
+        run: |
+          python semantic_cache_eval.py
+          git checkout -- SEMANTIC_CACHE.md
+
   # W39: both Helm charts must lint and render.
   helm:
     runs-on: ubuntu-latest

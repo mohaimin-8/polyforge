@@ -204,6 +204,56 @@ go run ./cmd/control-plane
 
 The Compose database uses trust authentication and binds only to `127.0.0.1`; it is a test fixture, not a deployment configuration.
 
+## Reproducing the research results
+
+Every measured claim traces to a committed script and a results file
+(single reading entry point: `research/analysis/RESULTS_MASTER.md`).
+
+```bash
+# Harness matrices (sim backend, runs anywhere)
+cd eval && pip install -r requirements.txt
+python -m harness.runner experiments/full.yaml --workers 4   # v1 headline
+python scripts/validate_results.py experiments/full.yaml
+
+# Statistical analysis, figures, exploratory weight sensitivity
+cd ../research/analysis
+python run_analysis.py && python sensitivity_j.py
+
+# Calibration (Phase 6): CPU congestion + GPU tier table
+cd ../calibration && python measure_congestion.py            # ~35 min
+# GPU half: push kaggle_tier_bench.py as a Kaggle GPU kernel (see file docstring)
+
+# Live cluster smoke (Phase 7, needs Docker — a Codespace works out of the box)
+bash scripts/phase7_kind_run.sh
+```
+
+Real datasets (BurstGPT v2.0, gated LMSYS-Chat-1M) are downloaded, never
+committed; the ETLs under `research/traces/` are the committed artifacts.
+
+## Limitations (honest boundaries)
+
+- **Substrate.** All headline numbers are simulator-backend decision
+  quality under the stated system model (`research/jcac_sim/model.py`),
+  driven by real traces where claimed. The congestion form and tier
+  ordering are calibrated against real inference servers
+  (`research/calibration/`); the calibration shows the model errs
+  *against* PolyForge's lean postures at high utilization.
+- **SLO.** Two pre-registered attempts to beat tuned reactive scalers on
+  raw violation failed and are published (v2 H1, v3 H1'). The earned
+  claim is violation parity at −43…−48% cost, plus the confirmed
+  forecast mechanism.
+- **Latency percentile.** p95, not p99 — deliberate, documented deviation
+  (`eval/README.md`); measured live percentiles can report both.
+- **Cache.** The live control plane exercises per-tenant partitioning
+  (the security result), not the semantic cache itself; semantic hit-rate
+  numbers come from the committed protocol on real LMSYS-Chat-1M.
+- **Live cluster.** The cluster backend is verified end-to-end for the
+  HPA arm on kind; the PolyForge (operator/planner) live arm and the
+  ordinal figure are staged, not yet run — running it before the operator
+  is wired would mislabel a static deployment as PolyForge.
+- **Fairness γ-term.** Published null: the joint controller absorbs
+  interference without it; the term stays configurable, claims dropped.
+
 ## Long-Term Target
 
 The production/research target includes:
