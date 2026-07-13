@@ -102,6 +102,18 @@ incorrect-hits-per-1k reported next to savings-per-1k. No single
 application-specific. Staleness/TTL remains out of scope and is listed as
 such.
 
+As measured: at the τ=0.85 operating point, precision is 0.313 overall,
+0.443 same-model, 0.353 first-turn, 165.5 incorrect hits per 1k queries —
+and the built-in calibration (τ≥0.95 near-duplicate prompts agree only
+33.8% at ρ=0.70) shows the absolute level is dominated by LLM response
+stochasticity, not caching errors alone. The claim is therefore the
+*shape*: precision rises monotonically as τ tightens while hit rate
+falls, and same-model precision is ≈2× cross-model. A production
+deployment caching a single model's responses sits in the most favorable
+stratum. This is a harder-nosed quality statement than any surveyed
+cache paper publishes, and it cost the headline nothing that was
+truthfully there.
+
 ## 8. "Your cost model mixes two economies."
 
 It does, deliberately, and they are separable in the model: replica-hours

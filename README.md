@@ -252,9 +252,13 @@ are the committed artifacts.
 - **Cache.** The live control plane exercises per-tenant partitioning
   (the security result), not the semantic cache itself; semantic hit-rate
   numbers come from the committed protocol on real LMSYS-Chat-1M. Hit
-  *precision* — the probability a served hit is a correct answer — is
-  measured by its own pre-registered protocol on the same dataset
-  (`research/analysis/CACHE_PRECISION.md`); staleness/TTL is out of scope.
+  *quality* is measured too (`research/analysis/CACHE_PRECISION.md`,
+  protocol frozen pre-run): at τ=0.85, response-agreement precision is
+  0.313 overall (0.443 same-model, 0.353 first-turn) with 165.5
+  incorrect hits per 1k queries — read against the proxy's own ceiling
+  (near-duplicate prompts agree only 33.8%, so response stochasticity
+  dominates the absolute level; the relative readings are the claim).
+  Staleness/TTL is out of scope.
 - **Live cluster.** The cluster backend is verified end-to-end for the
   HPA arm on kind; the PolyForge (operator/planner) arm is fully wired in
   code behind an executable actuation gate (`kubectl wait

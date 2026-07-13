@@ -3,7 +3,8 @@
 **This is the single reading entry point for every measured result in the project.**
 The per-campaign files it consolidates (`RESULTS.md`, `RESULTS_V2.md`, `RESULTS_V3.md`,
 `RESULTS_TRACE.md`, `RESULTS_TRACE2.md`, `VTC_FAIRNESS.md`, `FAIRNESS_V2.md`,
-`FORECAST_TRACE.md`, `FORECAST_TRACE_REAL.md`, `ADVANCED.md`, `SEMANTIC_CACHE.md`) are
+`FORECAST_TRACE.md`, `FORECAST_TRACE_REAL.md`, `ADVANCED.md`, `SEMANTIC_CACHE.md`,
+`CACHE_PRECISION.md`, `EFFECT_SIZES.md`, `PLANNER_SCALING.md`) are
 **machine-generated measurement records**: each is written by its analysis script from
 the raw run databases and is immutable once its campaign closes (pre-registration ground
 rules). They stay exactly as they are — this file summarizes and reconciles them but
@@ -24,7 +25,7 @@ context, not results.
 | **SLO** | **Closed honestly — iso-attainment framing** | Violation parity with tuned HPA/KEDA at −43…−48% cost (v2, H1 FAIL); beats FIRM (p=2e-19). Overload regime: reactive scalers buy attainment at 3.2–3.4× spend (v3, H1′ FAIL); forecast mechanism confirmed (H2′ PASS, p=6e-4); spike-class exploratory win (p=5e-5, d_z=0.57, −46% cost). Stopping rule: no further confirmatory attempts | `RESULTS_V2.md`, `RESULTS_V3.md` |
 | **Fairness** | **WON — two dedicated baselines beaten** | Beats FIRM on Jain (d_z=1.0, p=4.5e-47); beats the tuned VTC-replica **on Jain itself** (0.9705 vs 0.9599, p=1.5e-6) at −35% cost and −36% worst-tenant p95 (HV1+HV2 PASS). Own γ-term honestly nulled under injected interference | `VTC_FAIRNESS.md`, `FAIRNESS_V2.md` |
 | **Forecasting** | **WON — on real data** | On the real 10.63M-request BurstGPT trace, damped Holt (jcac_v2's forecaster) cuts one-step RMSE −26.9% vs the trend default (segment 1); the synthetic stand-in's −44.8% seasonal prediction **does not transfer** and is published as such; seasonal's mechanism is confirmed only where real periodicity exists (v3 H2′) | `FORECAST_TRACE_REAL.md`, `FORECAST_TRACE.md`, `RESULTS_V3.md` |
-| **Cache** | **CLOSED — real-data headline measured** | On real LMSYS-Chat-1M (200k-turn reservoir sample, MiniLM, exact NN): adaptive semantic hit rate **29.6% @ cosine 0.85, 48.8% @ 0.70** (InstCache's 51.34% anchor is their different protocol on the same dataset — placed beside, never head-to-head); adaptive beats a non-strawman fixed cache at 10% of inserted by **+93%** (29.6 vs 15.3); **$0.296 saved/1k queries** at mid-tier pricing; empirical h(K): hmax 0.285, K_half ≈ 6.6k entries (~19 MB) — the sim's assumed curve was optimistic, documented, constants unchanged | `SEMANTIC_CACHE.md` |
+| **Cache** | **CLOSED — real-data headline measured** | On real LMSYS-Chat-1M (200k-turn reservoir sample, MiniLM, exact NN): adaptive semantic hit rate **29.6% @ cosine 0.85, 48.8% @ 0.70** (InstCache's 51.34% anchor is their different protocol on the same dataset — placed beside, never head-to-head); adaptive beats a non-strawman fixed cache at 10% of inserted by **+93%** (29.6 vs 15.3); **$0.296 saved/1k queries** at mid-tier pricing; empirical h(K): hmax 0.285, K_half ≈ 6.6k entries (~19 MB) — the sim's assumed curve was optimistic, documented, constants unchanged. **Hit quality measured** (pre-registered proxy, `CACHE_PRECISION.md`): at τ=0.85, response-agreement precision 0.313 overall / 0.443 same-model / 0.353 first-turn (ρ=0.70), 165.5 incorrect hits per 1k queries; the τ=0.95 near-duplicate row (0.338) is the proxy's stochasticity ceiling, so cite the *relative* readings — precision rises with τ (0.249→0.338) while hit rate falls, same-model ≈ 2× cross-model — not the absolute level | `SEMANTIC_CACHE.md`, `CACHE_PRECISION.md` |
 | **Security** (uncontested novelty) | **WON — frontier dominance** | Shared semantic cache leaks prompt membership at AUC 0.88 from timing alone; per-tenant partitioning returns the attacker to chance (0.50) at 24% latency cost with 76% hits kept — strictly dominating padding (never < 0.73) and TTL jitter (chance only at ~90% hit loss) | `ADVANCED.md` (figs 16–17) |
 
 Composite objective J (cost + 2·violation + 0.5·(1−Jain), the objective every baseline
@@ -141,6 +142,7 @@ buy a large fairness win — jcac is *more* fair on Jain (0.9705 vs 0.9599, p=1.
 | Fairness | Jain 0.9705 vs VTC 0.9599 (p=1.5e-6) + FIRM d_z=1.0 | γ-ablation | the γ-term itself is a published null |
 | Security | AUC 0.88 → 0.50 at 24% latency / 76% hits kept | — | frontier table in `ADVANCED.md` |
 | Cache hit-rate headline | **29.6% @ 0.85 (48.8% @ 0.70), real LMSYS, +93% vs 10%-fixed** | synthetic 1.000 saturation; the +594% vs 200-entry fixed | synthetic saturates under a real encoder (caveat); the 200-entry fixed point is a strawman at 100k inserted — cite the 10%-fixed comparison |
+| Cache hit quality | **precision-vs-τ shape + strata** (0.443 same-model vs 0.223 cross-model; first-turn 0.353; `CACHE_PRECISION.md`) | "69% of hits are wrong" | the ρ=0.70 proxy is deflated by LLM response stochasticity — near-duplicate prompts (τ≥0.95) only agree 33.8% — so the absolute precision under-states correctness; relative readings are the claim |
 | Effect sizes, real-demand replay | **d_z with 95% bootstrap CI** (`EFFECT_SIZES.md`, n=96 rows) | bare p-values below ~1e-6 | at hundreds of paired seeded runs, tiny p measures simulator determinism; the interval is the citable unit |
 | Planner scalability | growth exponent 1.45; p95 crosses the 3 s timeout at 128 tenants (`PLANNER_SCALING.md`) | "linear in tenants" (design intuition) | measured super-linearity is the price of the joint fairness term; past the timeout the designed fallback holds the last good plan |
 
@@ -151,7 +153,7 @@ of the contribution, not failures to hide: **v2 H1** (SLO vs HPA/KEDA), **v3 H1�
 (overload SLO vs HPA/KEDA), **first-sample HT** (underpowered), **γ-term** (no
 significant fairness contribution under injection), **seasonal non-transfer** (synthetic
 prediction failed on real data), **v1/v2 raw per-metric gate** (structurally impossible
-against by-construction winners; framing documented in `RESULTS.md`).
+against by-construction winners; framing documented in `RESULTS.md`), **cache hit quality** (a majority of τ=0.85 hits fail the ρ=0.70 response-agreement proxy — published with its stochasticity-ceiling calibration rather than hidden behind the hit-rate headline).
 
 ## Cross-campaign ground rules
 
