@@ -1,4 +1,4 @@
-"""ETL: Azure LLM inference traces (2023) -> normalized trace_event.
+"""ETL: Azure LLM inference traces (2024 release) -> normalized trace_event.
 
 Second real LLM demand trace, for external validity (DEFENSE_QA.md #12
 named this the highest-value addition; RELATED_WORK descoped Azure

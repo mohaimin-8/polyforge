@@ -103,7 +103,7 @@ def main() -> None:
         raise SystemExit(f"{TRACE} missing — run research/traces/etl_azure_llm.py first")
     series = per_tenant_series(TRACE)
 
-    lines = ["# Forecast ablation — Azure LLM inference traces (2023)", ""]
+    lines = ["# Forecast ablation — Azure LLM inference traces (2024 release)", ""]
     lines.append("Protocol frozen in `forecast_azure.py` (committed pre-run); "
                  "identical decomposition and constants as the BurstGPT "
                  "restatement (`FORECAST_TRACE_REAL.md`). Two production "
