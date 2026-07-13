@@ -39,7 +39,7 @@ from __future__ import annotations
 import csv
 import gzip
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from etl_burstgpt import LATENCY_MS_PER_TOKEN, LATENCY_PREFILL_MS, PAYLOAD_BYTES_PER_TOKEN
@@ -65,10 +65,13 @@ def fetch(workload: str) -> Path:
 
 
 def parse_ts(raw: str) -> datetime:
-    # "2023-11-16 18:15:46.6805900" — 7 fractional digits; fromisoformat
-    # takes at most 6.
-    head, _, frac = raw.partition(".")
-    return datetime.fromisoformat(f"{head}.{frac[:6]}" if frac else head)
+    # 2024 rows carry "+00:00" offsets (and the 2023 files 7-digit
+    # fractions); fromisoformat on 3.11+ accepts both. Normalize
+    # everything to naive UTC so mixed rows stay comparable.
+    ts = datetime.fromisoformat(raw)
+    if ts.tzinfo is not None:
+        ts = ts.astimezone(timezone.utc).replace(tzinfo=None)
+    return ts
 
 
 def main() -> None:
