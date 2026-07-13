@@ -1,0 +1,18 @@
+# Sim-side reference for the Phase 7 ordinal figure: the identical cells
+# as phase7_live.yaml executed on the sim backend. The ordinal question
+# (V2_README Phase 7, ground rule 4) is whether the sim's per-cell
+# jcac-vs-hpa ranking reproduces live; this spec supplies the sim half of
+# each pair. Committed alongside research/analysis/phase7_ordinal.py
+# BEFORE the live slice finished, so the comparison protocol was frozen
+# while the live data did not yet exist.
+name: phase7_sim_ref
+backend: sim
+steps: 120
+reps: 3
+systems: [jcac, hpa]
+workloads: [crud_bursty, ai_cacheable]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/phase7_sim_ref.duckdb
+retries: 0
+timeseries_reps: 0
