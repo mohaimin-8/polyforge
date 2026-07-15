@@ -272,3 +272,4 @@ Appended by the runner every progress tick.
 | 2026-07-12 09:14 | vtc_fairness | 150/200 | 0 | 1077 runs/h |
 | 2026-07-12 09:14 | vtc_fairness | 175/200 | 0 | 1238 runs/h |
 | 2026-07-12 09:14 | vtc_fairness | 200/200 | 0 | 1393 runs/h |
+| 2026-07-13 15:36 | phase7_sim_ref | 12/12 | 0 | 5667 runs/h |
