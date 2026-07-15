@@ -1,0 +1,130 @@
+\chapter{Claims Traceability}
+\label{app:traceability}
+
+Every claim in this thesis maps to a committed, machine-generated
+measurement record in the public repository, regenerable by a named script
+from archived run databases. The consolidated entry point is
+\evfile{research/analysis/RESULTS\_MASTER.md}; per-campaign files are
+immutable once their campaign closes. Paths below are repository-relative;
+all measurement records live under \evfile{research/analysis/} unless
+prefixed.
+
+\begin{small}
+\begin{longtable}{@{}p{0.34\textwidth}p{0.30\textwidth}p{0.28\textwidth}@{}}
+\caption{Claim-to-evidence map. Raw run databases (DuckDB) are archived
+under \evfile{eval/results/}; the Zenodo deposit bundles them with a
+manifest (\evfile{docs/RELEASE\_CHECKLIST.md}).}
+\label{tab:traceability}\\
+\toprule
+\textbf{Claim} & \textbf{Evidence record} & \textbf{Protocol / regeneration} \\
+\midrule
+\endhead
+Wins composite $J$ and cost vs.\ all five tuned baselines, 1{,}800-run
+matrix; raw per-metric gate FAIL &
+\evfile{RESULTS.md} &
+v1 gate frozen in roadmap; \evfile{run\_analysis.py} \\
+\addlinespace
+Ablations: $-$joint $+2884\%$ cost; $-$eviction $+35.7\%$; $-$classifier
+$-45\%$ relative hits &
+\evfile{RESULTS.md} (ablation tables) &
+\evfile{run\_analysis.py} \\
+\addlinespace
+Holt $-16.3\%$ violation in-loop; realism ablation; self-calibration
+$\dz{=}{+}0.46$; side channel AUC 0.88 $\to$ 0.50 &
+\evfile{ADVANCED.md}, figs.\ 13--17 &
+\evfile{advanced.py} \\
+\addlinespace
+v2: H1 FAIL (parity at $-43\ldots{-48\%}$ cost), H2 PASS ($-11\%$ vs.\ v1);
+iso-cost gate outcomes &
+\evfile{RESULTS\_V2.md} &
+\evfile{PREREG\_V2.md}; \evfile{analysis\_v2.py} \\
+\addlinespace
+v3: H1$'$ FAIL (3.2--3.4$\times$ spend), H2$'$ PASS
+($p=6{\times}10^{-4}$); spike-class exploratory win &
+\evfile{RESULTS\_V3.md} &
+\evfile{PREREG\_V3.md} (pushed pre-run); \evfile{analysis\_v3.py} \\
+\addlinespace
+Replay $n{=}16$: HT FAIL, point estimates reproduce v1 ranking &
+\evfile{RESULTS\_TRACE.md} &
+\evfile{PREREG\_TRACE.md}; \evfile{trace\_matrix.py} \\
+\addlinespace
+Replay $n{=}96$: HT2 PASS, cost $-70\%$, violation $+0.07$ disclosed &
+\evfile{RESULTS\_TRACE2.md} &
+\evfile{PREREG\_TRACE2.md}; \evfile{trace\_matrix2.py} \\
+\addlinespace
+Effect sizes with 95\% bootstrap CIs (citable unit) &
+\evfile{EFFECT\_SIZES.md} &
+\evfile{effect\_sizes.py} \\
+\addlinespace
+BurstGPT forecast ablation: Holt $-26.9\%$ (seg.\ 1); seasonal
+non-transfer &
+\evfile{FORECAST\_TRACE\_REAL.md} &
+\evfile{forecast\_trace\_real.py}; ETL
+\evfile{research/\allowbreak traces/\allowbreak fetch\_burstgpt.py} \\
+\addlinespace
+Azure LLM 2024: mechanism boundary reproduces; pooling destroys
+forecastability &
+\evfile{FORECAST\_AZURE.md} &
+protocol commit 573c197 $+$ declared amendment 399f86a;
+\evfile{forecast\_azure.py} \\
+\addlinespace
+LMSYS cache headline: 29.6\% @ 0.85; $+93\%$ vs.\ 10\%-fixed; \$0.296/1k;
+$h(K)$ fit &
+\evfile{SEMANTIC\_CACHE.md} &
+pre-download amendment 31c73c7; \evfile{semantic\_cache\_eval.py} \\
+\addlinespace
+Cache hit precision: 0.313 @ $\tau{=}0.85$; strata; stochasticity ceiling
+0.338 &
+\evfile{CACHE\_PRECISION.md} &
+protocol f1b2988 (pushed pre-run); \evfile{cache\_hit\_precision.py} \\
+\addlinespace
+FIRM fairness win: Jain 0.9689 vs.\ 0.9294, $\dz{=}1.0$ (v1); replicated
+$\dz{=}0.95$ (v2) &
+\evfile{RESULTS.md}, \evfile{RESULTS\_V2.md} &
+\evfile{run\_analysis.py}, \evfile{analysis\_v2.py} \\
+\addlinespace
+VTC-replica: HV1$+$HV2 PASS; Jain 0.9705 vs.\ 0.9599 at $-35\%$ cost &
+\evfile{VTC\_FAIRNESS.md} &
+\evfile{PREREG\_VTC.md}; \evfile{analysis\_vtc.py} \\
+\addlinespace
+$\gamma$-term null under injected interference &
+\evfile{FAIRNESS\_V2.md} &
+\evfile{fairness\_v2.py} \\
+\addlinespace
+Objective-weight sensitivity: direction never flips in 425 cells &
+\evfile{SENSITIVITY\_J.md} &
+\evfile{sensitivity\_j.py} (declared before run) \\
+\addlinespace
+Solver propositions (block-coordinate optimality; calibration bounds) &
+\evfile{THEORY\_V2.md} &
+proofs against \evfile{research/\allowbreak jcac\_sim/\allowbreak controller.py} \\
+\addlinespace
+Congestion calibration $a{=}0.86$ (errs against us); GPU tier ordering
+1:1.5:16.6 &
+\evfile{research/\allowbreak calibration/\allowbreak CALIBRATION.md},
+\evfile{TIER\_BENCH.md} &
+calibration scripts; \evfile{kaggle\_tier\_bench.py} \\
+\addlinespace
+Planner scaling: exponent 1.45; timeout crossover at 128 tenants &
+\evfile{PLANNER\_SCALING.md} &
+\evfile{planner\_scaling.py} \\
+\addlinespace
+Live HPA arm verified; \jcac{} arm wired $+$ gated; ordinal protocol
+frozen pre-run &
+\evfile{docs/SESSION\_LOG.md} (16d, 17),
+\evfile{docs/PHASE7\_JCAC\_PLAN.md} &
+\evfile{scripts/\allowbreak phase7\_kind\_run.sh};
+\evfile{phase7\_ordinal.py} (commit 650ce29) \\
+\addlinespace
+Baseline tuning grids and bounds &
+\evfile{eval/baselines/TUNING.md} &
+grids in \evfile{eval/baselines/grids/} \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\paragraph{Reading order for an examiner.} (1)~\evfile{RESULTS\_MASTER.md}
+--- scoreboard, ledger, disambiguation; (2)~the pre-registrations, in commit
+order, against their result files; (3)~\evfile{docs/DEFENSE\_QA.md} ---
+thirteen hard questions pre-answered; (4)~\evfile{docs/SESSION\_LOG.md} ---
+the session-by-session verification record.

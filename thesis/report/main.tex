@@ -1,0 +1,137 @@
+% PolyForge — M.Sc. thesis report
+% Build: latexmk -pdf main.tex   (or: .\build.ps1)
+% Every number in this document traces to a committed measurement record;
+% see Appendix A and research/analysis/RESULTS_MASTER.md.
+
+\documentclass[11pt,a4paper,oneside]{report}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[margin=2.8cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{setspace}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+
+\setlength{\emergencystretch}{2em}
+
+\graphicspath{{../../eval/results/figures/}}
+
+\newtheorem{proposition}{Proposition}
+\captionsetup{font=small,labelfont=bf,width=0.92\textwidth}
+\setstretch{1.12}
+
+% ---- fill these in before submission -------------------------------------
+\newcommand{\thesisauthor}{Mohaiminul}          % TODO: full legal name
+\newcommand{\thesisdegree}{Master of Science}   % TODO: confirm degree title
+\newcommand{\thesisuniversity}{[University]}    % TODO
+\newcommand{\thesisdepartment}{[Department]}    % TODO
+\newcommand{\thesissupervisor}{[Supervisor]}    % TODO
+\newcommand{\thesisdate}{July 2026}
+% ---------------------------------------------------------------------------
+
+\newcommand{\polyforge}{PolyForge}
+\newcommand{\jcac}{JCAC}
+\newcommand{\dz}{d_z}
+\newcommand{\evfile}[1]{\texttt{\small #1}}     % evidence-file pointer
+
+\title{\polyforge{}: Joint Cross-Layer Control of Replicas, Semantic Cache,
+and Model Tier for Multi-Tenant Hybrid Serving}
+\author{\thesisauthor}
+\date{\thesisdate}
+
+\begin{document}
+
+% ===== Title page ==========================================================
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\LARGE\bfseries \polyforge{}: Joint Cross-Layer Control of Replicas,\\
+   Semantic Cache, and Model Tier\\
+   for Multi-Tenant Hybrid Serving\par}
+  \vspace{2cm}
+  {\large A thesis submitted in partial fulfilment of the requirements\\
+   for the degree of \thesisdegree\par}
+  \vspace{2cm}
+  {\Large \thesisauthor\par}
+  \vspace{0.6cm}
+  {\large \thesisdepartment\\ \thesisuniversity\par}
+  \vspace{0.6cm}
+  {\large Supervisor: \thesissupervisor\par}
+  \vfill
+  {\large \thesisdate\par}
+\end{titlepage}
+
+% ===== Abstract ============================================================
+\begin{abstract}
+\noindent
+Multi-tenant platforms increasingly serve \emph{hybrid} workloads --- classic
+CRUD traffic and AI inference from the same tenants on the same
+infrastructure. The layers that govern the cost and quality of that serving
+--- replica autoscaling, semantic response caching, and model-tier routing ---
+are today controlled by independent, per-layer policies. This thesis argues,
+and then measures, that per-layer local optima do not compose into a joint
+optimum: a controller that plans \emph{replicas, semantic-cache budget, and
+model tier together}, against one cost--SLO--fairness objective, dominates
+tuned per-layer baselines.
+
+\polyforge{} is that controller: a Kubernetes-native control plane with a
+five-class workload taxonomy, an online classifier, a receding-horizon joint
+planner (\jcac{}), and an operator that actuates plans under guardrails. The
+evaluation is fully pre-registered --- seven protocols committed and pushed
+before their first run --- with tuned baselines, paired seeds, effect sizes
+with bootstrap confidence intervals, and published nulls.
+
+As measured: on a 1{,}800-run blocked factorial matrix \polyforge{} beats
+every tuned baseline (HPA, KEDA, FIRM-replica, GPTCache-LRU, static) on the
+composite objective and on cost ($|\dz|$ 0.66--1.44); on replayed real demand
+(BurstGPT, 10.63M requests) the powered confirmatory replay ($n{=}96$) shows
+$-70\%$ cost against tuned HPA/KEDA/FIRM ($p \le 4.3\times10^{-6}$) with a
+disclosed $+0.07$ violation trade; on real LMSYS-Chat-1M prompts the adaptive
+semantic cache reaches 29.6\% hit rate at cosine $0.85$ ($+93\%$ over a
+non-strawman fixed baseline) with hit \emph{precision} measured rather than
+assumed; fairness beats both a FIRM-style and a VTC-style baseline on Jain's
+index at lower cost; and a timing side channel in shared semantic caches is
+demonstrated (AUC 0.88) and closed by per-tenant partitioning at 24\% latency
+cost, dominating padding and TTL-jitter defenses. Two pre-registered SLO
+hypotheses failed and are published as failures; the honest SLO claim is
+violation \emph{parity} with tuned reactive scalers at 43--48\% lower cost.
+All headline numbers are decision-quality measurements under a stated system
+model, calibrated against a real inference server and a real GPU tier bench;
+live-cluster validation is ordinal-only by design, with the HPA arm verified
+and the \jcac{} arm wired behind an executable actuation gate.
+\end{abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+% ===== Chapters ============================================================
+\input{chapters/01-introduction}
+\input{chapters/02-background}
+\input{chapters/03-design}
+\input{chapters/04-implementation}
+\input{chapters/05-methodology}
+\input{chapters/06-evaluation}
+\input{chapters/07-discussion}
+\input{chapters/08-conclusion}
+
+% ===== Appendices ==========================================================
+\appendix
+\input{chapters/appendix-traceability}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

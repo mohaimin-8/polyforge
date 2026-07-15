@@ -23,3 +23,17 @@ eval/results/zenodo/
 eval/infra/terraform/.terraform/
 eval/infra/terraform/*.tfstate*
 eval/infra/terraform/kubeconfig.yaml
+
+# LaTeX build artifacts (thesis report + slides); the PDFs are committed deliverables.
+thesis/**/*.aux
+thesis/**/*.bbl
+thesis/**/*.blg
+thesis/**/*.log
+thesis/**/*.out
+thesis/**/*.toc
+thesis/**/*.lof
+thesis/**/*.lot
+thesis/**/*.nav
+thesis/**/*.snm
+thesis/**/*.fls
+thesis/**/*.fdb_latexmk

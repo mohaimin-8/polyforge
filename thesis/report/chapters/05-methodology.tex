@@ -1,0 +1,128 @@
+\chapter{Experimental Methodology}
+\label{ch:methodology}
+
+The evaluation's credibility rests on rules that were fixed before results
+existed. This chapter states them; Chapter~\ref{ch:evaluation} reports what
+happened under them --- including the hypotheses that failed.
+
+\section{Pre-registration}
+\label{sec:method-prereg}
+
+Every confirmatory campaign's protocol --- hypotheses, sole treatment,
+analysis script, and stopping rule --- was committed and pushed to the
+public repository \emph{before its first run}. Seven pre-registrations
+exist: \evfile{PREREG\_V2.md}, \evfile{PREREG\_V3.md},
+\evfile{PREREG\_TRACE.md}, \evfile{PREREG\_TRACE2.md},
+\evfile{PREREG\_VTC.md}, plus the v1 gate and the Phase-4 acceptance frozen
+in the roadmap documents. Protocol changes forced by feasibility (e.g.\ the
+LMSYS similarity matrix that would not fit in 40\,TB) were committed as
+\emph{declared pre-run amendments} before the gated data was downloaded ---
+the amendment chain is the pre-registration's honest continuation, visible
+in git history. Closed campaigns are immutable: stopping rules forbid
+re-running, widening, or post-hoc tuning, and campaign result files are
+never edited after their run.
+
+\section{Baselines, tuned on our own objective}
+\label{sec:method-baselines}
+
+Five baselines: HPA-style reactive scaling, KEDA-style event-driven scaling,
+a FIRM-style replica controller~\citep{firm2020}, GPTCache-style fixed
+semantic caching with LRU~\citep{gptcache2023}, and static provisioning;
+later campaigns add a VTC-style least-service-first replica divider
+\citep{vtc2024} and iso-cost variants. Every baseline is grid-search tuned
+\emph{on the composite objective this thesis is graded on}, with sweeps
+committed (\evfile{eval/baselines/TUNING.md}, grids in
+\evfile{eval/baselines/grids/}). Grids are bounded at a vendor-sane envelope
+because $J$ improves monotonically toward over-provisioning --- an unbounded
+grid would tune every baseline into a cost blowout and flatter \polyforge{}.
+Iso-cost variants exist to remove the ``it just spends less'' objection, and
+the gate they impose is reported FAIL-honest where it fails.
+
+\section{Substrates and separation rules}
+\label{sec:method-substrates}
+
+Three substrates carry the evidence, and they are never mixed in one table:
+
+\begin{enumerate}
+  \item \textbf{The simulator} (\evfile{research/jcac\_sim}): discrete-event
+        decision-quality substrate. Its congestion form was calibrated
+        against a real inference server --- the fitted exponent
+        ($a{=}0.86$ vs.\ assumed $1.0$) means the model over-penalizes high
+        utilization, i.e.\ errs \emph{against} \polyforge{}'s lean postures
+        --- and its tier constants were checked against a real GPU bench
+        (measured latency ratios 1:1.5:16.6; same ordering as the priced
+        1:10:100, compressed scale, disclosed).
+  \item \textbf{Real data replayed through the simulator}: BurstGPT
+        v2.0~\citep{burstgpt2024} demand (10{,}632{,}194 requests, 335
+        days), Azure LLM inference 2024~\citep{azurellmtrace2024} demand
+        (44.1M requests), and LMSYS-Chat-1M prompts~\citep{lmsyschat1m2024}
+        under a real MiniLM encoder~\citep{minilm2020,sbert2019}.
+  \item \textbf{A live kind cluster}: real scheduler, real HPA, real load.
+        Claims from this substrate are \emph{ordinal only} --- does the
+        simulator's ranking reproduce? --- never absolute comparisons.
+\end{enumerate}
+
+Replay dollars are model-scale; the claim is always the ranking. Samples
+from different replays are never pooled ($n{=}16$ and $n{=}96$ are separate
+experiments with separate pre-registrations).
+
+\section{Statistics}
+\label{sec:method-stats}
+
+Runs are paired by seed: every system sees identical demand realizations,
+including arrival jitter drawn once per window and shared across systems.
+Significance is Wilcoxon/paired tests at the pre-registered gate; but at
+hundreds of paired seeded simulator runs, vanishing p-values measure the
+simulator's determinism, not the effect. The \emph{citable unit} is
+therefore the paired effect size $\dz$ with a 95\% bootstrap confidence
+interval (\evfile{EFFECT\_SIZES.md} restates the real-trace campaigns this
+way; all $n{=}96$ confirmatory intervals exclude zero, and the $+0.07$
+violation trade carries its own CI). P-values appear once, as prereg gate
+outcomes, and are never headlined below ${\sim}10^{-6}$. A
+declared-before-run weight-sensitivity sweep perturbs the objective weights
+across 425 cells spanning all campaigns: the win direction never flips, and
+416/425 cells keep $p<0.01$ (\evfile{SENSITIVITY\_J.md}).
+
+\section{Metrics}
+\label{sec:method-metrics}
+
+Cost (USD: replica-hours at \$0.048/replica-hr; model-tier calls at market
+API ratios 1:10:100), SLO violation rate, semantic-cache hit rate, Jain's
+index over per-tenant SLO satisfaction, and the composite
+\begin{equation}
+J = \text{cost} + 2\cdot\text{violation} + 0.5\cdot(1-\text{Jain}),
+\end{equation}
+normalized per tenant-step --- the objective every baseline was tuned on.
+Latency is reported at \textbf{p95, not p99}: the simulator's latency
+estimator is a queueing approximation whose tail beyond p95 is not credible,
+and pretending otherwise would be false precision. This is a documented
+deviation; the live path measures wall-time latency and can report any
+percentile.
+
+\section{The workload matrix}
+\label{sec:method-matrix}
+
+The headline matrix is a blocked factorial: 5 workload classes (from the
+taxonomy) $\times$ 4 tenant-mix profiles $\times$ 3 cluster sizes $\times$ 6
+systems $\times$ 5 repetitions $=$ 1{,}800 runs, plus 500 ablation runs.
+Eight tenants per cluster is the studied factor (composition, not
+population); the planner's tenant-count scaling is measured separately
+(Section~\ref{sec:impl-scaling}). The v3 overload cells were sized by
+\emph{arithmetic on committed model constants} --- burst climbs exceeding
+the shared $\pm2$-replicas-per-interval actuation clamp --- pinned by unit
+tests, not tuned by trial runs, with a same-envelope
+\texttt{ramp\_gentle} control cell where the hypothesized advantage should
+not (and does not) appear.
+
+\section{Honest-nulls policy}
+\label{sec:method-nulls}
+
+Negative and failed results are published with the same prominence as wins,
+in a dedicated ledger (\evfile{RESULTS\_MASTER.md}): the two confirmatory
+SLO failures (v2 H1, v3 H1$'$), the underpowered first replay (HT), the
+fairness-term null ($\gamma$), the seasonal-forecasting non-transfer from
+synthetic to real demand, the structurally impossible raw per-metric gate,
+and the cache hit-quality result that most $\tau{=}0.85$ hits fail the
+response-agreement proxy. Goalpost-moving is invisible when it happens in
+private; this project's position is that it happened in public, in the git
+history, where an examiner can diff it.

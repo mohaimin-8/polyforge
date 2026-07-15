@@ -1,0 +1,127 @@
+\chapter{Implementation}
+\label{ch:implementation}
+
+\polyforge{} is a working system, not a simulator with a paper wrapped
+around it. This chapter records what was built, the engineering gates it is
+held to, the deliberate deviations from the original roadmap, and the wiring
+that makes the live evaluation arm honest.
+
+\section{Components and code layout}
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Component} & \textbf{Code and role} \\
+\midrule
+Control plane & \evfile{cmd/control-plane}, \evfile{internal/}: tenant /
+project / API-key APIs, PostgreSQL with row-level security (SQLite dev
+path), rate limiting, telemetry ingestion, canary and isolation-ladder admin
+APIs. \\
+AI gateway & \evfile{cmd/ai-gateway}, \evfile{internal/ai}: multi-backend
+chat routing (plan/length/budget), semantic cache with cost-aware eviction,
+vector search, agent loop. \\
+Classifier & \evfile{internal/classifier}, \evfile{cmd/classifier-train}:
+12-feature windows $\to$ 5-class taxonomy, online labels every 10\,s, PSI
+drift detection. \\
+\jcac{} planner & \evfile{services/planner} $+$
+\evfile{research/jcac\_sim}: the service imports the simulator's controller,
+so offline and online planning are the same code. \\
+Operator & \evfile{cmd/operator}, \evfile{deploy/helm/polyforge-operator}:
+four CRDs, guardrailed reconciliation, ordered finalizer teardown,
+OTel-traced reconciles. \\
+Evaluation & \evfile{eval/}: YAML-driven harness, five tuned baselines,
+DuckDB results, validation and spot-check tooling; kind-cluster live
+backend. \\
+\bottomrule
+\end{tabularx}
+\caption{Implementation map.}
+\label{tab:impl-map}
+\end{table}
+
+\section{Engineering gates}
+\label{sec:impl-gates}
+
+Every session's work passes the same battery before it is committed:
+\texttt{gofmt} clean, \texttt{go vet}, \texttt{go build},
+\texttt{go test ./...\ -count=1} across 26 Go packages, the Python suites
+(harness, planner, analysis --- 41 tests at the time of writing), and
+OpenAPI linting. CI additionally runs the race detector
+(\texttt{-race -covermode=atomic}) --- which cannot run on the development
+machine --- a coverage gate, golangci-lint, and the PostgreSQL row-level
+security suite against a live PostgreSQL service. Two verification norms
+follow from that split and are kept throughout the project record: tests
+that only CI can execute are reported as \emph{unproven until a green CI
+run}, and the session log (\evfile{docs/SESSION\_LOG.md}) records how every
+change was verified.
+
+Security-relevant details received the same treatment as research claims.
+API-key identifiers are drawn independently of the secret (an audit found
+the ID leaked 64 of 192 entropy bits); keys are hashed with SHA-256 rather
+than argon2id --- sound because the secrets are 192-bit random strings where
+brute force is infeasible, a deliberate deviation recorded as an ADR
+precisely because it is defense bait; a panic-recovery middleware returns
+structured 500s without leaking stack details; the authentication packages
+are held at ${\sim}95\%$-plus coverage.
+
+\section{Deliberate deviations from the roadmap}
+
+The original roadmap named specific tools; the implementation deviates in
+three places with equivalent outcomes, each recorded rather than silently
+``fixed'': the chi router is replaced by Go 1.22$+$ stdlib
+\texttt{http.ServeMux} method patterns; sqlc and golang-migrate are replaced
+by hand-written SQL behind repository interfaces plus an idempotent
+migrator (type-safe access and versioned schema still hold, RLS proven by
+test); argon2id by SHA-256 as above. The evaluation deviates from the
+roadmap's p99 in reporting p95 (Section~\ref{sec:method-metrics}).
+
+\section{The live evaluation arm, and two desk-found defects}
+\label{sec:impl-live}
+
+The live campaign (Section~\ref{sec:eval-live}) runs on a kind cluster:
+harness-built images, a k6 load generator, real HPA for the baseline arm,
+and the operator $+$ planner for the \jcac{} arm. Wiring the \jcac{} arm
+surfaced two defects at the desk that would each have silently invalidated
+the cluster session:
+
+\begin{enumerate}
+  \item \textbf{Demand plumbing that could never have authenticated.} The
+        operator's feature-demand source sent its token as a bearer, which
+        the control plane treats strictly as a JWT; every read would have
+        been a 401, and the \jcac{} loop \emph{degrades by design} into
+        silent fallback --- the arm would have run ``live'' while planning
+        nothing. The features endpoint (that endpoint only) now accepts the
+        platform admin key, unit-tested in both directions (the admin key
+        reads any tenant's features; it still cannot touch other tenant
+        routes).
+  \item \textbf{Last-writer-wins actuation on a shared target.} All eight
+        eval tenants' Policies name one shared Deployment; each reconcile
+        overwrote the others' replica counts, which would have pinned the
+        target at a single tenant's share --- \jcac{} crippled by wiring and
+        mislabeled as \jcac{}. Policies resolving to the same target now sum
+        their clamped contributions, with deletion re-enqueuing siblings;
+        unit-tested.
+\end{enumerate}
+
+Both fixes carry a broader honesty mechanism: the harness ends operator
+installation with \texttt{kubectl wait -{}-for=condition=Applied} on every
+Policy, so a run in which the operator never actuated \emph{fails before
+any load is generated} --- the ``the controller was actually in the loop''
+gate is executable, not a promise. Capacity parity is a cell property under
+test: every arm starts at the same replica count and is ceilinged by the
+same cluster limits, so no arm can win by being handed more cluster.
+
+\section{Scale behavior of the deployed planner}
+\label{sec:impl-scaling}
+
+The deployed \texttt{PlannerCore.plan} path was driven from 8 to 256 tenants
+on one laptop core (\evfile{research/analysis/PLANNER\_SCALING.md}): fitted
+growth exponent \textbf{1.45} --- the joint fairness term couples tenants,
+and super-linearity is the measured price of jointness --- with p95 cycle
+time first exceeding the operator's 3\,s request timeout at 128 tenants and
+the 10\,s control period at 256. Past the timeout the failure mode is the
+designed one: the operator holds the last good plan and reports
+\texttt{fallback} status. Scaling levers past the crossover (planning cells,
+incremental fairness partial sums, a faster inner loop) are named with the
+measurement. Coordination costs outside the planner --- CR write fan-out,
+telemetry aggregation --- are not covered by this microbenchmark.

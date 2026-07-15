@@ -1,0 +1,68 @@
+\chapter{Conclusion}
+\label{ch:conclusion}
+
+\section{What was established}
+
+This thesis set out to test whether per-layer local optima compose in
+multi-tenant hybrid serving, and answered with a built system and a
+pre-registered measurement campaign. The answer: they do not compose, and
+the gap is large. A controller that plans replicas, semantic-cache budget,
+and model tier together beats every tuned per-layer baseline on the
+composite objective in every campaign that tested it, is the only
+Pareto-undominated system in a 1{,}800-run matrix, and on replayed real
+demand delivers $-70\%$ cost against tuned reactive scalers with a
+disclosed $+0.07$ violation trade. Removing jointness alone costs
+$+2884\%$ on the cost term --- the composition gap made into a number.
+
+Around that central result: an honest SLO account (parity at
+$-43\ldots{-48\%}$ cost, a confirmed forecasting mechanism, two published
+confirmatory failures, and a stopping rule); real-data cache results with a
+quality denominator no surveyed cache paper publishes; fairness wins over
+two dedicated baselines at the stated altitude with the controller's own
+fairness term honestly nulled; a security frontier showing per-tenant cache
+partitioning dominates padding and jitter defenses against a demonstrated
+AUC-0.88 timing side channel; two construction-level guarantees on the
+deployed solver; and a working Kubernetes-native implementation held to CI
+gates throughout.
+
+The methodological result may outlast the numbers: seven pre-registrations
+pushed before their runs, immutable closed campaigns, effect sizes over
+p-values, substrate separation, and a published honest-nulls ledger ---
+demonstrated in a systems evaluation at thesis scale, in public git
+history.
+
+\section{Future work}
+
+\begin{itemize}
+  \item \textbf{The live \jcac{} slice.} The one remaining measurement:
+        the jcac smoke and full ordinal runs on a Docker-capable machine,
+        under the already-frozen protocol and caption
+        (\evfile{PHASE7\_JCAC\_PLAN.md}). Everything is wired and gated;
+        the result will be reported ordinal-only whichever way it lands.
+  \item \textbf{Token-level demand signals.} Swap the request-rate
+        \texttt{DemandSource} for TTFT/queue-depth/KV-pressure signals from
+        an llm-d-class engine, keeping the planner unchanged --- the
+        designed migration path onto the 2026 substrate
+        (Section~\ref{sec:bg-substrate}).
+  \item \textbf{p99 live restatement.} The live path measures wall-time
+        latency; extending the ordinal protocol to p99 removes the
+        simulator's p95 scope limit.
+  \item \textbf{Planner scaling past 128 tenants.} Planning cells,
+        incremental fairness partial sums, and a faster inner loop are the
+        named levers against the measured 1.45 growth exponent.
+  \item \textbf{Adopting the empirical cache curve.} Feeding the measured
+        $h(K)$ fit into the model constants is a new pre-registered
+        experiment by the project's own rules --- deliberately left for one.
+  \item \textbf{Prefix/KV-cache layers and token-level fairness.} Both sit
+        below \polyforge{}'s altitude and compose with it; a joint
+        portfolio-plus-engine study is the natural next thesis.
+\end{itemize}
+
+\section{Closing remark}
+
+The strongest sentence this project can write is not a percentage. It is
+that every percentage in it can be traced --- to a protocol committed before
+the run, a script that regenerates it, and a git history that would have
+exposed any other way of obtaining it. That standard is portable to any
+systems evaluation, and it is the practice this thesis most hopes to see
+reused.

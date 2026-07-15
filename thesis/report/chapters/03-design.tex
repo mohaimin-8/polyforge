@@ -1,0 +1,212 @@
+\chapter{System Design}
+\label{ch:design}
+
+\polyforge{} is an adaptive control plane for multi-tenant clusters serving
+hybrid workloads. This chapter walks the control loop end to end
+(Figure~\ref{fig:architecture}), then presents the \jcac{} formulation and
+the two construction-level guarantees the deployed solver carries.
+
+\section{The control loop, end to end}
+\label{sec:design-loop}
+
+\begin{figure}[htbp]
+\centering
+\resizebox{0.99\linewidth}{!}{%
+\begin{tikzpicture}[
+  box/.style={draw, rounded corners=2pt, align=center, font=\small,
+              minimum height=9mm, inner sep=5pt, fill=gray!8},
+  arr/.style={-{Stealth[length=2.5mm]}, thick},
+  node distance=7mm and 9mm
+]
+\node[box, minimum width=52mm] (cp)
+  {Control plane (Go)\\ \scriptsize tenants \,$\cdot$\, projects \,$\cdot$\, API keys\\
+   \scriptsize rate limits \,$\cdot$\, RLS storage};
+\node[box, minimum width=52mm, right=of cp] (gw)
+  {AI gateway (Go)\\ \scriptsize chat routing \,$\cdot$\, semantic cache\\
+   \scriptsize cost-aware eviction \,$\cdot$\, agents};
+\node[box, minimum width=113mm, below=of $(cp.south)!0.5!(gw.south)$] (tel)
+  {Telemetry\\ \scriptsize Prometheus \,$\cdot$\, OTel traces \,$\cdot$\, ClickHouse mirror
+   \,$\cdot$\, 12-feature 15-min windows per tenant};
+\node[box, minimum width=52mm, below=of tel.south west, anchor=north west] (clf)
+  {Workload classifier\\ \scriptsize 5-class taxonomy \,$\cdot$\, softmax\\
+   \scriptsize PSI drift detection};
+\node[box, minimum width=52mm, below=of tel.south east, anchor=north east] (plan)
+  {\jcac{} planner (Python)\\ \scriptsize MPC over move-blocked lattice\\
+   \scriptsize $\alpha\,\mathrm{cost}+\beta\,\mathrm{SLO}+\gamma(1-\mathrm{Jain})$};
+\node[box, minimum width=113mm, below=7mm of $(clf.south)!0.5!(plan.south)$] (op)
+  {Kubernetes operator (Go)\\ \scriptsize CRDs: Tenant $\cdot$ WorkloadProfile $\cdot$
+   Policy $\cdot$ Budget \,---\, guardrailed reconciliation, last-good-plan fallback};
+\draw[arr] (cp.south) -- (tel.north -| cp.south);
+\draw[arr] (gw.south) -- (tel.north -| gw.south);
+\draw[arr] (tel.south -| clf.north) -- (clf.north);
+\draw[arr] (clf.east) -- node[above,font=\scriptsize]{profile} (plan.west);
+\draw[arr] (tel.south -| plan.north) -- (plan.north);
+\draw[arr] (plan.south) -- node[right,font=\scriptsize]{plan / 10 s} (op.north -| plan.south);
+\draw[arr] (clf.south) -- (op.north -| clf.south);
+\draw[arr] (op.west) .. controls +(-18mm,0) and +(-18mm,0) .. node[left,font=\scriptsize,align=center]{scale replicas\\ resize caches\\ retier models} (cp.west);
+\end{tikzpicture}%
+}
+\caption{The \polyforge{} control loop. Requests (CRUD $+$ AI, JWT-scoped per
+tenant) hit the control plane and AI gateway; per-request telemetry is
+aggregated into per-tenant feature windows; the classifier labels each
+tenant's workload; every 10\,s the \jcac{} planner emits a joint plan
+(replicas, cache budget, model tier per tenant); the operator actuates it
+under guardrails against the same data plane the requests hit.}
+\label{fig:architecture}
+\end{figure}
+
+\paragraph{Control plane.} Tenant, project, and API-key management; rate
+limiting; telemetry ingestion. Tenant isolation is enforced by PostgreSQL
+row-level security \emph{at the database}, not in the query builder, and is
+proven by a test that queries the telemetry table with no tenant predicate
+inside a tenant transaction context and asserts foreign rows are invisible
+(ADR 0003).
+
+\paragraph{AI gateway.} Multi-backend chat routing by plan, length, and
+budget; a semantic cache with \textbf{cost-aware eviction} (evict by
+expected re-computation dollars, not recency alone); vector search; an agent
+loop. The cache is per-tenant by default --- a security decision, not only a
+fairness one (Section~\ref{sec:eval-security}).
+
+\paragraph{Telemetry and classification.} Every request lands in Prometheus
+metrics, OpenTelemetry traces, and an analytical mirror. Per tenant, a
+15-minute window is reduced to a 12-feature vector (rates, mix, burstiness,
+latency percentiles, cache affinity); a softmax classifier maps windows onto
+a five-class taxonomy --- steady CRUD, bursty CRUD, cacheable AI chat,
+uncacheable AI chat, agentic --- with population-stability-index drift
+detection. Each class carries a control implication (e.g., agentic latency
+needs the tier knob, not more replicas), which the evaluation makes
+measurable (Figure~\ref{fig:violation-by-workload}).
+
+\paragraph{\jcac{} planner.} A receding-horizon model-predictive controller
+over a \emph{move-blocked action lattice} (Section~\ref{sec:design-jcac}).
+The deployed Python service imports the simulator's controller module ---
+offline evaluation and online planning are provably the same code, which is
+what licenses reading simulator decision quality as deployed decision
+quality (Section~\ref{sec:disc-validity}).
+
+\paragraph{Operator.} Four CRDs --- Tenant, WorkloadProfile, Policy, Budget
+--- reconciled with guardrails: replica bounds, at most one committed cache
+level move per step, per-tenant budget caps, ordered finalizer teardown, and
+last-good-plan fallback when the planner is unreachable or over deadline.
+When several Policies resolve to one shared target, their clamped
+contributions are \emph{summed} (pool-tenant semantics) rather than
+last-writer-wins --- a correctness property found and fixed at the desk
+before the live campaign (Section~\ref{sec:impl-live}).
+
+\section{The \jcac{} formulation}
+\label{sec:design-jcac}
+
+At each control step the planner holds tenants $T=\{1,\dots,m\}$. Tenant
+$i$'s decision variable is $x_i=(r_i,c_i,\tau_i)$ --- replicas, cache level,
+model tier --- drawn from a finite per-tenant lattice $X_i$: replica deltas
+$\Delta r\in\{-2,\dots,2\}$, cache moves at most one committed level, tier
+$\tau_i\in\{\text{none},\text{small},\text{mid},\text{large}\}$; hence
+$|X_i|\le 60$ and the joint space $X=\prod_i X_i$ is finite. The per-step
+objective is
+\begin{equation}
+\label{eq:objective}
+\begin{split}
+J(x)={}&\alpha\frac{1}{S}\sum_{i}\mathrm{cost}_i(x_i)
+      +\beta\sum_{i}\mathrm{obj}_i(x_i)
+      +\gamma\sum_{i}w_i\bigl(1-\mathrm{Jain}(s(x))\bigr)\\
+      &+\gamma\sum_i \nu_i\,\rho_i(x_i)
+      +\lambda\sum_i \mathrm{sw}_i(x_i),
+\end{split}
+\end{equation}
+where $s(x)_i = 1-\mathrm{viol}_i(x_i)$ is the per-tenant SLO-satisfaction
+vector entering Jain's index~\citep{jain1984}, $\nu_i$ is an exogenous
+interference score from the noisy-neighbor detector, and $\mathrm{sw}_i$
+counts switches (hysteresis). Feasibility intersects per-tenant budget caps
+with two cluster-level caps, $\sum_i c_i\le C$ and $\sum_i r_i\le R$, both
+separable in a scan.
+
+Demand enters through a pluggable forecaster. The code default is a linear
+trend; damped Holt smoothing~\citep{holt2004} is the documented recommended
+default after the in-loop ablation (Section~\ref{sec:eval-forecast}), and an
+online-seasonal variant exists for demand with a detected period. The
+evaluation shows the right reading is \emph{per-stream}: no fixed method
+dominates across three real traces; the winner tracks measured periodicity.
+
+The solver is not a MIP: it runs two fixed Gauss--Seidel sweeps over
+tenants, each block update exactly minimizing $J$ over the $\le 60$
+candidates of one tenant with the others held fixed (ADR 0014 records why
+enumeration beats a solver dependency at this lattice size).
+
+\section{Construction-level guarantees}
+\label{sec:design-theory}
+
+Both propositions hold \emph{by construction of the deployed solver}
+(\evfile{research/\allowbreak jcac\_sim/\allowbreak controller.py}); neither is asymptotic or
+probabilistic. Full proofs are committed in
+\evfile{research/analysis/THEORY\_V2.md}; the statements and proof shapes
+follow.
+
+\begin{proposition}[Block-coordinate optimality]
+\label{prop:bco}
+Let $x^{(0)}$ be the incumbent configuration and $x^\star$ the result of the
+solver's two fixed sweeps, each replacing
+$x_i\leftarrow\arg\min_{x_i\in X_i(x_{-i})}J_i(x_i;x_{-i})$ over the feasible
+slice. Then $x^\star$ is a block-coordinate minimum of $J$: no single tenant
+can lower the global objective by unilaterally changing its own
+configuration.
+\end{proposition}
+
+\emph{Proof shape.} Each block update is an exact minimization over a finite
+set containing the incumbent, so $J$ is non-increasing across updates.
+A tenant's best response depends on the others only through sums and the
+satisfaction multiset, and the feasible slice depends only on residual-cap
+sums, which are order-independent; a backward-propagation argument over the
+last moved tenant in sweep two shows every tenant ends at a best response to
+the final configuration. $\square$
+
+\textbf{Scope.} A block-coordinate minimum is \emph{not} guaranteed to be
+the global minimizer: the Jain coupling is non-separable, and a simultaneous
+multi-tenant move could in principle beat a coordinate-wise optimum. The
+proposition claims exactly what the solver delivers --- unilateral-move
+optimality --- and no more.
+
+\begin{proposition}[Self-calibration is bounded and contracts on agreement]
+\label{prop:calibration}
+Let $g_i^{(t)}$ be tenant $i$'s capacity scale under the feedback update
+with learning rate $\eta=0.15$, recovery step $\delta=0.02$, and tolerance
+$\epsilon=0.02$. Then (a) $[0.5,1]$ is forward-invariant and absorbing;
+(b) the scale can only lower effective capacity --- planned load is never
+below observed load; (c) under sustained agreement between projection and
+realization, $g_i \uparrow 1$ in at most $\lceil 0.5/0.02\rceil = 25$ steps
+and stays there.
+\end{proposition}
+
+\emph{Reading.} The mechanism is safe to ship on by default: it can only
+make the planner more conservative, it is confined to a bounded corrective
+band by explicit $\max/\min$ projections (safety does not depend on tuning),
+and it provably relaxes back to trusting the nominal model rather than
+ratcheting pessimism forever. Its empirical value is measured under
+reconfiguration realism ($\dz{=}{+}0.46$, Section~\ref{sec:eval-advanced}).
+
+\section{Fairness and security in the design}
+
+\paragraph{Fairness.} The noisy-neighbor detector scores tenants
+\emph{peer-relatively} (ADR 0015) on eBPF-shaped signals; the score enters
+the objective as the $\nu_i\rho_i$ penalty. Jain's index over SLO
+satisfaction is exported every cycle. The $\gamma$-weighted Jain term is a
+design feature whose measured contribution under injected interference is a
+published null (Section~\ref{sec:eval-fairness}); it remains configurable,
+and the claims rest on the measured outcomes, not on the term's presence.
+
+\paragraph{Security.} Sharing a semantic cache across tenants creates a
+timing side channel: a hit on a prompt another tenant inserted returns
+faster, leaking membership. The design defense is per-tenant cache
+partitioning with demand-proportional sizing --- the evaluation quantifies
+both the attack and the defense frontier
+(Section~\ref{sec:eval-security}).
+
+\section{Design decisions with alternatives}
+
+Every architectural choice with a live alternative is recorded as an ADR
+(\evfile{docs/adr/0001--0015}). Load-bearing examples: row-level security at
+the database, not the query builder (0003); an outbox-audited tenant
+isolation ladder (0008); enumeration over a MIP backend for the planner
+(0014); peer-relative rather than absolute noisy-neighbor detection (0015).
+Chapter~\ref{ch:implementation} records the tool-level deviations from the
+original roadmap and why their outcomes are equivalent.

@@ -1,0 +1,136 @@
+\chapter{Discussion}
+\label{ch:discussion}
+
+This chapter confronts the objections a competent examiner should raise ---
+each stated in its strongest form, answered with committed evidence, and
+never softened. The full pre-answered set is maintained in
+\evfile{docs/DEFENSE\_QA.md}; the load-bearing ones follow.
+
+\section{Threats to validity}
+\label{sec:disc-validity}
+
+\paragraph{``Your headline numbers come from your own simulator.''}
+True, and framed that way everywhere: decision quality under a stated system
+model. Three things bound the gap. First, \emph{calibration direction}: the
+congestion form was fitted against a real inference server and the model
+over-penalizes high utilization ($a{=}0.86$ vs.\ assumed $1.0$) --- it errs
+against \polyforge{}'s lean postures; the GPU tier bench confirms tier
+ordering on real hardware. Second, \emph{real data}: the cost and
+forecasting claims are restated on replayed BurstGPT demand ($n{=}96$
+confirmatory) and the cache claims are measured on real LMSYS prompts.
+Third, the \emph{live ordinal check}: the kind-cluster experiment asks only
+whether the simulator's ranking reproduces, with the HPA arm verified and
+the \jcac{} arm gated behind an executable actuation check. What is not
+claimed: absolute dollars or latencies transferring to any production
+fleet.
+
+\paragraph{``You designed the v3 overload cells so your system would
+win.''} The cells were sized by arithmetic on committed model constants,
+pinned by unit tests, not tuned by trial runs. Three protections: the
+pre-registration named the sole treatment and hypotheses before any run; a
+same-envelope control cell (\texttt{ramp\_gentle}) exists where the alleged
+advantage should not appear --- and it does not; and the confirmatory H1$'$
+still \emph{failed}. A designed regime with an honest null inside it is
+evidence of measurement, not of rigging.
+
+\paragraph{``$p=10^{-33}$? Really?''} At hundreds of paired seeded simulator
+runs, tiny p-values measure the simulator's determinism, not the effect. The
+citation unit is the paired effect size with a bootstrap CI
+(Section~\ref{sec:method-stats}); p-values appear once, as prereg gate
+outcomes.
+
+\paragraph{``Your SLO story moved the goalposts.''} The ledger says
+otherwise, and the ledger is the answer: seven pre-registrations pushed
+before their runs, two confirmatory SLO failures published as failures, one
+mechanism confirmation, and a stopping rule forbidding a third attempt. The
+final SLO claim --- parity at $-43\ldots{-48\%}$ cost --- is what survived,
+not what was hoped for. Goalpost-moving is invisible when it happens in
+private; here it happened in public, in the git history, where it can be
+diffed.
+
+\paragraph{``Were the baselines actually tuned, or strawmen?''}
+Grid-searched on the paper's own composite objective, per baseline, sweeps
+committed. The grids are bounded at a vendor-sane envelope because $J$
+improves monotonically toward over-provisioning --- an unbounded grid would
+tune every baseline into a cost blowout and \emph{flatter} \polyforge{}.
+Iso-cost variants remove the ``it just spends less'' objection, and their
+gate is reported FAIL-honest where it fails.
+
+\section{Construct scope}
+
+\paragraph{Fairness altitude.}
+\label{sec:disc-fairness-altitude}
+Jain's index over SLO satisfaction is not fairness as OSDI defines it: VTC
+and successors define \emph{service} fairness at token granularity inside a
+continuous-batching engine. \polyforge{}'s fairness is capacity allocation
+across tenants at the control plane, the claims are scoped to that altitude,
+and the \texttt{vtc\_replica} baseline is a replica-level transplant of
+VTC's least-service-first idea, stated as such. Beating it on Jain says
+\polyforge{} allocates capacity more evenly at lower cost --- not that it
+schedules tokens more fairly. Token-level fair schedulers would run
+\emph{inside} each replica pool \polyforge{} sizes; the two are
+complementary.
+
+\paragraph{Two economies in one cost model.} Replica-hours are priced as
+infrastructure (\$0.048/replica-hr; the live arm meters real
+replica-seconds) while model-tier calls are priced at market API ratios
+(1:10:100). A self-hosting operator should read the tier ratios as relative
+GPU-time costs --- the tier bench measured 1:1.5:16.6 latency ratios on real
+hardware: same ordering, compressed scale, disclosed. Spot pricing, MIG
+partitioning, and fractional GPUs are below the model's altitude and named
+out of scope. Reconfiguration friction is not ignored: the realism ablation
+bills startup lag and cold caches; multi-minute large-model pulls exceed
+what it models, and the limitation says so.
+
+\paragraph{Cache hits that are wrong answers.} Anticipated and measured
+(Section~\ref{sec:eval-cache}): precision with strata and a
+per-1k-incorrect-hits figure next to the savings, plus the stochasticity
+ceiling that bounds what the proxy can say. No ``quality-adjusted dollar''
+is invented, because pricing a wrong answer is application-specific.
+Staleness and TTL are out of scope and listed as such.
+
+\section{Limitations}
+\label{sec:disc-limits}
+
+\begin{itemize}
+  \item \textbf{Substrate.} Headline numbers are simulator decision quality;
+        live validation is ordinal-only, currently verified for the HPA arm
+        with the \jcac{} live slice pending
+        (Section~\ref{sec:eval-live}).
+  \item \textbf{The live figure exercises one knob.} The live data plane
+        burns fixed CPU per request kind, so cache and tier are inert there;
+        the live check validates the replica-control projection, with the
+        other knobs' realism carried by their own real-data protocols. The
+        frozen caption states this.
+  \item \textbf{Latency is p95, request-level.} The simulator's tail beyond
+        p95 is not credible and is not reported; token-level dynamics (TTFT,
+        decode-length tails, head-of-line blocking under continuous
+        batching) are outside the model. The live path can report any
+        percentile; p99 live restatement is future work, not silently
+        substituted.
+  \item \textbf{Trace scope.} Demand claims rest on BurstGPT plus the Azure
+        LLM 2024 release; prompt claims on LMSYS-Chat-1M. One
+        generalization failure is already published (the seasonal
+        non-transfer), which is the strongest available evidence that the
+        remaining claims are scoped honestly. FaaS/VM traces were
+        deliberately descoped as non-LLM demand.
+  \item \textbf{Tenant count.} Eight tenants per cluster is the studied
+        composition factor; the planner's measured scaling (exponent 1.45,
+        timeout crossover at 128 tenants) bounds, but does not remove, the
+        gap to production tenant populations. Coordination costs outside
+        the planner are unmeasured.
+  \item \textbf{Production scale.} SageServe-class fleets serve more in a
+        day than the entire replay; the 10.63M-request demand replay is the
+        honest analog at decision level, and no stronger claim is made.
+\end{itemize}
+
+\section{The honest-nulls ledger as a contribution}
+
+Seven published negatives travel with the wins: v2 H1, v3 H1$'$, the
+underpowered first replay, the $\gamma$-term null, the seasonal
+non-transfer, the structurally impossible raw per-metric gate, and the cache
+hit-quality result. None was hidden; several redirected the design (Holt as
+recommended default; per-stream forecasting; per-tenant caches). The
+methodological claim of this thesis --- pre-registration with published
+nulls in a systems evaluation --- is independent of any performance number
+and, in the surveyed literature, unique to this work.

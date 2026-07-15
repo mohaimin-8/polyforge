@@ -1,0 +1,152 @@
+\chapter{Introduction}
+\label{ch:introduction}
+
+\section{The problem: hybrid serving is controlled one layer at a time}
+
+Multi-tenant platforms no longer serve one kind of traffic. The same tenants,
+on the same clusters, issue classic CRUD requests and AI inference requests
+--- chat completions, embeddings, multi-step agent chains --- often within a
+single user-facing transaction. Three control surfaces govern what that
+serving costs and how it feels:
+
+\begin{enumerate}
+  \item \textbf{Replica autoscaling} decides how much capacity each service
+        holds. In production this is the Kubernetes Horizontal Pod Autoscaler
+        (HPA)~\citep{k8shpa}, KEDA~\citep{keda}, or a research
+        controller~\citep{firm2020,sageserve2025,chiron2025,aladdin2024}.
+  \item \textbf{Semantic response caching} decides which AI answers are
+        served from an embedding-similarity cache instead of a model
+        call~\citep{gptcache2023,scalm2024,instcache2024,meancache2024}.
+  \item \textbf{Model-tier routing} decides which of several differently
+        priced model classes answers each request~\citep{infaas2019}.
+\end{enumerate}
+
+Each layer has a mature literature and, in every surveyed system, an
+independent controller: an autoscaler that has never heard of the cache, a
+cache that does not know what a replica costs, a router that optimizes one
+request at a time. Each controller can be locally optimal. This thesis starts
+from the observation that the three layers share one budget, one latency
+target, and one set of tenants --- and asks whether local optima compose.
+
+\section{Thesis statement}
+
+\begin{quote}
+\emph{Per-layer local optima do not compose into a joint optimum. A
+controller that plans replicas, semantic-cache budget, and model tier
+together --- one receding-horizon optimization per control interval, against
+a single objective in cost, SLO compliance, and cross-tenant fairness ---
+dominates tuned per-layer baselines on that objective, and does so with
+per-tenant dollar accounting and budget guardrails that no surveyed system
+provides.}
+\end{quote}
+
+The claim is tested, not asserted: against five baselines each grid-tuned on
+the thesis's own objective, under seven pre-registered protocols whose
+hypotheses --- including the two that failed --- were committed and pushed
+before the first run.
+
+\section{What was built}
+
+\polyforge{} is a Kubernetes-native control plane implementing the thesis
+statement end to end (Chapter~\ref{ch:design}):
+
+\begin{itemize}
+  \item a \textbf{control plane} (Go) for tenants, projects, API keys, rate
+        limits, and telemetry, with row-level-security-enforced tenant
+        isolation proven by test;
+  \item an \textbf{AI gateway} (Go) with multi-backend chat routing, a
+        semantic cache with cost-aware eviction, vector search, and an agent
+        loop;
+  \item a \textbf{workload classifier} mapping 12-feature telemetry windows
+        onto a five-class taxonomy with drift detection;
+  \item the \textbf{\jcac{} planner} (\emph{Joint Cache--Autoscaling
+        Control}): receding-horizon model-predictive control over a
+        move-blocked action lattice, minimizing
+        $J = \alpha\,\text{cost} + \beta\,\text{SLO violation} +
+        \gamma\,(1-\text{Jain})$, deployed as a Python service that imports
+        the simulator's controller so offline and online planning are the
+        same code;
+  \item a \textbf{Kubernetes operator} (Go) with four CRDs (Tenant,
+        WorkloadProfile, Policy, Budget) that actuates plans under
+        guardrails: replica bounds, one cache level per step, per-tenant
+        budget caps, and last-good-plan fallback.
+\end{itemize}
+
+\section{Contributions}
+
+\begin{enumerate}
+  \item \textbf{Joint cross-layer control.} The first surveyed controller to
+        co-optimize replicas, semantic-cache budget, and model tier against
+        one multi-tenant objective (Chapter~\ref{ch:design}); ablating
+        jointness costs $+2884\%$ on the objective's cost term
+        (Section~\ref{sec:eval-v1}).
+  \item \textbf{A measured composition result.} On a 1{,}800-run blocked
+        factorial with tuned baselines, \polyforge{} wins the composite
+        objective against every baseline ($|\dz|$ 0.66--1.44) and is the only
+        Pareto-undominated system; on replayed real BurstGPT demand the
+        powered confirmatory replay shows $-70\%$ cost
+        ($n{=}96$, $p \le 4.3\times10^{-6}$) with a disclosed $+0.07$
+        violation trade (Section~\ref{sec:eval-replay}).
+  \item \textbf{An honest SLO result.} Two pre-registered attempts to beat
+        tuned reactive scalers on raw violation failed and are published as
+        failures; what holds is violation parity at $-43$\ldots$-48\%$ cost,
+        a confirmed forecasting mechanism (seasonal $<$ trend on violation
+        where real periodicity exists, $p=6\times10^{-4}$), and a
+        declared-exploratory win in the spike regime where reaction is
+        structurally impossible (Section~\ref{sec:eval-v3}).
+  \item \textbf{Real-data cache results with a quality denominator.} On real
+        LMSYS-Chat-1M prompts: 29.6\% adaptive hit rate at cosine 0.85
+        ($+93\%$ over a 10\%-of-working-set fixed cache), dollar-weighted
+        savings, an empirical hit-rate--capacity curve, and --- unique among
+        surveyed cache papers --- measured hit \emph{precision} with its
+        stochasticity ceiling (Section~\ref{sec:eval-cache}).
+  \item \textbf{Fairness at the control-plane altitude.} Beats a FIRM-style
+        baseline on Jain's index ($\dz{=}1.0$) and a VTC-style replica-level
+        transplant \emph{on Jain itself} at $-35\%$ cost; the controller's
+        own fairness term is honestly nulled under injected interference
+        (Section~\ref{sec:eval-fairness}).
+  \item \textbf{A security frontier for shared semantic caches.} A timing
+        side channel leaking prompt membership at AUC 0.88, and a defense
+        comparison in which per-tenant partitioning restores
+        attacker-to-chance at 24\% latency cost, dominating padding and TTL
+        jitter (Section~\ref{sec:eval-security}).
+  \item \textbf{Construction-level theory.} Block-coordinate optimality of
+        the planner's two-sweep solver and boundedness/contraction of its
+        self-calibration scale, stated at exactly the altitude the code
+        delivers (Section~\ref{sec:design-theory}).
+  \item \textbf{A pre-registered systems methodology.} Seven protocols
+        pushed before their runs, tuned baselines, paired effect sizes with
+        bootstrap CIs, stopping rules, substrate separation, and a published
+        honest-nulls ledger (Chapter~\ref{ch:methodology}) --- a
+        methodological contribution independent of any performance number.
+\end{enumerate}
+
+\section{Scope and honesty of claims}
+\label{sec:intro-scope}
+
+Every headline number in this thesis is \emph{decision quality under a stated
+system model}: a discrete-event simulator whose congestion form was
+calibrated against a real inference server (the fit direction errs
+\emph{against} \polyforge{}'s lean postures) and whose model-tier constants
+were checked against a real GPU latency bench. Real data enters three ways:
+replayed BurstGPT demand (10.63M requests) and Azure LLM inference 2024
+demand (44.1M requests) for the cost and forecasting claims, and real
+LMSYS-Chat-1M prompts for the cache claims. Live-cluster validation is
+\emph{ordinal only} by design --- absolutes are never compared across
+substrates --- with the HPA arm verified live and the \jcac{} arm wired
+behind an executable actuation gate at the time of writing
+(Section~\ref{sec:eval-live}). What is \emph{not} claimed: absolute dollar or
+latency numbers transferring to any production fleet, token-level scheduling
+fairness, or tail behavior beyond p95 on the simulated substrate.
+
+\section{Document structure}
+
+Chapter~\ref{ch:background} positions the work against autoscaling, caching,
+fairness, and the 2026 serving stack. Chapter~\ref{ch:design} presents the
+architecture, the \jcac{} formulation, and the two propositions.
+Chapter~\ref{ch:implementation} covers the implementation and its
+engineering gates. Chapter~\ref{ch:methodology} defines the pre-registered
+methodology. Chapter~\ref{ch:evaluation} reports all campaigns ---
+wins, nulls, and failures. Chapter~\ref{ch:discussion} confronts threats to
+validity. Chapter~\ref{ch:conclusion} concludes.
+Appendix~\ref{app:traceability} maps every claim to its committed evidence.

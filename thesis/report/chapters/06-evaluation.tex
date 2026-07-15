@@ -1,0 +1,412 @@
+\chapter{Evaluation}
+\label{ch:evaluation}
+
+This chapter reports every campaign in the order it was run, under the rules
+of Chapter~\ref{ch:methodology}: wins, nulls, and failures alike. Every
+number traces to a committed, machine-generated measurement record
+(Appendix~\ref{app:traceability}); where a summary here and a campaign file
+could disagree, the campaign file wins.
+
+\section{Scoreboard}
+\label{sec:eval-scoreboard}
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lp{0.21\textwidth}X@{}}
+\toprule
+\textbf{Segment} & \textbf{Verdict} & \textbf{The citable claim} \\
+\midrule
+Cost & \textbf{Won} (confirmatory; synthetic $+$ real) &
+Beats every tuned baseline on cost in the 1{,}800-run matrix
+($\dz$ 0.66--1.12); on real BurstGPT demand: $-70\%$ cost vs.\ tuned
+HPA/KEDA/FIRM ($p \le 4.3{\times}10^{-6}$, $n{=}96$). \\
+SLO & \textbf{Closed honestly} &
+Violation parity with tuned HPA/KEDA at $-43\ldots{-48\%}$ cost; beats FIRM.
+Overload: reactive scalers buy attainment at 3.2--3.4$\times$ spend
+(H1$'$ FAIL); forecast mechanism confirmed (H2$'$ PASS); spike-class
+exploratory win. \\
+Fairness & \textbf{Won} (two dedicated baselines) &
+Beats FIRM on Jain ($\dz{=}1.0$); beats tuned VTC-replica on Jain itself
+(0.9705 vs.\ 0.9599) at $-35\%$ cost. Own $\gamma$-term honestly nulled. \\
+Forecasting & \textbf{Won} (on real data) &
+Damped Holt $-26.9\%$ RMSE on real BurstGPT; the synthetic seasonal
+prediction did not transfer and is published as such; on Azure LLM 2024 the
+mechanism boundary reproduces --- the winner tracks measured periodicity. \\
+Cache & \textbf{Closed} (real-data headline) &
+29.6\% hit at cosine 0.85 / 48.8\% at 0.70 on real LMSYS-Chat-1M; $+93\%$
+vs.\ 10\%-fixed; \$0.296/1k queries; hit precision measured with its
+stochasticity ceiling. \\
+Security & \textbf{Won} (uncontested novelty) &
+Timing side channel at AUC 0.88; per-tenant partitioning restores chance at
+24\% latency cost, dominating padding and TTL jitter. \\
+\bottomrule
+\end{tabularx}
+\caption{Verdicts across the six contested segments
+(\evfile{RESULTS\_MASTER.md}).}
+\label{tab:scoreboard}
+\end{table}
+
+On the composite objective $J$ --- the objective every baseline was tuned on
+--- \polyforge{} wins against \emph{every} baseline in \emph{every} campaign
+that tested it: v1 ($p \le 4.6{\times}10^{-25}$), v2
+($p \le 6.7{\times}10^{-25}$), v3 overload ($p \le 1.3{\times}10^{-11}$),
+the VTC slice ($p = 3.3{\times}10^{-19}$), and the real-demand replay
+($p \le 5.5{\times}10^{-5}$) --- and is the only Pareto-undominated system
+in the matrix (Figure~\ref{fig:pareto}).
+
+\section{The headline matrix: 1{,}800 runs plus 500 ablations}
+\label{sec:eval-v1}
+
+The blocked factorial of Section~\ref{sec:method-matrix} with all baselines
+grid-tuned on $J$. \polyforge{} beats every tuned baseline on composite $J$
+($p \le 4.6{\times}10^{-25}$, $|\dz|$ 0.66--1.44) and on cost against all
+five (Figure~\ref{fig:cost-by-system}); it holds violations near the
+over-provisioned floor at a fraction of that floor's cost, and sits alone on
+the cost--violation frontier (Figure~\ref{fig:pareto}).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.78\textwidth]{fig01_cost_by_system.pdf}
+  \caption{Cost by system, mean $\pm$ 95\% CI over all 300 matrix cells per
+  system (log scale): joint control converts visibility into savings rather
+  than over-provisioning.}
+  \label{fig:cost-by-system}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.78\textwidth]{fig03_pareto_cost_violation.pdf}
+  \caption{The cost--violation plane (means $\pm$ 95\% CI): every baseline
+  is dominated on at least one axis without winning the other.}
+  \label{fig:pareto}
+\end{figure}
+
+One pre-committed gate \textbf{fails as measured} and is reported: the
+roadmap's raw per-metric gate (win every metric outright) is structurally
+impossible against by-construction winners --- over-provisioned Static and
+cache-maxed GPTCache take the SLO and hit-rate columns at 12--30$\times$
+\polyforge{}'s spend. The iso-cost variants exist for exactly this
+comparison (Section~\ref{sec:eval-v2}).
+
+Where baselines break is class-structured, as the taxonomy's
+control-implication column predicts: replica-only controllers cannot fix
+agentic latency, because it needs the tier knob
+(Figure~\ref{fig:violation-by-workload}). The single-trace view shows the
+composed behavior directly: within the first minute of an agentic run,
+\polyforge{} fills its replica budget \emph{and} quadruples the semantic
+cache, while HPA chases each burst with the only knob it has
+(Figure~\ref{fig:adaptation}).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.88\textwidth]{fig07_violation_by_workload.pdf}
+  \caption{SLO violation by workload class (mean $\pm$ 95\% CI): the
+  taxonomy's control implications made measurable --- agentic latency is a
+  tier-knob problem no replica-only controller solves.}
+  \label{fig:violation-by-workload}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.88\textwidth]{fig09_adaptation_trace.pdf}
+  \caption{One agentic run, blow by blow: joint control in a single trace.}
+  \label{fig:adaptation}
+\end{figure}
+
+\paragraph{Ablations (500 runs).} Removing joint control costs $+2884\%$ on
+the cost metric; removing cost-aware eviction $+35.7\%$; removing the
+classifier $+2.1\%$ cost and $-45\%$ relative hit rate; each of the four
+components carries independent, statistically significant weight
+(Figure~\ref{fig:ablations}). The composition claim of
+Section~\ref{sec:intro-scope} is this measurement.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\textwidth]{fig08_ablation_deltas.pdf}
+  \caption{Ablation deltas (red $=$ worse than full \polyforge{};
+  $* = p<0.01$).}
+  \label{fig:ablations}
+\end{figure}
+
+\section{Advanced tier: forecasters, realism, self-calibration}
+\label{sec:eval-advanced}
+
+The in-loop forecast ablation found headroom in the system's own default:
+the linear-trend forecaster overreacts to bucket noise, and damped Holt
+smoothing beats it by $-16.3\%$ SLO violation at equal cost ($p=0.0027$;
+Figure~\ref{fig:forecast-ablation}). Holt became the documented recommended
+default; trend stays the code default so the committed 1{,}800-run headline
+remains bit-reproducible. Under reconfiguration realism (replica startup lag
+and half-warm caches, billed immediately), reactive scalers pay for capacity
+that misses the burst it was bought for, while \polyforge{}'s hysteresis
+holds the frontier; self-calibration (Proposition~\ref{prop:calibration})
+earns $\dz{=}{+}0.46$ ($p=0.029$), concentrated on the bursty classes where
+trusting nominal capacity hurts most.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig13_forecast_ablation.pdf}
+  \caption{Forecast ablation: damped Holt beats the trend default on
+  violation at equal cost; online-seasonal helps only where a period
+  exists.}
+  \label{fig:forecast-ablation}
+\end{figure}
+
+\section{The v2 pre-registered matrix: an SLO hypothesis fails in public}
+\label{sec:eval-v2}
+
+\evfile{PREREG\_V2.md} froze \texttt{jcac\_v2} (Holt $+$ adaptive capacity)
+and two hypotheses before any of the 2{,}100 runs. \textbf{H1 FAILED}: SLO
+violation is not significantly below tuned HPA/KEDA --- what holds is
+violation \emph{parity} at $-43\ldots{-48\%}$ cost, and a clear win over
+FIRM ($p=2{\times}10^{-19}$). \textbf{H2 PASSED}: no large-effect
+self-regression, and cost improves $-11\%$ over v1
+($p=4{\times}10^{-36}$). The iso-cost gate reshapes the by-construction
+winners of Section~\ref{sec:eval-v1}: budget-matching flips Static from
+win-by-spending to a 3-of-5 loss, and 36 of 60 cells are budget-infeasible
+for the cache-max posture (it outspends the budget 36$\times$). Per the
+pre-registered stopping rule, \texttt{jcac\_v2} was not re-tuned after the
+H1 failure; v1 \texttt{jcac} remains the headline system.
+
+\section{The v3 overload matrix: a failed hypothesis and a confirmed
+mechanism}
+\label{sec:eval-v3}
+
+The v2 matrix's demand shapes are smooth enough that reactive scalers keep
+up; when everyone can react in time, everyone ties on violation and the
+only degree of freedom left is cost. \evfile{PREREG\_V3.md} therefore
+constructed overload cells where demand climbs faster than the shared
+$\pm2$-replicas-per-interval actuation clamp --- sized by arithmetic on
+committed model constants, pinned by unit tests
+(Section~\ref{sec:method-matrix}) --- with \texttt{jcac\_seasonal} named in
+advance as the sole treatment. 1{,}200 runs, all valid.
+
+\textbf{H1$'$ FAILED, and the failure is informative}: tuned HPA/KEDA buy
+overload attainment with 3.2--3.4$\times$ \polyforge{}'s spend (seasonal is
+$-69/{-71}\%$ on cost at $+0.05/{+0.09}$ violation), and only \polyforge{}
+honors the cluster capacity cap at these amplitudes (a disclosed harness
+asymmetry, strict against us). \textbf{H2$'$ PASSED}: seasonal forecasting
+reduces violations against trend ($p=6{\times}10^{-4}$) at no cost
+regression --- the mechanism is real. In the declared-exploratory spike
+class, where reaction is structurally impossible, the full predicted
+phenomenon appears: seasonal beats HPA on violation
+($p=5{\times}10^{-5}$, $\dz{=}0.57$) at $-46\%$ cost. Composite $J$: wins
+against all three baselines ($p \le 1.3{\times}10^{-11}$). The
+pre-registered stopping rule closes confirmatory SLO attempts for this
+thesis: two attempts, two published failures, one confirmed mechanism.
+
+\section{Real demand: the BurstGPT replays}
+\label{sec:eval-replay}
+
+Real BurstGPT v2.0 demand~\citep{burstgpt2024} --- 10{,}632{,}194 requests
+over 335 days, normalized deterministically --- replayed through the
+committed system model in 6-hour windows, demand scale frozen pre-run,
+arrival jitter drawn once per window and shared across systems.
+
+\textbf{First sample ($n{=}16$): HT FAILED} at the $p<0.01$ gate ---
+underpowered ($p\approx0.07$--$0.11$) --- but every point estimate
+reproduces the v1 ranking. The sample stands as measured; it is not the
+citable headline. \textbf{Powered second sample
+(\evfile{PREREG\_TRACE2.md}, $n{=}96$ independent seeds, ${\sim}94\%$
+power): HT2 PASSED with disclosure} --- $J$ beats HPA/KEDA/FIRM at
+$p \le 5.5{\times}10^{-5}$ ($\dz$ $-0.43\ldots{-0.47}$), \textbf{cost
+$-70\%$} ($-\$77\ldots{-\$80}$ per window, $p \le 4.3{\times}10^{-6}$), and
+the pre-registered disclosure is honored: a violation trade of $+0.07$
+($p<10^{-6}$) rides along --- the same attainment-for-multiples-of-spend
+trade quantified everywhere else. Both collection segments show the
+identical effect; samples are never pooled. Effect sizes with bootstrap CIs,
+the citable unit, are tabulated in \evfile{EFFECT\_SIZES.md}; all $n{=}96$
+confirmatory intervals exclude zero.
+
+\section{Forecasting on real traces: a prediction fails to transfer, a
+boundary reproduces}
+\label{sec:eval-forecast}
+
+The synthetic stand-in (textbook diurnal, autocorrelation 0.85 at 24\,h)
+predicted seasonal forecasting would dominate: $-44.8\%$ RMSE. On the real
+BurstGPT trace the periodicity is weak (best autocorrelation $\le 0.49$ at
+8\,h) and \textbf{the prediction does not transfer}: seasonal never beats
+trend; damped Holt wins segment 1 ($-26.9\%$ RMSE), persistence wins segment
+2 ($-16.6\%$), and trend is the worst choice on real data. The
+recommendation followed the data (Holt is \texttt{jcac\_v2}'s forecaster).
+
+The second real trace --- Azure LLM inference 2024
+\citep{azurellmtrace2024}, 44.1M requests, two production workloads ---
+reproduces the \emph{mechanism boundary} through the identical frozen
+decomposition: seasonal wins exactly on the stream with a genuine daily
+cycle (code: $-15.6\%$ RMSE at autocorrelation 0.57, lag 24), loses on the
+weakly periodic conversation stream ($+48.5\%$; persistence wins), and
+pooling the streams destroys forecastability (seasonal $+104\%$). Across
+three real streams no fixed forecaster dominates; the winner tracks measured
+periodicity. That is direct external support for \emph{per-tenant}
+forecasting and the pluggable-forecaster design --- and it is the scoped
+version of the v3 H2$'$ result.
+
+\section{The semantic cache on real prompts}
+\label{sec:eval-cache}
+
+On LMSYS-Chat-1M~\citep{lmsyschat1m2024} (seeded reservoir sample of
+200{,}000 from 2{,}015{,}645 user turns; MiniLM embeddings; block-wise exact
+nearest neighbor, verified bit-identical against the dense computation;
+feasibility amendments committed before the gated download):
+
+\begin{itemize}
+  \item \textbf{Hit rate}: adaptive 29.6\% at cosine 0.85, 48.8\% at 0.70.
+        InstCache's 51.34\% on the same dataset~\citep{instcache2024} is a
+        different mechanism (pre-populated predicted instructions) and is
+        placed beside, never head-to-head.
+  \item \textbf{Against a non-strawman fixed baseline}: $+93\%$ over a fixed
+        cache at 10\% of the inserted working set (29.6\% vs.\ 15.3\%).
+        In-matrix, adaptive sizing gives $+83\%$ over fixed (0.106 vs.\
+        0.058).
+  \item \textbf{Dollars}: \$0.296 saved per 1{,}000 queries at mid-tier
+        pricing --- the metric cache-only papers cannot produce, because it
+        requires the tenant-tier accounting.
+  \item \textbf{Capacity curve}: empirical $h(K)$ fit --- $h_{\max}=0.285$,
+        $K_{1/2}\approx 6{,}569$ entries (${\approx}19$\,MB). The
+        simulator's assumed curve was optimistic; the fit is documented
+        beside it, and the committed constants are unchanged
+        (bit-reproducibility; adopting them requires a new
+        pre-registration).
+\end{itemize}
+
+\paragraph{Hit quality.} A hit that serves the wrong answer is not a saving,
+so precision was measured under a frozen protocol
+(\evfile{CACHE\_PRECISION.md}): the probability, given a hit, that the
+served response agrees with the actually received response, at agreement
+threshold $\rho=0.70$, with same-model and first-turn strata declared
+pre-run. At
+$\tau{=}0.85$: precision 0.313 overall, 0.443 same-model, 0.353 first-turn;
+165.5 incorrect hits per 1{,}000 queries reported next to the savings. The
+built-in calibration bounds the reading: near-duplicate prompts
+($\tau\ge0.95$) agree only 33.8\% --- 25 models and sampling temperature
+dominate the absolute level. The citable claims are therefore the
+\emph{relative} readings: precision rises monotonically as $\tau$ tightens
+(0.249 $\to$ 0.338) while hit rate falls, and same-model precision is
+${\approx}2\times$ cross-model (0.443 vs.\ 0.223) --- a production
+deployment caching a single model's responses sits in the most favorable
+stratum.
+
+\section{Fairness: two dedicated baselines beaten, one own term nulled}
+\label{sec:eval-fairness}
+
+Against FIRM-style control, \polyforge{} wins Jain's index 0.9689 vs.\
+0.9294 in the v1 matrix ($\dz{=}1.0$, $p=4.5{\times}10^{-47}$), replicated
+in v2 (0.9672 vs.\ 0.929, $\dz{=}0.95$, $p=7.5{\times}10^{-44}$). Against
+the tuned VTC-style replica divider~\citep{vtc2024} under interference
+injection (\evfile{PREREG\_VTC.md}, 200 runs): \textbf{HV1 PASS} --- the
+dedicated fair divider loses composite $J$ ($\dz{=}{-1.12}$,
+$p=3{\times}10^{-19}$); \textbf{HV2 PASS} --- and it does not buy a fairness
+win either: \polyforge{} is \emph{more} fair on Jain itself (0.9705 vs.\
+0.9599, $p=1.5{\times}10^{-6}$) at $-35\%$ cost and $-36\%$ worst-tenant
+p95. Scope: this is capacity-allocation fairness at the control plane, not
+token-level service fairness (Section~\ref{sec:disc-fairness-altitude}).
+
+The controller's own $\gamma$-term is a published null: under injected
+noisy-neighbor interference, the $\gamma$-ablation shows no significant
+contribution even in the whale-only subgroup where the injection fires
+(\evfile{FAIRNESS\_V2.md}). The term stays in the system as a configurable
+weight; it is dropped from the claims.
+
+\section{Security: a timing side channel and its defense frontier}
+\label{sec:eval-security}
+
+A shared semantic cache leaks prompt membership across tenants from response
+time alone: an attacker distinguishing whether a victim tenant inserted a
+prompt reaches AUC 0.88 (Figure~\ref{fig:side-channel}; cf.\ the prompt-cache
+audit of \citet{promptcacheaudit2025} at the API layer). Per-tenant
+partitioning returns the attacker to chance (AUC 0.50) at 24\% latency cost
+while keeping 76\% of hits --- strictly dominating response-time padding
+(never below AUC 0.73 at any cost) and TTL jitter (chance only at
+${\sim}90\%$ hit loss) on the leakage-vs-benefit frontier
+(Figure~\ref{fig:defense-frontier}). This measurement motivated the
+per-tenant default in the gateway design
+(Section~\ref{sec:design-loop}).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{fig16_cache_side_channel.pdf}
+  \caption{Left: membership leakage from response time in a shared semantic
+  cache; per-tenant caching pins the attacker at chance. Right: isolation
+  costs hit rate; demand-proportional sizing recovers part of the penalty.}
+  \label{fig:side-channel}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig17_defense_frontier.pdf}
+  \caption{Defense frontier: worst-case membership-inference AUC vs.\ share
+  of the cache's latency benefit given up. Per-tenant partitioning dominates
+  the frontier rather than merely joining it.}
+  \label{fig:defense-frontier}
+\end{figure}
+
+\section{Live-cluster validation: ordinal by design}
+\label{sec:eval-live}
+
+Ground rule: absolutes are never compared across substrates; the live
+experiment asks only whether the simulator's \emph{ranking} reproduces under
+a real scheduler, real HPA, and real load on a kind cluster. Status at the
+time of writing:
+
+\begin{itemize}
+  \item The \textbf{HPA arm is verified live}: a full cluster-backend run
+        valid on a real kind cluster, with eval-export metrics matching the
+        load's construction exactly.
+  \item The \textbf{\jcac{} arm is fully wired and locally tested}
+        (Section~\ref{sec:impl-live}), gated behind the executable actuation
+        check: a run in which the operator never actuated fails before load
+        is generated.
+  \item The \textbf{analysis protocol is frozen} before any live \jcac{}
+        number exists (\evfile{phase7\_ordinal.py}, committed with the sim
+        reference slice, 12/12 valid): per-cell winner agreement on
+        $J$/cost/violation, no absolutes across substrates, no significance
+        testing on three repetitions.
+\end{itemize}
+
+The figure caption is frozen verbatim in \evfile{PHASE7\_JCAC\_PLAN.md} and
+carries the disclosure that the live data plane burns fixed CPU per request
+kind, so the cache-size and model-tier knobs are inert live: the live figure
+validates the \emph{replica-control projection} of the joint controller,
+while the cache knob's realism is carried by the LMSYS protocol
+(Section~\ref{sec:eval-cache}) and the tier knob's by the GPU tier bench
+(Section~\ref{sec:method-substrates}). The live \jcac{} slice is the one
+remaining measurement in the project; until it runs, the HPA arm is the only
+live-verified system, and this thesis says so rather than extrapolating.
+
+\section{Summary: which number to cite}
+\label{sec:eval-summary}
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+\textbf{Claim} & \textbf{Cite} & \textbf{Not} \\
+\midrule
+Cost, real demand & $-70\%$ ($n{=}96$, $p\le4.3{\times}10^{-6}$) & $-76\%$
+($n{=}16$ point estimate, HT FAIL) \\
+Cost, synthetic matrix & $-36\ldots{-48\%}$ vs.\ HPA/KEDA/FIRM & any mixing
+with replay numbers \\
+Forecasting gain & Holt $-26.9\%$ RMSE, real trace & seasonal $-44.8\%$
+(synthetic; did not transfer) \\
+Forecasting, external & winner tracks measured periodicity (3 traces) &
+``Holt is best'' (scoped to BurstGPT) \\
+SLO & parity at $-43\ldots{-48\%}$ cost; mechanism $p=6{\times}10^{-4}$ &
+any ``beats HPA/KEDA on violation'' \\
+Fairness & Jain 0.9705 vs.\ VTC 0.9599; FIRM $\dz{=}1.0$ & the
+$\gamma$-ablation (published null) \\
+Cache hit rate & 29.6\% @ 0.85, real LMSYS, $+93\%$ vs.\ 10\%-fixed &
+synthetic saturation; the 200-entry strawman \\
+Cache quality & precision-vs-$\tau$ shape $+$ strata & ``69\% of hits are
+wrong'' (ignores the stochasticity ceiling) \\
+Security & AUC 0.88 $\to$ 0.50 at 24\% latency, 76\% hits kept & --- \\
+Effect sizes & $\dz$ with 95\% bootstrap CI & bare p-values below
+${\sim}10^{-6}$ \\
+Planner scale & exponent 1.45; 3\,s timeout crossed at 128 tenants &
+``linear in tenants'' \\
+\bottomrule
+\end{tabularx}
+\caption{Disambiguation table (from \evfile{RESULTS\_MASTER.md}); the
+conservative column is the thesis's claim.}
+\label{tab:which-number}
+\end{table}

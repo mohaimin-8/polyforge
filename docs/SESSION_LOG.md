@@ -7,6 +7,81 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-15 (session 18) — Milestone 9 opened: thesis report and defense slides, compiled from the evidence base
+
+Milestone status: M9 (Thesis and Publication Package) moves from empty to
+substantially drafted. `thesis/report/` (43-page LaTeX report, compiles
+clean) and `thesis/slides/` (16-frame beamer deck, compiles clean) now
+exist; both are generated strictly from the committed measurement records,
+with every number following RESULTS_MASTER.md's which-number-to-cite
+discipline. Related-work matrix, viva Q&A, and evaluation figures (the
+other M9 deliverables) already existed; the remaining M9 gap is the live
+jcac ordinal figure (blocked on a Docker box) and human submission items.
+
+### Audit findings
+
+Clean tree except one uncommitted DAILY.md progress tick from the 7/13
+phase7_sim_ref slice (12/12 valid) — committed as f3317a8. No regressions;
+CI green through 650ce29.
+
+### What changed (docs-only; no Go/Python source touched)
+
+- `thesis/report/`: `main.tex` (report class, natbib, TikZ architecture
+  figure), 8 chapters + claims-traceability appendix (`chapters/`),
+  `references.bib` (31 entries from RELATED_WORK.md's verified URL list),
+  `build.ps1`. Figures included directly from `eval/results/figures/*.pdf`
+  (8 used). Structure: intro/thesis statement → related work (shape-vs-shape
+  rule stated) → design + both THEORY_V2 propositions with scope →
+  implementation incl. the two desk-found live-arm defects → pre-registered
+  methodology → evaluation (all campaigns, wins AND nulls, scoreboard +
+  which-number-to-cite tables) → discussion mirroring DEFENSE_QA → 
+  conclusion → Appendix A mapping every claim to its evidence file,
+  protocol commit, and regeneration script.
+- `thesis/slides/`: 16-frame Madrid-theme deck along the same skeleton,
+  honest-nulls framing kept (H1/H1′ FAIL slides included).
+- `thesis/README.md`: build instructions + the four human fill-ins.
+- `.gitignore`: LaTeX build artifacts; the two PDFs are committed
+  deliverables.
+
+### Honesty notes for the record
+
+- A numeric discrepancy surfaced while sourcing the FIRM Jain claim:
+  RESULTS_MASTER says d_z=1.0/p=4.5e-47, RELATED_WORK says 0.95/7e-44.
+  Resolved by the campaign files per the master's own rule: both are real —
+  v1 (RESULTS.md: 0.9689 vs 0.9294, dz=1.001, p=4.536e-47) and v2
+  (RESULTS_V2.md: dz=0.9513, p=7.479e-44). The thesis cites v1 as headline
+  with the v2 replication beside it. RESULTS_MASTER is NOT edited (its
+  number is v1's and is correct).
+- `references.bib` uses placeholder author fields ("Chiron authors") for
+  arXiv-only sources whose author lists were not verified — flagged in
+  thesis/README.md as a pre-submission fill-in. No fabricated authors.
+- Title-page macros (university, supervisor, degree, full name) are
+  placeholders in `main.tex`.
+- The live section (§6.10) states the true Phase 7 status: hpa arm
+  verified, jcac wired+gated, live slice pending; frozen caption referenced,
+  not pre-claimed.
+
+### How it was verified
+
+pdflatex (MiKTeX 25.12) ×3 + bibtex: **0 undefined references, 0 undefined
+citations**, 43-page main.pdf, all 8 figure PDFs embedded (checked in
+main.log); one residual 9.6pt overfull hbox (cosmetic). Slides: 2 passes,
+16-page slides.pdf, no errors (metropolis theme failed on missing
+mathkerncmssi fonts → switched to stock Madrid + lmodern). Visual
+proofread NOT done on this machine (no PDF renderer available to the
+agent); the compile log is the verification. Go/Python gates not re-run:
+no source files changed this session.
+
+### What remains (unchanged, all outside this machine)
+
+The jcac live session (`--jcac-smoke` then `--full` on a Docker box) and
+its ordinal figure into §6.10; RELEASE_CHECKLIST account items (Zenodo DOI,
+Artifact Hub, GHCR images, demo video, pages site, cloud smoke, arXiv/FGCS);
+the four thesis fill-ins in thesis/README.md; a human proofread of both
+PDFs.
+
+---
+
 ## 2026-07-13 (session 17, round 2) — the leak-fill round: every field- and reviewer-perspective gap closable from this machine, closed
 
 Milestone status: after the morning's jcac wiring, the session pivoted
