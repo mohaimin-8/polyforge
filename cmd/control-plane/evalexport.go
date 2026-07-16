@@ -56,15 +56,19 @@ var (
 )
 
 type evalExportDoc struct {
-	TotalCostUSD        float64 `json:"total_cost_usd"`
-	CostTierUSD         float64 `json:"cost_tier_usd"`
-	CostInfraUSD        float64 `json:"cost_infra_usd"`
-	MeanViolation       float64 `json:"mean_violation"`
-	ViolationStepShare  float64 `json:"violation_step_share"`
-	MeanJain            float64 `json:"mean_jain"`
-	CacheHitRate        float64 `json:"cache_hit_rate"`
-	CrudP95MS           float64 `json:"crud_p95_ms"`
-	AIP95MS             float64 `json:"ai_p95_ms"`
+	TotalCostUSD       float64 `json:"total_cost_usd"`
+	CostTierUSD        float64 `json:"cost_tier_usd"`
+	CostInfraUSD       float64 `json:"cost_infra_usd"`
+	MeanViolation      float64 `json:"mean_violation"`
+	ViolationStepShare float64 `json:"violation_step_share"`
+	MeanJain           float64 `json:"mean_jain"`
+	CacheHitRate       float64 `json:"cache_hit_rate"`
+	CrudP95MS          float64 `json:"crud_p95_ms"`
+	AIP95MS            float64 `json:"ai_p95_ms"`
+	// p99 is a live-only order statistic (PREREG_LIVE_CHAOS_P99.md); the sim
+	// estimates p95 only, so these stay out of the sim-comparison tables.
+	CrudP99MS           float64 `json:"crud_p99_ms"`
+	AIP99MS             float64 `json:"ai_p99_ms"`
 	NEvents             int     `json:"n_events"`
 	NTenants            int     `json:"n_tenants"`
 	GeneratedAtUTC      string  `json:"generated_at_utc"`
@@ -217,6 +221,8 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 	doc.NTenants = len(tenants)
 	doc.CrudP95MS = evalP95(crudLatencies)
 	doc.AIP95MS = evalP95(aiLatencies)
+	doc.CrudP99MS = evalPercentile(crudLatencies, 0.99)
+	doc.AIP99MS = evalPercentile(aiLatencies, 0.99)
 	if total > 0 {
 		doc.MeanViolation = float64(violations) / float64(total)
 	}
@@ -246,15 +252,25 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 	return doc
 }
 
-func evalP95(values []float64) float64 {
+func evalP95(values []float64) float64 { return evalPercentile(values, 0.95) }
+
+// evalPercentile is the exact order statistic used for p95; p99 (Wave 3,
+// PREREG_LIVE_CHAOS_P99.md) reads the same per-request latencies through the
+// identical path. p99 is a LIVE-ONLY number: the sim is a p95 estimator by
+// construction (model.P95_FACTOR), so p99 is exported for the cluster and is
+// never back-fitted into the sim tables.
+func evalPercentile(values []float64, q float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}
 	sorted := append([]float64(nil), values...)
 	sort.Float64s(sorted)
-	index := int(math.Ceil(0.95*float64(len(sorted)))) - 1
+	index := int(math.Ceil(q*float64(len(sorted)))) - 1
 	if index < 0 {
 		index = 0
+	}
+	if index >= len(sorted) {
+		index = len(sorted) - 1
 	}
 	return sorted[index]
 }

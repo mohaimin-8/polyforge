@@ -52,6 +52,11 @@ func TestComputeEvalExportAggregatesHarnessSchema(t *testing.T) {
 	if doc.CrudP95MS != 400 || doc.AIP95MS != 7000 {
 		t.Fatalf("expected p95s 400/7000, got %v/%v", doc.CrudP95MS, doc.AIP95MS)
 	}
+	// p99 (Wave 3, live-only) reads the same latencies: ceil(0.99*n)-1.
+	// [100,400] -> index 1 = 400; [30,2000,7000] -> index 2 = 7000.
+	if doc.CrudP99MS != 400 || doc.AIP99MS != 7000 {
+		t.Fatalf("expected p99s 400/7000, got %v/%v", doc.CrudP99MS, doc.AIP99MS)
+	}
 	// Tier cost: small + mid + large = 0.0001 + 0.001 + 0.01.
 	if diff := doc.CostTierUSD - 0.0111; diff > 1e-9 || diff < -1e-9 {
 		t.Fatalf("expected tier cost 0.0111, got %v", doc.CostTierUSD)
