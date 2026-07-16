@@ -7,6 +7,94 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-16 (session 20) — Waves 1–2 leak-fill: six DEFENSE_QA audit gaps turned into pre-registered measurements, all as measured
+
+Milestone status: **the user-gated Waves 1–4 leak-fill plan is opened and
+Waves 1–2 are complete; every closed result got a robustness measurement,
+and none reversed.** No thesis prose touched (user: "no thesis writing —
+make it a strong publication").
+
+### Engine (defaults bit-identical; 86/86 py tests, 8/8 spot-check replays 0.00e+00)
+
+- `model.set_economy()` — per-run tier-price / cache-curve override, reset-
+  first so a pooled worker is stateless; the module constants both
+  `evaluate_step` (world) and every controller (beliefs) read move together,
+  preserving the shared-model contract.
+- `simulate.run` chaos hooks: `chaos_planner_outage` (last-known-good hold,
+  no plan/observe) and `chaos_replica_kill` (serving-only degrade, billing
+  nominal), controllers blind, default-off.
+- Harness: `ExperimentSpec.economy` (sim-only, validated, appended to run
+  identity only when set → every existing run_id unchanged); chaos SystemSpec
+  arms routed to the engine, never the controller. `TestEconomyOverride` +
+  `TestChaosArms` added; the KNOWN_FULL_RUN identity test pins the v1 headline
+  run_id so resume/replay of every closed campaign can't silently break.
+- `evalexport.go`: `evalPercentile` generalizes the exact p95 path; live
+  `crud_p99_ms`/`ai_p99_ms` added (Go test green). p99 stays LIVE-ONLY.
+
+### Wave 1 (re-reads immutable DBs only, exploratory, no new runs)
+
+- `BREAKEVEN_TIER.md` — exact re-pricing algebra over rep-0 rows (identity
+  check vs recorded cost ≤ 4e-4 USD); no aggregate cost win reverses across
+  60 frozen price vectors in any campaign.
+- `OBJECTIVE_FORM.md` — 69/85 form×baseline combinations preserve the
+  published direction; all 16 non-wins are the disclosed +0.07 violation
+  trade under violation-first / log-cost orderings.
+
+### Wave 2 (four pre-registered campaigns, preregs pushed at 7deb6a3 pre-run)
+
+- **Tier-ratio (§15)** `RESULTS_TIER_RATIO.md`, 1,800 runs at GPU corner
+  1:1.516:16.64 — TR-H1 cost PASS 5/5 (p ≤ 6.8e-47), TR-H2 J PASS 5/5;
+  decision response = jcac re-plans into now-cheap mid tier (1.7% → 13.7%
+  steps), still wins.
+- **Cache curve (§16)** `RESULTS_HK_ADOPTION.md`, 1,800 runs at measured
+  hmax 0.285 / half 19 MB — HK-H1 J PASS 5/5, HK-H2 cost PASS 5/5; hit rate
+  halves, gptcache devalued most, jcac drops cache spend, margin narrows
+  (−27.5% → −19.4% vs HPA) but never closes.
+- **Sim chaos (§19a)** `RESULTS_CHAOS_SIM.md`, 540 runs — CH-H1 (dead planner
+  1 min beats healthy HPA, dz −1.69) + CH-H2 (survives 50% kill, dz −1.79)
+  PASS; centralization-tax finding: freeze costs jcac ΔJ +0.0063 < HPA
+  +0.0109 (p 3.8e-7) — proactive held config ages better than a frozen
+  reactive one. Recovery 2–5 steps.
+- **Pseudo-tenant (§18)** `PSEUDO_TENANT.md`, 19 sub-streams — PT-H1 PASS 0
+  counterexamples, PT-H2 all 6 periodic streams, PT-H3 three distinct
+  forecasters win → per-tenant pluggability measured one level down.
+
+### Wave 3 prepared (deferred to a live Codespace session; pushed at c38bce6)
+
+- `PREREG_WIRE_ATTACK.md` (over-the-wire membership attack, WA-H1 defense =
+  load-bearing, no attack magnitude pre-committed) and
+  `PREREG_LIVE_CHAOS_P99.md` (live planner-crash / apiserver-throttle + live
+  p99). p99 export desk half landed and unit-tested now.
+- `OSF_REGISTRATION.md` (§17): registry-ready mirror index, git push anchor
+  per protocol; OSF submit is the one flagged user action.
+
+### What changed (docs/code; no thesis .tex, no Go/Python controller logic)
+
+`model.py`, `simulate.py`, harness `config.py`/`sim_backend.py`/`systems.py`,
+`evalexport.go`(+test), `test_harness.py`; eight new analysis scripts/records
++ six preregs; `RESULTS_MASTER.md` (ledger entry 10, four new which-number
+rows, prereg count 7→11, p95/p99 ground rule) and `DEFENSE_QA.md` §15–19
+rewritten from open→measured/closed. Run-level CSVs committed
+(`metrics_matrix_gpu_econ`, `metrics_matrix_hk`, `metrics_chaos_sim`); raw
+duckdbs gitignored per policy.
+
+### How it was verified
+
+Each economy rerun spot-checked bit-identical on its default path (drift
+0.00e+00); every campaign validated at full N (1800/1800, 1800/1800,
+540/540) with runner `ok: true`; 86/86 harness + 43/43 sim py tests; Go
+evalexport test green; gofmt clean. Every hypothesis outcome is the analysis
+script's own output, committed verbatim.
+
+### What remains
+
+Wave 3 live execution (Codespace: wire attack, live chaos, live p99); Wave 4
+(three-knob live plane, planner→1024 cells, GPU rental) — both user-gated.
+RELEASE_CHECKLIST human items; thesis fill-ins (user-owned). OSF submission
+(user action).
+
+---
+
 ## 2026-07-16 (session 19) — the jcac live campaign executed end-to-end; ordinal verdict: DISAGREE, published as measured
 
 Milestone status: **the project's final open measurement is done.** The

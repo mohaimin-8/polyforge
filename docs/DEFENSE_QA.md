@@ -220,24 +220,38 @@ cache and tier levers.
 
 ## 15. "You never tested cost sensitivity to the tier-price ratios."
 
-Correct, and this is an open item rather than a hidden one: the matrix
-prices tiers at API ratios (1:10:100) while the GPU bench measured
-1:1.5:16.6 (same ordering, compressed scale, disclosed). `SENSITIVITY_J.md`
-swept the objective *weights*, not the price *constants*, so the fraction
-of the cost win that survives at self-hosting ratios is unmeasured. It is a
-cheap, pre-registrable sim rerun and is named as exactly that in the thesis
-limitations.
+Now measured, and it holds. The matrix prices tiers at API ratios
+(1:10:100) while the GPU bench measured 1:1.516:16.64 (same ordering,
+compressed scale, disclosed). Two closures, pre-registered before either
+ran (`PREREG_TIER_RATIO.md`, pushed at 7deb6a3): the *accounting* reading
+(`BREAKEVEN_TIER.md`, decisions frozen, exact re-pricing over 60 price
+vectors) finds no aggregate cost win reversed anywhere in the grid; the
+*decision* reading (`RESULTS_TIER_RATIO.md`, the full 1,800-run headline
+matrix rerun at the measured GPU corner so both the world's bill and every
+controller's beliefs move together) confirms the cost win against all five
+baselines survives (TR-H1 PASS 5/5, p ≤ 6.8e-47) and so does composite J
+(TR-H2 PASS 5/5). The interesting datum: given cheap mid-tier inference the
+joint controller *re-plans* into it (mid-tier steps 1.7% → 13.7%) and still
+wins cost — adaptation the fixed-decision reading cannot show. `SENSITIVITY_J.md`
+(weights) and now this (prices) are orthogonal robustness axes; both survive.
 
 ## 16. "Your 'calibration errs against us' line is only half true."
 
 The congestion fit (a=0.86) errs against PolyForge's lean postures; the
 assumed cache curve erred *for* the in-matrix cache benefit (measured h(K):
 hmax 0.285 vs the assumed 0.85 — `SEMANTIC_CACHE.md`). Both directions are
-documented; the matrix ran on the frozen optimistic curve for
-bit-reproducibility, all cache-using systems share it, and the differential
-effect on *rankings* is unquantified. The citable cache claims come from
-the real-LMSYS protocol, not the matrix; the pre-registered adoption of the
-empirical curve is the named closure.
+documented, and the second is now quantified rather than conceded. The named
+closure ran: `PREREG_HK_ADOPTION.md` (pushed at 7deb6a3), the full 1,800-run
+headline matrix rerun under the *measured* curve — pessimistic for every
+cache-using system, ours included (`RESULTS_HK_ADOPTION.md`). Effect as
+expected and as measured: realized cache hit rate halves (jcac 0.106 → 0.051),
+the cache-centric baseline is devalued most (gptcache mean cost 13.5 → 90.5),
+and the joint controller *stops paying for cache it can no longer use*
+(mean cache 362 → 136 MB). The ranking survives: HK-H1 (composite J) PASS
+5/5 and HK-H2 (cost) PASS 5/5, because PolyForge's advantage was never
+primarily the cache curve — the J margin against HPA narrows (−27.5% →
+−19.4% aggregate) but does not close. The differential-effect-on-rankings
+gap this question named is measured shut.
 
 ## 17. "Pre-registration without a registry is self-refereed."
 
@@ -245,28 +259,56 @@ The anchor is GitHub push-event forensics: every protocol was committed and
 pushed before its first run, and amendments were declared pre-run in the
 same history. That is weaker than an external registry and stronger than
 nothing; the strongest evidence that the mechanism was not gamed is what it
-produced — two failed confirmatory hypotheses and five further negatives,
-published in full. New experiments will mirror their pre-registrations to
-an external registry (OSF) prospectively.
+produced — failed confirmatory hypotheses and further negatives, published
+in full. The named upgrade is now in motion: `OSF_REGISTRATION.md` is the
+registry-ready mirror index, carrying every Wave 2/3 protocol with its git
+push anchor (commit + ISO timestamp) so an OSF registration is a
+transcription, not a re-derivation. Submitting to OSF needs a browser and an
+account and is the one human step, flagged there exactly as the Zenodo/GHCR
+items are in `docs/RELEASE_CHECKLIST.md`; until each DOI lands the git anchor
+stands and is independently checkable.
 
 ## 18. "Your per-tenant forecasting claim rests on aggregate streams."
 
 Yes — BurstGPT and the Azure workloads are aggregate demand streams, not
 per-tenant SaaS series. "The winner tracks each stream's measured
 periodicity" supports per-tenant forecasting by extrapolation across one
-aggregation level, and the thesis says so. A pseudo-per-tenant
-decomposition (workload/model splits of the existing traces under the
-frozen protocol) is the named, pre-registrable next step.
+aggregation level, and the thesis says so. That extrapolation is now
+measured one level down (`PREREG_PSEUDO_TENANT.md` pushed at 7deb6a3,
+`PSEUDO_TENANT.md`): the same traces split by Model × Log Type into 19
+qualifying sub-streams, driven through the identical frozen forecast
+protocol. The boundary reproduces with **zero counterexamples** — no weakly
+periodic sub-stream (detrended autocorrelation < 0.5) shows a material
+seasonal win (PT-H1 PASS), every one of the six periodic sub-streams does
+(PT-H2), and **three different forecasters win across sub-streams**
+(persistence / Holt / seasonal), which is precisely what a per-tenant
+pluggable forecasting layer exists to exploit (PT-H3). The claim is no
+longer an extrapolation across one aggregation level; it is measured across
+two. True per-tenant SaaS series remain unavailable and that limit stands.
 
 ## 19. "Where is the chaos testing? And was the security attack real?"
 
-Two honest boundaries. Failure injection: the planner-outage fallback is
-designed, unit-tested, and was observed once past the scaling bench's
-timeout crossover — but no live chaos campaign (planner crash mid-burst,
-apiserver throttling) has run; it is future work. Security: the AUC-0.88
-membership attack runs in the simulator's timing model, not over a real
-network; real network jitter typically degrades timing attacks, so the
-attack number is an upper-bound reading, while the defense conclusion
-(partitioning dominates padding/TTL) is expected to be robust in that
-direction. An over-the-wire demonstration on the live gateway is the named
-closure; membership inference is the only threat class studied.
+Both boundaries are now addressed — one measured in sim, both live halves
+pre-registered with the desk work landed. Failure injection: the sim chaos
+campaign ran (`PREREG_CHAOS_SIM.md` at 7deb6a3, `RESULTS_CHAOS_SIM.md`,
+540/540) — planner-outage and replica-kill injected into the scoring engine,
+controllers blind. A dead planner for one minute still beats a *healthy* HPA
+(CH-H1 PASS, dz −1.69); under an identical 50% replica kill jcac keeps its J
+win (CH-H2 PASS, dz −1.79); recovery lands within 2–5 steps. The result that
+turns the objection around: a one-minute control freeze costs jcac less
+(ΔJ +0.0063) than it costs a frozen HPA (ΔJ +0.0109, p 3.8e-7) — a
+proactively-planned held configuration ages better than a reactively-lagged
+one, so the central-planner "single point of failure" is, at this fault
+scale, the *more* graceful failure. The **live** chaos half (planner crash
+mid-burst and apiserver throttling on the kind cluster) is pre-registered
+(`PREREG_LIVE_CHAOS_P99.md`, deferred to a Codespace session), and it also
+closes the p99 question (#11): the export now emits live p99 alongside p95
+(desk-landed, unit-tested), kept out of the sim tables because the sim is a
+p95 estimator by construction. Security: the AUC-0.88 membership attack runs
+in the simulator's timing model, not over a real network; the over-the-wire
+demonstration on the live gateway is pre-registered
+(`PREREG_WIRE_ATTACK.md`), with the defense hypothesis (per-tenant
+partitioning returns the attacker to chance) as the load-bearing claim and
+no attack magnitude pre-committed, since real RTT jitter is expected to
+weaken the sim's upper bound. Membership inference remains the only threat
+class studied.

@@ -5,7 +5,9 @@ The per-campaign files it consolidates (`RESULTS.md`, `RESULTS_V2.md`, `RESULTS_
 `RESULTS_TRACE.md`, `RESULTS_TRACE2.md`, `VTC_FAIRNESS.md`, `FAIRNESS_V2.md`,
 `FORECAST_TRACE.md`, `FORECAST_TRACE_REAL.md`, `ADVANCED.md`, `SEMANTIC_CACHE.md`,
 `CACHE_PRECISION.md`, `EFFECT_SIZES.md`, `PLANNER_SCALING.md`, `FORECAST_AZURE.md`,
-`PHASE7_ORDINAL.md`) are
+`PHASE7_ORDINAL.md`, and the Wave 1–2 robustness records `BREAKEVEN_TIER.md`,
+`OBJECTIVE_FORM.md`, `RESULTS_TIER_RATIO.md`, `RESULTS_HK_ADOPTION.md`,
+`RESULTS_CHAOS_SIM.md`, `PSEUDO_TENANT.md`) are
 **machine-generated measurement records**: each is written by its analysis script from
 the raw run databases and is immutable once its campaign closes (pre-registration ground
 rules). They stay exactly as they are — this file summarizes and reconciles them but
@@ -151,6 +153,51 @@ knob, OSDI '24), interference injection on. **HV1 PASS**: loses composite J to j
 buy a large fairness win — jcac is *more* fair on Jain (0.9705 vs 0.9599, p=1.5e-6) at
 −35% cost, −36% worst-tenant p95. → `VTC_FAIRNESS.md`
 
+### 10. Wave 1–2 leak-fill campaigns — robustness of the closed results (session 20)
+
+Six DEFENSE_QA audit gaps (§14–19) turned into measurements. Wave 1 re-reads the
+immutable databases only (no new runs); Wave 2 is four pre-registered campaigns, each
+protocol pushed before its run (7deb6a3), the two economy reruns exact 1,800-cell
+mirrors of the v1 headline matrix under a changed world, spot-checked bit-identical
+(drift 0.00e+00) on the default path.
+
+- **Tier-price sensitivity (§15).** Break-even accounting (`BREAKEVEN_TIER.md`,
+  exploratory): re-pricing every rep-0 row across 60 frozen price vectors reverses no
+  aggregate cost win anywhere. Decision rerun (`RESULTS_TIER_RATIO.md`, 1,800 runs at the
+  measured GPU corner 1:1.516:16.64): **TR-H1 cost PASS 5/5** (p ≤ 6.8e-47), **TR-H2 J
+  PASS 5/5**; given cheap mid-tier inference the joint controller re-plans into it
+  (mid-tier steps 1.7% → 13.7%) and still wins — adaptation the frozen-decision reading
+  cannot show.
+- **Empirical cache curve (§16).** `RESULTS_HK_ADOPTION.md`, 1,800 runs under the
+  measured LMSYS curve (hmax 0.285 vs assumed 0.85, half 19 MB), pessimistic for every
+  cache-using system: hit rate halves (jcac 0.106 → 0.051), gptcache is devalued most
+  (mean cost 13.5 → 90.5), jcac stops paying for cache (362 → 136 MB) — and **HK-H1 J
+  PASS 5/5**, **HK-H2 cost PASS 5/5**. The J margin vs HPA narrows (−27.5% → −19.4%
+  aggregate) but never closes: the advantage was never primarily cache-driven.
+- **Objective-form robustness (§ threats-to-validity, exploratory).** `OBJECTIVE_FORM.md`:
+  69/85 form×baseline combinations preserve the published direction at p<0.01 across five
+  campaigns; all 16 non-wins are the already-disclosed +0.07 violation trade surfacing
+  under violation-first orderings (F4 lexicographic) or log-cost compression near-misses
+  (p 0.011–0.014) — the win's *shape*, not a refutation. Orthogonal to the weight sweep
+  (`SENSITIVITY_J.md`, 416/425).
+- **Sim chaos (§19, sim half).** `RESULTS_CHAOS_SIM.md`, 540 runs, controllers blind to
+  the injection. **CH-H1 PASS**: jcac with a dead planner for 1 min beats a *healthy* HPA
+  (dz −1.69, p 4.2e-19). **CH-H2 PASS**: under an identical 50% replica kill jcac keeps
+  its J win (dz −1.79). Centralization-tax finding: a 1-min freeze costs jcac ΔJ +0.0063
+  vs HPA's +0.0109 (p 3.8e-7) — a proactively-planned held config ages better than a
+  frozen reactive one. Recovery within 2–5 steps.
+- **Pseudo-per-tenant forecasting (§18).** `PSEUDO_TENANT.md`, 19 qualifying sub-streams
+  (Model × Log Type of the same traces) under the frozen forecast protocol. **PT-H1 PASS,
+  zero counterexamples**: no weakly-periodic (autocorr<0.5) stream shows a material
+  seasonal win; all six periodic streams do (PT-H2); **three distinct forecasters win**
+  across streams (PT-H3) — the per-tenant pluggability claim, measured one aggregation
+  level down.
+
+Deferred to a live Codespace session, pre-registered and desk-prepared now (c38bce6):
+the over-the-wire membership attack (`PREREG_WIRE_ATTACK.md`) and live chaos + p99
+(`PREREG_LIVE_CHAOS_P99.md`, p99 export landed and unit-tested at the desk). OSF
+prospective mirror index: `OSF_REGISTRATION.md` (§17), submission is the one user step.
+
 ---
 
 ## Which number to cite (disambiguation)
@@ -169,6 +216,9 @@ buy a large fairness win — jcac is *more* fair on Jain (0.9705 vs 0.9599, p=1.
 | Effect sizes, real-demand replay | **d_z with 95% bootstrap CI** (`EFFECT_SIZES.md`, n=96 rows) | bare p-values below ~1e-6 | at hundreds of paired seeded runs, tiny p measures simulator determinism; the interval is the citable unit |
 | Planner scalability | growth exponent 1.45; p95 crosses the 3 s timeout at 128 tenants (`PLANNER_SCALING.md`) | "linear in tenants" (design intuition) | measured super-linearity is the price of the joint fairness term; past the timeout the designed fallback holds the last good plan |
 | Live validation | **both arms live-verified end-to-end; ordinal check recorded DISAGREE — live parity at the replica-only projection** (`PHASE7_ORDINAL.md`) | any "sim ranking confirmed live" claim | the frozen protocol's primary reading flips in both cells; live separations (0.002 in J) are within rep spread, and the cache lever behind the sim's `ai_cacheable` separation is inert live by construction |
+| Cost/J win robustness to prices & cache curve | **survives both: TR-H1/H2 PASS 5/5 at the measured GPU price corner (`RESULTS_TIER_RATIO.md`); HK-H1/H2 PASS 5/5 under the measured cache curve (`RESULTS_HK_ADOPTION.md`)** | the published-economy numbers as if they were the only economy | the headline still runs on the published economy for bit-reproducibility; these two pre-registered reruns are the sensitivity evidence, cite them *as* robustness, not as replacements |
+| Fallback under failure | **jcac with a 1-min-dead planner beats a healthy HPA (CH-H1, dz −1.69); a freeze costs jcac *less* than HPA (`RESULTS_CHAOS_SIM.md`)** | any live-chaos claim | the chaos campaign is sim-substrate (controllers blind, engine-injected); the live chaos demonstration is pre-registered and deferred |
+| Per-tenant forecasting | **boundary reproduces one level down: 0 counterexamples, 3 distinct winners across 19 sub-streams (`PSEUDO_TENANT.md`)** | "validated on per-tenant SaaS series" | the decomposition is Model×Log-Type of aggregate traces; true per-tenant series remain unavailable (stated) |
 
 ## Honest-nulls ledger
 
@@ -182,15 +232,23 @@ against by-construction winners; framing documented in `RESULTS.md`), **cache hi
 ## Cross-campaign ground rules
 
 1. Every campaign's protocol was committed and pushed **before** its first run
-   (7 pre-registrations: PREREG_V2, PREREG_V3, PREREG_TRACE, PREREG_TRACE2, PREREG_VTC,
-   plus the v1 gate and Phase 4 acceptance frozen in the roadmap/V2_README).
+   (11 pre-registrations: PREREG_V2, PREREG_V3, PREREG_TRACE, PREREG_TRACE2, PREREG_VTC,
+   PREREG_TIER_RATIO, PREREG_HK_ADOPTION, PREREG_CHAOS_SIM, PREREG_PSEUDO_TENANT — plus
+   the two deferred live protocols PREREG_WIRE_ATTACK and PREREG_LIVE_CHAOS_P99 pushed
+   before any live number exists — plus the v1 gate and Phase 4 acceptance frozen in the
+   roadmap/V2_README). From Wave 2 on, each is additionally mirrored to OSF prospectively
+   (`OSF_REGISTRATION.md`; the submit step is a flagged user action).
 2. Closed campaigns are immutable: stopping rules forbid re-running, widening, or
    post-hoc tuning; per-campaign files are never edited after their run.
 3. Substrates never mix: matrix tables, replay tables, and forecast-ablation tables are
    reported on their own substrate only. Replay dollars are model-scale; the claim is
    the ranking.
 4. Samples are never pooled (n=16 and n=96 replays are separate experiments).
-5. Latency metrics are p95, not p99 (documented deviation, `eval/README.md`).
+5. Sim latency metrics are p95, not p99 — the sim is a p95 estimator by construction
+   (`model.P95_FACTOR`, documented deviation in `eval/README.md`). p99 is a **live-only**
+   number: `control-plane eval-export` emits live p95 and p99 side by side, and the live
+   p99 reading (`PREREG_LIVE_CHAOS_P99.md`, deferred) is never back-fitted into a sim
+   table.
 6. All of this is sim-backend decision quality under a stated system model
    (`research/jcac_sim/model.py`), not live-cluster absolutes.
 
