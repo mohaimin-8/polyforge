@@ -26,36 +26,42 @@ under `bash -l`; a Codespace clone can lose its `.git` → fresh clone via
 ## 1. Over-the-wire cache side-channel (`PREREG_WIRE_ATTACK.md`)
 
 The attack client is `research/security/wire_attack.py` (stdlib only; verified
-offline with `--selftest`). It needs the gateway URL and two tenant keys, and
-it runs **once per cache posture** — the posture is a chart value (eval/README
-integration point 2), so the gateway is redeployed between the two runs.
+offline with `--selftest`). It runs **once per cache posture**.
+
+**One piece of setup code is required first (be honest about it):** the gateway
+today is *unconditionally per-tenant* — `SemanticCache.Lookup` calls
+`index.Search(tenantID, …)`, so isolation is not a toggle, it is the design.
+That means:
+
+- **WA-H1 (the per-tenant defense, the load-bearing claim) needs no code** —
+  the deployed gateway already is the defended posture; run the client against
+  it as-is.
+- **WA-H2 (the SHARED / insecure baseline) needs a deliberate insecure mode
+  added** before it can be measured: a build/chart flag
+  (e.g. `POLYFORGE_CACHE_SHARED=1`) that makes `Lookup`/`Store` use one fixed
+  partition key instead of `tenantID`. This is the honest shape of the attack —
+  you must intentionally *break* isolation to demonstrate the leak the design
+  prevents. It is ~20 lines in `cache.go` + a chart value; it does not exist
+  yet and is the first task of the live session (ask the agent to wire it).
 
 ```
-# 1a. Deploy the gateway in the SHARED-cache posture, provision two tenants.
-#     (shared = NewSemanticCache with no per-tenant policy; the insecure
-#     baseline every multi-tenant deployment that keys on prompt-only runs.)
-helm upgrade --install polyforge deploy/helm/polyforge-operator \
-     --set gateway.cache.perTenant=false
+# provision the two tenants + keys (both postures)
 VICTIM_KEY=$(curl -s -XPOST $BASE/v1/tenants/victim/api-keys   -d '{"name":"k","scope":"full"}' | jq -r .key)
 ATTACKER_KEY=$(curl -s -XPOST $BASE/v1/tenants/attacker/api-keys -d '{"name":"k","scope":"full"}' | jq -r .key)
 
-# 1b. Run the attack against the shared gateway.
+# 1a. PER-TENANT posture (deployed default) — measures WA-H1 now.
 GATEWAY_URL=$BASE VICTIM_KEY=$VICTIM_KEY ATTACKER_KEY=$ATTACKER_KEY \
-  WIRE_POSTURE=shared python research/security/wire_attack.py
+  WIRE_POSTURE=per-tenant python research/security/wire_attack.py
 
-# 1c. Redeploy in the PER-TENANT posture (the W28 default, policyFor(tenant)),
-#     re-provision keys, run again with WIRE_POSTURE=per-tenant.
-helm upgrade polyforge deploy/helm/polyforge-operator --set gateway.cache.perTenant=true
-# ... re-mint keys, re-run wire_attack.py ...
+# 1b. SHARED posture — only after the insecure mode above is wired; redeploy
+#     the gateway with it on, re-mint keys, run again with WIRE_POSTURE=shared.
 ```
 
 Reads: WA-H1 (per-tenant AUC ≈ chance 0.50, the load-bearing defense claim),
 WA-H2 (shared AUC over the wire — no magnitude pre-committed; real RTT jitter
 is expected to sit below the sim's 0.88), WA-H3 (measured hit/miss timing gap
 vs the sim's 20/800 ms). The client writes
-`eval/results/security/RESULTS_WIRE_ATTACK.md`. If the chart flag names differ
-at run time, the two toggles are the only integration point — everything else
-is frozen in the fixture and the client.
+`eval/results/security/RESULTS_WIRE_ATTACK.md`.
 
 ## 2. Live chaos + p99 (`PREREG_LIVE_CHAOS_P99.md`)
 
