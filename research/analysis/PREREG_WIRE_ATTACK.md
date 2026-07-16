@@ -92,7 +92,11 @@ collected, so the pre-registration discipline holds:
    the lexical embedder — and is the conservative standard threat; it is an
    *upper bound* on attacker power (a paraphrase attacker is strictly weaker),
    which only strengthens the WA-H1 defense reading (isolation must kill even
-   the exact-prompt channel).
+   the exact-prompt channel). **Each candidate is probed once (REPS=1):**
+   repeating a probe would let the attacker's *own* cache serve it after the
+   first miss (the gateway stores every miss), collapsing the cross-tenant
+   signal; 50 distinct secrets + 50 distinct unrelated give the power and the
+   bootstrap CI the uncertainty.
 3. **Consequences for the hypotheses:** WA-H1 (per-tenant AUC ≈ chance) and
    WA-H2 (shared AUC > chance) are unchanged in meaning. WA-H2's magnitude was
    never pre-committed; on loopback with a deterministic hit/miss gap it is

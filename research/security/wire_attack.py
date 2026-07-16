@@ -48,7 +48,12 @@ OUT = HERE.parents[1] / "eval" / "results" / "security" / "RESULTS_WIRE_ATTACK.m
 
 # Frozen protocol constants (PREREG_WIRE_ATTACK.md).
 N_SECRET = 50
-REPS = 20
+# One probe per candidate: repeating a probe would let the ATTACKER's own
+# cache serve it after the first miss (the gateway stores every miss), which
+# collapses the cross-tenant signal. Membership inference tests each candidate
+# once; N_SECRET distinct secrets + N_SECRET distinct unrelated give the power,
+# and the bootstrap CI gives the uncertainty.
+REPS = 1
 CACHE_THRESHOLD = 0.85  # the deployed DefaultCacheThreshold
 BOOTSTRAP = 2000
 CHANCE_BAND = (0.45, 0.55)  # WA-H1 indistinguishable-from-chance band
