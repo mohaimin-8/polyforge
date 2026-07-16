@@ -184,7 +184,7 @@ claims to measured periodicity, exactly as v3 H2' bounded them.
 ## 13. "Eight tenants is not multi-tenancy at scale."
 
 Eight tenants per cluster is the factor under study (composition, not
-population — `eval/harness/workloads.py`). The scaling bound is now
+population — `eval/harness/workloads.py`). The scaling bound is
 *measured*, not scoped away: `research/analysis/PLANNER_SCALING.md`
 drives the deployed planner code path from 8 to 256 tenants on one
 laptop core — fitted growth exponent 1.45 (the joint fairness term
@@ -194,9 +194,24 @@ p95 cycle time first exceeding the operator's 3 s request timeout at
 with it: past the timeout, the failure mode is the designed one (hold
 last good plan, `fallback` status — plan_runner.go), and coordination
 costs outside the planner (CR write fan-out, telemetry aggregation) are
-not covered by the microbenchmark. Scaling levers past the crossover are
-named there (planning cells, incremental fairness partial sums, faster
-inner loop).
+not covered by the microbenchmark.
+
+The named scaling lever is now executed, not just named (Wave 4,
+`PLANNER_CELLS.md` + `PLANNER_CELLS_DEALIAS.md`, both pre-registered):
+partition the portfolio into fixed K=32 planning cells, each planned by
+the deployed `PlannerCore.plan` on an independent replica. **PS-H1 PASS:
+per-cell p95 stays flat at ~195 ms through 1024 tenants** (fitted
+exponent 0.27) where the monolithic joint plan takes **71 s** — 1024
+tenants become deadline-feasible. The fairness cost of independent-cell
+planning depends on the assignment rule, and measuring both rules is the
+useful result: naive round-robin-on-index *aliases* with periodic tenant
+structure (a whale every 8th tenant collapses into a few cells when the
+cell count is a multiple of 8) and global Jain fell 0.99 → 0.90
+(PS-H2 FAIL, published with the diagnosis); a **hash-based assignment
+that decorrelates cell membership from index recovers it — worst ΔJain
+−0.0053 through 1024 (PF-H1 PASS).** The engineering lesson (hash cells,
+not index round-robin) is itself measured. Contiguous-by-budget
+assignment remains the adversarial worst case, named as future work.
 
 ## 14. "Your live ordinal check disagreed with the simulator."
 

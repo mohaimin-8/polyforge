@@ -220,12 +220,22 @@ def main() -> None:
     w("")
     w("Reading: partitioning converts the planner's super-linear cycle cost into a")
     w("per-cell constant, so 1024 tenants plan within the operator deadline on")
-    w("independent planner replicas, at a global-fairness cost bounded and measured")
-    w("above. Round-robin cell assignment is what makes the fairness cost small —")
-    w("it spreads whales evenly, so every cell optimizes a representative mix;")
-    w("contiguous-by-budget partitioning is the adversarial opposite and is named")
-    w("as future work. Cross-planner coordination overheads (CR write fan-out,")
-    w("telemetry aggregation) are still not measured here (DEFENSE_QA #13).")
+    w("independent planner replicas. The global-fairness cost depends on the")
+    w("assignment rule:")
+    if h2:
+        w("round-robin here kept global Jain within the ΔJain ≤ %.2f bound at every N."
+          % DJAIN_TOL)
+    else:
+        w("round-robin here BREACHED the ΔJain ≤ %.2f bound (worst %+.4f). Check whether"
+          % (DJAIN_TOL, worst_djain))
+        w("the assignment rule aliases with periodic tenant structure (e.g. the whale")
+        w("period vs the cell count) before reading this as an inherent cost of")
+        w("partitioning; a hash-based assignment that decorrelates cell membership from")
+        w("tenant index is the standard fix and is measured separately.")
+    w("Contiguous-by-budget partitioning (all whales together) is the adversarial")
+    w("worst case and is named as future work. Cross-planner coordination overheads")
+    w("(CR write fan-out, telemetry aggregation) are still not measured here")
+    w("(DEFENSE_QA #13).")
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {OUT} (PS-H1 {'PASS' if h1 else 'FAIL'}, PS-H2 {'PASS' if h2 else 'FAIL'})")
 

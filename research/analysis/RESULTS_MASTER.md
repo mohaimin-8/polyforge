@@ -7,7 +7,8 @@ The per-campaign files it consolidates (`RESULTS.md`, `RESULTS_V2.md`, `RESULTS_
 `CACHE_PRECISION.md`, `EFFECT_SIZES.md`, `PLANNER_SCALING.md`, `FORECAST_AZURE.md`,
 `PHASE7_ORDINAL.md`, and the Wave 1–2 robustness records `BREAKEVEN_TIER.md`,
 `OBJECTIVE_FORM.md`, `RESULTS_TIER_RATIO.md`, `RESULTS_HK_ADOPTION.md`,
-`RESULTS_CHAOS_SIM.md`, `PSEUDO_TENANT.md`) are
+`RESULTS_CHAOS_SIM.md`, `PSEUDO_TENANT.md`, and the Wave 4 scaling records
+`PLANNER_CELLS.md`, `PLANNER_CELLS_DEALIAS.md`) are
 **machine-generated measurement records**: each is written by its analysis script from
 the raw run databases and is immutable once its campaign closes (pre-registration ground
 rules). They stay exactly as they are — this file summarizes and reconciles them but
@@ -198,6 +199,32 @@ the over-the-wire membership attack (`PREREG_WIRE_ATTACK.md`) and live chaos + p
 (`PREREG_LIVE_CHAOS_P99.md`, p99 export landed and unit-tested at the desk). OSF
 prospective mirror index: `OSF_REGISTRATION.md` (§17), submission is the one user step.
 
+### 11. Wave 4 — planning-cell partitioning to 1024 tenants (session 21, local)
+
+Executes the scaling lever `PLANNER_SCALING.md` named as future work (DEFENSE_QA #13),
+on the deployed `PlannerCore.plan` code path, single laptop core; two pre-registered
+campaigns.
+
+- **Latency (`PLANNER_CELLS.md`, PREREG_PLANNER_CELLS.md at 264356a).** Partition the
+  portfolio into fixed K=32 planning cells (each planned on an independent replica).
+  **PS-H1 PASS:** partitioned per-cell p95 stays flat at ~195 ms through 1024 tenants
+  (fitted exponent 0.27) while the monolithic joint plan grows to **71 s at 1024**
+  (exponent 1.59, reproducing the ~1.45 joint-planner cost) and crosses the 3 s operator
+  timeout at 128. Partitioning makes 1024 tenants deadline-feasible.
+- **Fairness (`PLANNER_CELLS.md` + `PLANNER_CELLS_DEALIAS.md`).** **PS-H2 FAIL** under the
+  frozen round-robin-on-index rule (worst ΔJain −0.089): diagnosed — round-robin aliases
+  with the whale period (a whale every 8th tenant), so all whales collapse into a few
+  cells whenever the cell count is a multiple of 8 (N ∈ {256,512,1024}). Published as
+  measured with the diagnosis (erratum in the file), then the disciplined follow-up
+  (`PREREG_PLANNER_CELLS_DEALIAS.md` at 0a61c6a, one changed factor): a hash-based
+  assignment that decorrelates cell membership from index. **PF-H1 PASS: worst ΔJain
+  −0.0053 through 1024** — the fairness cost was the aliasing, not partitioning. The
+  engineering lesson (hash cells, not index round-robin) is itself measured.
+
+Wave 3 (over-the-wire attack, live chaos, live p99) stays deferred — no local Docker;
+the attack harness is offline-verified (`research/security/wire_attack.py --selftest`)
+and the live steps are the push-button runbook `docs/WAVE3_LIVE_RUNBOOK.md`.
+
 ---
 
 ## Which number to cite (disambiguation)
@@ -219,6 +246,7 @@ prospective mirror index: `OSF_REGISTRATION.md` (§17), submission is the one us
 | Cost/J win robustness to prices & cache curve | **survives both: TR-H1/H2 PASS 5/5 at the measured GPU price corner (`RESULTS_TIER_RATIO.md`); HK-H1/H2 PASS 5/5 under the measured cache curve (`RESULTS_HK_ADOPTION.md`)** | the published-economy numbers as if they were the only economy | the headline still runs on the published economy for bit-reproducibility; these two pre-registered reruns are the sensitivity evidence, cite them *as* robustness, not as replacements |
 | Fallback under failure | **jcac with a 1-min-dead planner beats a healthy HPA (CH-H1, dz −1.69); a freeze costs jcac *less* than HPA (`RESULTS_CHAOS_SIM.md`)** | any live-chaos claim | the chaos campaign is sim-substrate (controllers blind, engine-injected); the live chaos demonstration is pre-registered and deferred |
 | Per-tenant forecasting | **boundary reproduces one level down: 0 counterexamples, 3 distinct winners across 19 sub-streams (`PSEUDO_TENANT.md`)** | "validated on per-tenant SaaS series" | the decomposition is Model×Log-Type of aggregate traces; true per-tenant series remain unavailable (stated) |
+| Planner scale to 1024 | **planning cells: per-cell p95 ~195 ms flat vs 71 s monolithic (PS-H1); fairness preserved under hash assignment, ΔJain −0.0053 (PF-H1)** (`PLANNER_CELLS*.md`) | round-robin's ΔJain −0.089 as the fairness cost | that drop is a whale-period/cell-count aliasing artifact (PS-H2 FAIL, diagnosed); hash-based cell assignment is the measured fix |
 
 ## Honest-nulls ledger
 
@@ -232,11 +260,14 @@ against by-construction winners; framing documented in `RESULTS.md`), **cache hi
 ## Cross-campaign ground rules
 
 1. Every campaign's protocol was committed and pushed **before** its first run
-   (11 pre-registrations: PREREG_V2, PREREG_V3, PREREG_TRACE, PREREG_TRACE2, PREREG_VTC,
-   PREREG_TIER_RATIO, PREREG_HK_ADOPTION, PREREG_CHAOS_SIM, PREREG_PSEUDO_TENANT — plus
-   the two deferred live protocols PREREG_WIRE_ATTACK and PREREG_LIVE_CHAOS_P99 pushed
-   before any live number exists — plus the v1 gate and Phase 4 acceptance frozen in the
-   roadmap/V2_README). From Wave 2 on, each is additionally mirrored to OSF prospectively
+   (13 pre-registrations: PREREG_V2, PREREG_V3, PREREG_TRACE, PREREG_TRACE2, PREREG_VTC,
+   PREREG_TIER_RATIO, PREREG_HK_ADOPTION, PREREG_CHAOS_SIM, PREREG_PSEUDO_TENANT,
+   PREREG_PLANNER_CELLS, PREREG_PLANNER_CELLS_DEALIAS — plus the two deferred live
+   protocols PREREG_WIRE_ATTACK and PREREG_LIVE_CHAOS_P99 pushed before any live number
+   exists — plus the v1 gate and Phase 4 acceptance frozen in the roadmap/V2_README). The
+   PREREG_PLANNER_CELLS_DEALIAS follow-up is itself the disciplined response to a confound
+   found in the frozen PLANNER_CELLS run — a new pre-registration, not a silent re-run.
+   From Wave 2 on, each is additionally mirrored to OSF prospectively
    (`OSF_REGISTRATION.md`; the submit step is a flagged user action).
 2. Closed campaigns are immutable: stopping rules forbid re-running, widening, or
    post-hoc tuning; per-campaign files are never edited after their run.

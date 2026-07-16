@@ -7,6 +7,80 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-16 (session 21) — Waves 3–4 opened: planning cells to 1024 measured (local), live campaigns made turnkey (deferred)
+
+Milestone status: **Wave 4's local half is done and Wave 3 is turnkey.** User:
+"go on next two waves." The honest split, stated up front: Wave 3 is
+fundamentally a *live-cluster* wave and this machine has **no Docker/kind**
+(confirmed: `docker`/`kind` absent), so its runs are deferred to a Codespace;
+Wave 4's planner-scaling half is pure local CPU and was executed. No thesis
+`.tex`, no controller logic touched.
+
+### Wave 4 — planning-cell partitioning to 1024 (local, executed)
+
+Two pre-registered campaigns on the deployed `PlannerCore.plan` path,
+single laptop core.
+
+- **`PLANNER_CELLS.md`** (PREREG_PLANNER_CELLS at 264356a, pushed pre-run):
+  partition the portfolio into fixed K=32 planning cells. **PS-H1 PASS** —
+  partitioned per-cell p95 flat at ~195 ms through 1024 tenants (fitted
+  exponent 0.27) where the monolithic joint plan reaches **71 s at 1024**
+  (exponent 1.59) and crosses the 3 s operator timeout at 128. 1024 tenants
+  become deadline-feasible. **PS-H2 FAIL** (worst ΔJain −0.089): diagnosed as
+  a whale-period/cell-count aliasing artifact — round-robin on index (cell =
+  i mod C) puts every whale (i mod 8 == 0) into a handful of cells whenever C
+  is a multiple of 8 (N ∈ {256,512,1024}). Published as measured; a post-run
+  **erratum** (prose only, data immutable) flags the script's pre-written
+  optimistic "Reading" as falsified by the FAIL, and the script's prose
+  generation was made outcome-aware so it cannot self-contradict again.
+- **`PLANNER_CELLS_DEALIAS.md`** (PREREG_PLANNER_CELLS_DEALIAS at 0a61c6a,
+  pushed pre-run) — the disciplined follow-up, one changed factor: hash-order
+  cells by md5(tenant_id). **PF-H1 PASS**, worst ΔJain **−0.0053** through 1024
+  (vs round-robin's −0.089). The fairness cost was the aliasing, not
+  partitioning; hash-based cell assignment is the measured fix, and reporting
+  both rules is the contribution.
+
+### Wave 3 — live wave, made turnkey (execution deferred)
+
+- **`research/security/wire_attack.py`** — stdlib-only over-the-wire attack
+  client for PREREG_WIRE_ATTACK; the analysis (Mann-Whitney AUC reused from
+  `cache_side_channel._auc` + bootstrap CI + WA-H1/H2/H3 verdicts) and
+  orchestration are **offline-verified** via `--selftest` against a
+  fixture-aware mock gateway (shared posture separates; per-tenant CI contains
+  chance 0.50). The self-test caught a mock bug before it could mislead. The
+  live transport is a thin adapter; deterministic 50-secret probe fixture
+  committed.
+- **`docs/WAVE3_LIVE_RUNBOOK.md`** — push-button Codespace steps for both
+  deferred live campaigns (wire attack shared/per-tenant posture toggles; live
+  chaos via kubectl planner-crash + apiserver-throttle; the new live p99
+  export), reusing the session-19 Phase 7 harness with its gotchas pre-solved.
+
+### What changed (docs/analysis/security; no thesis .tex, no controller logic)
+
+Two preregs + two analysis scripts + two result records (planner cells); wire
+attack client + fixture; live runbook. `RESULTS_MASTER.md` (ledger entry 11,
+new which-number row, prereg count 11→13, consolidated-files list);
+`DEFENSE_QA.md` §13 rewritten (scale lever executed to 1024, both assignment
+rules measured); `OSF_REGISTRATION.md` (two new rows). p99 export from Wave 3
+prep landed and unit-tested last session.
+
+### How it was verified
+
+Both planner campaigns ran to N=1024; PS-H1/PS-H3 and PF-H1 are the scripts'
+own committed output. Wire-attack `--selftest` passes (analysis pipeline
+verified offline). Environment absence of Docker/kind confirmed by command
+probe. Every prereg pushed before its run (264356a, 0a61c6a); the de-alias is
+a new prereg, not a re-run of the frozen campaign.
+
+### What remains
+
+Wave 3 live execution (Codespace: wire attack, live chaos, live p99 — runbook
+ready) and Wave 4's live-plane + GPU-rental halves (three-knob real data plane,
+paid host) — all user-gated. RELEASE_CHECKLIST + thesis fill-ins user-owned;
+OSF submission the one flagged user action.
+
+---
+
 ## 2026-07-16 (session 20) — Waves 1–2 leak-fill: six DEFENSE_QA audit gaps turned into pre-registered measurements, all as measured
 
 Milestone status: **the user-gated Waves 1–4 leak-fill plan is opened and

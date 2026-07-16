@@ -38,6 +38,8 @@ listed for the user exactly as the Zenodo/GHCR/video items are in
 | `PREREG_PSEUDO_TENANT.md` | DEFENSE_QA #18 | `7deb6a3` | 2026-07-16T12:47:08+06:00 | yes (session 20, PSEUDO_TENANT.md) | _pending_ |
 | `PREREG_WIRE_ATTACK.md` | DEFENSE_QA #19 (security, live) | `c38bce6` | 2026-07-16T13:24:16+06:00 | deferred (Codespace) | _pending_ |
 | `PREREG_LIVE_CHAOS_P99.md` | DEFENSE_QA #19 (chaos, live) + #11 (p99) | `c38bce6` | 2026-07-16T13:24:16+06:00 | deferred (Codespace) | _pending_ |
+| `PREREG_PLANNER_CELLS.md` | DEFENSE_QA #13 (scale) | `264356a` | 2026-07-16 (session 21) | yes (session 21, PLANNER_CELLS.md) | _pending_ |
+| `PREREG_PLANNER_CELLS_DEALIAS.md` | DEFENSE_QA #13 (scale, confound follow-up) | `0a61c6a` | 2026-07-16 (session 21) | yes (session 21, PLANNER_CELLS_DEALIAS.md) | _pending_ |
 
 Prior-campaign preregs (PREREG_V2/V3/VTC/TRACE/TRACE2) predate this OSF
 commitment and remain git-anchored only, as disclosed in DEFENSE_QA #17;
