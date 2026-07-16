@@ -37,3 +37,4 @@ thesis/**/*.nav
 thesis/**/*.snm
 thesis/**/*.fls
 thesis/**/*.fdb_latexmk
+*.exe
