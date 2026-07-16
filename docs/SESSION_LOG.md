@@ -46,11 +46,18 @@ straight into the gateway sqlite), both cache postures.
 
 ### Genuinely blocked / deferred (stated, not skipped)
 
-- **Kaggle GPU (Wave 4):** the provided token is the new `KGAT_` OAuth format;
-  the installed Kaggle CLI 2.2.3 only does browser OAuth for it (Basic/Bearer
-  API probes all 400), and there is no non-interactive path. Needs a classic
-  32-hex `kaggle.json` key (Account → Create New API Token) or a browser
-  login. Precise ask surfaced to the user.
+- **Kaggle GPU (Wave 4) — later UNBLOCKED and run:** the first token was the
+  new `KGAT_` OAuth format (CLI 2.2.3 browser-only, API probes 400); the user
+  then provided a classic 32-hex `kaggle.json` key, which authenticated
+  immediately. Pushed `kaggle_tier_bench.py` (kernel v7, GPU+internet) and
+  polled to completion. **Independent replication: all three tiers reproduce
+  session 16d within ~3%** (small 1205 vs 1242 ms, mid 1887 vs 1883, large
+  20595 vs 20665; tokens/s identical) → the tier-latency ordering is
+  reproducible across GPU sessions. The 7B large-tier CPU-offload caveat
+  persists (pool granted a single ~16 GB card again; T4 ×2 is not selectable
+  from the `kaggle kernels push` script API, only the notebook UI). Recorded
+  as a replication section in `TIER_BENCH.md` + `tier_bench_replication.csv`;
+  no sim constants change.
 - **Live chaos campaign + live p99 number:** both need the kind cluster
   (Codespace, no local Docker) AND new harness work — fault injection wired
   into the live run, and p99 persisted through the results schema (the export
