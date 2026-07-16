@@ -5,6 +5,14 @@ Written 2026-07-13 (session 16e), after the hpa arm was verified live
 (session 17): **the wiring below is done in code and tested locally**;
 what remains is the live execution itself.
 
+**STATUS 2026-07-16 (session 19): EXECUTED.** `--jcac-smoke` passed on the
+first attempt (1/1 valid, zero bug tail — the two desk-found fixes held);
+`--full` completed 12/12 valid on the Codespace. The frozen analysis ran
+once: **ordinal verdict DISAGREE in both cells (live parity between the
+arms; see `research/analysis/PHASE7_ORDINAL.md`)** — published as
+measured, mechanisms analyzed in the thesis §6.10 and DEFENSE_QA §14.
+Nothing below remains open; kept for the protocol record.
+
 ## Done in code (session 17) — was steps 1–5
 
 1. ~~Build + side-load both images~~ — `scripts/phase7_kind_run.sh` builds

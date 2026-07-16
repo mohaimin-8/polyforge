@@ -108,9 +108,14 @@ cost, dominating padding and TTL-jitter defenses. Two pre-registered SLO
 hypotheses failed and are published as failures; the honest SLO claim is
 violation \emph{parity} with tuned reactive scalers at 43--48\% lower cost.
 All headline numbers are decision-quality measurements under a stated system
-model, calibrated against a real inference server and a real GPU tier bench;
-live-cluster validation is ordinal-only by design, with the HPA arm verified
-and the \jcac{} arm wired behind an executable actuation gate.
+model, calibrated against a real inference server and a real GPU tier bench.
+Live-cluster validation is ordinal-only by design; both arms are
+live-verified end to end, and the pre-registered ordinal check is reported
+as measured: at the replica-only live projection the two controllers tie,
+and the simulator's ranking does not reproduce --- a published
+disagreement whose mechanisms (the inert live cache lever, disclosed
+pre-run, and a measured sim-side overestimate of reactive lateness) are
+analyzed in the evaluation.
 \end{abstract}
 
 \tableofcontents

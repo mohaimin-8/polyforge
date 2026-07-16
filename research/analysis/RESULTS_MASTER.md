@@ -4,7 +4,8 @@
 The per-campaign files it consolidates (`RESULTS.md`, `RESULTS_V2.md`, `RESULTS_V3.md`,
 `RESULTS_TRACE.md`, `RESULTS_TRACE2.md`, `VTC_FAIRNESS.md`, `FAIRNESS_V2.md`,
 `FORECAST_TRACE.md`, `FORECAST_TRACE_REAL.md`, `ADVANCED.md`, `SEMANTIC_CACHE.md`,
-`CACHE_PRECISION.md`, `EFFECT_SIZES.md`, `PLANNER_SCALING.md`, `FORECAST_AZURE.md`) are
+`CACHE_PRECISION.md`, `EFFECT_SIZES.md`, `PLANNER_SCALING.md`, `FORECAST_AZURE.md`,
+`PHASE7_ORDINAL.md`) are
 **machine-generated measurement records**: each is written by its analysis script from
 the raw run databases and is immutable once its campaign closes (pre-registration ground
 rules). They stay exactly as they are — this file summarizes and reconciles them but
@@ -121,6 +122,27 @@ pre-registered disclosure is honored: a violation trade of +0.07 (p < 1e-6) ride
 collection segments show the identical effect; the first sample's segment-2 parity was
 small-n noise. Samples are never pooled. → `RESULTS_TRACE.md`, `RESULTS_TRACE2.md`
 
+### 9a. Phase 7 live ordinal check — smoke + 12 runs on a real kind cluster (session 19)
+
+The jcac arm's first live execution passed its smoke on the first attempt (1/1 valid,
+actuation gate passed before load — the session-17 desk fixes held with zero bug tail).
+Full mirrored slice: {jcac, hpa} × {crud_bursty, ai_cacheable} × 3 reps, **12/12 valid**
+(one hpa attempt failed on a pod-level memcg OOM at 22:29:43 and was cleanly retried per
+the retry-then-mark design; the validated data is the clean attempt's). Analyzed by the
+pre-frozen protocol (`phase7_ordinal.py`, commit 650ce29, committed before any live
+number existed). **As measured: the primary reading DISAGREES — the J winner flips in
+both cells.** Descriptively, live the two arms land at *parity* on every metric (J
+separations 0.002 with overlapping rep ranges; violations zero for both arms in both
+cells) while the sim separates them decisively. Mechanisms: `ai_cacheable`'s sim
+separation flows through the cache economy and the live cache knob is inert by
+construction (the frozen caption's disclosure made concrete); in `crud_bursty` the sim's
+HPA concedes 0.0417 violation where real HPA at this amplitude never violates — the sim
+overestimates reactive lateness in that cell, a direction that had favored jcac in-sim.
+What the campaign establishes: the full jcac loop runs live under a mechanical actuation
+gate, capacity parity held, no live degradation. No thesis claim rested on live ranking
+reproduction; the claims stand on the sim and replay substrates, scoped as such.
+→ `PHASE7_ORDINAL.md`, run table `eval/results/phase7_live_runs.csv`
+
 ### 9. VTC-replica fairness comparison — 200 runs
 
 Tuned least-weighted-service-first pool division (VTC's scheduler reduced to the replica
@@ -146,6 +168,7 @@ buy a large fairness win — jcac is *more* fair on Jain (0.9705 vs 0.9599, p=1.
 | Cache hit quality | **precision-vs-τ shape + strata** (0.443 same-model vs 0.223 cross-model; first-turn 0.353; `CACHE_PRECISION.md`) | "69% of hits are wrong" | the ρ=0.70 proxy is deflated by LLM response stochasticity — near-duplicate prompts (τ≥0.95) only agree 33.8% — so the absolute precision under-states correctness; relative readings are the claim |
 | Effect sizes, real-demand replay | **d_z with 95% bootstrap CI** (`EFFECT_SIZES.md`, n=96 rows) | bare p-values below ~1e-6 | at hundreds of paired seeded runs, tiny p measures simulator determinism; the interval is the citable unit |
 | Planner scalability | growth exponent 1.45; p95 crosses the 3 s timeout at 128 tenants (`PLANNER_SCALING.md`) | "linear in tenants" (design intuition) | measured super-linearity is the price of the joint fairness term; past the timeout the designed fallback holds the last good plan |
+| Live validation | **both arms live-verified end-to-end; ordinal check recorded DISAGREE — live parity at the replica-only projection** (`PHASE7_ORDINAL.md`) | any "sim ranking confirmed live" claim | the frozen protocol's primary reading flips in both cells; live separations (0.002 in J) are within rep spread, and the cache lever behind the sim's `ai_cacheable` separation is inert live by construction |
 
 ## Honest-nulls ledger
 
@@ -154,7 +177,7 @@ of the contribution, not failures to hide: **v2 H1** (SLO vs HPA/KEDA), **v3 H1�
 (overload SLO vs HPA/KEDA), **first-sample HT** (underpowered), **γ-term** (no
 significant fairness contribution under injection), **seasonal non-transfer** (synthetic
 prediction failed on real data), **v1/v2 raw per-metric gate** (structurally impossible
-against by-construction winners; framing documented in `RESULTS.md`), **cache hit quality** (a majority of τ=0.85 hits fail the ρ=0.70 response-agreement proxy — published with its stochasticity-ceiling calibration rather than hidden behind the hit-rate headline).
+against by-construction winners; framing documented in `RESULTS.md`), **cache hit quality** (a majority of τ=0.85 hits fail the ρ=0.70 response-agreement proxy — published with its stochasticity-ceiling calibration rather than hidden behind the hit-rate headline), **live ordinal check** (J-winner DISAGREE in both cells — live parity between the arms at the replica-only projection; frozen protocol, published as measured in `PHASE7_ORDINAL.md`).
 
 ## Cross-campaign ground rules
 

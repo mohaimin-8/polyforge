@@ -306,7 +306,10 @@ The controller's own $\gamma$-term is a published null: under injected
 noisy-neighbor interference, the $\gamma$-ablation shows no significant
 contribution even in the whale-only subgroup where the injection fires
 (\evfile{FAIRNESS\_V2.md}). The term stays in the system as a configurable
-weight; it is dropped from the claims.
+weight; it is dropped from the claims. The honest framing that follows: the
+measured fairness wins are an \emph{emergent} property of joint capacity
+allocation, not the product of the designed fairness mechanism --- fairness
+is claimed as a measured outcome, not as a mechanism.
 
 \section{Security: a timing side channel and its defense frontier}
 \label{sec:eval-security}
@@ -346,33 +349,71 @@ per-tenant default in the gateway design
 
 Ground rule: absolutes are never compared across substrates; the live
 experiment asks only whether the simulator's \emph{ranking} reproduces under
-a real scheduler, real HPA, and real load on a kind cluster. Status at the
-time of writing:
+a real scheduler, real HPA, and real load on a kind cluster. The campaign
+ran end to end: the \jcac{} arm's first live execution passed its smoke on
+the first attempt (1/1 valid, actuation gate passed before load), and the
+full mirrored slice completed with \textbf{12/12 valid runs} (\{jcac, hpa\}
+$\times$ \{crud\_bursty, ai\_cacheable\} $\times$ 3 reps), analyzed by the
+protocol frozen before any live number existed
+(\evfile{phase7\_ordinal.py} $\to$ \evfile{PHASE7\_ORDINAL.md}).
 
-\begin{itemize}
-  \item The \textbf{HPA arm is verified live}: a full cluster-backend run
-        valid on a real kind cluster, with eval-export metrics matching the
-        load's construction exactly.
-  \item The \textbf{\jcac{} arm is fully wired and locally tested}
-        (Section~\ref{sec:impl-live}), gated behind the executable actuation
-        check: a run in which the operator never actuated fails before load
-        is generated.
-  \item The \textbf{analysis protocol is frozen} before any live \jcac{}
-        number exists (\evfile{phase7\_ordinal.py}, committed with the sim
-        reference slice, 12/12 valid): per-cell winner agreement on
-        $J$/cost/violation, no absolutes across substrates, no significance
-        testing on three repetitions.
-\end{itemize}
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+\textbf{Cell / substrate} & \textbf{system} & \textbf{$J$ mean [min..max]}
+& \textbf{cost \$} & \textbf{violation} \\
+\midrule
+ai\_cacheable, sim  & jcac & 0.596 [0.593..0.601] & 5.66 & 0.0006 \\
+                    & hpa  & 0.921 [0.917..0.924] & 8.77 & 0.0000 \\
+ai\_cacheable, live & jcac & 0.739 [0.738..0.739] & 7.03 & 0.0000 \\
+                    & hpa  & 0.737 [0.735..0.740] & 7.02 & 0.0000 \\
+\addlinespace
+crud\_bursty, sim   & jcac & 0.040 [0.040..0.040] & 0.38 & 0.0000 \\
+                    & hpa  & 0.136 [0.136..0.136] & 0.30 & 0.0417 \\
+crud\_bursty, live  & jcac & 0.027 [0.027..0.027] & 0.26 & 0.0000 \\
+                    & hpa  & 0.025 [0.023..0.027] & 0.24 & 0.0000 \\
+\bottomrule
+\end{tabular}
+\caption{Live ordinal check on a kind cluster: does the simulator's
+jcac-vs-HPA ranking on $J$/cost/violation reproduce under a real scheduler,
+real HPA, and real load? Absolutes are not comparable across substrates and
+are not compared. The live data plane burns fixed CPU per request kind, so
+the cache-size and model-tier knobs are inert here: this figure validates
+the replica-control projection of the joint controller. The cache knob's
+realism is carried by the LMSYS protocol (SEMANTIC\_CACHE.md,
+CACHE\_PRECISION.md), the tier knob's by the GPU tier bench
+(TIER\_BENCH.md). [Caption frozen verbatim in PHASE7\_JCAC\_PLAN.md before
+the run.]}
+\label{tab:ordinal}
+\end{table}
 
-The figure caption is frozen verbatim in \evfile{PHASE7\_JCAC\_PLAN.md} and
-carries the disclosure that the live data plane burns fixed CPU per request
-kind, so the cache-size and model-tier knobs are inert live: the live figure
-validates the \emph{replica-control projection} of the joint controller,
-while the cache knob's realism is carried by the LMSYS protocol
-(Section~\ref{sec:eval-cache}) and the tier knob's by the GPU tier bench
-(Section~\ref{sec:method-substrates}). The live \jcac{} slice is the one
-remaining measurement in the project; until it runs, the HPA arm is the only
-live-verified system, and this thesis says so rather than extrapolating.
+\textbf{As measured, the primary reading is a disagreement}: the $J$ winner
+flips in both cells (Table~\ref{tab:ordinal}). The descriptive detail the
+protocol permits: live, the two arms land at \emph{parity} on every metric
+--- $J$ separations of $0.002$ with overlapping rep ranges, violations zero
+for both arms in both cells --- while the simulator separates them
+decisively. The protocol forbids significance claims on three reps in
+either direction; the recorded verdict is DISAGREE, and it stands.
+
+Two mechanisms account for it, one disclosed in advance and one newly
+measured. In \texttt{ai\_cacheable}, the simulator's \jcac{} win flows
+through the cache economy, and the live cache knob is inert by construction
+--- the frozen caption's disclosure is the operative explanation: the lever
+behind the sim's separation does not exist on this substrate. In
+\texttt{crud\_bursty}, the simulator's HPA concedes $0.0417$ violation
+under the burst while real HPA at this amplitude, under the small-cluster
+capacity cap, never violates: the simulator overestimates reactive-scaler
+lateness in this cell --- an honest model datum, recorded as such, and a
+direction that \emph{favored} \jcac{} in-simulator.
+
+What the live campaign establishes: the full \jcac{} loop runs live
+(features $\to$ planner $\to$ operator actuation, mechanically gated),
+capacity parity held, and neither arm degrades live. What it does not
+establish: reproduction of the simulator's ranking on the replica-only
+projection at this amplitude. That result is published per the frozen
+protocol, and it is the single strongest argument for the three-knob live
+substrate named in future work (Section~\ref{ch:conclusion}).
 
 \section{Summary: which number to cite}
 \label{sec:eval-summary}
@@ -400,6 +441,9 @@ synthetic saturation; the 200-entry strawman \\
 Cache quality & precision-vs-$\tau$ shape $+$ strata & ``69\% of hits are
 wrong'' (ignores the stochasticity ceiling) \\
 Security & AUC 0.88 $\to$ 0.50 at 24\% latency, 76\% hits kept & --- \\
+Live validation & both arms verified end-to-end; ordinal check recorded
+DISAGREE (live parity, replica-only projection) & any ``sim ranking
+confirmed live'' claim \\
 Effect sizes & $\dz$ with 95\% bootstrap CI & bare p-values below
 ${\sim}10^{-6}$ \\
 Planner scale & exponent 1.45; 3\,s timeout crossed at 128 tenants &

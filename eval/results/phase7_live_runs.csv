@@ -1,0 +1,13 @@
+run_id,experiment,backend,system,workload,tenant_mix,cluster_size,rep,seed,steps,status,attempts,wall_s,tenants,error,harness_version,recorded_at,total_cost_usd,mean_violation,mean_jain,metric_steps
+39c879b96d45ef7c,phase7_live,cluster,jcac,crud_bursty,uniform,small,0,2108076706,120,valid,1,1353.701980829239,8,,1.0.0,2026-07-15 18:45:13.361851,0.258133,0.0,1.0,120
+0f9a702d87b9c774,phase7_live,cluster,jcac,crud_bursty,uniform,small,1,991663698,120,valid,1,1358.9450998306274,8,,1.0.0,2026-07-15 19:07:52.482405,0.258133,0.0,1.0,120
+1545bd0834218f6b,phase7_live,cluster,jcac,crud_bursty,uniform,small,2,2070509261,120,valid,1,1366.8217506408691,8,,1.0.0,2026-07-15 19:30:39.482164,0.256,0.0,1.0,120
+60a2df2c00e0166d,phase7_live,cluster,jcac,ai_cacheable,uniform,small,0,921020150,120,valid,1,1362.290251493454,8,,1.0.0,2026-07-15 19:53:21.933708,7.0294329999975576,0.0,1.0,120
+38c493520915f6ef,phase7_live,cluster,jcac,ai_cacheable,uniform,small,1,1542135112,120,valid,1,1358.9496660232544,8,,1.0.0,2026-07-15 20:16:01.06047,7.027432999997562,0.0,1.0,120
+2ea280bde380df22,phase7_live,cluster,jcac,ai_cacheable,uniform,small,2,1784338195,120,valid,2,1353.9571599960327,8,,1.0.0,2026-07-15 21:01:15.791469,7.036232999997542,0.0,1.0,120
+ed12405676ec6a1d,phase7_live,cluster,hpa,crud_bursty,uniform,small,0,1458324434,120,valid,1,1327.2130677700043,8,,1.0.0,2026-07-15 21:23:23.172695,0.231333,0.0,1.0,120
+7fe5ab8170d05177,phase7_live,cluster,hpa,crud_bursty,uniform,small,1,49223382,120,valid,1,1327.9098353385925,8,,1.0.0,2026-07-15 21:45:31.206672,0.217733,0.0,1.0,120
+611edb3760b78f87,phase7_live,cluster,hpa,crud_bursty,uniform,small,2,5288924,120,valid,1,1325.3499083518982,8,,1.0.0,2026-07-15 22:07:36.685061,0.261333,0.0,1.0,120
+53e00b1471d0e502,phase7_live,cluster,hpa,ai_cacheable,uniform,small,0,2041551457,120,valid,2,1324.003579378128,8,,1.0.0,2026-07-15 22:51:48.564258,7.041666999997471,0.0,1.0,120
+8eeca9c1a864c785,phase7_live,cluster,hpa,ai_cacheable,uniform,small,1,577518764,120,valid,1,1324.884619474411,8,,1.0.0,2026-07-15 23:13:53.558426,7.014166999997535,0.0,1.0,120
+3d409ebe4e1b6ad0,phase7_live,cluster,hpa,ai_cacheable,uniform,small,2,782029072,120,valid,1,1322.6724190711975,8,,1.0.0,2026-07-15 23:35:56.350384,6.998366999997572,0.0,1.0,120

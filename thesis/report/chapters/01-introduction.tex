@@ -133,9 +133,10 @@ replayed BurstGPT demand (10.63M requests) and Azure LLM inference 2024
 demand (44.1M requests) for the cost and forecasting claims, and real
 LMSYS-Chat-1M prompts for the cache claims. Live-cluster validation is
 \emph{ordinal only} by design --- absolutes are never compared across
-substrates --- with the HPA arm verified live and the \jcac{} arm wired
-behind an executable actuation gate at the time of writing
-(Section~\ref{sec:eval-live}). What is \emph{not} claimed: absolute dollar or
+substrates --- and both arms are live-verified end to end; the
+pre-registered ordinal check recorded a \emph{disagreement} (live parity
+between the arms at the replica-only projection), published as measured in
+Section~\ref{sec:eval-live}. What is \emph{not} claimed: absolute dollar or
 latency numbers transferring to any production fleet, token-level scheduling
 fairness, or tail behavior beyond p95 on the simulated substrate.
 

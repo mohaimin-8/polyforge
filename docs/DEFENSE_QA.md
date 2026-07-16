@@ -197,3 +197,76 @@ costs outside the planner (CR write fan-out, telemetry aggregation) are
 not covered by the microbenchmark. Scaling levers past the crossover are
 named there (planning cells, incremental fairness partial sums, faster
 inner loop).
+
+## 14. "Your live ordinal check disagreed with the simulator."
+
+It did, and it is published as measured (`PHASE7_ORDINAL.md`, protocol
+frozen at 650ce29 before any live number existed): the J winner flips in
+both cells. The content of the disagreement matters: live, the two arms
+land at *parity* on every metric — J separations of 0.002 with overlapping
+rep ranges, violations zero for both arms in both cells — while the sim
+separates them decisively. Two mechanisms, one disclosed pre-run, one newly
+measured: (1) in `ai_cacheable` the sim's jcac win flows through the cache
+economy, and the live cache knob is inert by construction — the frozen
+caption's disclosure made concrete; (2) in `crud_bursty` the sim's HPA
+concedes 0.0417 violation where real HPA at this amplitude never violates —
+the sim overestimates reactive lateness in this cell, a model datum that
+had *favored* jcac in-sim and is now on the record. What the live campaign
+does establish: the full jcac loop runs live under a mechanical actuation
+gate, capacity parity held, and no thesis claim rested on live ranking
+reproduction — the claims stand on the sim and real-data-replay substrates,
+scoped as such throughout. The named closure is a live substrate with real
+cache and tier levers.
+
+## 15. "You never tested cost sensitivity to the tier-price ratios."
+
+Correct, and this is an open item rather than a hidden one: the matrix
+prices tiers at API ratios (1:10:100) while the GPU bench measured
+1:1.5:16.6 (same ordering, compressed scale, disclosed). `SENSITIVITY_J.md`
+swept the objective *weights*, not the price *constants*, so the fraction
+of the cost win that survives at self-hosting ratios is unmeasured. It is a
+cheap, pre-registrable sim rerun and is named as exactly that in the thesis
+limitations.
+
+## 16. "Your 'calibration errs against us' line is only half true."
+
+The congestion fit (a=0.86) errs against PolyForge's lean postures; the
+assumed cache curve erred *for* the in-matrix cache benefit (measured h(K):
+hmax 0.285 vs the assumed 0.85 — `SEMANTIC_CACHE.md`). Both directions are
+documented; the matrix ran on the frozen optimistic curve for
+bit-reproducibility, all cache-using systems share it, and the differential
+effect on *rankings* is unquantified. The citable cache claims come from
+the real-LMSYS protocol, not the matrix; the pre-registered adoption of the
+empirical curve is the named closure.
+
+## 17. "Pre-registration without a registry is self-refereed."
+
+The anchor is GitHub push-event forensics: every protocol was committed and
+pushed before its first run, and amendments were declared pre-run in the
+same history. That is weaker than an external registry and stronger than
+nothing; the strongest evidence that the mechanism was not gamed is what it
+produced — two failed confirmatory hypotheses and five further negatives,
+published in full. New experiments will mirror their pre-registrations to
+an external registry (OSF) prospectively.
+
+## 18. "Your per-tenant forecasting claim rests on aggregate streams."
+
+Yes — BurstGPT and the Azure workloads are aggregate demand streams, not
+per-tenant SaaS series. "The winner tracks each stream's measured
+periodicity" supports per-tenant forecasting by extrapolation across one
+aggregation level, and the thesis says so. A pseudo-per-tenant
+decomposition (workload/model splits of the existing traces under the
+frozen protocol) is the named, pre-registrable next step.
+
+## 19. "Where is the chaos testing? And was the security attack real?"
+
+Two honest boundaries. Failure injection: the planner-outage fallback is
+designed, unit-tested, and was observed once past the scaling bench's
+timeout crossover — but no live chaos campaign (planner crash mid-burst,
+apiserver throttling) has run; it is future work. Security: the AUC-0.88
+membership attack runs in the simulator's timing model, not over a real
+network; real network jitter typically degrades timing attacks, so the
+attack number is an upper-bound reading, while the defense conclusion
+(partitioning dominates padding/TTL) is expected to be robust in that
+direction. An over-the-wire demonstration on the live gateway is the named
+closure; membership inference is the only threat class studied.

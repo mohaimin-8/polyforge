@@ -7,6 +7,93 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-16 (session 19) — the jcac live campaign executed end-to-end; ordinal verdict: DISAGREE, published as measured
+
+Milestone status: **the project's final open measurement is done.** The
+Phase 7 jcac live arm ran on the reusable 16d Codespace, driven remotely
+from this machine over `gh codespace ssh` (no Docker locally). Smoke passed
+on the FIRST attempt — 1/1 valid, actuation gate passed before load, zero
+bug tail; the two session-17 desk fixes (admin-key demand auth, summed
+shared-target actuation) held exactly as designed. Full mirrored slice:
+12/12 valid ({jcac, hpa} × {crud_bursty, ai_cacheable} × 3 reps, ~22.5 min
+wall each, `ok: true`).
+
+### The measured result (frozen protocol, one run)
+
+`phase7_ordinal.py` (frozen pre-run at 650ce29) against the committed sim
+reference: **primary reading DISAGREE — the J winner flips in both cells.**
+Live, the arms are at parity on every metric (J deltas 0.002, overlapping
+rep ranges, violations 0 for both arms in both cells); the sim separates
+them decisively. Mechanisms recorded in `PHASE7_ORDINAL.md` + thesis §6.10:
+(1) ai_cacheable's sim separation flows through the cache economy — the
+live cache knob is inert by construction (the frozen caption's disclosure
+made concrete); (2) crud_bursty: sim HPA concedes 0.0417 violation where
+real HPA at this amplitude never violates — the sim overestimates reactive
+lateness there, a direction that had favored jcac in-sim, now on the
+record. No thesis claim rested on live ranking reproduction; the claims
+stand on the sim + replay substrates, scoped as such throughout.
+
+### Operational record (for the next live session's benefit)
+
+- Codespace fantastic-waffle had lost its `.git` (stale tree preserved at
+  `/workspaces/polyforge.stale.16d`); fresh clone via
+  `x-access-token:$GITHUB_TOKEN`. `gh codespace cp` broke on Windows —
+  files streamed down via `base64` over ssh instead. Nested quoting
+  through `gh codespace ssh` from PowerShell strips inner quotes — all
+  remote commands shipped as base64-decoded scripts run under `bash -l`
+  (GITHUB_TOKEN only exists in login shells).
+- One hpa attempt died to a pod-level memcg OOM (22:29:43, control-plane
+  pod at its limit); the harness retried per design and the clean second
+  attempt validated (`attempts=2` in the run table). One jcac run
+  similarly at attempts=2. The runner itself was killed AFTER run 12
+  validated (23:35:56), during teardown — lost only the buffered summary,
+  one leftover kind cluster (deleted), and the DAILY tick (recovered via
+  no-op resume, which re-validated 12/12 and printed the official
+  `ok: true`).
+- Run-level table exported and committed:
+  `eval/results/phase7_live_runs.csv` (runs ⋈ metrics); the duckdb stays
+  gitignored per policy.
+
+### What changed (docs + thesis; no Go/Python source)
+
+- `research/analysis/PHASE7_ORDINAL.md` — the frozen script's output,
+  committed verbatim; `RESULTS_MASTER.md` gains campaign entry 9a, a
+  which-number row ("live validation — cite the end-to-end verification +
+  parity DISAGREE; never 'sim ranking confirmed live'"), and an
+  honest-nulls ledger entry.
+- `docs/DEFENSE_QA.md` §14–19: the live-disagreement answer plus the five
+  audit gaps named this session (tier-ratio sensitivity absent;
+  calibration-asymmetry — congestion errs against us but the assumed cache
+  curve erred FOR the matrix; prereg anchored in git forensics not a
+  registry; per-stream→per-tenant extrapolation; no chaos campaign +
+  security attack is model-level).
+- Thesis: §6.10 rewritten around the measured table + frozen caption;
+  abstract/intro/limitations/future-work updated (live = published
+  disagreement, three-knob live substrate promoted to top future-work
+  item); limitations gains six new bullets mirroring DEFENSE_QA §15–19;
+  fairness section states the emergent-not-mechanism framing. Recompiled
+  clean: 44 pp, 0 undefined refs.
+- `PHASE7_JCAC_PLAN.md` marked EXECUTED; `DAILY.md` gains the smoke + live
+  ticks.
+
+### How it was verified
+
+Runner validation JSON `ok: true` (12/12, 0 failed, 0 orphans) via no-op
+resume; run table cross-read from the duckdb (read-only) before analysis;
+pdflatex ×2 clean. The OOM-retry forensics come from `dmesg` timestamps
+matched against `runs.recorded_at`. Codespace stopped after data pull to
+conserve quota.
+
+### What remains
+
+RELEASE_CHECKLIST human items; thesis fill-ins (bib authors, title page,
+proofread; slides to be re-cut into the user's own template); and the
+user-gated Waves 1–4 leak-fill plan (tier-ratio prereg + h(K)-adoption
+prereg + chaos + over-the-wire side channel + three-knob live substrate),
+recorded in this session's conversation and DEFENSE_QA §15–19.
+
+---
+
 ## 2026-07-15 (session 18) — Milestone 9 opened: thesis report and defense slides, compiled from the evidence base
 
 Milestone status: M9 (Thesis and Publication Package) moves from empty to

@@ -34,11 +34,13 @@ history.
 \section{Future work}
 
 \begin{itemize}
-  \item \textbf{The live \jcac{} slice.} The one remaining measurement:
-        the jcac smoke and full ordinal runs on a Docker-capable machine,
-        under the already-frozen protocol and caption
-        (\evfile{PHASE7\_JCAC\_PLAN.md}). Everything is wired and gated;
-        the result will be reported ordinal-only whichever way it lands.
+  \item \textbf{A three-knob live substrate.} The completed live campaign
+        (Section~\ref{sec:eval-live}) recorded ordinal disagreement with
+        live parity between the arms --- because the live data plane
+        exposes only the replica lever. Extending it with a real semantic
+        cache and tier-differentiated service is the highest-priority
+        follow-up: it is the experiment that could confirm, or refute, the
+        joint-control ranking outside the simulator.
   \item \textbf{Token-level demand signals.} Swap the request-rate
         \texttt{DemandSource} for TTFT/queue-depth/KV-pressure signals from
         an llm-d-class engine, keeping the planner unchanged --- the

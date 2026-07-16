@@ -94,14 +94,19 @@ Staleness and TTL are out of scope and listed as such.
 
 \begin{itemize}
   \item \textbf{Substrate.} Headline numbers are simulator decision quality;
-        live validation is ordinal-only, currently verified for the HPA arm
-        with the \jcac{} live slice pending
-        (Section~\ref{sec:eval-live}).
-  \item \textbf{The live figure exercises one knob.} The live data plane
-        burns fixed CPU per request kind, so cache and tier are inert there;
-        the live check validates the replica-control projection, with the
-        other knobs' realism carried by their own real-data protocols. The
-        frozen caption states this.
+        live validation is ordinal-only, and its pre-registered check
+        recorded a disagreement --- live parity between the arms at the
+        replica-only projection (Section~\ref{sec:eval-live}). The
+        simulator's ranking is therefore \emph{unconfirmed} live, and the
+        thesis claims stand on the simulator and real-data-replay substrates
+        alone.
+  \item \textbf{The live figure exercises one knob, and that knob did not
+        separate the arms.} The live data plane burns fixed CPU per request
+        kind, so cache and tier are inert there; the frozen caption states
+        this, and the measured live parity in \texttt{ai\_cacheable} ---
+        where the sim's separation flows through the cache economy --- is
+        the disclosure made concrete. A live substrate with real cache and
+        tier levers is the named closure.
   \item \textbf{Latency is p95, request-level.} The simulator's tail beyond
         p95 is not credible and is not reported; token-level dynamics (TTFT,
         decode-length tails, head-of-line blocking under continuous
@@ -122,6 +127,40 @@ Staleness and TTL are out of scope and listed as such.
   \item \textbf{Production scale.} SageServe-class fleets serve more in a
         day than the entire replay; the 10.63M-request demand replay is the
         honest analog at decision level, and no stronger claim is made.
+  \item \textbf{Tier-price sensitivity is unmeasured.} The matrix prices
+        tiers at API ratios (1:10:100); the GPU bench measured 1:1.5:16.6.
+        The weight-sensitivity sweep varied objective weights, not these
+        price constants, so the fraction of the cost win that survives at
+        self-hosting ratios is an open, pre-registrable question --- named
+        here rather than implied away.
+  \item \textbf{The calibration story is asymmetric.} The congestion fit
+        errs against \polyforge{} ($a{=}0.86$), but the simulator's assumed
+        cache curve was \emph{optimistic} relative to the measured $h(K)$,
+        and the headline matrix ran on the assumed curve (constants frozen
+        for bit-reproducibility). All cache-using systems share the curve;
+        the differential effect on rankings is unquantified. The
+        pre-registered adoption of the empirical curve is the named
+        closure.
+  \item \textbf{Pre-registration is anchored in git forensics}, not an
+        external registry: protocols were pushed before runs, and
+        amendments were self-adjudicated. The strongest counter-evidence is
+        the record itself --- two failed confirmatory hypotheses and five
+        further negatives published in full.
+  \item \textbf{Per-tenant forecasting is supported at stream granularity.}
+        The three real traces are aggregate workload streams, not
+        per-tenant SaaS demand; ``the winner tracks each stream's
+        periodicity'' supports per-tenant forecasting by extrapolation
+        across one aggregation level.
+  \item \textbf{No failure-injection campaign.} The planner-outage fallback
+        is designed and unit-tested, and the scaling bench observed the
+        designed fallback past the timeout, but no chaos experiment
+        (planner crash mid-burst, apiserver throttling) has been run live.
+  \item \textbf{The security result is model-level.} The AUC-0.88 attack
+        runs in the simulator's timing model, not over a real network,
+        where jitter typically degrades timing attacks; the defense
+        conclusion (partitioning dominates) is expected to be robust to
+        that direction, but an over-the-wire demonstration is future work,
+        and membership inference is the only threat class studied.
 \end{itemize}
 
 \section{The honest-nulls ledger as a contribution}
