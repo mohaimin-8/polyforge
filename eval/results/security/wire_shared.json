@@ -1,0 +1,14 @@
+{
+  "posture": "shared",
+  "auc": 1.0,
+  "ci": [
+    1.0,
+    1.0
+  ],
+  "n_pos": 50,
+  "n_neg": 50,
+  "hit_latency_med": 15.592050000122981,
+  "miss_latency_med": 98.66485000020475,
+  "n_hits": 50,
+  "n_miss": 50
+}

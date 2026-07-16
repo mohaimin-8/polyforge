@@ -22,7 +22,7 @@ untested logic.
 
 Gateway contract (internal/ai/gateway/server.go):
   POST /v1/tenants/{tenant}/ai/chat   body {"messages":[{"role":"user","content":...}]}
-  auth  Authorization: Bearer <key>   (or X-PolyForge-API-Key)
+  auth  X-PolyForge-API-Key: <key>   (the gateway's header; not Bearer)
   resp headers  X-PolyForge-Cache: hit|miss,  X-PolyForge-Cache-Score: <cosine>
 """
 
@@ -79,33 +79,31 @@ _SUBJECTS = ["Postgres", "Redis", "Kubernetes", "Django", "Go", "Rust",
 
 
 def build_fixture() -> dict:
-    """Deterministic: N_SECRET secrets, each with one near-paraphrase (the
-    positive probe) and one unrelated prompt of matched length (the negative).
-    The gateway's own embedder decides hits at threshold 0.85 — we do not
-    pre-verify cosine, the live run records the achieved score per probe."""
-    rng = random.Random(SEED)
-    # Build all secrets first; negatives use a disjoint sentence frame
-    # ("Explain how to ...") so a negative can never string-equal a secret
-    # ("How do I ...?"), which would otherwise spuriously hit and deflate the
-    # measured AUC.
-    secrets = []
-    for i in range(N_SECRET):
-        tmpl, _ = _DOMAINS[i % len(_DOMAINS)]
-        subj = _SUBJECTS[(i // len(_DOMAINS)) % len(_SUBJECTS)]
-        secrets.append("How do I " + tmpl.format(sys=subj) + "?")
-    secret_set = set(secrets)
+    """Deterministic high-entropy probe corpus. Each secret and each unrelated
+    prompt is a distinct random word sequence, so distinct prompts do NOT
+    collide under the deployed n-gram (lexical) embedder — only an *exact*
+    re-send hits, which is exactly the exact-membership threat (embedder-
+    agnostic: identical text -> cosine 1.0). Natural-language prompts sharing a
+    sentence frame ("How do I ... on ...?") collide above 0.95 under a lexical
+    embedder and are deliberately NOT used; the disclosure travels with the
+    result."""
+    import hashlib
+
+    def token(tag: str, i: int) -> str:
+        return hashlib.sha256(f"{SEED}:{tag}:{i}".encode()).hexdigest()
+
+    # 12 hex tokens per prompt (~96 chars of high-entropy text); two different
+    # prompts share almost no character trigrams -> cosine near 0.
+    def prompt_text(tag: str, i: int) -> str:
+        return " ".join(token(f"{tag}:{i}", w)[:8] for w in range(12))
+
     items = []
     for i in range(N_SECRET):
-        tmpl, para = _DOMAINS[i % len(_DOMAINS)]
-        subj = _SUBJECTS[(i // len(_DOMAINS)) % len(_SUBJECTS)]
-        paraphrase = "What is the way to " + para.format(sys=subj) + "?"
-        j = (i + 5) % len(_DOMAINS)
-        usubj = _SUBJECTS[(i + 3) % len(_SUBJECTS)]
-        unrelated = "Explain how to " + _DOMAINS[j][0].format(sys=usubj) + " step by step."
-        assert unrelated not in secret_set  # disjoint frame guarantees this
-        items.append({"secret": secrets[i], "paraphrase": paraphrase,
-                      "unrelated": unrelated})
-    rng.shuffle(items)
+        items.append({
+            "secret": prompt_text("secret", i),
+            "unrelated": prompt_text("unrelated", i),
+        })
+    random.Random(SEED).shuffle(items)
     return {"threshold": CACHE_THRESHOLD, "n_secret": N_SECRET, "items": items}
 
 
@@ -204,7 +202,7 @@ class HTTPGatewayClient:
         req = urllib.request.Request(
             f"{self.base}/v1/tenants/{tenant}/ai/chat", data=body, method="POST")
         req.add_header("Content-Type", "application/json")
-        req.add_header("Authorization", f"Bearer {self.keys[who]}")
+        req.add_header("X-PolyForge-API-Key", self.keys[who])
         t0 = time.perf_counter()
         with urllib.request.urlopen(req, timeout=30) as resp:
             resp.read()

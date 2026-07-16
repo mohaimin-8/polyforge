@@ -3,254 +3,204 @@
   "n_secret": 50,
   "items": [
     {
-      "secret": "How do I rate-limit an API in Postgres?",
-      "paraphrase": "What is the way to throttle requests in a Postgres server?",
-      "unrelated": "Explain how to write a retry loop in Redis step by step."
+      "secret": "6e587d01 85019e8f a8eee361 c59a3502 96dea79b 870d4604 0e247927 59b5e359 a15666a9 2c13d3ef 7304ce3b f6a5dd29",
+      "unrelated": "596e2a2a b2e1e17a 856ab080 a7ebd8f1 e1f25e9f 92719721 5682096b 5017cefe 3ab4d9d2 df03ad7b 3be3aa36 9ef73d9e"
     },
     {
-      "secret": "How do I rate-limit an API in Go?",
-      "paraphrase": "What is the way to throttle requests in a Go server?",
-      "unrelated": "Explain how to write a retry loop in Redis step by step."
+      "secret": "e3dae959 b7d4d421 5b7ffc71 b69c01cb 56739dfe 71aade80 2623d8a6 6cf794cd 577b47fc e077a680 4efc7a7b ffd0aa13",
+      "unrelated": "2b46a7b7 2df3663a a2000895 0b5d58b6 5e333098 95bc4dc9 b71cc350 386005d6 073bfd33 a67bd338 984c2c06 7709bf88"
     },
     {
-      "secret": "How do I containerize a Kubernetes service?",
-      "paraphrase": "What is the way to write a Dockerfile for Kubernetes?",
-      "unrelated": "Explain how to configure TLS for Postgres step by step."
+      "secret": "de74b346 92d00f7e aa1ab401 1bd63071 e240462a 83cd298e a87da978 c87e91d9 0d8be2f1 9006f430 e743de54 3181e14d",
+      "unrelated": "93cd6331 ff08bfe5 3ad90058 a99b040a 6c45317e 24c1ff7d 53a4001e 91667052 bf870301 68b2c0d2 5086dd72 dc72f6c4"
     },
     {
-      "secret": "How do I parse a CSV file in Kubernetes?",
-      "paraphrase": "What is the way to read comma-separated data with Kubernetes?",
-      "unrelated": "Explain how to reset a forgotten password on Kafka step by step."
+      "secret": "51a71c81 0dec1673 0e177d89 4dec05f3 e6ce5aae aef2740b 2e4f84cb b46ddabd ac373b32 592d30c3 5a5e8bfd d1750e30",
+      "unrelated": "e46f5cf5 98fc583e 3a2eb5f9 67842289 af68edf6 6f4cdb02 a7896ef0 05329a83 205e2a73 0a35940a 1d50d47d 91b72f59"
     },
     {
-      "secret": "How do I set up CI for a Postgres project?",
-      "paraphrase": "What is the way to add a build pipeline to Postgres?",
-      "unrelated": "Explain how to optimize a slow SQL query on Terraform step by step."
+      "secret": "b2ae3e85 c24bb660 2a377ae3 19781e56 5fcd3d97 775b6213 9a20d612 71e0a7e8 db400353 7bd0ffbc e73e1513 a931f256",
+      "unrelated": "bc88379a 4d751f7a e75b134b 49fd3965 2db52a14 0d584fd7 e0435792 4a1bbf72 90ec709a faf47e4a c1fca2cc a580da01"
     },
     {
-      "secret": "How do I set up CI for a Redis project?",
-      "paraphrase": "What is the way to add a build pipeline to Redis?",
-      "unrelated": "Explain how to optimize a slow SQL query on Terraform step by step."
+      "secret": "7e3cb1d1 49ccf8ed eeabde80 e4440c5f cabdaa42 d0a2a878 efbcb9bc ff2eeb43 07ad6fa3 86a99edb ddbb908e 398e75ba",
+      "unrelated": "06f76f5f edde1970 fb4814e4 7ccc38f7 554ffc90 b6001c31 14faf911 a14cb169 ad206dbe ecb5f9ed 6969e90e 2d2fe685"
     },
     {
-      "secret": "How do I reset a forgotten password on Kubernetes?",
-      "paraphrase": "What is the way to recover access when I forget my Kubernetes password?",
-      "unrelated": "Explain how to parse a CSV file in Django step by step."
+      "secret": "30d36572 1a496d7f 70f12c04 9cd3dcd8 7ce89c24 a7aceb88 ac4b93db a94bbf3f f5aef4a9 568b553d 5d261444 63571e0f",
+      "unrelated": "dd2aa80c e9b9c7f3 efd7e212 49e82a41 3bdd873d e8e2dd7d e01cf1f5 c68f065b 339f2fde cc4914b5 9d61d85f 255ed2fc"
     },
     {
-      "secret": "How do I debug a memory leak in Go?",
-      "paraphrase": "What is the way to find what is leaking memory in Go?",
-      "unrelated": "Explain how to rotate API keys for Nginx step by step."
+      "secret": "8bcc6767 ee5e7f0e 10a8b221 b3e7ec8d 7f4855e6 2ef6997b 733d4c19 bad55c34 1bba28ae c6da4443 cfce81c6 aac32092",
+      "unrelated": "ed859664 cc167e3b c23ae459 e6e812c9 12773282 54e4abff e4c88f84 7001a537 84d5ca2b ddd5f255 3d7f36cf d3e983a2"
     },
     {
-      "secret": "How do I rotate API keys for Django?",
-      "paraphrase": "What is the way to safely change Django credentials?",
-      "unrelated": "Explain how to debug a memory leak in Kubernetes step by step."
+      "secret": "0d282a84 f3f62066 6b5a0746 18faa3ec 725d8588 0a913fb8 50d6538b b12aac56 9ef50a31 3be3c475 58600e75 36d16982",
+      "unrelated": "b2cd48c8 52973f1b 845ac54f edba9491 a5a786ff 062aca99 adbec7b4 638b2277 6a3a8309 c6fb38b5 6ec5e8f5 7b3b8d0d"
     },
     {
-      "secret": "How do I parse a CSV file in Postgres?",
-      "paraphrase": "What is the way to read comma-separated data with Postgres?",
-      "unrelated": "Explain how to reset a forgotten password on Kafka step by step."
+      "secret": "cbf173a0 aa05aa13 19bb39e5 8d9a2b9e a6e88a0f 006e4545 752064ec d0859312 0024ef88 ffab0a33 8aae0b2e caf78d80",
+      "unrelated": "70907e75 be842150 dfde13b0 a7d47f4d 8fe456b9 1d70738c 539f7983 1a23bb1a dcadf1d8 c65a650b 70fd8b9f d8f23897"
     },
     {
-      "secret": "How do I debug a memory leak in Postgres?",
-      "paraphrase": "What is the way to find what is leaking memory in Postgres?",
-      "unrelated": "Explain how to rotate API keys for Nginx step by step."
+      "secret": "2b72cf70 f0721e70 fdd5e775 4bb2f38d 40d358f5 cbbf6f5f 53577b85 c54fc766 1ad6f2f9 6662d229 84651401 d4e5dc75",
+      "unrelated": "8793b7e5 fb7feb7b a74244b2 114ff75f 8728d577 07e138ce 9105edc8 f2fd2c2d 3f2971d9 529cf151 8ded315b a367d432"
     },
     {
-      "secret": "How do I parse a CSV file in Redis?",
-      "paraphrase": "What is the way to read comma-separated data with Redis?",
-      "unrelated": "Explain how to reset a forgotten password on Kafka step by step."
+      "secret": "10da15f8 e8597065 1e7d0f52 088a5a24 a665f471 b35cbcb5 431fe1bc 7cbd6c5c d5de8615 96844ac5 06df49fb 74083a79",
+      "unrelated": "ccbb3a92 2b9c088d cb359cd0 0371d9ca 26ca594d 2eff3848 ff55218f 096fc746 9b180918 e1b9ed34 69e51633 2982c464"
     },
     {
-      "secret": "How do I parse a CSV file in Django?",
-      "paraphrase": "What is the way to read comma-separated data with Django?",
-      "unrelated": "Explain how to reset a forgotten password on Kafka step by step."
+      "secret": "ef8e437b 588b98bc c0f993d5 730299b8 39ff5dc2 f0b35c23 7c5a199e 10216924 91ca155e 38739e9f 4569742e 6f04b19a",
+      "unrelated": "be0e120d 38f4ee91 e6ce1410 084c8bc3 8f793550 30e7fea3 a87014cc 6bb07990 37d26db7 9e0d6047 de4eca33 8d7066a2"
     },
     {
-      "secret": "How do I containerize a Go service?",
-      "paraphrase": "What is the way to write a Dockerfile for Go?",
-      "unrelated": "Explain how to configure TLS for Postgres step by step."
+      "secret": "5a725440 cb132c7c 5355f059 248c4a10 6feebc52 1b846add f309e534 e068da8f 68e903ea 18038192 1b7998f1 4b259abf",
+      "unrelated": "6cb59f38 dc7c0722 5661f3be f1119b37 8f52e564 ff3142a9 31051ba2 d8ec514a ed4c5fc3 e2413dc1 537b3100 3b671b07"
     },
     {
-      "secret": "How do I debug a memory leak in Redis?",
-      "paraphrase": "What is the way to find what is leaking memory in Redis?",
-      "unrelated": "Explain how to rotate API keys for Nginx step by step."
+      "secret": "43720c2c 53d6974f 4d0e7fc2 cf48a7b4 4d15d4e3 74527f23 f2d4f108 1b0152d1 c7f802c9 6d20210b 68882d21 4fec69bd",
+      "unrelated": "ebc8759d 9af59de0 b880abfb 8b056216 b0a389de 957c74b5 60ab1ec8 b83be7f1 1def7857 360da256 c57b1552 1d81c85a"
     },
     {
-      "secret": "How do I rate-limit an API in Kubernetes?",
-      "paraphrase": "What is the way to throttle requests in a Kubernetes server?",
-      "unrelated": "Explain how to write a retry loop in Redis step by step."
+      "secret": "276823e9 c8c75ff0 8137f37e 5df8bb2d b868fb7b 1e500183 1092f607 9a2abf59 cc312f86 bf925fbe 1f0d5fdc ab3f4704",
+      "unrelated": "8dd4edd9 409b48a5 e677dc93 2d46f5d6 d6180d5c aa452778 8b294f45 ed615110 de8f2577 b67ae8b5 a62da434 84dc201a"
     },
     {
-      "secret": "How do I write a retry loop in Go?",
-      "paraphrase": "What is the way to add automatic retries to Go code?",
-      "unrelated": "Explain how to rate-limit an API in React step by step."
+      "secret": "cfa0438e 88534f3e 2f6d43bb e0e2d56c a361e121 1880859c c91eb6bb 67103c05 9acb6891 ec3f87b7 b5c62e28 d865c0be",
+      "unrelated": "b1823e19 70534167 44a81631 b9096172 d61af433 a4707b3a e57cbb07 772065b7 a7130a55 126b60cc ac43014e 270f65e7"
     },
     {
-      "secret": "How do I containerize a Django service?",
-      "paraphrase": "What is the way to write a Dockerfile for Django?",
-      "unrelated": "Explain how to configure TLS for Postgres step by step."
+      "secret": "83eb54fe 8c233f62 8ed3c8bd 5cf61b69 d775e5ca 2260b7a9 55b727d4 27966fc8 ea71faa7 a0d3839f 443bd5bf c6468d33",
+      "unrelated": "446f6559 97823eaa 3f0fd298 f8e8438b 246af1d4 a3dc951f 1f2d9a1e cf7ab35b cc23d723 3cf5d79c 88deae50 67ecbae0"
     },
     {
-      "secret": "How do I optimize a slow SQL query on Postgres?",
-      "paraphrase": "What is the way to make a Postgres database query run faster?",
-      "unrelated": "Explain how to set up CI for a Go project step by step."
+      "secret": "2fefe375 50e713ba ffd237ad 543822df 5c8645ef 94f12846 43b6fb48 b4759f39 c46e99f1 6a87c2cf 46b0de7c bc3e8b2b",
+      "unrelated": "8db88c4a bc799800 01b524bc 67aca70b 2745d197 aaf8ed1a fa332be2 5fdc5bba 351b608b a30cae8c 688326ef 1dd2d920"
     },
     {
-      "secret": "How do I reset a forgotten password on Django?",
-      "paraphrase": "What is the way to recover access when I forget my Django password?",
-      "unrelated": "Explain how to parse a CSV file in Django step by step."
+      "secret": "8414ad3e 7a8c8678 bc5b57a7 6b9e6e58 7520d79c 7cbf57d5 a771ba4d 2c2321ab d0aafd55 9215cf98 67f2cab7 43596aa5",
+      "unrelated": "08de004d 3e59b2e9 b74a7a3d dfb3f09e f1d44df2 b530a8cd a4ad5e8f 24aba4ab 83ad3d92 62c71b30 caa2b608 ab87865e"
     },
     {
-      "secret": "How do I containerize a Postgres service?",
-      "paraphrase": "What is the way to write a Dockerfile for Postgres?",
-      "unrelated": "Explain how to configure TLS for Postgres step by step."
+      "secret": "1516fa5b f796e639 f2fff526 4acc75e6 a084bd51 0275b5ba fcaa4fe4 dd662ac9 67e826d7 f1613cbb 8afc914a e5e5a0f7",
+      "unrelated": "999c6935 6a23b59d 5fe2396e 3e03cd22 04c2d759 e58a3db4 337da7be 7416b2d6 ba58fdcf a9947c7e 788afde6 36ffac19"
     },
     {
-      "secret": "How do I containerize a Redis service?",
-      "paraphrase": "What is the way to write a Dockerfile for Redis?",
-      "unrelated": "Explain how to configure TLS for Postgres step by step."
+      "secret": "5b5f3adf 28228724 49c341ca 61f0939a a9624381 a576b738 c9c366d4 a8784da7 b1bd7e0b e0d10b14 e9d213b8 2d946dff",
+      "unrelated": "e2543ac7 e604687e df79b921 9438420f 5d7cc341 f85009ea 99d1f118 a788d75a 62c8f30a f2696767 9bf662ce dc704c28"
     },
     {
-      "secret": "How do I set up CI for a Go project?",
-      "paraphrase": "What is the way to add a build pipeline to Go?",
-      "unrelated": "Explain how to optimize a slow SQL query on Terraform step by step."
+      "secret": "dc83f4e2 626e75b6 378e345c f8fd8a27 2a3eebcf ab3df9cc 0485547e d62e906c 7ae31743 aef8c958 e54cf774 65d17d6d",
+      "unrelated": "1151f443 d11a5eaf 0c7a7596 4ffeacca 0b47c6ff eb85b571 4fa9bf30 d8c5c07f 372d1c7e 537be966 8daa65d0 07f636f4"
     },
     {
-      "secret": "How do I rotate API keys for Redis?",
-      "paraphrase": "What is the way to safely change Redis credentials?",
-      "unrelated": "Explain how to debug a memory leak in Kubernetes step by step."
+      "secret": "696ddbfe 1e844ebb f4fe5943 9c2aca03 a4e25670 a4ca10b9 75b5e727 58ec38ea 931378f7 6fdebbba e925d20b a3e18e05",
+      "unrelated": "6a2cfee0 b551013f d5ac73e3 0b344893 94ffb449 13bd73f3 3482d3e5 af6727ad 14552451 c64e6972 1e54d453 7bdbb1b3"
     },
     {
-      "secret": "How do I set up CI for a Django project?",
-      "paraphrase": "What is the way to add a build pipeline to Django?",
-      "unrelated": "Explain how to optimize a slow SQL query on Terraform step by step."
+      "secret": "de7c88bd 6d603c37 04a5efb7 60ad05f7 93277059 be4bbcc4 332153ef 0803b945 df17d8e0 e82e2c9c 28868d4f 80a5f721",
+      "unrelated": "11ca5f25 79a2ed83 785441a6 d304667e 57f012ef 50721b2c f4b88924 7950836f 12c0449f 2593a910 1ffe5a0f 9d116993"
     },
     {
-      "secret": "How do I debug a memory leak in Kubernetes?",
-      "paraphrase": "What is the way to find what is leaking memory in Kubernetes?",
-      "unrelated": "Explain how to rotate API keys for Nginx step by step."
+      "secret": "ab1b6299 88a58367 5ada1fc4 523b1c6d 63d45515 391b2288 d2685907 9a613d4e b3b6469a a31f89dc 1f0907a2 32ddebd1",
+      "unrelated": "34227101 8068d381 38701232 8eb228bc 45225414 a0aa6ef0 7e3e899f bd2c0f11 570c251a c0e78685 6aa7a441 6bd977e8"
     },
     {
-      "secret": "How do I configure TLS for Kubernetes?",
-      "paraphrase": "What is the way to set up HTTPS certificates on Kubernetes?",
-      "unrelated": "Explain how to containerize a Rust service step by step."
+      "secret": "16774565 0bc3ed17 22d45549 0242d6db 2bef7441 c05a9fd8 6ae56888 0df22478 aec640b7 77d684d0 69565e44 03583ac9",
+      "unrelated": "9c3d5601 47037cf3 0c4284c1 e28a7afd 93f39e9c 2002b700 9aa93e3d fee46fa0 6e7907bf 144c849f 65cb2d16 2cf5be78"
     },
     {
-      "secret": "How do I optimize a slow SQL query on Kubernetes?",
-      "paraphrase": "What is the way to make a Kubernetes database query run faster?",
-      "unrelated": "Explain how to set up CI for a Go project step by step."
+      "secret": "768a7bd2 9ff86af3 339e86f9 0119e111 0f0bdf3b 2d9257a8 a398ddda 82154263 502b9751 581c285c c33919d9 4f76d739",
+      "unrelated": "3f3738d1 4b84e69b 68dcfee2 f1351e76 b8c9e004 e2acb9bb a6990c97 383965ca f982c94a 12f5b099 5786c76e d62433c9"
     },
     {
-      "secret": "How do I debug a memory leak in Django?",
-      "paraphrase": "What is the way to find what is leaking memory in Django?",
-      "unrelated": "Explain how to rotate API keys for Nginx step by step."
+      "secret": "4f3ef1d3 4b33fe77 862f3cdc 9807d8c5 5c887828 4223ca54 e97d3fbc dcf460be d4500b86 8f22e6c6 34ccacd4 85ace858",
+      "unrelated": "e70230a8 c96e132d 3721b21b 6a3a6548 bab818a9 3a4e9920 6d3e2fe4 3f1ae89d c1e6da68 3e37f5c6 21e3d1da 785b8df0"
     },
     {
-      "secret": "How do I rotate API keys for Go?",
-      "paraphrase": "What is the way to safely change Go credentials?",
-      "unrelated": "Explain how to debug a memory leak in Kubernetes step by step."
+      "secret": "92e549c9 4c4ce93f 67ca6bf9 9dab0d91 aa7a9805 81ad7400 ef8e96d8 6ad42156 80b78c96 826829bf 3fcafbda 7368c778",
+      "unrelated": "c20c05fa e46de35d 90c77bc1 ae127b28 222229e4 20429b78 7ac75f64 89ab27cc 7d2a5f04 647b6ee5 a072f557 0bf8c171"
     },
     {
-      "secret": "How do I configure TLS for Redis?",
-      "paraphrase": "What is the way to set up HTTPS certificates on Redis?",
-      "unrelated": "Explain how to containerize a Rust service step by step."
+      "secret": "86d9d442 aae91026 eec55339 3b5d501b e2205491 132d4f5a cdcbe8ea 2df80923 60012537 0e3aee5a 7690c2da 4d8c2131",
+      "unrelated": "f1d6e082 c9440b52 721b9520 841d0909 51052a37 7eb4bd8d 881a1e05 67be9403 ba229c3c ab68045c b10ad772 a11d6ec4"
     },
     {
-      "secret": "How do I rate-limit an API in Django?",
-      "paraphrase": "What is the way to throttle requests in a Django server?",
-      "unrelated": "Explain how to write a retry loop in Redis step by step."
+      "secret": "d5f83411 f498d867 235b24b4 12471dca e5a0860a 5b80f8e2 f495d713 2ea20911 f8935c71 e903c69c 22dca1db 1789cbab",
+      "unrelated": "f4f2abab d8e31184 3f130035 b1e688b8 f92393f0 613c5da5 52ad8ddb 3f552e4c 27e90b91 1dac5b53 d4d21d81 64fa4e6d"
     },
     {
-      "secret": "How do I parse a CSV file in Go?",
-      "paraphrase": "What is the way to read comma-separated data with Go?",
-      "unrelated": "Explain how to reset a forgotten password on Kafka step by step."
+      "secret": "ad064d98 48885b9e 0b7e46d6 8954c2dd 473ba785 9ad0d895 0c9243a6 268f76c5 8b24c859 ba64a58f 76e56ebb 8db0c104",
+      "unrelated": "a2986ba8 54c45a7c 8b133c19 1d96ca41 f046ac72 5b463c99 d5cc4513 1e6d0add d3840840 287f9770 9545479b de80866c"
     },
     {
-      "secret": "How do I reset a forgotten password on Postgres?",
-      "paraphrase": "What is the way to recover access when I forget my Postgres password?",
-      "unrelated": "Explain how to parse a CSV file in Django step by step."
+      "secret": "e67a9007 51f5f9ad adb97467 59d3d0a4 f1234f24 568381eb 47b9eb0a 67cfebfa 538676e1 2eac0cc0 b297bcd7 0d6d1001",
+      "unrelated": "f4ea1892 6156c41f c8d856a0 3bec25a1 121f8259 cb1bdb5b c7a6da21 e1ddc876 e89c979f b785329d 72c72cb6 0bf1a4c2"
     },
     {
-      "secret": "How do I optimize a slow SQL query on Django?",
-      "paraphrase": "What is the way to make a Django database query run faster?",
-      "unrelated": "Explain how to set up CI for a Go project step by step."
+      "secret": "15cbaf9f 1ea0664d 698f0507 78bff881 6fd1a02a d4d16b84 735ad4d6 8bbbff0c 0457c9e7 f0d5acce 93482f80 2b280ece",
+      "unrelated": "29579515 4c96cc8d 171eb1b7 e3ad1488 4085a8fe 466fafd8 0c005e94 d268128a 0dc238de 4f16e932 ea8dbfe2 d4d2bbf9"
     },
     {
-      "secret": "How do I rotate API keys for Postgres?",
-      "paraphrase": "What is the way to safely change Postgres credentials?",
-      "unrelated": "Explain how to debug a memory leak in Kubernetes step by step."
+      "secret": "a3caead5 53dbb677 39c418e4 a175f57b c1a9f6a0 32ca2802 3fe22055 8854f0fa 30db4388 fd3ef386 37dc681f 28528af6",
+      "unrelated": "d01c9c51 84a1bf76 c3698788 77b5bdb0 ca12e799 0febad0a 22e8f1f1 780facca 297b564e f8adbad7 673959a6 70689c8c"
     },
     {
-      "secret": "How do I write a retry loop in Redis?",
-      "paraphrase": "What is the way to add automatic retries to Redis code?",
-      "unrelated": "Explain how to rate-limit an API in React step by step."
+      "secret": "0ca558bf eaaa1268 ab98b03e ffe3cc49 d9eddabf 87705b1c 9fc11816 72263fde 965d5198 d724e52c 4f25e122 a7d5fff5",
+      "unrelated": "3d75421c 7dcf79b2 be407e3f a7e7e1ad 20dd61ef a8e6de3e 816efe02 b6a1b4e8 b32a45cf bae6d2ad ebfdfbae cfc65e6b"
     },
     {
-      "secret": "How do I reset a forgotten password on Go?",
-      "paraphrase": "What is the way to recover access when I forget my Go password?",
-      "unrelated": "Explain how to parse a CSV file in Django step by step."
+      "secret": "4bbbe6de 817fd85f 7df68c10 e48e32c9 309c1bf6 ec2d3af6 5fb9f3f1 c9ce4aec 612bd030 55898f31 76da3e68 7969f796",
+      "unrelated": "528f7f66 3f3671fe de08af43 daa0abec bf2e92a7 85e182b1 06331b0b 17806af5 3b69d947 830d38a9 906b34dc 24b71115"
     },
     {
-      "secret": "How do I write a retry loop in Kubernetes?",
-      "paraphrase": "What is the way to add automatic retries to Kubernetes code?",
-      "unrelated": "Explain how to rate-limit an API in React step by step."
+      "secret": "a3eeb053 57e30a36 3fa4c8d9 b8a28378 b9fb6ed0 48b07cfb 77e882fe bba5c16b 31fe5971 35354050 0926fc73 ecaefedc",
+      "unrelated": "1b7ab9c7 dbf3bb27 a86cac65 388f9e1f 4e302979 4151c61a 6a431279 57281ef2 678c17a5 102d6dd8 183b2ec7 70244aaa"
     },
     {
-      "secret": "How do I write a retry loop in Django?",
-      "paraphrase": "What is the way to add automatic retries to Django code?",
-      "unrelated": "Explain how to rate-limit an API in React step by step."
+      "secret": "130e77ef 7e2887a9 8492a201 dd9fc79b e2fec172 91516899 f59c6816 886cc7ca 1fb3391e 32aa8803 95215865 1d39d675",
+      "unrelated": "f36ec736 e3cea5e2 5e76b95f 98304840 664dddd3 412834e3 80aa3621 02a7019d eab51277 08d55fd3 d29192ad 98836107"
     },
     {
-      "secret": "How do I rate-limit an API in Redis?",
-      "paraphrase": "What is the way to throttle requests in a Redis server?",
-      "unrelated": "Explain how to write a retry loop in Redis step by step."
+      "secret": "8e7ada8e f5010b96 6b4ab6e5 adee0c1e 972ba6cc 0d16d266 b427761d 1993aa53 868f712c f1f957ee 59011601 b0e959a9",
+      "unrelated": "5ca170f2 8b7513e6 b9df8ed4 929f315b c3afb4d6 1cee3186 04b1a388 576c4897 3e06cec1 e08cf3a8 64d6adaf b4d4d081"
     },
     {
-      "secret": "How do I optimize a slow SQL query on Redis?",
-      "paraphrase": "What is the way to make a Redis database query run faster?",
-      "unrelated": "Explain how to set up CI for a Go project step by step."
+      "secret": "c60d9191 5fafb643 79bee17b 19bde98e f779cce6 a8fda833 f3b0192e d55b5473 f2b3346f e7016fcf bdf52b1a e2a9d2c1",
+      "unrelated": "8e1d9a8f 12cc33b1 8efe333e 2a5b6ede acce2b26 34905108 2fdd05f7 bc403d3f 49509440 9765a847 7e4de5b4 39ea81f3"
     },
     {
-      "secret": "How do I write a retry loop in Postgres?",
-      "paraphrase": "What is the way to add automatic retries to Postgres code?",
-      "unrelated": "Explain how to rate-limit an API in React step by step."
+      "secret": "879977c3 4d7c63be 9b5c11e8 b67f4ea3 58f8fa75 fe6d950f 77400920 28f1a6de 18ad7ac2 1d361811 d29f0de8 fc0a062e",
+      "unrelated": "8b418ef2 76ea5e83 ba28c2f9 77a9a316 5d22c562 5dda95b6 7a80cc68 7c04b962 81c9e9c5 0e005063 46b3b273 e2753061"
     },
     {
-      "secret": "How do I configure TLS for Go?",
-      "paraphrase": "What is the way to set up HTTPS certificates on Go?",
-      "unrelated": "Explain how to containerize a Rust service step by step."
+      "secret": "753c2515 9277d650 6418a56b 7eee2467 25ea445a 80b5f777 b845f634 e29f7c02 e543ce26 6ed0b1c4 596bbe29 0faa851f",
+      "unrelated": "eb8aa538 a0946373 e1933893 7ad194f5 fa40d37f c8f8c357 2bbca78c 7f602cff 47877f7f 295481f9 4184823c 38117024"
     },
     {
-      "secret": "How do I reset a forgotten password on Redis?",
-      "paraphrase": "What is the way to recover access when I forget my Redis password?",
-      "unrelated": "Explain how to parse a CSV file in Django step by step."
+      "secret": "78207247 42ddc71e e3f5868f 9080f894 63c5666c 292f9551 bb7538c0 140d8b17 1a58b4b4 1f7dc187 519e8443 1b19ffa0",
+      "unrelated": "c94216c5 2711ff5e 64ac389d 66b52276 95a3eda8 54ed2cc0 cf927cc7 a27bc225 bb425c7f 4d1ba0f6 f2b26149 0bd690c9"
     },
     {
-      "secret": "How do I rotate API keys for Kubernetes?",
-      "paraphrase": "What is the way to safely change Kubernetes credentials?",
-      "unrelated": "Explain how to debug a memory leak in Kubernetes step by step."
+      "secret": "283001f7 36c39535 efa42bc7 77a6645e 5d22e58a e697bb5d a060bb3b 181f2815 04e805ba eb7d8570 709d110b be00f941",
+      "unrelated": "1adf1d70 d660c70f d5d1ec86 2736adeb 0a4f5e40 438b56a3 9e14a699 a4ccff3b a5bd497a 62c74099 c57e605b f816b958"
     },
     {
-      "secret": "How do I configure TLS for Django?",
-      "paraphrase": "What is the way to set up HTTPS certificates on Django?",
-      "unrelated": "Explain how to containerize a Rust service step by step."
+      "secret": "77a7f941 786c76c6 7f699446 7dbf4648 cad9a5dd e39d1d41 3fa5d0af 50036b51 7cd0943e 02367fee 8b9f3b1c 27d677e4",
+      "unrelated": "ba0e9d81 8af1685b df31122a abbde764 50933e8d 01337959 030f8a3f a4af9e15 72d71759 98be0a79 3cafef41 6f215a55"
     },
     {
-      "secret": "How do I set up CI for a Kubernetes project?",
-      "paraphrase": "What is the way to add a build pipeline to Kubernetes?",
-      "unrelated": "Explain how to optimize a slow SQL query on Terraform step by step."
+      "secret": "2348dec6 a33aec75 106edcd1 31a47a6e a6980464 db422e9a 6ee6cb76 c9b2382b ca5b60bb 2cf15400 49fee21f f58fabff",
+      "unrelated": "13b63dc9 4f02545e d2546cf9 4d90b518 f3138a5d e2f9a52a ff0910a4 85489334 11e2d6ef 2f26cfe1 0c114c94 d12aa927"
     },
     {
-      "secret": "How do I configure TLS for Postgres?",
-      "paraphrase": "What is the way to set up HTTPS certificates on Postgres?",
-      "unrelated": "Explain how to containerize a Rust service step by step."
+      "secret": "f2b08667 66c3fe1f cc63777c 3edbbd19 8e79af96 4cf3a8d9 144f948e e8ecb494 c4b83b49 70fe6612 4fc78c13 00c9f12f",
+      "unrelated": "9285065b f58e4f8e 904baf73 f2cb8251 51caf67f e1a97641 79491aa6 23224ff0 f3e5737a cb33a831 de02791c 1dd742df"
     },
     {
-      "secret": "How do I optimize a slow SQL query on Go?",
-      "paraphrase": "What is the way to make a Go database query run faster?",
-      "unrelated": "Explain how to set up CI for a Go project step by step."
+      "secret": "d4f8f75c 5aa9ea0c be96055b 4b19f7a7 5fd09632 ab22a03b 49535b14 fc6b3aeb efd40956 e55a16c4 d34245d2 d37b6d4f",
+      "unrelated": "a7d100de d2fbe2b7 fe54bd8f c51ef742 2d568057 9651c3bb 3293d110 fe96f1c9 3e60cdbc 94c99cbc 5eeb821f 5b90c417"
     }
   ]
 }

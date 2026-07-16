@@ -1,0 +1,14 @@
+{
+  "posture": "per-tenant",
+  "auc": 0.502,
+  "ci": [
+    0.384,
+    0.6124
+  ],
+  "n_pos": 50,
+  "n_neg": 50,
+  "hit_latency_med": null,
+  "miss_latency_med": 98.52924999904644,
+  "n_hits": 0,
+  "n_miss": 100
+}
