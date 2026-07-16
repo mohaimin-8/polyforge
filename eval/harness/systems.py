@@ -171,6 +171,38 @@ SYSTEMS: dict[str, SystemSpec] = {
         "gptcache", params={"isocost": "cache"}, lru_eviction=True,
         description="GPTCache posture, cache pinned at PolyForge v2's realized cache spend (ceiling)",
     ),
+    # --- Wave 2 chaos arms (PREREG_CHAOS_SIM.md). The chaos_* params are
+    # engine settings consumed by sim_backend, never seen by the controller.
+    # Windows are frozen in the prereg: planning outage starts at step 40
+    # (post-warm-up, mid-run); 6 steps = 1 min of dead planner, 18 steps =
+    # 3 min, which covers >= 1 full burst cycle of every periodic shape with
+    # period <= 18 for every tenant phase. The replica kill hits scored
+    # steps 60-62 (30 s of half-capacity before rescheduling). Baseline
+    # chaos arms mirror their base systems' eviction accounting exactly.
+    "jcac_outage_1m": SystemSpec(
+        "jcac", params={"chaos_planner_outage": (40, 6)},
+        description="PolyForge with its planner dead for 1 min mid-run (last-known-good hold)",
+    ),
+    "jcac_outage_3m": SystemSpec(
+        "jcac", params={"chaos_planner_outage": (40, 18)},
+        description="PolyForge with its planner dead for 3 min mid-run (last-known-good hold)",
+    ),
+    "hpa_outage_1m": SystemSpec(
+        "hpa", lru_eviction=True, params={"chaos_planner_outage": (40, 6)},
+        description="HPA with its control loop frozen 1 min (apiserver-throttling analog)",
+    ),
+    "jcac_kill50": SystemSpec(
+        "jcac", params={"chaos_replica_kill": (60, 0.5, 3)},
+        description="PolyForge under a 50% replica kill at steps 60-62, billing nominal",
+    ),
+    "hpa_kill50": SystemSpec(
+        "hpa", lru_eviction=True, params={"chaos_replica_kill": (60, 0.5, 3)},
+        description="HPA under the identical 50% replica kill",
+    ),
+    "keda_kill50": SystemSpec(
+        "keda", lru_eviction=True, params={"chaos_replica_kill": (60, 0.5, 3)},
+        description="KEDA under the identical 50% replica kill",
+    ),
     # --- W36 ablations (PolyForge minus one contribution) ----------------
     "jcac_noclassifier": SystemSpec(
         "jcac", blind_classifier=True,

@@ -23,6 +23,11 @@ from .workloads import CLUSTER_SIZES, TENANT_MIXES, WORKLOAD_CLASSES
 
 BACKENDS = ("sim", "cluster")
 
+ECONOMY_KEYS = {
+    "tier_cost_small", "tier_cost_mid", "tier_cost_large",
+    "cache_hit_max", "cache_half_mb",
+}
+
 
 @dataclass(frozen=True)
 class RunSpec:
@@ -42,6 +47,10 @@ class RunSpec:
     store_timeseries: bool
     transition_costs: bool = False
     interference: bool = False
+    # Economy override (PREREG_TIER_RATIO / PREREG_HK_ADOPTION): sorted
+    # (key, value) pairs, empty for the published economy. Kept as a tuple
+    # so the frozen spec stays hashable and deterministic.
+    economy: tuple = ()
 
 
 @dataclass
@@ -66,6 +75,11 @@ class ExperimentSpec:
     # `timeseries_reps` repetitions only (figures need one trace, stats
     # need only the per-run aggregates).
     timeseries_reps: int = 1
+    # Economy override, sim backend only. Known keys: tier_cost_small,
+    # tier_cost_mid, tier_cost_large (USD per request), cache_hit_max,
+    # cache_half_mb. An empty mapping is the published economy and leaves
+    # every pre-existing run_id unchanged.
+    economy: dict = field(default_factory=dict)
 
     def total_runs(self) -> int:
         return (
@@ -101,6 +115,18 @@ def load(path: str | Path) -> ExperimentSpec:
     _check_membership(spec.cluster_sizes, CLUSTER_SIZES, "cluster size")
     if spec.reps < 1 or spec.steps < 3:
         raise ValueError("reps must be >= 1 and steps >= 3")
+    if spec.economy:
+        if spec.backend != "sim":
+            raise ValueError("economy overrides are sim-only; the live data "
+                             "plane's economy is physical, not configurable")
+        unknown = set(spec.economy) - ECONOMY_KEYS
+        if unknown:
+            raise ValueError(f"unknown economy keys {sorted(unknown)} "
+                             f"(known: {sorted(ECONOMY_KEYS)})")
+        bad = {k: v for k, v in spec.economy.items()
+               if not isinstance(v, (int, float)) or v < 0}
+        if bad:
+            raise ValueError(f"economy values must be non-negative numbers: {bad}")
     return spec
 
 
@@ -114,6 +140,10 @@ def run_identity(spec: ExperimentSpec, system: str, workload: str, mix: str,
         material += "|tc"
     if spec.interference:
         material += "|if"
+    if spec.economy:
+        material += "|econ:" + ",".join(
+            f"{k}={spec.economy[k]:g}" for k in sorted(spec.economy)
+        )
     digest = hashlib.sha256(material.encode()).hexdigest()
     run_id = digest[:16]
     seed = int(digest[16:28], 16) % (2**31 - 1)
@@ -144,5 +174,6 @@ def expand(spec: ExperimentSpec) -> list[RunSpec]:
                             store_timeseries=rep < spec.timeseries_reps,
                             transition_costs=spec.transition_costs,
                             interference=spec.interference,
+                            economy=tuple(sorted(spec.economy.items())),
                         ))
     return runs

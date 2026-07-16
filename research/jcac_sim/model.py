@@ -61,6 +61,46 @@ MEM_COST_USD_GB_HR = 0.005
 
 CACHE_LEVELS_MB = (0, 64, 128, 256, 512, 1024)
 
+# The constants above are the *published* economy: every committed campaign
+# ran on them and stays bit-reproducible because they are the defaults.
+# Pre-registered sensitivity reruns (PREREG_TIER_RATIO.md,
+# PREREG_HK_ADOPTION.md) replay the same matrices under a different economy
+# via set_economy(); hit_rate/evaluate_step read the module globals at call
+# time, and the controllers plan through those same functions, so one
+# override moves the *world* and every controller's *beliefs* together —
+# the shared-model contract this file's docstring promises is preserved.
+_DEFAULT_TIER_COST_USD_PER_REQ = dict(TIER_COST_USD_PER_REQ)
+_DEFAULT_CACHE_HIT_MAX = CACHE_HIT_MAX
+_DEFAULT_CACHE_HALF_MB = CACHE_HALF_MB
+
+
+def set_economy(
+    tier_cost_usd_per_req: dict | None = None,
+    cache_hit_max: float | None = None,
+    cache_half_mb: float | None = None,
+) -> None:
+    """Reset the economy to the published defaults, then apply overrides.
+
+    Always resets first so a worker process is stateless across runs: calling
+    with no arguments restores the frozen constants exactly. The price table
+    is mutated in place (never rebound) so `from model import` aliases keep
+    seeing the active economy.
+    """
+    global CACHE_HIT_MAX, CACHE_HALF_MB
+    TIER_COST_USD_PER_REQ.clear()
+    TIER_COST_USD_PER_REQ.update(_DEFAULT_TIER_COST_USD_PER_REQ)
+    if tier_cost_usd_per_req:
+        unknown = set(tier_cost_usd_per_req) - set(TIERS)
+        if unknown:
+            raise ValueError(f"unknown tiers in economy override: {sorted(unknown)}")
+        if any(v < 0.0 for v in tier_cost_usd_per_req.values()):
+            raise ValueError("tier prices must be non-negative")
+        TIER_COST_USD_PER_REQ.update(tier_cost_usd_per_req)
+    CACHE_HIT_MAX = _DEFAULT_CACHE_HIT_MAX if cache_hit_max is None else float(cache_hit_max)
+    CACHE_HALF_MB = _DEFAULT_CACHE_HALF_MB if cache_half_mb is None else float(cache_half_mb)
+    if not 0.0 <= CACHE_HIT_MAX <= 1.0 or CACHE_HALF_MB <= 0.0:
+        raise ValueError("cache_hit_max must be in [0,1] and cache_half_mb positive")
+
 # SLO targets on estimated p95, per traffic family, scaled by class.
 SLO_BASE_MS = {"crud": 150.0, "ai": 2500.0}
 SLO_CLASS_FACTOR = {"premium": 1.0, "standard": 2.5, "best-effort": 8.0}

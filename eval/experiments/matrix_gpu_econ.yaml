@@ -1,0 +1,19 @@
+# PREREG_TIER_RATIO.md (Wave 2): the v1 headline matrix under the measured
+# GPU-bench price corner. Exact mirror of full.yaml except `economy`.
+# Prices frozen in the prereg: small anchors the published 1.0e-4; mid/large
+# scale by TIER_BENCH.md measured per-request GPU-seconds (1 : 1.516 : 16.64).
+name: matrix_gpu_econ
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, hpa, keda, firm, static, gptcache]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_gpu_econ.duckdb
+retries: 2
+timeseries_reps: 1
+economy:
+  tier_cost_small: 1.0e-4
+  tier_cost_mid: 1.516e-4
+  tier_cost_large: 1.664e-3

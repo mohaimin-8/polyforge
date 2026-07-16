@@ -1,0 +1,18 @@
+# PREREG_CHAOS_SIM.md (Wave 2): failure injection in the scoring engine,
+# controllers blind. Chaos windows are frozen in the SystemSpec registry
+# (planner outage from planning step 40 for 6/18 steps; 50% replica kill on
+# scored steps 60-62). timeseries_reps covers every rep: the recovery-time
+# metric needs per-step rows for all repetitions.
+name: chaos_sim
+backend: sim
+steps: 120
+reps: 15
+systems: [jcac, hpa, keda,
+          jcac_outage_1m, jcac_outage_3m, hpa_outage_1m,
+          jcac_kill50, hpa_kill50, keda_kill50]
+workloads: [crud_bursty, ai_cacheable, flash_crud, spike_agentic]
+tenant_mixes: [uniform]
+cluster_sizes: [medium]
+output: eval/results/chaos_sim.duckdb
+retries: 2
+timeseries_reps: 15

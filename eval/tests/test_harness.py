@@ -399,3 +399,146 @@ class TestV3OverloadCells:
         # On a locked square wave the period-aware forecast must beat the
         # trend fallback decisively, jitter included.
         assert rmse["seasonal"] < 0.5 * rmse["trend"]
+
+
+class TestEconomyOverride:
+    """Wave 2 economy overrides (PREREG_TIER_RATIO / PREREG_HK_ADOPTION):
+    the override must reach world and planner alike, reset statelessly, and
+    never move a pre-existing run identity."""
+
+    # Ground truth from the committed v1 headline campaign (raw_sim.duckdb,
+    # produced before economy overrides existed). If this breaks, resume and
+    # spot-check replay of every closed campaign break with it.
+    KNOWN_FULL_RUN = ("bc7525d3a011b1e3", 1891929049)
+
+    def test_headline_run_identity_is_unchanged(self):
+        spec = ExperimentSpec(
+            name="full", backend="sim", steps=120, reps=5,
+            systems=["jcac", "hpa", "keda", "firm", "static", "gptcache"],
+            workloads=["crud_bursty", "crud_steady", "ai_cacheable",
+                       "ai_uncacheable", "agentic"],
+            tenant_mixes=["uniform", "premium_heavy", "besteffort_heavy", "whale"],
+            cluster_sizes=["small", "medium", "large"],
+        )
+        rid, seed = run_identity(spec, "jcac", "crud_bursty", "uniform", "small", 0)
+        assert (rid, seed) == self.KNOWN_FULL_RUN
+
+    def test_economy_changes_identity_only_when_set(self):
+        base, _ = run_identity(tiny_spec(), "hpa", "crud_steady", "uniform", "small", 0)
+        assert base == run_identity(tiny_spec(economy={}), "hpa", "crud_steady",
+                                    "uniform", "small", 0)[0]
+        econ = tiny_spec(economy={"tier_cost_mid": 1.52e-4})
+        assert base != run_identity(econ, "hpa", "crud_steady", "uniform", "small", 0)[0]
+
+    def test_economy_validation(self, tmp_path):
+        bad = tmp_path / "e.yaml"
+        bad.write_text("name: x\neconomy: {bogus_knob: 1}\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="unknown economy keys"):
+            load(bad)
+        bad.write_text("name: x\nbackend: cluster\neconomy: {cache_hit_max: 0.3}\n",
+                       encoding="utf-8")
+        with pytest.raises(ValueError, match="sim-only"):
+            load(bad)
+        bad.write_text("name: x\neconomy: {cache_hit_max: -0.3}\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="non-negative"):
+            load(bad)
+
+    def test_set_economy_moves_model_and_resets_exactly(self):
+        import model
+        from model import Demand, TenantConfig, TenantState, evaluate_step
+
+        cfg = TenantConfig(tenant_id="t")
+        state = TenantState(replicas=2, cache_mb=128, tier="mid")
+        demand = Demand(rps={"chat": 4.0, "crud_read": 5.0})
+        before = evaluate_step(cfg, state, demand)
+        default_hit = model.hit_rate(128)
+
+        model.set_economy(tier_cost_usd_per_req={"mid": 1.52e-4},
+                          cache_hit_max=0.285, cache_half_mb=19.0)
+        overridden = evaluate_step(cfg, state, demand)
+        assert model.hit_rate(128) == pytest.approx(0.285 * 128 / (128 + 19.0))
+        assert overridden.cost_tier_usd < before.cost_tier_usd
+        assert overridden.cache_hit_rate < before.cache_hit_rate
+
+        model.set_economy()  # reset must restore the published economy exactly
+        after = evaluate_step(cfg, state, demand)
+        assert after == before
+        assert model.hit_rate(128) == default_hit
+        assert model.TIER_COST_USD_PER_REQ == {"none": 0.0, "small": 0.0001,
+                                               "mid": 0.001, "large": 0.01}
+
+    def test_execute_applies_and_clears_economy(self):
+        spec = tiny_spec(systems=["hpa"], workloads=["ai_cacheable"],
+                         economy={"cache_hit_max": 0.285, "cache_half_mb": 19.0})
+        run_e = expand(spec)[0]
+        run_d = expand(tiny_spec(systems=["hpa"], workloads=["ai_cacheable"]))[0]
+        import model
+
+        res_e = sim_backend.execute(run_e)
+        hit_after_e = model.CACHE_HIT_MAX  # still overridden right after
+        assert hit_after_e == 0.285
+        res_d = sim_backend.execute(run_d)  # default run must reset it
+        assert model.CACHE_HIT_MAX == 0.85
+        assert res_e["metrics"]["cache_hit_rate"] < res_d["metrics"]["cache_hit_rate"]
+
+
+class TestChaosArms:
+    """Wave 2 chaos hooks (PREREG_CHAOS_SIM): engine-level, controller-blind,
+    default-off."""
+
+    def _run(self, system: str, steps: int = 30):
+        spec = tiny_spec(systems=[system], workloads=["crud_bursty"], reps=1,
+                         steps=steps)
+        return sim_backend.execute(expand(spec)[0])
+
+    def test_chaos_params_never_reach_controller(self):
+        # Would raise TypeError in JCACController(**params) if they leaked.
+        res = self._run("jcac_outage_1m", steps=50)
+        assert res["metrics"]["steps"] == 50
+
+    def test_default_chaos_is_bit_identical_noop(self):
+        import simulate
+
+        _, buckets, configs, limits = workloads.build(
+            "crud_bursty", "uniform", "small", seed=11, steps=20)
+        tids = sorted(configs)
+        a = simulate.run("hpa", tids, buckets, configs=configs, limits=limits,
+                         jitter_seed=3)
+        b = simulate.run("hpa", tids, buckets, configs=configs, limits=limits,
+                         jitter_seed=3, chaos_planner_outage=None,
+                         chaos_replica_kill=None)
+        assert a.summary() == b.summary()
+
+    def test_outage_holds_last_known_good(self):
+        import simulate
+
+        _, buckets, configs, limits = workloads.build(
+            "crud_bursty", "uniform", "small", seed=11, steps=20)
+        tids = sorted(configs)
+        res = simulate.run("jcac", tids, buckets, configs=configs, limits=limits,
+                           jitter_seed=3, chaos_planner_outage=(0, 999))
+        # Planner dead from step 0: nothing may ever move off the initial state.
+        assert {r["replicas"] for r in res.rows} == {2}
+        assert {r["cache_mb"] for r in res.rows} == {128}
+
+    def test_replica_kill_degrades_serving_not_billing(self):
+        import simulate
+
+        _, buckets, configs, limits = workloads.build(
+            "crud_bursty", "uniform", "small", seed=11, steps=20)
+        tids = sorted(configs)
+        base = simulate.run("static", tids, buckets, configs=configs,
+                            limits=limits, jitter_seed=3)
+        kill = simulate.run("static", tids, buckets, configs=configs,
+                            limits=limits, jitter_seed=3,
+                            chaos_replica_kill=(5, 0.9, 3))
+        by_step = lambda rows: {(r["step"], r["tenant"]): r for r in rows}
+        b, k = by_step(base.rows), by_step(kill.rows)
+        assert b.keys() == k.keys()
+        for key, row in k.items():
+            # Billing follows the nominal configuration in the kill window
+            # and everything is untouched outside it.
+            assert row["cost_usd"] == pytest.approx(b[key]["cost_usd"], abs=1e-9)
+            if not 5 <= key[0] < 8:
+                assert row["violation"] == b[key]["violation"]
+        assert kill.mean_violation > base.mean_violation

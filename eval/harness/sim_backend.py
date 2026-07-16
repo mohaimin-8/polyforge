@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import time
 
-import simulate  # research/jcac_sim via harness sys.path
+import model  # research/jcac_sim via harness sys.path
+import simulate
 from controller import Weights
 
 from .config import RunSpec
@@ -22,16 +23,39 @@ from . import workloads
 _JITTER_SALT = 0x5F3759DF
 
 
+def _apply_economy(economy: tuple) -> None:
+    """Set the model economy for this run. Called unconditionally so a
+    pooled worker process is stateless: an empty override restores the
+    published constants exactly (model.set_economy resets first)."""
+    e = dict(economy)
+    tier_cost = {
+        tier: e[key]
+        for tier, key in (("small", "tier_cost_small"), ("mid", "tier_cost_mid"),
+                          ("large", "tier_cost_large"))
+        if key in e
+    }
+    model.set_economy(
+        tier_cost_usd_per_req=tier_cost or None,
+        cache_hit_max=e.get("cache_hit_max"),
+        cache_half_mb=e.get("cache_half_mb"),
+    )
+
+
 def execute(run: RunSpec) -> dict:
     """Run one cell. Returns the standardized result dict the writer
     stores; raises on execution failure (the runner owns retry)."""
     spec = SYSTEMS[run.system]
+    _apply_economy(run.economy)
     tenant_ids, buckets, configs, limits = workloads.build(
         run.workload, run.tenant_mix, run.cluster_size, run.seed, run.steps
     )
 
     params = dict(tuned_params().get(spec.controller, {}))
     params.update(spec.params)
+    # Chaos settings are engine-level, not controller knobs: the controller
+    # must not know (PREREG_CHAOS_SIM.md).
+    chaos_outage = params.pop("chaos_planner_outage", None)
+    chaos_kill = params.pop("chaos_replica_kill", None)
     if "isocost" in params:
         from .isocost import resolve as isocost_resolve
 
@@ -58,6 +82,8 @@ def execute(run: RunSpec) -> dict:
         miss_cost_factor=lru_miss_cost_factor() if spec.lru_eviction else 1.0,
         transition_costs=run.transition_costs,
         interference_injection=run.interference,
+        chaos_planner_outage=chaos_outage,
+        chaos_replica_kill=chaos_kill,
     )
     wall_s = time.time() - started
 

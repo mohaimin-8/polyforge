@@ -241,6 +241,8 @@ def run(
     miss_cost_factor: float = 1.0,
     transition_costs: bool = False,
     interference_injection: bool = False,
+    chaos_planner_outage: tuple | None = None,
+    chaos_replica_kill: tuple | None = None,
 ) -> RunResult:
     """Replay `buckets` under one controller.
 
@@ -265,6 +267,18 @@ def run(
       nominal). The JCAC controller — and only JCAC, whose plan() accepts
       it — receives the observable detector score each step, which is what
       finally makes the γ-term testable in the sim (RESULTS.md limitation).
+    - `chaos_planner_outage = (start, n_steps)` (Wave 2, PREREG_CHAOS_SIM):
+      for planning steps in [start, start+n_steps) the controller is dead —
+      no plan() call, no observe_feedback — and the cluster holds its
+      last-known-good configuration, which is exactly the operator's
+      designed planner-outage fallback. Scoring and billing continue.
+    - `chaos_replica_kill = (start, fraction, n_steps)` (Wave 2): an
+      infrastructure failure — for *scored* steps in [start, start+n_steps)
+      each tenant serves on max(1, floor(replicas·(1−fraction))) replicas
+      while billing stays nominal (the pods you asked for are still
+      scheduled). System-agnostic: it hits every controller identically.
+      Controllers are not told about either chaos mode; recovery behavior
+      is part of what the campaign measures.
     """
     configs = configs or default_configs(tenant_ids)
     if controller_name == "jcac":
@@ -291,21 +305,37 @@ def run(
     horizon = buckets[:max_steps] if max_steps else buckets
     prev_states = dict(states)
     for step, demands in enumerate(horizon):
-        # Controller decides on this bucket's observed demand...
-        seen = plan_demand_transform(demands) if plan_demand_transform else demands
-        if interference_injection and isinstance(ctl, JCACController):
-            plans = ctl.plan(states, seen, interference=interference_scores(states, seen))
+        planner_down = bool(
+            chaos_planner_outage
+            and chaos_planner_outage[0] <= step < chaos_planner_outage[0] + chaos_planner_outage[1]
+        )
+        if planner_down:
+            # Last-known-good hold: the dead controller neither plans nor
+            # observes; the previous configuration keeps serving.
+            prev_states = dict(states)
         else:
-            plans = ctl.plan(states, seen)
-        prev_states, states = states, {
-            tid: (p.state if hasattr(p, "state") else p) for tid, p in plans.items()
-        }
+            # Controller decides on this bucket's observed demand...
+            seen = plan_demand_transform(demands) if plan_demand_transform else demands
+            if interference_injection and isinstance(ctl, JCACController):
+                plans = ctl.plan(states, seen, interference=interference_scores(states, seen))
+            else:
+                plans = ctl.plan(states, seen)
+            prev_states, states = states, {
+                tid: (p.state if hasattr(p, "state") else p) for tid, p in plans.items()
+            }
         # ...and is scored against the next bucket that actually arrives.
         if step + 1 >= len(horizon):
             break
         actual = horizon[step + 1]
         inj = interference_scores(states, actual) if interference_injection else {}
         inj_dom, inj_theta = (next(iter(inj.items())) if inj else (None, 0.0))
+        # Kill windows are defined on the *scored* step index (the `step`
+        # column of the recorded rows), so a window is what an observer of
+        # the metrics stream would see fail.
+        kill_active = bool(
+            chaos_replica_kill
+            and chaos_replica_kill[0] <= step + 1 < chaos_replica_kill[0] + chaos_replica_kill[2]
+        )
         satisfactions = []
         realized: dict[str, float] = {}
         for tid in tenant_ids:
@@ -315,6 +345,12 @@ def run(
                 serving = effective_state(prev_states[tid], nominal)
             if inj_theta > 0.0 and tid != inj_dom:
                 serving = interfered_state(serving, inj_theta)
+            if kill_active:
+                replicas = max(1, int(serving.replicas * (1.0 - chaos_replica_kill[1])))
+                if replicas != serving.replicas:
+                    serving = TenantState(
+                        replicas=replicas, cache_mb=serving.cache_mb, tier=serving.tier
+                    )
             m = evaluate_step(configs[tid], serving, actual[tid])
             cost = miss_cost_factor * m.cost_tier_usd
             if serving != nominal:
@@ -356,7 +392,7 @@ def run(
                 })
         jain_sum += jain_index(satisfactions)
         result.steps += 1
-        if hasattr(ctl, "observe_feedback"):
+        if hasattr(ctl, "observe_feedback") and not planner_down:
             ctl.observe_feedback(realized)
 
     if tenant_steps:
