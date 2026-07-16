@@ -35,6 +35,34 @@ type SemanticCache struct {
 	capacityPerTenant int
 	policyMu          sync.Mutex
 	policies          map[string]eviction.Policy
+
+	// shared collapses every tenant into one cache partition — the
+	// deliberately INSECURE posture, off by default. It exists only so the
+	// cross-tenant timing side channel this design prevents can be measured
+	// as a baseline (research/security/PREREG_WIRE_ATTACK.md); a production
+	// gateway must never set it. When false (the default) the cache is
+	// per-tenant and isolation is unconditional.
+	shared bool
+}
+
+// sharedPartition is the single key every tenant collapses onto in the
+// insecure shared posture.
+const sharedPartition = "__shared__"
+
+// WithShared enables the insecure single-partition cache posture. Off by
+// default; see the `shared` field.
+func (c *SemanticCache) WithShared(shared bool) *SemanticCache {
+	c.shared = shared
+	return c
+}
+
+// partition is the cache key namespace for a tenant: the tenant's own id
+// (isolated, the default and only safe posture) or one shared bucket.
+func (c *SemanticCache) partition(tenantID string) string {
+	if c.shared {
+		return sharedPartition
+	}
+	return tenantID
 }
 
 func NewSemanticCache(embedder embed.Embedder, threshold float64) *SemanticCache {
@@ -88,7 +116,8 @@ func (c *SemanticCache) Lookup(ctx context.Context, tenantID string, messages []
 		c.misses.Add(1)
 		return "", 0, false
 	}
-	matches := c.index.Search(tenantID, vecs[0], 1)
+	part := c.partition(tenantID)
+	matches := c.index.Search(part, vecs[0], 1)
 	if len(matches) == 0 || matches[0].Score < c.threshold {
 		c.misses.Add(1)
 		return "", 0, false
@@ -96,7 +125,7 @@ func (c *SemanticCache) Lookup(ctx context.Context, tenantID string, messages []
 	c.hits.Add(1)
 	if c.capacityPerTenant > 0 {
 		c.policyMu.Lock()
-		c.policyFor(tenantID).OnHit(matches[0].Doc.ID, time.Now())
+		c.policyFor(part).OnHit(matches[0].Doc.ID, time.Now())
 		c.policyMu.Unlock()
 	}
 	return matches[0].Doc.Meta["completion"], matches[0].Score, true
@@ -122,9 +151,10 @@ func (c *SemanticCache) StoreWithCost(ctx context.Context, tenantID string, mess
 	}
 	// Semantic density: similarity to the nearest already-cached prompt.
 	// Measured before the insert so the entry never counts itself.
+	part := c.partition(tenantID)
 	density := 0.0
 	if c.capacityPerTenant > 0 {
-		if nearest := c.index.Search(tenantID, vecs[0], 1); len(nearest) > 0 && nearest[0].Score > 0 {
+		if nearest := c.index.Search(part, vecs[0], 1); len(nearest) > 0 && nearest[0].Score > 0 {
 			density = nearest[0].Score
 		}
 	}
@@ -132,7 +162,7 @@ func (c *SemanticCache) StoreWithCost(ctx context.Context, tenantID string, mess
 	id := hex.EncodeToString(sum[:16])
 	if err := c.index.Upsert(vector.Doc{
 		ID:       id,
-		TenantID: tenantID,
+		TenantID: part,
 		Text:     text,
 		Vector:   vecs[0],
 		Meta:     map[string]string{"completion": completion},
@@ -145,7 +175,7 @@ func (c *SemanticCache) StoreWithCost(ctx context.Context, tenantID string, mess
 	now := time.Now()
 	c.policyMu.Lock()
 	defer c.policyMu.Unlock()
-	policy := c.policyFor(tenantID)
+	policy := c.policyFor(part)
 	policy.OnStore(eviction.Entry{
 		ID:               id,
 		SizeBytes:        int64(len(completion)),
@@ -153,12 +183,12 @@ func (c *SemanticCache) StoreWithCost(ctx context.Context, tenantID string, mess
 		EmbeddingDensity: density,
 		StoredAt:         now,
 	}, now)
-	for c.index.Count(tenantID) > c.capacityPerTenant {
+	for c.index.Count(part) > c.capacityPerTenant {
 		victim, ok := policy.Victim(now)
 		if !ok {
 			break
 		}
-		c.index.Delete(tenantID, victim)
+		c.index.Delete(part, victim)
 		policy.OnRemove(victim)
 	}
 }

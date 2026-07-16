@@ -67,6 +67,40 @@ seed; the classifier sees only response times, never the hit flag.
   the sim's 800 ms/20 ms, to state how much of the sim's attacker advantage
   was modeling.
 
+## Amendment (declared pre-run, session 22 — substrate + threat model)
+
+The frozen substrate above assumed the kind cluster gateway with a semantic
+(MiniLM) embedder at threshold 0.85. The deployable offline substrate differs,
+and this amendment is committed and pushed **before** any wire number is
+collected, so the pre-registration discipline holds:
+
+1. **Substrate = the real `cmd/ai-gateway` process** run on the Codespace host
+   (a real Go HTTP server with the production `SemanticCache`), backed by the
+   **deployed local n-gram embedder** (`embed.NewLocal`, lexical, offline —
+   there is no external embedding API available offline) and a stdlib mock LLM
+   backend (`research/security/mock_llm.py`, fixed ~250 ms miss delay) so a
+   cache *miss* costs real wall time. This is a real-HTTP, real-cache,
+   real-timing measurement over the loopback interface — a rung above the
+   simulator's timing *model*, below a WAN cluster. It carries genuine
+   (small) loopback + server jitter, not injected noise; it does **not** carry
+   WAN RTT jitter, so it is not the "over-the-wire on a live gateway" WAN
+   demonstration and is not claimed as one.
+2. **Threat = exact-prompt membership.** The positive probe is the *exact*
+   secret prompt (the attacker tests "is this specific prompt cached?"), the
+   canonical membership-inference form, rather than a semantic paraphrase.
+   This is embedder-independent — it works at the deployed 0.95 threshold on
+   the lexical embedder — and is the conservative standard threat; it is an
+   *upper bound* on attacker power (a paraphrase attacker is strictly weaker),
+   which only strengthens the WA-H1 defense reading (isolation must kill even
+   the exact-prompt channel).
+3. **Consequences for the hypotheses:** WA-H1 (per-tenant AUC ≈ chance) and
+   WA-H2 (shared AUC > chance) are unchanged in meaning. WA-H2's magnitude was
+   never pre-committed; on loopback with a deterministic hit/miss gap it is
+   expected to be high (near the sim's upper bound), and that is reported as
+   measured, explicitly as a loopback-substrate reading. The insecure shared
+   posture is provided by the pre-registered, unit-tested `POLYFORGE_CACHE_SHARED`
+   flag (off by default; `TestSharedCachePostureLeaksCrossTenant`).
+
 ## Outcome handling and stopping rule
 
 Results to `RESULTS_WIRE_ATTACK.md` as measured, including a WA-H1 failure

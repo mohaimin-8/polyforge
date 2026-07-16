@@ -55,6 +55,10 @@ type Config struct {
 	CacheThreshold float64
 	// ModelTier labels this gateway's telemetry (small/mid/large).
 	ModelTier string
+	// CacheShared enables the INSECURE single-partition cache posture
+	// (off by default). Only the wire-attack baseline sets it; a production
+	// gateway must not. See SemanticCache.shared.
+	CacheShared bool
 }
 
 func NewServer(log *slog.Logger, cfg Config) *Server {
@@ -68,7 +72,7 @@ func NewServer(log *slog.Logger, cfg Config) *Server {
 		log:       log,
 		provider:  cfg.Provider,
 		router:    cfg.Router,
-		cache:     NewSemanticCache(cfg.Embedder, cfg.CacheThreshold),
+		cache:     NewSemanticCache(cfg.Embedder, cfg.CacheThreshold).WithShared(cfg.CacheShared),
 		embedder:  cfg.Embedder,
 		search:    vector.NewIndex(cfg.Embedder.Dimensions()),
 		tenants:   cfg.Tenants,

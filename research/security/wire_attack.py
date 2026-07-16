@@ -79,17 +79,26 @@ def build_fixture() -> dict:
     The gateway's own embedder decides hits at threshold 0.85 — we do not
     pre-verify cosine, the live run records the achieved score per probe."""
     rng = random.Random(SEED)
+    # Build all secrets first; negatives use a disjoint sentence frame
+    # ("Explain how to ...") so a negative can never string-equal a secret
+    # ("How do I ...?"), which would otherwise spuriously hit and deflate the
+    # measured AUC.
+    secrets = []
+    for i in range(N_SECRET):
+        tmpl, _ = _DOMAINS[i % len(_DOMAINS)]
+        subj = _SUBJECTS[(i // len(_DOMAINS)) % len(_SUBJECTS)]
+        secrets.append("How do I " + tmpl.format(sys=subj) + "?")
+    secret_set = set(secrets)
     items = []
     for i in range(N_SECRET):
         tmpl, para = _DOMAINS[i % len(_DOMAINS)]
         subj = _SUBJECTS[(i // len(_DOMAINS)) % len(_SUBJECTS)]
-        secret = "How do I " + tmpl.format(sys=subj) + "?"
         paraphrase = "What is the way to " + para.format(sys=subj) + "?"
-        # Unrelated: a different template+subject, length-matched by padding.
         j = (i + 5) % len(_DOMAINS)
         usubj = _SUBJECTS[(i + 3) % len(_SUBJECTS)]
-        unrelated = "How do I " + _DOMAINS[j][0].format(sys=usubj) + "?"
-        items.append({"secret": secret, "paraphrase": paraphrase,
+        unrelated = "Explain how to " + _DOMAINS[j][0].format(sys=usubj) + " step by step."
+        assert unrelated not in secret_set  # disjoint frame guarantees this
+        items.append({"secret": secrets[i], "paraphrase": paraphrase,
                       "unrelated": unrelated})
     rng.shuffle(items)
     return {"threshold": CACHE_THRESHOLD, "n_secret": N_SECRET, "items": items}
@@ -120,8 +129,11 @@ def collect_probe_times(client, fixture: dict, posture: str) -> dict:
     # 1. Victim warms each secret once (attacker never sees this key's data).
     for it in items:
         client.chat("victim", it["secret"])
-    # 2. Attacker probes: positives = paraphrases, negatives = unrelated,
-    #    REPS timed reps each in randomized order.
+    # 2. Attacker probes (exact-membership threat, see the prereg amendment):
+    #    positive = the exact secret prompt (attacker tests "is THIS prompt
+    #    cached?"), negative = an unrelated prompt. REPS timed reps each in
+    #    randomized order. Embedder-independent: works on the deployed local
+    #    n-gram embedder at the deployed 0.95 threshold.
     rng = random.Random(SEED)
     pos_samples = {i: [] for i in range(len(items))}
     neg_samples = {i: [] for i in range(len(items))}
@@ -129,7 +141,7 @@ def collect_probe_times(client, fixture: dict, posture: str) -> dict:
     order = [(i, kind) for i in range(len(items)) for kind in ("pos", "neg")] * REPS
     rng.shuffle(order)
     for i, kind in order:
-        prompt = items[i]["paraphrase"] if kind == "pos" else items[i]["unrelated"]
+        prompt = items[i]["secret"] if kind == "pos" else items[i]["unrelated"]
         latency, hit, _ = client.chat("attacker", prompt)
         (pos_samples if kind == "pos" else neg_samples)[i].append(latency)
         (hit_gap_hits if hit else hit_gap_miss).append(latency)
@@ -210,8 +222,6 @@ class MockGatewayClient:
         self.posture = posture
         self.rng = random.Random(seed)
         self.warm_secrets: set[str] = set()
-        # paraphrase text -> its secret; unrelated texts are absent (never hit).
-        self.para_to_secret = {it["paraphrase"]: it["secret"] for it in fixture["items"]}
         self.secrets = {it["secret"] for it in fixture["items"]}
 
     def chat(self, who: str, prompt: str):
@@ -219,9 +229,8 @@ class MockGatewayClient:
         if who == "victim":
             if prompt in self.secrets:
                 self.warm_secrets.add(prompt)  # populates shared+own cache
-        else:  # attacker
-            secret = self.para_to_secret.get(prompt)  # None for unrelated probes
-            if self.posture == "shared" and secret in self.warm_secrets:
+        else:  # attacker probes the exact prompt; hits only if shared + warmed
+            if self.posture == "shared" and prompt in self.warm_secrets:
                 hit = True
         base = 20.0 if hit else 800.0
         latency = max(0.0, base + self.rng.gauss(0.0, 25.0))
@@ -231,21 +240,37 @@ class MockGatewayClient:
 # --- entry ------------------------------------------------------------------
 
 def run_live() -> None:
+    """Attack the gateway in whatever posture it is currently running
+    (WIRE_POSTURE names it) and dump a per-posture JSON. Run once per posture
+    (restart the gateway with POLYFORGE_CACHE_SHARED=1 between), then --compose."""
     base = os.environ["GATEWAY_URL"]
     keys = {"victim": os.environ["VICTIM_KEY"], "attacker": os.environ["ATTACKER_KEY"]}
-    posture = os.environ.get("WIRE_POSTURE", "both")
+    posture = os.environ.get("WIRE_POSTURE", "per-tenant")
     fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
     client = HTTPGatewayClient(base, keys)
-    isolated = collect_probe_times(client, fixture, "per-tenant")
-    shared = None
-    if posture == "both":
-        # The harness re-provisions the gateway with the shared posture between
-        # runs (chart toggle, eval/README integration point 2); here we assume
-        # WIRE_POSTURE names which posture this invocation's gateway is in.
-        shared = None
-    lines = ["# Over-the-wire cache side-channel — as measured (PREREG_WIRE_ATTACK.md)", ""]
-    lines += verdicts(shared, isolated)
+    result = collect_probe_times(client, fixture, posture)
     OUT.parent.mkdir(parents=True, exist_ok=True)
+    blob = OUT.parent / f"wire_{posture}.json"
+    blob.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    print(f"{posture}: AUC {result['auc']:.3f} CI "
+          f"({result['ci'][0]:.3f}, {result['ci'][1]:.3f}) -> {blob}")
+
+
+def compose() -> None:
+    """Read the two per-posture JSONs and write RESULTS_WIRE_ATTACK.md."""
+    def load(name):
+        p = OUT.parent / f"wire_{name}.json"
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    isolated, shared = load("per-tenant"), load("shared")
+    if isolated is None:
+        raise SystemExit("missing wire_per-tenant.json (run the per-tenant posture first)")
+    lines = ["# Over-the-wire cache side-channel — as measured (PREREG_WIRE_ATTACK.md)", ""]
+    lines.append("Substrate (prereg amendment): the real `cmd/ai-gateway` process with the")
+    lines.append("deployed local n-gram embedder + a mock LLM backend, attacked over loopback;")
+    lines.append("exact-prompt membership threat. Real HTTP + real cache + real timing, no WAN")
+    lines.append("jitter. AUC by the same Mann-Whitney statistic the simulator uses.")
+    lines.append("")
+    lines += verdicts(shared, isolated)
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {OUT}")
 
@@ -270,6 +295,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--gen-fixture", action="store_true")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--compose", action="store_true")
     args = ap.parse_args()
     if args.gen_fixture:
         FIXTURE.write_text(json.dumps(build_fixture(), indent=2), encoding="utf-8")
@@ -277,6 +303,9 @@ def main() -> int:
         return 0
     if args.selftest:
         return run_selftest()
+    if args.compose:
+        compose()
+        return 0
     run_live()
     return 0
 

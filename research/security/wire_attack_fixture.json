@@ -5,252 +5,252 @@
     {
       "secret": "How do I rate-limit an API in Postgres?",
       "paraphrase": "What is the way to throttle requests in a Postgres server?",
-      "unrelated": "How do I write a retry loop in Redis?"
+      "unrelated": "Explain how to write a retry loop in Redis step by step."
     },
     {
       "secret": "How do I rate-limit an API in Go?",
       "paraphrase": "What is the way to throttle requests in a Go server?",
-      "unrelated": "How do I write a retry loop in Redis?"
+      "unrelated": "Explain how to write a retry loop in Redis step by step."
     },
     {
       "secret": "How do I containerize a Kubernetes service?",
       "paraphrase": "What is the way to write a Dockerfile for Kubernetes?",
-      "unrelated": "How do I configure TLS for Postgres?"
+      "unrelated": "Explain how to configure TLS for Postgres step by step."
     },
     {
       "secret": "How do I parse a CSV file in Kubernetes?",
       "paraphrase": "What is the way to read comma-separated data with Kubernetes?",
-      "unrelated": "How do I reset a forgotten password on Kafka?"
+      "unrelated": "Explain how to reset a forgotten password on Kafka step by step."
     },
     {
       "secret": "How do I set up CI for a Postgres project?",
       "paraphrase": "What is the way to add a build pipeline to Postgres?",
-      "unrelated": "How do I optimize a slow SQL query on Terraform?"
+      "unrelated": "Explain how to optimize a slow SQL query on Terraform step by step."
     },
     {
       "secret": "How do I set up CI for a Redis project?",
       "paraphrase": "What is the way to add a build pipeline to Redis?",
-      "unrelated": "How do I optimize a slow SQL query on Terraform?"
+      "unrelated": "Explain how to optimize a slow SQL query on Terraform step by step."
     },
     {
       "secret": "How do I reset a forgotten password on Kubernetes?",
       "paraphrase": "What is the way to recover access when I forget my Kubernetes password?",
-      "unrelated": "How do I parse a CSV file in Django?"
+      "unrelated": "Explain how to parse a CSV file in Django step by step."
     },
     {
       "secret": "How do I debug a memory leak in Go?",
       "paraphrase": "What is the way to find what is leaking memory in Go?",
-      "unrelated": "How do I rotate API keys for Nginx?"
+      "unrelated": "Explain how to rotate API keys for Nginx step by step."
     },
     {
       "secret": "How do I rotate API keys for Django?",
       "paraphrase": "What is the way to safely change Django credentials?",
-      "unrelated": "How do I debug a memory leak in Kubernetes?"
+      "unrelated": "Explain how to debug a memory leak in Kubernetes step by step."
     },
     {
       "secret": "How do I parse a CSV file in Postgres?",
       "paraphrase": "What is the way to read comma-separated data with Postgres?",
-      "unrelated": "How do I reset a forgotten password on Kafka?"
+      "unrelated": "Explain how to reset a forgotten password on Kafka step by step."
     },
     {
       "secret": "How do I debug a memory leak in Postgres?",
       "paraphrase": "What is the way to find what is leaking memory in Postgres?",
-      "unrelated": "How do I rotate API keys for Nginx?"
+      "unrelated": "Explain how to rotate API keys for Nginx step by step."
     },
     {
       "secret": "How do I parse a CSV file in Redis?",
       "paraphrase": "What is the way to read comma-separated data with Redis?",
-      "unrelated": "How do I reset a forgotten password on Kafka?"
+      "unrelated": "Explain how to reset a forgotten password on Kafka step by step."
     },
     {
       "secret": "How do I parse a CSV file in Django?",
       "paraphrase": "What is the way to read comma-separated data with Django?",
-      "unrelated": "How do I reset a forgotten password on Kafka?"
+      "unrelated": "Explain how to reset a forgotten password on Kafka step by step."
     },
     {
       "secret": "How do I containerize a Go service?",
       "paraphrase": "What is the way to write a Dockerfile for Go?",
-      "unrelated": "How do I configure TLS for Postgres?"
+      "unrelated": "Explain how to configure TLS for Postgres step by step."
     },
     {
       "secret": "How do I debug a memory leak in Redis?",
       "paraphrase": "What is the way to find what is leaking memory in Redis?",
-      "unrelated": "How do I rotate API keys for Nginx?"
+      "unrelated": "Explain how to rotate API keys for Nginx step by step."
     },
     {
       "secret": "How do I rate-limit an API in Kubernetes?",
       "paraphrase": "What is the way to throttle requests in a Kubernetes server?",
-      "unrelated": "How do I write a retry loop in Redis?"
+      "unrelated": "Explain how to write a retry loop in Redis step by step."
     },
     {
       "secret": "How do I write a retry loop in Go?",
       "paraphrase": "What is the way to add automatic retries to Go code?",
-      "unrelated": "How do I rate-limit an API in React?"
+      "unrelated": "Explain how to rate-limit an API in React step by step."
     },
     {
       "secret": "How do I containerize a Django service?",
       "paraphrase": "What is the way to write a Dockerfile for Django?",
-      "unrelated": "How do I configure TLS for Postgres?"
+      "unrelated": "Explain how to configure TLS for Postgres step by step."
     },
     {
       "secret": "How do I optimize a slow SQL query on Postgres?",
       "paraphrase": "What is the way to make a Postgres database query run faster?",
-      "unrelated": "How do I set up CI for a Go project?"
+      "unrelated": "Explain how to set up CI for a Go project step by step."
     },
     {
       "secret": "How do I reset a forgotten password on Django?",
       "paraphrase": "What is the way to recover access when I forget my Django password?",
-      "unrelated": "How do I parse a CSV file in Django?"
+      "unrelated": "Explain how to parse a CSV file in Django step by step."
     },
     {
       "secret": "How do I containerize a Postgres service?",
       "paraphrase": "What is the way to write a Dockerfile for Postgres?",
-      "unrelated": "How do I configure TLS for Postgres?"
+      "unrelated": "Explain how to configure TLS for Postgres step by step."
     },
     {
       "secret": "How do I containerize a Redis service?",
       "paraphrase": "What is the way to write a Dockerfile for Redis?",
-      "unrelated": "How do I configure TLS for Postgres?"
+      "unrelated": "Explain how to configure TLS for Postgres step by step."
     },
     {
       "secret": "How do I set up CI for a Go project?",
       "paraphrase": "What is the way to add a build pipeline to Go?",
-      "unrelated": "How do I optimize a slow SQL query on Terraform?"
+      "unrelated": "Explain how to optimize a slow SQL query on Terraform step by step."
     },
     {
       "secret": "How do I rotate API keys for Redis?",
       "paraphrase": "What is the way to safely change Redis credentials?",
-      "unrelated": "How do I debug a memory leak in Kubernetes?"
+      "unrelated": "Explain how to debug a memory leak in Kubernetes step by step."
     },
     {
       "secret": "How do I set up CI for a Django project?",
       "paraphrase": "What is the way to add a build pipeline to Django?",
-      "unrelated": "How do I optimize a slow SQL query on Terraform?"
+      "unrelated": "Explain how to optimize a slow SQL query on Terraform step by step."
     },
     {
       "secret": "How do I debug a memory leak in Kubernetes?",
       "paraphrase": "What is the way to find what is leaking memory in Kubernetes?",
-      "unrelated": "How do I rotate API keys for Nginx?"
+      "unrelated": "Explain how to rotate API keys for Nginx step by step."
     },
     {
       "secret": "How do I configure TLS for Kubernetes?",
       "paraphrase": "What is the way to set up HTTPS certificates on Kubernetes?",
-      "unrelated": "How do I containerize a Rust service?"
+      "unrelated": "Explain how to containerize a Rust service step by step."
     },
     {
       "secret": "How do I optimize a slow SQL query on Kubernetes?",
       "paraphrase": "What is the way to make a Kubernetes database query run faster?",
-      "unrelated": "How do I set up CI for a Go project?"
+      "unrelated": "Explain how to set up CI for a Go project step by step."
     },
     {
       "secret": "How do I debug a memory leak in Django?",
       "paraphrase": "What is the way to find what is leaking memory in Django?",
-      "unrelated": "How do I rotate API keys for Nginx?"
+      "unrelated": "Explain how to rotate API keys for Nginx step by step."
     },
     {
       "secret": "How do I rotate API keys for Go?",
       "paraphrase": "What is the way to safely change Go credentials?",
-      "unrelated": "How do I debug a memory leak in Kubernetes?"
+      "unrelated": "Explain how to debug a memory leak in Kubernetes step by step."
     },
     {
       "secret": "How do I configure TLS for Redis?",
       "paraphrase": "What is the way to set up HTTPS certificates on Redis?",
-      "unrelated": "How do I containerize a Rust service?"
+      "unrelated": "Explain how to containerize a Rust service step by step."
     },
     {
       "secret": "How do I rate-limit an API in Django?",
       "paraphrase": "What is the way to throttle requests in a Django server?",
-      "unrelated": "How do I write a retry loop in Redis?"
+      "unrelated": "Explain how to write a retry loop in Redis step by step."
     },
     {
       "secret": "How do I parse a CSV file in Go?",
       "paraphrase": "What is the way to read comma-separated data with Go?",
-      "unrelated": "How do I reset a forgotten password on Kafka?"
+      "unrelated": "Explain how to reset a forgotten password on Kafka step by step."
     },
     {
       "secret": "How do I reset a forgotten password on Postgres?",
       "paraphrase": "What is the way to recover access when I forget my Postgres password?",
-      "unrelated": "How do I parse a CSV file in Django?"
+      "unrelated": "Explain how to parse a CSV file in Django step by step."
     },
     {
       "secret": "How do I optimize a slow SQL query on Django?",
       "paraphrase": "What is the way to make a Django database query run faster?",
-      "unrelated": "How do I set up CI for a Go project?"
+      "unrelated": "Explain how to set up CI for a Go project step by step."
     },
     {
       "secret": "How do I rotate API keys for Postgres?",
       "paraphrase": "What is the way to safely change Postgres credentials?",
-      "unrelated": "How do I debug a memory leak in Kubernetes?"
+      "unrelated": "Explain how to debug a memory leak in Kubernetes step by step."
     },
     {
       "secret": "How do I write a retry loop in Redis?",
       "paraphrase": "What is the way to add automatic retries to Redis code?",
-      "unrelated": "How do I rate-limit an API in React?"
+      "unrelated": "Explain how to rate-limit an API in React step by step."
     },
     {
       "secret": "How do I reset a forgotten password on Go?",
       "paraphrase": "What is the way to recover access when I forget my Go password?",
-      "unrelated": "How do I parse a CSV file in Django?"
+      "unrelated": "Explain how to parse a CSV file in Django step by step."
     },
     {
       "secret": "How do I write a retry loop in Kubernetes?",
       "paraphrase": "What is the way to add automatic retries to Kubernetes code?",
-      "unrelated": "How do I rate-limit an API in React?"
+      "unrelated": "Explain how to rate-limit an API in React step by step."
     },
     {
       "secret": "How do I write a retry loop in Django?",
       "paraphrase": "What is the way to add automatic retries to Django code?",
-      "unrelated": "How do I rate-limit an API in React?"
+      "unrelated": "Explain how to rate-limit an API in React step by step."
     },
     {
       "secret": "How do I rate-limit an API in Redis?",
       "paraphrase": "What is the way to throttle requests in a Redis server?",
-      "unrelated": "How do I write a retry loop in Redis?"
+      "unrelated": "Explain how to write a retry loop in Redis step by step."
     },
     {
       "secret": "How do I optimize a slow SQL query on Redis?",
       "paraphrase": "What is the way to make a Redis database query run faster?",
-      "unrelated": "How do I set up CI for a Go project?"
+      "unrelated": "Explain how to set up CI for a Go project step by step."
     },
     {
       "secret": "How do I write a retry loop in Postgres?",
       "paraphrase": "What is the way to add automatic retries to Postgres code?",
-      "unrelated": "How do I rate-limit an API in React?"
+      "unrelated": "Explain how to rate-limit an API in React step by step."
     },
     {
       "secret": "How do I configure TLS for Go?",
       "paraphrase": "What is the way to set up HTTPS certificates on Go?",
-      "unrelated": "How do I containerize a Rust service?"
+      "unrelated": "Explain how to containerize a Rust service step by step."
     },
     {
       "secret": "How do I reset a forgotten password on Redis?",
       "paraphrase": "What is the way to recover access when I forget my Redis password?",
-      "unrelated": "How do I parse a CSV file in Django?"
+      "unrelated": "Explain how to parse a CSV file in Django step by step."
     },
     {
       "secret": "How do I rotate API keys for Kubernetes?",
       "paraphrase": "What is the way to safely change Kubernetes credentials?",
-      "unrelated": "How do I debug a memory leak in Kubernetes?"
+      "unrelated": "Explain how to debug a memory leak in Kubernetes step by step."
     },
     {
       "secret": "How do I configure TLS for Django?",
       "paraphrase": "What is the way to set up HTTPS certificates on Django?",
-      "unrelated": "How do I containerize a Rust service?"
+      "unrelated": "Explain how to containerize a Rust service step by step."
     },
     {
       "secret": "How do I set up CI for a Kubernetes project?",
       "paraphrase": "What is the way to add a build pipeline to Kubernetes?",
-      "unrelated": "How do I optimize a slow SQL query on Terraform?"
+      "unrelated": "Explain how to optimize a slow SQL query on Terraform step by step."
     },
     {
       "secret": "How do I configure TLS for Postgres?",
       "paraphrase": "What is the way to set up HTTPS certificates on Postgres?",
-      "unrelated": "How do I containerize a Rust service?"
+      "unrelated": "Explain how to containerize a Rust service step by step."
     },
     {
       "secret": "How do I optimize a slow SQL query on Go?",
       "paraphrase": "What is the way to make a Go database query run faster?",
-      "unrelated": "How do I set up CI for a Go project?"
+      "unrelated": "Explain how to set up CI for a Go project step by step."
     }
   ]
 }

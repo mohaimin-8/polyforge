@@ -79,6 +79,35 @@ func TestCacheGivesNoCrossTenantHit(t *testing.T) {
 	}
 }
 
+// TestSharedCachePostureLeaksCrossTenant is the companion baseline to
+// TestCacheGivesNoCrossTenantHit: with the INSECURE shared posture on
+// (WithShared(true)), the attacker DOES get a hit on the victim's entry —
+// this is the open channel the wire-attack baseline (WA-H2) measures, and
+// the reason the shared posture must never ship. If this ever stops leaking,
+// the shared-mode wiring is broken and the attack baseline is invalid.
+func TestSharedCachePostureLeaksCrossTenant(t *testing.T) {
+	cache := NewSemanticCache(embed.NewLocal(128), 0.95).WithShared(true)
+	ctx := context.Background()
+	secret := prompt("victim's confidential prompt about an unreleased product")
+	cache.StoreWithCost(ctx, "victim", secret, "the sensitive completion", 0.01)
+
+	// Under the shared posture the attacker probing the identical prompt hits.
+	completion, _, ok := cache.Lookup(ctx, "attacker", secret)
+	if !ok {
+		t.Fatal("shared posture must leak: the attacker should hit the victim's entry")
+	}
+	if completion != "the sensitive completion" {
+		t.Fatalf("shared hit returned the wrong completion: %q", completion)
+	}
+	// And the default posture on the same inputs must NOT leak (guard against
+	// the flag defaulting wrong).
+	safe := NewSemanticCache(embed.NewLocal(128), 0.95)
+	safe.StoreWithCost(ctx, "victim", secret, "the sensitive completion", 0.01)
+	if _, _, ok := safe.Lookup(ctx, "attacker", secret); ok {
+		t.Fatal("default posture leaked: WithShared must default to false")
+	}
+}
+
 func TestUnboundedCacheKeepsCompatibleBehavior(t *testing.T) {
 	cache := NewSemanticCache(embed.NewLocal(128), 0.95)
 	ctx := context.Background()
