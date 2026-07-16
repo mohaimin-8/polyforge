@@ -44,3 +44,28 @@ because Kaggle images ship it preinstalled and the free pool's GPU
 architecture is not guaranteed vLLM-compatible. Single-stream shape is
 engine-agnostic; serving-optimized absolutes would be lower for every tier
 alike.
+
+## Independent replication (2026-07-16, session 22, kernel version 7)
+
+Re-ran the identical script on a fresh Kaggle GPU session
+(`tier_bench_replication.csv`). The measurement **reproduces within ~3%** on
+every tier:
+
+| tier | mean ms (16d) | mean ms (v7) | Δ | tokens/s (16d) | tokens/s (v7) |
+|---|---|---|---|---|---|
+| small | 1241.9 | 1205.2 | −3.0% | 38.65 | 39.83 |
+| mid | 1882.8 | 1887.0 | +0.2% | 25.49 | 25.44 |
+| large | 20665.1 | 20594.9 | −0.3% | 2.32 | 2.33 |
+
+What this establishes and what it does not: the tier-latency *ordering and
+shape* (small < mid < large, super-linear at large) is **reproducible across
+independent GPU sessions**, not a one-off. The `large` row's CPU-offload
+caveat **persists** — the pool again granted a single ~16 GB card, and the
+7B fp16 (~15 GB) still spills to CPU; the near-identical 2.33 tok/s is the
+signature of the same offload path. Removing that caveat needs a 32 GB
+allocation (Kaggle "GPU T4 ×2"), which is **not selectable from the
+`kaggle kernels push` script API** — only the notebook UI's accelerator
+picker sets it, so it remains a UI-gated follow-up. The small/mid rows ran
+fully on-GPU in both sessions and stand as clean measurements. No sim
+constant changes (replication of an engineering microbenchmark, not a new
+pre-registration).
