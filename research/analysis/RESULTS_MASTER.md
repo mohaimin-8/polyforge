@@ -30,7 +30,7 @@ context, not results.
 | **Fairness** | **WON — two dedicated baselines beaten** | Beats FIRM on Jain (d_z=1.0, p=4.5e-47); beats the tuned VTC-replica **on Jain itself** (0.9705 vs 0.9599, p=1.5e-6) at −35% cost and −36% worst-tenant p95 (HV1+HV2 PASS). Own γ-term honestly nulled under injected interference | `VTC_FAIRNESS.md`, `FAIRNESS_V2.md` |
 | **Forecasting** | **WON — on real data** | On the real 10.63M-request BurstGPT trace, damped Holt (jcac_v2's forecaster) cuts one-step RMSE −26.9% vs the trend default (segment 1); the synthetic stand-in's −44.8% seasonal prediction **does not transfer** and is published as such; seasonal's mechanism is confirmed only where real periodicity exists (v3 H2′). **Second real trace (Azure LLM 2024, 44.1M requests): the mechanism boundary reproduces** — seasonal wins −15.6% RMSE exactly on the stream with a genuine daily cycle (code, autocorr 0.57 @ lag 24), loses +48.5% on the weakly-periodic conv stream (persistence wins there), and pooling the streams destroys forecastability (seasonal +104%) — per-stream forecasting, which is what PolyForge does per tenant, is the supported design. Across three real streams no single forecaster dominates; the winner tracks measured periodicity | `FORECAST_TRACE_REAL.md`, `FORECAST_TRACE.md`, `RESULTS_V3.md`, `FORECAST_AZURE.md` |
 | **Cache** | **CLOSED — real-data headline measured** | On real LMSYS-Chat-1M (200k-turn reservoir sample, MiniLM, exact NN): adaptive semantic hit rate **29.6% @ cosine 0.85, 48.8% @ 0.70** (InstCache's 51.34% anchor is their different protocol on the same dataset — placed beside, never head-to-head); adaptive beats a non-strawman fixed cache at 10% of inserted by **+93%** (29.6 vs 15.3); **$0.296 saved/1k queries** at mid-tier pricing; empirical h(K): hmax 0.285, K_half ≈ 6.6k entries (~19 MB) — the sim's assumed curve was optimistic, documented, constants unchanged. **Hit quality measured** (pre-registered proxy, `CACHE_PRECISION.md`): at τ=0.85, response-agreement precision 0.313 overall / 0.443 same-model / 0.353 first-turn (ρ=0.70), 165.5 incorrect hits per 1k queries; the τ=0.95 near-duplicate row (0.338) is the proxy's stochasticity ceiling, so cite the *relative* readings — precision rises with τ (0.249→0.338) while hit rate falls, same-model ≈ 2× cross-model — not the absolute level | `SEMANTIC_CACHE.md`, `CACHE_PRECISION.md` |
-| **Security** (uncontested novelty) | **WON — frontier dominance** | Shared semantic cache leaks prompt membership at AUC 0.88 from timing alone; per-tenant partitioning returns the attacker to chance (0.50) at 24% latency cost with 76% hits kept — strictly dominating padding (never < 0.73) and TTL jitter (chance only at ~90% hit loss) | `ADVANCED.md` (figs 16–17) |
+| **Security** (uncontested novelty) | **WON — frontier dominance, now confirmed over the wire** | Shared semantic cache leaks prompt membership at AUC 0.88 from timing alone (sim); per-tenant partitioning returns the attacker to chance (0.50) at 24% latency cost with 76% hits kept — strictly dominating padding (never < 0.73) and TTL jitter (chance only at ~90% hit loss). **Executed against the real gateway process (`RESULTS_WIRE_ATTACK.md`): per-tenant AUC 0.502 (CI [0.384, 0.612]), 0 hits — WA-H1 PASS on the real HTTP/cache path; shared posture leaks perfectly on loopback (AUC 1.000, all 50 secrets)** | `ADVANCED.md` (figs 16–17), `RESULTS_WIRE_ATTACK.md` |
 
 Composite objective J (cost + 2·violation + 0.5·(1−Jain), the objective every baseline
 was tuned on): PolyForge wins against **every** baseline in **every** campaign that
@@ -221,9 +221,25 @@ campaigns.
   −0.0053 through 1024** — the fairness cost was the aliasing, not partitioning. The
   engineering lesson (hash cells, not index round-robin) is itself measured.
 
-Wave 3 (over-the-wire attack, live chaos, live p99) stays deferred — no local Docker;
-the attack harness is offline-verified (`research/security/wire_attack.py --selftest`)
-and the live steps are the push-button runbook `docs/WAVE3_LIVE_RUNBOOK.md`.
+### 12. Wave 3 — over-the-wire cache side-channel, executed (session 22)
+
+The security half of Wave 3 ran for real. `research/security/wire_attack.py` drove the
+frozen protocol (PREREG_WIRE_ATTACK + pre-run amendment) against a live `cmd/ai-gateway`
+process — the production `SemanticCache` over real HTTP, deployed local n-gram embedder,
+mock LLM backend for miss latency, both cache postures via the pre-registered
+`POLYFORGE_CACHE_SHARED` flag (unit-tested: `TestSharedCachePostureLeaksCrossTenant`).
+**WA-H1 PASS on the wire:** per-tenant isolation holds the attacker's membership AUC at
+**0.502 (95% CI [0.384, 0.612]), zero cross-tenant hits** — chance, on the real cache/HTTP
+path rather than the sim's timing model. Shared posture leaks perfectly on loopback (AUC
+1.000, exactly the 50 victim-warmed secrets); measured hit/miss gap 15.6/98.7 ms. Scope,
+disclosed: gateway *process* over loopback (no WAN jitter, which would only weaken the
+shared number); exact-prompt membership threat (embedder-agnostic, since the offline
+embedder is lexical). → `RESULTS_WIRE_ATTACK.md`
+
+Still deferred (need the kind cluster + harness plumbing, not local Docker): the live
+chaos *campaign* (fault injection wired into the harness) and a live p99 *number* (the
+export is landed + unit-tested; persisting it through the harness remains). Runbook:
+`docs/WAVE3_LIVE_RUNBOOK.md`.
 
 ---
 

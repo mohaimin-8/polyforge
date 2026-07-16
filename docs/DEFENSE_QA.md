@@ -319,11 +319,22 @@ mid-burst and apiserver throttling on the kind cluster) is pre-registered
 (`PREREG_LIVE_CHAOS_P99.md`, deferred to a Codespace session), and it also
 closes the p99 question (#11): the export now emits live p99 alongside p95
 (desk-landed, unit-tested), kept out of the sim tables because the sim is a
-p95 estimator by construction. Security: the AUC-0.88 membership attack runs
-in the simulator's timing model, not over a real network; the over-the-wire
-demonstration on the live gateway is pre-registered
-(`PREREG_WIRE_ATTACK.md`), with the defense hypothesis (per-tenant
-partitioning returns the attacker to chance) as the load-bearing claim and
-no attack magnitude pre-committed, since real RTT jitter is expected to
-weaken the sim's upper bound. Membership inference remains the only threat
-class studied.
+p95 estimator by construction. Security: the attack is no longer only a
+sim-timing reading — it was **executed against the real `cmd/ai-gateway`
+process** over HTTP (`PREREG_WIRE_ATTACK.md` + its pre-run amendment,
+`RESULTS_WIRE_ATTACK.md`). The load-bearing defense hypothesis holds on the
+wire: under per-tenant isolation the attacker's membership AUC is **0.502
+(95% CI [0.384, 0.612]), zero cross-tenant hits — chance (WA-H1 PASS)** on
+the real cache/HTTP path, not a model. The deliberately-insecure shared
+posture (the pre-registered, unit-tested `POLYFORGE_CACHE_SHARED` flag) leaks
+perfectly on loopback (AUC 1.000, exactly the 50 victim-warmed secrets), and
+the measured hit/miss gap is 15.6 ms vs 98.7 ms. Two honest scope notes: the
+substrate is the gateway *process* over loopback (real HTTP, real cache, real
+timing, but no WAN RTT jitter — which would only *weaken* the shared-posture
+number, never the defense), and the deployed offline embedder is lexical, so
+the threat measured is exact-prompt membership (the conservative, embedder-
+agnostic form). What stays deferred to a Codespace campaign: the live chaos
+run itself (fault injection wired into the kind harness) and a live p99
+*number* (the export is landed and unit-tested; persisting it through the
+harness is the remaining plumbing). Membership inference remains the only
+threat class studied.

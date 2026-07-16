@@ -7,6 +7,76 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-16 (session 22) — the over-the-wire cache attack executed on the real gateway (WA-H1 PASS)
+
+Milestone status: **the security half of Wave 3 ran for real.** User granted
+broad autonomy ("do everything by yourself") and a new Kaggle token. Honest
+outcome up front: the novel Wave-3 deliverable — the over-the-wire cache
+side-channel attack — was executed against the live gateway and passed; the
+live chaos *campaign*, a live p99 *number*, and the Kaggle GPU run are
+genuinely blocked/deferred for reasons stated below (not skipped quietly).
+
+### Over-the-wire cache side-channel — EXECUTED (RESULTS_WIRE_ATTACK.md)
+
+Realisation that unblocked it: the attack needs a real gateway *process*, not
+the kind cluster — so it runs anywhere with Go+Python, no Docker. Built and
+ran the whole harness against a live `cmd/ai-gateway` (production
+`SemanticCache` over real HTTP, deployed local n-gram embedder, `mock_llm.py`
+backend for miss latency, `wireseed.go` to seed victim/attacker tenants+keys
+straight into the gateway sqlite), both cache postures.
+
+- New code (committed, tested): `SemanticCache.WithShared` / `Config.CacheShared`
+  / `POLYFORGE_CACHE_SHARED` — the INSECURE single-partition posture, off by
+  default, `partition()` threaded through Lookup/Store;
+  `TestSharedCachePostureLeaksCrossTenant` asserts it leaks AND that the
+  default does not. Gateway tests green.
+- **WA-H1 (defense, primary) PASS on the wire:** per-tenant AUC **0.502
+  (95% CI [0.384, 0.612]), 0 cross-tenant hits** — chance, on the real
+  cache/HTTP path. Shared posture leaks perfectly on loopback (AUC 1.000,
+  exactly the 50 victim-warmed secrets). Hit/miss gap 15.6/98.7 ms.
+- Honest scope: gateway process over loopback (no WAN jitter — would only
+  weaken the shared number, never the defense); exact-prompt membership
+  threat (embedder-agnostic). Declared in a pre-run PREREG_WIRE_ATTACK
+  amendment.
+- Two real bugs found by running: gateway auth header is `X-PolyForge-API-Key`
+  not Bearer; and the probe fixture must use high-entropy prompts — natural
+  prompts sharing a sentence frame collide above 0.95 under the lexical n-gram
+  embedder (40 spurious per-tenant hits before the fix). Both fixed; the
+  clean run shows 0 / 50 hits exactly.
+
+### Genuinely blocked / deferred (stated, not skipped)
+
+- **Kaggle GPU (Wave 4):** the provided token is the new `KGAT_` OAuth format;
+  the installed Kaggle CLI 2.2.3 only does browser OAuth for it (Basic/Bearer
+  API probes all 400), and there is no non-interactive path. Needs a classic
+  32-hex `kaggle.json` key (Account → Create New API Token) or a browser
+  login. Precise ask surfaced to the user.
+- **Live chaos campaign + live p99 number:** both need the kind cluster
+  (Codespace, no local Docker) AND new harness work — fault injection wired
+  into the live run, and p99 persisted through the results schema (the export
+  emits it, the schema stores only p95). Substantial; the sim chaos (Wave 2,
+  CH-H1/H2 PASS) already closed the mechanism, so these are confirmatory.
+  Codespace was started, driven, synced, and stopped again (quota); runbook
+  ready.
+
+### What changed / verified
+
+Go: cache.go/server.go/ai-gateway main + cache_test (green). Python:
+wire_attack.py (exact-membership, REPS=1, high-entropy fixture, per-posture
+JSON + --compose; --selftest green), mock_llm.py, wireseed.go. Results:
+RESULTS_WIRE_ATTACK.md + two JSONs. Integrated into RESULTS_MASTER (scoreboard
+security row + ledger entry 12) and DEFENSE_QA §19. All pushed
+(d73d99a + this commit). The wire attack ran end-to-end locally; every number
+is the harness's own committed output.
+
+### What remains
+
+Wave 3 live chaos + live p99 (Codespace + harness plumbing); Wave 4 GPU
+(classic Kaggle key) + live three-knob plane; RELEASE_CHECKLIST + thesis
+fill-ins (user-owned); OSF submit (user action).
+
+---
+
 ## 2026-07-16 (session 21) — Waves 3–4 opened: planning cells to 1024 measured (local), live campaigns made turnkey (deferred)
 
 Milestone status: **Wave 4's local half is done and Wave 3 is turnkey.** User:
