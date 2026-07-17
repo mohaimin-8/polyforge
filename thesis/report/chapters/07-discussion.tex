@@ -40,7 +40,7 @@ citation unit is the paired effect size with a bootstrap CI
 outcomes.
 
 \paragraph{``Your SLO story moved the goalposts.''} The ledger says
-otherwise, and the ledger is the answer: seven pre-registrations pushed
+otherwise, and the ledger is the answer: thirteen pre-registrations pushed
 before their runs, two confirmatory SLO failures published as failures, one
 mechanism confirmation, and a stopping rule forbidding a third attempt. The
 final SLO claim --- parity at $-43\ldots{-48\%}$ cost --- is what survived,
@@ -92,6 +92,18 @@ Staleness and TTL are out of scope and listed as such.
 \section{Limitations}
 \label{sec:disc-limits}
 
+\paragraph{The single load-bearing claim.} Breadth invites the question of
+what one thing this thesis proves. The load-bearing claim is narrow and
+falsifiable: \emph{under a stated, partially-calibrated system model, jointly
+controlling replicas, cache, and model tier across a tenant portfolio yields
+strictly better cost-at-fixed-fairness decision quality than any single-knob
+reactive baseline tuned on the same objective, without a fairness or ---
+outside the overload regime --- SLO regression.} Everything else (the
+real-trace replays, the forecasting decomposition, the cache and isolation
+measurements, the scaling and chaos campaigns) is supporting or scope-bounding
+evidence for that claim, not a co-equal contribution. The limitations below
+are read against that one claim.
+
 \begin{itemize}
   \item \textbf{Substrate.} Headline numbers are simulator decision quality;
         live validation is ordinal-only, and its pre-registered check
@@ -106,7 +118,11 @@ Staleness and TTL are out of scope and listed as such.
         this, and the measured live parity in \texttt{ai\_cacheable} ---
         where the sim's separation flows through the cache economy --- is
         the disclosure made concrete. A live substrate with real cache and
-        tier levers is the named closure.
+        tier levers --- the joint controller's central novelty, which no live
+        run has yet exercised in full --- is the named closure, now
+        pre-registered
+        (\evfile{research/analysis/PREREG\_WAVE4\_LIVE\_PLANE.md}) and gated
+        only on a GPU-capable host.
   \item \textbf{Latency is p95, request-level.} The simulator's tail beyond
         p95 is not credible and is not reported; token-level dynamics (TTFT,
         decode-length tails, head-of-line blocking under continuous
@@ -127,48 +143,119 @@ Staleness and TTL are out of scope and listed as such.
   \item \textbf{Production scale.} SageServe-class fleets serve more in a
         day than the entire replay; the 10.63M-request demand replay is the
         honest analog at decision level, and no stronger claim is made.
-  \item \textbf{Tier-price sensitivity is unmeasured.} The matrix prices
-        tiers at API ratios (1:10:100); the GPU bench measured 1:1.5:16.6.
-        The weight-sensitivity sweep varied objective weights, not these
-        price constants, so the fraction of the cost win that survives at
-        self-hosting ratios is an open, pre-registrable question --- named
-        here rather than implied away.
-  \item \textbf{The calibration story is asymmetric.} The congestion fit
-        errs against \polyforge{} ($a{=}0.86$), but the simulator's assumed
-        cache curve was \emph{optimistic} relative to the measured $h(K)$,
-        and the headline matrix ran on the assumed curve (constants frozen
-        for bit-reproducibility). All cache-using systems share the curve;
-        the differential effect on rankings is unquantified. The
-        pre-registered adoption of the empirical curve is the named
-        closure.
+  \item \textbf{Tier-price sensitivity: measured, and the win survives.}
+        The headline matrix prices tiers at API ratios (1:10:100); the GPU
+        bench measured 1:1.516:16.64 (same ordering, compressed scale). The
+        pre-registered rerun of the full 1{,}800-run matrix at that measured
+        GPU corner (\evfile{research/analysis/RESULTS\_TIER\_RATIO.md}) holds:
+        the cost win against all five baselines survives (TR-H1 PASS 5/5) and
+        so does composite $J$ (TR-H2 PASS 5/5), and given cheap mid-tier
+        inference the joint controller \emph{re-plans} into it (mid-tier steps
+        $1.7\% \to 13.7\%$) and still wins. The headline still runs on the
+        published economy for bit-reproducibility; this rerun is the
+        sensitivity evidence, not a replacement.
+  \item \textbf{The calibration story is asymmetric --- and now quantified
+        both ways.} The congestion fit errs against \polyforge{}
+        ($a{=}0.86$), while the simulator's assumed cache curve was
+        \emph{optimistic} relative to the measured $h(K)$ ($h_{\max}{=}0.285$
+        vs.\ the assumed $0.85$). The headline matrix ran on the assumed curve
+        (constants frozen for bit-reproducibility), so the pre-registered
+        rerun under the \emph{measured} curve
+        (\evfile{research/analysis/RESULTS\_HK\_ADOPTION.md}) is the
+        differential-effect measurement: pessimistic for every cache-using
+        system, ours included --- realized hit rate halves ($0.106 \to
+        0.051$), the cache-centric baseline is devalued most, and the joint
+        controller stops paying for cache it can no longer use ($362 \to 136$
+        MB) --- yet HK-H1 ($J$) and HK-H2 (cost) both PASS 5/5. The margin
+        against HPA narrows ($-27.5\% \to -19.4\%$ aggregate) but does not
+        close: the advantage was never primarily cache-driven.
   \item \textbf{Pre-registration is anchored in git forensics}, not an
         external registry: protocols were pushed before runs, and
         amendments were self-adjudicated. The strongest counter-evidence is
         the record itself --- two failed confirmatory hypotheses and five
         further negatives published in full.
-  \item \textbf{Per-tenant forecasting is supported at stream granularity.}
-        The three real traces are aggregate workload streams, not
-        per-tenant SaaS demand; ``the winner tracks each stream's
-        periodicity'' supports per-tenant forecasting by extrapolation
-        across one aggregation level.
-  \item \textbf{No failure-injection campaign.} The planner-outage fallback
-        is designed and unit-tested, and the scaling bench observed the
-        designed fallback past the timeout, but no chaos experiment
-        (planner crash mid-burst, apiserver throttling) has been run live.
-  \item \textbf{The security result is model-level.} The AUC-0.88 attack
-        runs in the simulator's timing model, not over a real network,
-        where jitter typically degrades timing attacks; the defense
-        conclusion (partitioning dominates) is expected to be robust to
-        that direction, but an over-the-wire demonstration is future work,
-        and membership inference is the only threat class studied.
+  \item \textbf{Per-tenant forecasting is supported one aggregation level
+        down, not at true per-tenant granularity.} The three real traces are
+        aggregate workload streams, not per-tenant SaaS demand. The
+        extrapolation is now measured one level down
+        (\evfile{research/analysis/PSEUDO\_TENANT.md}): the same traces split
+        by Model\,$\times$\,Log-Type into 19 sub-streams reproduce the
+        boundary with zero counterexamples (PT-H1), every periodic sub-stream
+        shows the seasonal win (PT-H2), and three different forecasters win
+        across sub-streams (PT-H3) --- exactly what a pluggable per-tenant
+        forecasting layer exists to exploit. True per-tenant SaaS series
+        remain unavailable, and that limit stands.
+  \item \textbf{Chaos measured in simulation; live chaos still deferred.}
+        The failure-injection campaign ran in the scoring engine with
+        controllers blind (\evfile{research/analysis/RESULTS\_CHAOS\_SIM.md},
+        540/540): a dead planner for one minute still beats a \emph{healthy}
+        HPA (CH-H1 PASS, $d_z{=}{-}1.69$), \jcac{} keeps its $J$ win under an
+        identical 50\% replica kill (CH-H2 PASS), and a one-minute freeze
+        costs \jcac{} \emph{less} than a frozen HPA --- a proactively-planned
+        held configuration ages better than a reactively-lagged one. What
+        remains deferred is the \emph{live} analogue (planner crash mid-burst,
+        apiserver throttling on the kind cluster), pre-registered and
+        runbook-ready (\evfile{docs/WAVE3\_LIVE\_RUNBOOK.md}).
+  \item \textbf{The isolation result is now over-the-wire; its threat model
+        stays narrow.} The membership-inference channel and its defense were
+        executed against the real \texttt{cmd/ai-gateway} process over HTTP
+        (\evfile{eval/results/security/RESULTS\_WIRE\_ATTACK.md}): under
+        per-tenant isolation the attacker's membership AUC is $0.502$ (95\% CI
+        $[0.384, 0.612]$), zero cross-tenant hits --- chance, on the real
+        cache/HTTP path (WA-H1 PASS) --- while the deliberately insecure
+        shared posture leaks perfectly on loopback (AUC $1.000$, all 50 victim
+        secrets). Two honest scope limits remain: the substrate is the gateway
+        process over loopback (no WAN RTT jitter, which would only
+        \emph{weaken} the shared-posture leak, never the defense), and the
+        deployed offline embedder is lexical, so the measured threat is
+        exact-prompt membership --- the conservative, embedder-agnostic form.
+        Membership inference is still the only threat class studied, and
+        whether a \emph{shared} cache can be defended without forfeiting its
+        hit-rate benefit (noise, bucketing, differential privacy) is an open
+        frontier question the partition/padding/TTL sweep does not answer.
+  \item \textbf{The cost win is measured against orchestration-layer
+        baselines, not the serving-engine frontier.} \polyforge{} is a control
+        plane; its $-70\%$ figure is against tuned reactive autoscalers
+        (HPA/KEDA/FIRM) that over-provision, not against a well-provisioned
+        2026 serving engine whose efficiency comes from disaggregated
+        prefill/decode, continuous batching, and KV-cache management
+        (llm-d, AIBrix, Dynamo). Those systems are the \emph{actuation} level
+        the three knobs sit above, and the mapping is direct
+        (RELATED\_WORK \S4); what \polyforge{} adds is the joint,
+        dollar-accounted, fairness-aware decision across a tenant portfolio,
+        which none of them optimize. But the fraction of the orchestration-level
+        win that survives on top of an engine-level-optimized stack is
+        untested and is named future work, not implied away.
+  \item \textbf{The advantage is conditional on the operator's SLO
+        tolerance.} SLO attainment is a published parity, not a win
+        (v2 H1, v3 H1$'$ both FAIL), and the composite-$J$ advantage narrows
+        under violation-first weightings --- the nine losses in the weight
+        sweep all sit at $w_v{=}4$
+        (\evfile{research/analysis/SENSITIVITY\_J.md}), the profile of a
+        latency-strict operator. The honest positioning follows: \polyforge{}
+        wins for cost-sensitive, SLO-tolerant tenant portfolios; an operator
+        who prices a violation far above a dollar of spend sits outside the
+        regime where the trade is favorable, and the thesis says so rather
+        than averaging that operator away.
+  \item \textbf{The evidence chain is self-contained.} Simulator, baselines,
+        objective function, trace ETL, and analysis are one author's code on
+        one machine; the GPU tier-bench replication reproduces the author's
+        own kernel, and the pre-registration anchor is git-push forensics, not
+        yet an external registry. Independent replication is what the archived
+        artifact bundle and the OSF/Zenodo deposits exist to enable
+        (\evfile{docs/RELEASE\_CHECKLIST.md}); until a third party re-runs the
+        campaigns, the published nulls and the immutable commit history are the
+        strongest available counter to the circularity this implies.
 \end{itemize}
 
 \section{The honest-nulls ledger as a contribution}
 
-Seven published negatives travel with the wins: v2 H1, v3 H1$'$, the
+Eight published negatives travel with the wins: v2 H1, v3 H1$'$, the
 underpowered first replay, the $\gamma$-term null, the seasonal
-non-transfer, the structurally impossible raw per-metric gate, and the cache
-hit-quality result. None was hidden; several redirected the design (Holt as
+non-transfer, the structurally impossible raw per-metric gate, the cache
+hit-quality result, and the live ordinal check (the simulator's $J$ winner
+flips to live parity in both cells, published as measured). None was hidden;
+several redirected the design (Holt as
 recommended default; per-stream forecasting; per-tenant caches). The
 methodological claim of this thesis --- pre-registration with published
 nulls in a systems evaluation --- is independent of any performance number

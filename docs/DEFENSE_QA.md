@@ -338,3 +338,130 @@ run itself (fault injection wired into the kind harness) and a live p99
 *number* (the export is landed and unit-tested; persisting it through the
 harness is the remaining plumbing). Membership inference remains the only
 threat class studied.
+
+---
+
+*The four questions below were added 2026-07-17 (session 23) as the harder
+follow-ups a sharp examiner reaches for once §1–19 are conceded. They are the
+project's currently-sharpest open pressure points; each is answered honestly,
+and where the honest answer is "not yet closed," the closure path is named
+rather than the question deflected.*
+
+## 20. "Your one live experiment disagreed with the simulator — so why trust any simulated number?"
+
+This is the deepest question in the defense, and "we scoped it out" is not the
+answer. The disagreement is real, pre-registered, and published
+(`PHASE7_ORDINAL.md`, protocol frozen at 650ce29 before any live number
+existed): the simulator's J winner flips in both cells. What earns the
+simulator its remaining credibility is the *direction and mechanism* of the
+flip, not a hand-wave past it.
+
+Both cells moved to **parity**, not to a baseline win — and both mechanisms
+were identified, and both had *favoured* jcac in-sim:
+
+1. In `ai_cacheable` the sim's jcac edge flows through the cache economy, and
+   the live data plane's cache knob is inert by construction (fixed CPU per
+   request kind) — a test-substrate limitation disclosed pre-run in the frozen
+   figure caption, not a discovery.
+2. In `crud_bursty` the sim's HPA concedes 0.0417 violation where real HPA at
+   that amplitude never violated — the sim *over-penalised* reactive lateness,
+   a model datum that had been working *for* jcac and is now on the record
+   against it.
+
+So the live contact with reality removed two simulator advantages that were
+**ours**; it did not expose a hidden baseline advantage. The honest reading:
+the simulator is a decision-quality model whose separations are directionally
+right where its mechanisms are live-active and overstated where a knob is
+inert — and the campaign that established this was run by us, pre-registered,
+and published as a null (it is the eighth entry in the honest-nulls ledger).
+The headline claims are scoped to the simulator and real-data-replay
+substrates throughout (ground rule 4); no claim ever asserted live-ranking
+transfer.
+
+**Do not say:** "the live run confirms the simulator" (it does not) or "the
+disagreement doesn't matter" (it does — it bounds the sim's credibility, which
+is exactly why the all-knobs-live closure in §21 is named as the primary
+remaining experiment).
+
+## 21. "The joint 3-knob controller — your central novelty — has never run live with all three knobs. Isn't the contribution unproven?"
+
+Correct on the fact, and it is the honest number-one open item; the answer is
+to be precise about what *is* and *is not* established, and to name the exact
+experiment that would close it.
+
+**Established live** (Phase 7, session 19): the full jcac control loop runs
+end-to-end on a real kind cluster under a mechanical actuation gate, capacity
+parity held, zero degradation — but on the *replica axis only*, because the
+kind data plane burns fixed CPU per request so the cache and tier levers are
+inert there. "The loop runs live" is proven; "the joint optimisation's benefit
+reproduces live" is not.
+
+Three things bound the gap without closing it: (a) each knob's realism is
+carried separately on a real substrate — the cache knob by the LMSYS hit-rate
+protocol *and* the over-the-wire isolation test, the tier knob by the GPU tier
+bench; (b) the `-joint` ablation that establishes jointness matters (+2884%
+cost when the knobs are decoupled) is a sim mechanism result, not a headline
+absolute; (c) the closure is now pre-registered
+(`research/analysis/PREREG_WAVE4_LIVE_PLANE.md`) and gated only on a
+GPU-capable host: a real cache/tier data plane where all three knobs actuate,
+with the falsifier stated in advance (if the joint arm does not beat the
+best single-knob arm on cost-at-fixed-fairness on that substrate, the central
+claim is wounded).
+
+**Do not say:** "the simulator is enough." Name the all-knobs-live run as the
+primary remaining experiment and state exactly what result would falsify the
+claim.
+
+## 22. "−70% is against HPA/KEDA/FIRM, which over-provision. Against a well-configured 2026 serving engine, does the win survive?"
+
+The comparison is honest about its *altitude*, and that is the whole answer.
+PolyForge is a control plane; the −70% is an orchestration-level figure
+against tuned-but-reactive autoscalers, and it is never claimed against
+engine-level state of the art. Engine-level efficiency (continuous batching,
+disaggregated prefill/decode, KV-cache management) comes from the *actuation*
+layer the three knobs sit above; the mapping is explicit (`RELATED_WORK.md`
+§4: replicas → decode-pool size, cache → gateway semantic-cache budget as a
+sibling of prefix-cache budgets, tier → model routing).
+
+What PolyForge adds is **orthogonal**, not competitive: the joint,
+dollar-accounted, fairness-aware decision across a *tenant portfolio*, which
+none of llm-d / AIBrix / Dynamo optimises — they maximise a single
+deployment's throughput, not a multi-tenant portfolio's cost-vs-SLO-vs-fairness
+trade. So the honest claim is **composability**: PolyForge's decisions ride on
+top of an engine-optimised stack and the two sets of gains multiply rather
+than compete.
+
+What is genuinely untested, and named as such in the limitations: the residual
+orchestration-level win *on top of* an engine-level-optimised stack — because
+some fraction of −70% is precisely the over-provisioning a good engine would
+not do, so the number would compress against a strong engine even though the
+portfolio-level decision still adds value.
+
+**Do not say:** "−70% versus the state of the art." It is −70% versus
+tuned-but-reactive autoscalers, full stop.
+
+## 23. "Your defence is 'partition the cache per tenant.' That is almost tautologically secure — where is the research contribution?"
+
+Three parts, and the third is the one that matters.
+
+1. **It is a measured frontier, not an asserted property.** The contribution
+   is not "partitioning is secure"; it is the *utility cost* of security
+   quantified against the two mitigations operators actually reach for first.
+   Partitioning removes the AUC-0.88 leak to chance (0.50) at a measured 24%
+   latency cost with 76% of hits kept — while response padding never gets below
+   AUC 0.73 and TTL jitter reaches chance only at ~90% hit loss (`ADVANCED.md`,
+   figs 16–17). That the *cheapest-utility* option is also the *most secure*
+   one is not obvious a priori; it is the citable result.
+2. **It is now executed, not designed.** WA-H1 PASS over the wire against the
+   real gateway (AUC 0.502, `RESULTS_WIRE_ATTACK.md`) makes "partitioning
+   defends" an executed measurement rather than a design assertion.
+3. **The genuinely hard question is named as open.** Can a *shared* cache — the
+   one that keeps the hit-rate benefit partitioning forfeits — be defended
+   without collapsing utility, via noise injection, bucketing, or differential
+   privacy? PolyForge's answer today is "don't share," and the honest framing
+   is that we mapped the leakage/utility frontier of the three obvious
+   mitigations and identified secure-sharing as the question worth a paper.
+
+**Do not say:** "we solved cache side channels." We characterised them, showed
+the cheap-and-obvious mitigations are the weak ones, and left secure sharing
+as explicit open work.
