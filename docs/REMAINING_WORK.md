@@ -39,7 +39,6 @@ These need no account, host, or payment. They are the natural next agent tasks.
 
 | Item | What it is | Where |
 |---|---|---|
-| Bibliography author fields | arXiv-only sources still carry placeholder `{{X authors}}` author fields; fill from the real papers (never fabricate) | `thesis/report/references.bib` |
 | Title-page macros | placeholder author/roll/supervisor/date macros on the title page | `thesis/report/main.tex` |
 | Harness prep for the Wave 4 live plane | wire the tier-routing data plane + real cache hit/miss latency gap so the knobs are live levers (buildable before the GPU host exists) | `PREREG_WAVE4_LIVE_PLANE.md` §Substrate 2–3 |
 | Slides ↔ thesis consistency pass | ensure the deck's numbers match the reconciled discussion chapter (−70% not −76%; eight nulls; over-the-wire done) | `thesis/slides/`, `PolyForge_Pre-defence_Presentation.pptx` |
@@ -88,8 +87,9 @@ Cannot be automated from this repo. Full detail in `docs/RELEASE_CHECKLIST.md`.
 
 ## Suggested order
 
-1. **Bucket A now** (this session and next): bib + title page finish the
-   thesis's own debts; the Wave 4 harness prep makes B1 turnkey.
+1. **Bucket A now** (this session and next): the title page finishes the
+   thesis's own debts (bib authors were filled and verified in session 23);
+   the Wave 4 harness prep makes B1 turnkey.
 2. **Bucket B1 next time a GPU host is opened** — the one experiment that
    materially strengthens the thesis by adding live joint-controller evidence.
    B2/B3 can share a cheaper CPU Codespace sitting whenever convenient.
