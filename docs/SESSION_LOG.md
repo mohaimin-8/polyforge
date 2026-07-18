@@ -7,6 +7,98 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-19 (session 25) — platform-maturity hardening: the five advanced-engineering gaps closed
+
+Milestone status: **the five non-thesis platform gaps from the session-24
+advanced-engineering critique are engineered shut**, each with tests, the
+result-bearing one pre-registered, and one that turned into an honest null and
+one that caught a real bug. User directive: solve all five §4 items and all
+four sub-leaks of §4.5, best-outcome, no hallucination. Audit-first corrected
+two of my own prior overstatements before writing a line.
+
+### 4.1 Canary rollback breaker — replica-shared (e099f0a)
+
+Correction from audit: rate limiting + idempotency were ALREADY Redis-shared
+(cmd/control-plane wires limit.SlidingWindow + idempotency.RedisStore); the
+only in-process control-surface state was the canary breaker. Extracted a
+Breaker interface: localBreaker (unchanged default) + redisBreaker (shared
+window + trip flag via an atomic Lua script, hash-tagged keys). Decision =
+"tripped locally OR shared", fail-safe to local on any Redis error; 1s
+staleness bound on the fast path. Gateway wires NewSharedCanaryProvider on
+POLYFORGE_REDIS_URL. Tests (miniredis): ratio parity, cross-replica
+propagation, shared reset, distributed aggregation, fail-safe-on-redis-down.
+
+### 4.2 Planner failover — forecast snapshot/restore (77b7c99)
+
+Forecast.snapshot/from_snapshot + JCACController.snapshot/restore serialize
+fine window + coarse buckets + capacity corrections (JSON-safe). PlannerCore
+buffers a pushed/loaded snapshot and applies it the moment the controller is
+(re)built, so the FIRST plan after failover reflects pre-failover history.
+GET/POST /v1/state for hand-off; --state-file for durable restart (atomic
+temp+rename; corrupt file tolerated). Committed matrices still bit-identical.
+
+### 4.3 Packaging — robust import + published-physics invariant (9865941)
+
+pin_published_physics() resets economy/form globals at PlannerCore construction
+— the real correctness win: the live planner can never plan against a stray
+sensitivity override left in a module global. _ensure_jcac_sim_importable()
+prefers a normal import, falls back to repo-relative, raises clearly if
+missing. research/jcac_sim/pyproject.toml makes the sim pip-installable (flat
+py-modules, so the sim's own tests are unchanged). Full-suite ordering-safe.
+
+### 4.4 Degradation policy — measured NO-OP, published as an honest null (3e66253 + 633a12c)
+
+degrade_gracefully option (default off) serves the cheapest affordable tier
+instead of a tier=none outage. Measured fact: the fallback binds in ZERO rows
+of every committed campaign (v1/v2/v3/hk/lm). PREREG_DEGRADE + degrade_probe.py
+(20 seeds x 7 budgets, pushed before the run) then measured the fix in the
+tight-budget band: DG-H1 NOT MET, DG-H2 PASS — graceful equals shed everywhere
+because the fallback binds only when even the cheapest tier's per-request price
+exceeds budget, and the cache=0 floor MAXIMISES misses. The finding: shed-to-
+none was already the correct budget-respecting response. A proposed fix,
+pre-registered, measured, found unnecessary — kept default-off + documented.
+
+### 4.5 Never-audited-at-depth — all four sub-leaks
+
+- **(a) operator reconcile (fd0a35e):** recovery-from-fallback (status flips
+  back to planner), per-tenant apply isolation (one Update failing via a
+  fake-client interceptor doesn't stop the others), budget defaulting to $5/hr.
+- **(b) cluster backend (eefcdf2):** 10 tests — BackendUnavailable guard names
+  the fix, command-plan invariants (delete-first, operator images/CRs only for
+  the operator arm, capacity-parity bounds, absolute chart path), provisioner
+  error surfacing, kind_mix normalization, _wait_http timeout.
+- **(c) fuzz (1057815):** Go native fuzz (page-request + scope, 8k+ execs no
+  crash) + a 2000-seed Python fuzz on PlannerCore.plan that FOUND A REAL BUG —
+  a non-dict body/entry/field raised an uncaught AttributeError (a 500); fixed
+  with up-front shape validation raising ValueError (a clean 400).
+- **(d) OpenAPI drift (d5c5dac):** routes() registers through a recording
+  helper; TestOpenAPIContractMatchesRoutes diffs served routes vs
+  api/openapi.yaml both directions (runs in `go test ./...`). Verified it
+  catches an injected undocumented route; passes on the real 25-route contract.
+
+### Verification
+
+```
+gofmt -l .                 -> clean       go vet ./...        -> pass
+go test ./... -race        -> ok (25 pkgs, incl. all touched)
+python -m pytest eval/tests research/jcac_sim services/planner -> 145 passed
+```
+
+Two result-adjacent artifacts pre-registered before running (PREREG_DEGRADE);
+no committed campaign's numbers changed (defaults bit-identical). No thesis
+prose touched (agent-scope rule). Eight commits, all pushed.
+
+### What to be able to explain next
+
+- Why 4.4 being a null strengthens the record (proposed, pre-registered,
+  measured, found unnecessary — shed-to-none is correct, not a flaw).
+- Why the planner-payload 500 bug mattered (the handler's 400/500 split is the
+  contract; an uncaught AttributeError leaked a 500 to a malformed client).
+- That the canary *split* is the mesh's job (Linkerd); the app-level breaker's
+  value is testability + cross-replica rollback, now shared.
+
+---
+
 ## 2026-07-19 (session 24) — Wave 5: the structural-form program, and the audit that caught the controller breaking its own clamps
 
 Milestone status: **the sensitivity program's blind spot is closed.** User
