@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -79,11 +80,27 @@ func main() {
 	var chatProvider gateway.Provider = provider
 	if canaryBase := os.Getenv("POLYFORGE_CANARY_LLM_BASE_URL"); canaryBase != "" {
 		weight := envInt("POLYFORGE_CANARY_WEIGHT", 5)
+		canaryModel := envOr("POLYFORGE_CANARY_LLM_MODEL", envOr("POLYFORGE_LLM_MODEL", "llama3.2"))
 		canaryProvider := gateway.NewOpenAICompat(canaryBase,
-			os.Getenv("POLYFORGE_CANARY_LLM_API_KEY"),
-			envOr("POLYFORGE_CANARY_LLM_MODEL", envOr("POLYFORGE_LLM_MODEL", "llama3.2")))
-		chatProvider = gateway.NewCanaryProvider(provider, canaryProvider, weight)
-		log.Info("canary active", "base_url", canaryBase, "weight_percent", weight)
+			os.Getenv("POLYFORGE_CANARY_LLM_API_KEY"), canaryModel)
+		// With Redis the rollback breaker is shared across gateway replicas,
+		// so a bad canary rolls back fleet-wide; without it the breaker is
+		// in-process, correct for a single replica. Keyed by canary identity
+		// so distinct canary rollouts don't share a trip decision.
+		if redisURL := os.Getenv("POLYFORGE_REDIS_URL"); redisURL != "" {
+			options, err := redis.ParseURL(redisURL)
+			if err != nil {
+				log.Error("parse POLYFORGE_REDIS_URL", "error", err)
+				os.Exit(1)
+			}
+			client := redis.NewClient(options)
+			defer func() { _ = client.Close() }()
+			chatProvider = gateway.NewSharedCanaryProvider(provider, canaryProvider, weight, client, canaryModel)
+			log.Info("canary active (shared breaker)", "base_url", canaryBase, "weight_percent", weight, "redis", options.Addr)
+		} else {
+			chatProvider = gateway.NewCanaryProvider(provider, canaryProvider, weight)
+			log.Info("canary active", "base_url", canaryBase, "weight_percent", weight)
+		}
 	}
 
 	// Multi-backend routing (roadmap W20): a JSON policy file turns the
