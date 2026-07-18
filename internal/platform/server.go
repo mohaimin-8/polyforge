@@ -50,6 +50,7 @@ type Server struct {
 	telemetry telemetry.Repository
 	adminKey  string
 	mux       *http.ServeMux
+	patterns  []string // registered "METHOD /path" patterns (OpenAPI-drift gate)
 	limiter   RequestLimiter
 	metrics   *metrics
 	issuer    *auth.Issuer
@@ -192,32 +193,46 @@ func (s *Server) recoverPanics(next http.Handler) http.Handler {
 }
 
 func (s *Server) routes() {
-	s.mux.HandleFunc("GET /healthz", s.health)
-	s.mux.HandleFunc("GET /metrics", s.metricsEndpoint)
-	s.mux.HandleFunc("GET /.well-known/jwks.json", s.jwks)
-	s.mux.HandleFunc("POST /v1/auth/token", s.issueToken)
-	s.mux.HandleFunc("POST /v1/auth/token/refresh", s.refreshToken)
-	s.mux.HandleFunc("POST /v1/auth/keys/rotate", s.rotateSigningKeys)
-	s.mux.HandleFunc("GET /v1/tenants", s.listTenants)
-	s.mux.HandleFunc("POST /v1/tenants", s.createTenant)
-	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/isolation", s.promoteTenantIsolation)
-	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/api-keys", s.listAPIKeys)
-	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/api-keys", s.createAPIKey)
-	s.mux.HandleFunc("DELETE /v1/tenants/{tenant_id}/api-keys/{key_id}", s.revokeAPIKey)
-	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/api-keys/{key_id}/rotate", s.rotateAPIKey)
-	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/projects", s.listProjects)
-	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/projects", s.createProject)
-	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/projects/{project_id}", s.getProject)
-	s.mux.HandleFunc("PATCH /v1/tenants/{tenant_id}/projects/{project_id}", s.updateProject)
-	s.mux.HandleFunc("DELETE /v1/tenants/{tenant_id}/projects/{project_id}", s.deleteProject)
-	s.mux.HandleFunc("POST /v1/telemetry", s.ingestTelemetry)
-	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/workloads/replay", s.replayWorkload)
-	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/telemetry/features", s.telemetryFeatures)
-	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/workload-profile", s.workloadProfile)
-	s.mux.HandleFunc("GET /v1/tenants/{tenant_id}/policy-recommendation", s.policyRecommendation)
-	s.mux.HandleFunc("GET /v1/admin/workloads", s.adminWorkloads)
-	s.mux.HandleFunc("GET /v1/admin/workloads/{tenant_id}/history", s.adminWorkloadHistory)
-	s.mux.HandleFunc("GET /admin/workloads", s.workloadsUI)
+	s.handle("GET /healthz", s.health)
+	s.handle("GET /metrics", s.metricsEndpoint)
+	s.handle("GET /.well-known/jwks.json", s.jwks)
+	s.handle("POST /v1/auth/token", s.issueToken)
+	s.handle("POST /v1/auth/token/refresh", s.refreshToken)
+	s.handle("POST /v1/auth/keys/rotate", s.rotateSigningKeys)
+	s.handle("GET /v1/tenants", s.listTenants)
+	s.handle("POST /v1/tenants", s.createTenant)
+	s.handle("POST /v1/tenants/{tenant_id}/isolation", s.promoteTenantIsolation)
+	s.handle("GET /v1/tenants/{tenant_id}/api-keys", s.listAPIKeys)
+	s.handle("POST /v1/tenants/{tenant_id}/api-keys", s.createAPIKey)
+	s.handle("DELETE /v1/tenants/{tenant_id}/api-keys/{key_id}", s.revokeAPIKey)
+	s.handle("POST /v1/tenants/{tenant_id}/api-keys/{key_id}/rotate", s.rotateAPIKey)
+	s.handle("GET /v1/tenants/{tenant_id}/projects", s.listProjects)
+	s.handle("POST /v1/tenants/{tenant_id}/projects", s.createProject)
+	s.handle("GET /v1/tenants/{tenant_id}/projects/{project_id}", s.getProject)
+	s.handle("PATCH /v1/tenants/{tenant_id}/projects/{project_id}", s.updateProject)
+	s.handle("DELETE /v1/tenants/{tenant_id}/projects/{project_id}", s.deleteProject)
+	s.handle("POST /v1/telemetry", s.ingestTelemetry)
+	s.handle("POST /v1/tenants/{tenant_id}/workloads/replay", s.replayWorkload)
+	s.handle("GET /v1/tenants/{tenant_id}/telemetry/features", s.telemetryFeatures)
+	s.handle("GET /v1/tenants/{tenant_id}/workload-profile", s.workloadProfile)
+	s.handle("GET /v1/tenants/{tenant_id}/policy-recommendation", s.policyRecommendation)
+	s.handle("GET /v1/admin/workloads", s.adminWorkloads)
+	s.handle("GET /v1/admin/workloads/{tenant_id}/history", s.adminWorkloadHistory)
+	s.handle("GET /admin/workloads", s.workloadsUI) // ui: HTML dashboard, not in the OpenAPI contract
+}
+
+// handle registers a route and records its "METHOD /path" pattern, so the
+// served surface is the single source of truth the OpenAPI-drift test
+// (server_openapi_test.go) checks api/openapi.yaml against.
+func (s *Server) handle(pattern string, h http.HandlerFunc) {
+	s.patterns = append(s.patterns, pattern)
+	s.mux.HandleFunc(pattern, h)
+}
+
+// RoutePatterns returns the registered "METHOD /path" patterns in
+// registration order. Used by the OpenAPI-drift gate.
+func (s *Server) RoutePatterns() []string {
+	return append([]string(nil), s.patterns...)
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
