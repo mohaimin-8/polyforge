@@ -132,12 +132,17 @@ def global_score(entries) -> float:
 
 
 def main() -> None:
+    # --anchored: the PREREG_MOVE_CLAMP rerun — same frozen seeds, the
+    # clamp-fixed controller. Writes *_anchored outputs, never touching
+    # the original campaign record.
+    anchored = "--anchored" in sys.argv
     rows = []
     for n in SIZES:
         for seed in SEEDS:
             rng = random.Random(1000 * n + seed)
             configs, states, demands = draw_instance(rng, n)
-            ctl = JCACController(configs, weights=WEIGHTS, limits=LIMITS)
+            ctl = JCACController(configs, weights=WEIGHTS, limits=LIMITS,
+                                 anchor_moves=anchored)
             # One observation -> every forecast method returns a flat
             # horizon: forecast noise is excluded by construction.
             for tid, d in demands.items():
@@ -187,7 +192,8 @@ def main() -> None:
             print(f"n={n} seed={seed:2d} gap={gap:+.4%} "
                   f"{'EXACT' if rows[-1]['exact'] else ''}")
 
-    out_csv = Path(__file__).resolve().parent / "coord_gap.csv"
+    suffix = "_anchored" if anchored else ""
+    out_csv = Path(__file__).resolve().parent / f"coord_gap{suffix}.csv"
     with out_csv.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=[
             "n", "seed", "status", "cd_score", "opt_score", "rel_gap", "exact"])
@@ -195,9 +201,14 @@ def main() -> None:
         writer.writerows(rows)
 
     ok = [r for r in rows if r["status"] == "ok"]
-    lines = ["# Coordination gap — two-sweep coordinate descent vs exact joint optimum", ""]
-    lines.append("Campaign of `PREREG_COORD_GAP.md` (pushed before the run); "
-                 "mechanics in `coordination_gap.py`, rows in `coord_gap.csv`.")
+    title = ("# Coordination gap (anchored controller) — clamp-fixed CD vs exact joint optimum"
+             if anchored else
+             "# Coordination gap — two-sweep coordinate descent vs exact joint optimum")
+    lines = [title, ""]
+    lines.append(("Campaign of `PREREG_MOVE_CLAMP.md` (anchored rerun over the same frozen seeds); "
+                  if anchored else
+                  "Campaign of `PREREG_COORD_GAP.md` (pushed before the run); ")
+                 + f"mechanics in `coordination_gap.py`, rows in `coord_gap{suffix}.csv`.")
     lines.append("")
     lines.append("| N | instances | exact-match | median gap | p95 gap | max gap |")
     lines.append("|---|---|---|---|---|---|")
@@ -221,7 +232,7 @@ def main() -> None:
     h1 = all(med <= 0.01 and mx <= 0.05 for med, mx in verdicts)
     lines.append(f"**CG-H1 (median gap <= 1% and max gap <= 5% at every N): "
                  f"{'PASS' if h1 else 'FAIL'}.**")
-    out_md = Path(__file__).resolve().parent / "COORD_GAP.md"
+    out_md = Path(__file__).resolve().parent / f"COORD_GAP{suffix.upper()}.md"
     out_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {out_md} and {out_csv}")
 

@@ -199,6 +199,7 @@ class JCACController:
         limits: ClusterLimits | None = None,
         forecast_method: str = "trend",
         adaptive_capacity: bool = False,
+        anchor_moves: bool = False,
     ):
         self.configs = configs
         self.weights = weights or Weights()
@@ -206,6 +207,14 @@ class JCACController:
         self.forecasts = {tid: Forecast(method=forecast_method) for tid in configs}
         self._interference: dict[str, float] = {}
         self.adaptive_capacity = adaptive_capacity
+        # PREREG_MOVE_CLAMP (Wave 5): the coordination-gap audit caught the
+        # second coordinate-descent sweep re-anchoring the move clamps at
+        # its own sweep-1 choice, so one control interval could move
+        # replicas ±4 and cache two levels while every baseline is clamped
+        # to ±2 / one level. `anchor_moves=True` anchors the candidate
+        # lattice at the interval-start state; the default preserves the
+        # published behavior bit-for-bit (committed campaigns replay).
+        self.anchor_moves = anchor_moves
         self.capacity_scale = {tid: 1.0 for tid in configs}
         self._projected: dict[str, float] = {}
 
@@ -261,10 +270,13 @@ class JCACController:
         chosen = dict(states)
         # Two sweeps of coordinate descent: tenant order is fixed, each
         # tenant optimizes against the others' current choices; the second
-        # sweep lets early tenants react to late ones.
+        # sweep lets early tenants react to late ones. With anchor_moves,
+        # both sweeps draw candidates from the interval-start lattice so
+        # coordination cannot compound the per-interval actuation clamps.
+        origin = dict(states) if self.anchor_moves else None
         for _ in range(2):
             for tid in sorted(self.configs):
-                chosen[tid] = self._best_for_tenant(tid, chosen, horizons)
+                chosen[tid] = self._best_for_tenant(tid, chosen, horizons, origin)
 
         plans = {}
         for tid, state in chosen.items():
@@ -294,9 +306,14 @@ class JCACController:
         tid: str,
         chosen: dict[str, TenantState],
         horizons: dict[str, list[Demand]],
+        origin: dict[str, TenantState] | None = None,
     ) -> TenantState:
         config = self.configs[tid]
         current = chosen[tid]
+        # Candidate moves anchor at `base`: the interval-start state when
+        # anchor_moves is on (clamps are per interval), the sweep's current
+        # choice otherwise (published behavior, kept bit-identical).
+        base = current if origin is None else origin[tid]
         budget_per_step = config.hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
 
         # Others' contributions are fixed during this tenant's move.
@@ -315,9 +332,9 @@ class JCACController:
 
         best_state, best_score = current, float("inf")
         for delta in DELTA_REPLICAS:
-            for cache_mb in neighbor_cache_levels(current.cache_mb):
+            for cache_mb in neighbor_cache_levels(base.cache_mb):
                 for tier in TIERS:
-                    candidate = apply_action(config, current, delta, cache_mb, tier)
+                    candidate = apply_action(config, base, delta, cache_mb, tier)
                     if others_cache + candidate.cache_mb > self.limits.cache_mb:
                         continue
                     if others_replicas + candidate.replicas > self.limits.replicas:
@@ -326,9 +343,9 @@ class JCACController:
                     if cost > budget_per_step:
                         continue
                     switches = (
-                        (candidate.replicas != current.replicas)
-                        + (candidate.cache_mb != current.cache_mb)
-                        + (candidate.tier != current.tier)
+                        (candidate.replicas != base.replicas)
+                        + (candidate.cache_mb != base.cache_mb)
+                        + (candidate.tier != base.tier)
                     )
                     fairness = 1.0 - jain_index(other_satisfaction + [1.0 - viol])
                     # W32: a tenant flagged noisy pays for expansion in

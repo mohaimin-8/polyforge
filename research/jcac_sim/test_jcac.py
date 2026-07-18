@@ -587,3 +587,69 @@ class ModelFormTests(unittest.TestCase):
             model.set_model_form(wu_tier_factor={"huge": 2.0})
         with self.assertRaises(ValueError):
             model.set_model_form(wu_tier_factor={"mid": 0.0})
+
+
+class AnchorMovesTests(unittest.TestCase):
+    """PREREG_MOVE_CLAMP: the coordination-gap audit caught the second
+    coordinate-descent sweep re-anchoring the move clamps at its own
+    sweep-1 choice. anchor_moves=True must hold every plan within the
+    per-interval clamps; the default must keep the published behavior."""
+
+    def _random_instance(self, seed: int, n: int = 3):
+        import random
+        rng = random.Random(seed)
+        configs, states, demands = {}, {}, {}
+        classes = ("premium", "standard", "best-effort")
+        for i in range(n):
+            tid = f"t{i}"
+            configs[tid] = TenantConfig(tenant_id=tid, slo_class=classes[i % 3])
+            states[tid] = TenantState(
+                replicas=rng.randint(1, 6),
+                cache_mb=rng.choice(model.CACHE_LEVELS_MB),
+                tier=rng.choice(("small", "small", "mid", "large")),
+            )
+            demands[tid] = demand({
+                "crud_read": rng.uniform(0, 300),
+                "chat": rng.uniform(0, 6),
+                "agent": rng.uniform(0, 2),
+            })
+        return configs, states, demands
+
+    def test_anchored_plan_respects_per_interval_clamps(self):
+        for seed in range(25):
+            configs, states, demands = self._random_instance(seed)
+            ctl = JCACController(configs, anchor_moves=True)
+            plans = ctl.plan(states, demands)
+            for tid, p in plans.items():
+                dr = abs(p.state.replicas - states[tid].replicas)
+                self.assertLessEqual(dr, 2, f"seed {seed} tenant {tid}: replica move {dr}")
+                li = model.CACHE_LEVELS_MB.index(states[tid].cache_mb)
+                lj = model.CACHE_LEVELS_MB.index(p.state.cache_mb)
+                self.assertLessEqual(abs(lj - li), 1,
+                                     f"seed {seed} tenant {tid}: cache {li}->{lj}")
+
+    def test_default_can_exceed_clamps_documented(self):
+        """The published behavior (kept for bit-reproducibility of the
+        committed campaigns): at least one instance in this sweep moves
+        beyond the one-interval clamps via the second sweep."""
+        exceeded = False
+        for seed in range(25):
+            configs, states, demands = self._random_instance(seed)
+            ctl = JCACController(configs)
+            plans = ctl.plan(states, demands)
+            for tid, p in plans.items():
+                dr = abs(p.state.replicas - states[tid].replicas)
+                li = model.CACHE_LEVELS_MB.index(states[tid].cache_mb)
+                lj = model.CACHE_LEVELS_MB.index(p.state.cache_mb)
+                if dr > 2 or abs(lj - li) > 1:
+                    exceeded = True
+        self.assertTrue(exceeded, "expected the published two-sweep behavior "
+                                  "to exceed the clamps somewhere in 25 seeds")
+
+    def test_anchored_and_default_agree_when_one_move_suffices(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        states = {"a": TenantState(replicas=2, cache_mb=128, tier="small")}
+        demands = {"a": demand({"crud_read": 30.0})}
+        default = JCACController(configs).plan(states, demands)["a"].state
+        anchored = JCACController(configs, anchor_moves=True).plan(states, demands)["a"].state
+        self.assertEqual(default, anchored)

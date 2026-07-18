@@ -1,0 +1,18 @@
+# PREREG_MOVE_CLAMP.md (Wave 5): the v1 headline matrix with the clamp-fixed
+# controller (jcac_anchored) as the treatment — candidate moves anchored at
+# the interval-start state so the second coordination sweep cannot compound
+# the ±2-replica / one-cache-level per-interval clamps every baseline obeys.
+# Discovered by the coordination-gap audit (COORD_GAP.md): the published
+# jcac could move ±4 replicas / two cache levels per interval. Baselines and
+# every other setting mirror full.yaml exactly.
+name: matrix_clamp
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac_anchored, hpa, keda, firm, static, gptcache]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_clamp.duckdb
+retries: 2
+timeseries_reps: 1

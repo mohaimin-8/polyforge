@@ -87,6 +87,20 @@ CAMPAIGNS = {
         "noninferiority": {"tag": "MX-H3", "metric": "mean_violation",
                            "baselines": ["hpa", "keda"], "margin": 0.02},
     },
+    "clamp": {
+        "db": "raw_sim_clamp.duckdb",
+        "out": "RESULTS_MOVE_CLAMP.md",
+        "title": "Clamp-fixed controller rerun (moves anchored at interval start) — as measured",
+        "prereg": "PREREG_MOVE_CLAMP.md",
+        "treatment": "jcac_anchored",
+        "primary_metric": "J",
+        "primary_name": "MC-H1 composite-J win vs every baseline (clamp-fixed jcac)",
+        "secondary_metric": "total_cost_usd",
+        "secondary_name": "MC-H2 cost win vs every baseline",
+        "accounting": None,
+        "noninferiority": {"tag": "MC-H3", "metric": "mean_violation",
+                           "baselines": ["hpa", "keda"], "margin": 0.02},
+    },
     "tierwu": {
         "db": "raw_sim_tierwu.duckdb",
         "out": "RESULTS_TIER_WU.md",
@@ -101,8 +115,9 @@ CAMPAIGNS = {
 }
 
 
-def paired(df: pd.DataFrame, baseline: str, metric: str) -> dict:
-    t = df[df.system == "jcac"]
+def paired(df: pd.DataFrame, baseline: str, metric: str,
+           treatment: str = "jcac") -> dict:
+    t = df[df.system == treatment]
     b = df[df.system == baseline]
     m = t.merge(b, on=stats.CELL_KEYS, suffixes=("_t", "_b"))
     diff = m[f"{metric}_t"] - m[f"{metric}_b"]
@@ -161,7 +176,7 @@ def main() -> None:
         w("|---|---|---|---|---|---|---|---|")
         outcomes = []
         for baseline in BASELINES:
-            r = paired(df, baseline, metric)
+            r = paired(df, baseline, metric, spec.get("treatment", "jcac"))
             r_ref = paired(ref, baseline, metric)
             outcomes.append(r["win"])
             w(f"| {baseline} | {r['pairs']} | {r['mean']:+.4f} | {r['dz']:+.2f} "
@@ -187,7 +202,7 @@ def main() -> None:
         w("|---|---|---|---|---|---|---|")
         outcomes = []
         for baseline in ni["baselines"]:
-            t = df[df.system == "jcac"]
+            t = df[df.system == spec.get("treatment", "jcac")]
             b = df[df.system == baseline]
             m = t.merge(b, on=stats.CELL_KEYS, suffixes=("_t", "_b"))
             diff = m[f"{ni['metric']}_t"] - m[f"{ni['metric']}_b"]
@@ -230,10 +245,12 @@ def main() -> None:
         ["total_cost_usd", "mean_violation", "mean_jain", "cache_hit_rate"]
     ].mean()
     ref_agg = ref.groupby("system").cache_hit_rate.mean()
-    for system in ["jcac"] + BASELINES:
+    treatment = spec.get("treatment", "jcac")
+    for system in [treatment] + BASELINES:
         a = agg.loc[system]
+        ref_hit = ref_agg.get(system if system in ref_agg else "jcac")
         w(f"| {system} | {a.total_cost_usd:.3f} | {a.mean_violation:.4f} "
-          f"| {a.mean_jain:.4f} | {a.cache_hit_rate:.3f} | {ref_agg[system]:.3f} |")
+          f"| {a.mean_jain:.4f} | {a.cache_hit_rate:.3f} | {ref_hit:.3f} |")
     w("")
 
     w("## Tier / cache posture, rep-0 rows (descriptive)")
@@ -243,7 +260,7 @@ def main() -> None:
     w("| system | " + " | ".join(f"steps @ {t}" for t in ("none", "small", "mid", "large"))
       + " | mean cache MB |")
     w("|---|---|---|---|---|---|")
-    for system in ["jcac"] + BASELINES:
+    for system in [treatment] + BASELINES:
         sub = post[post.system == system].set_index("tier")
         shares = [f"{(sub.n.get(t, 0) / total[system]):.1%}"
                   for t in ("none", "small", "mid", "large")]

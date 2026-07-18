@@ -111,6 +111,13 @@ SYSTEMS: dict[str, SystemSpec] = {
         "jcac",
         description="PolyForge: joint MPC over replicas, cache, tier (W30-32)",
     ),
+    "jcac_anchored": SystemSpec(
+        "jcac", params={"anchor_moves": True},
+        description="PolyForge with per-interval move clamps enforced across "
+                    "coordination sweeps (PREREG_MOVE_CLAMP; the audit-caught "
+                    "fix — the published jcac could move ±4 replicas / two "
+                    "cache levels per interval via its second sweep)",
+    ),
     # --- W34 baselines ---------------------------------------------------
     "hpa": SystemSpec(
         "hpa", lru_eviction=True,
