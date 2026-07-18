@@ -1,0 +1,21 @@
+# PREREG_TIER_WU.md (Wave 5): the v1 headline matrix under tier-scaled work
+# units — an AI request on mid/large consumes 1.516x / 16.64x the serving
+# capacity it consumes on small, the measured per-request serving-time ratios
+# from the GPU tier bench (TIER_BENCH.md; large is the disclosed
+# offload-dominated upper bound). This makes the self-hosted reading of the
+# tier knob capacity-coherent: a heavier model can no longer congest the pool
+# for free. Exact mirror of full.yaml except `model_form`.
+name: matrix_tierwu
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, hpa, keda, firm, static, gptcache]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_tierwu.duckdb
+retries: 2
+timeseries_reps: 1
+model_form:
+  wu_tier_mid: 1.516
+  wu_tier_large: 16.64

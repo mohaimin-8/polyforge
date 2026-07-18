@@ -28,6 +28,17 @@ ECONOMY_KEYS = {
     "cache_hit_max", "cache_half_mb",
 }
 
+# Structural model-form overrides (Wave 5 preregs: PREREG_LM_ADOPTION,
+# PREREG_MIXTURE_P95, PREREG_TIER_WU). Same contract as economy: sim-only,
+# applies to the world and every controller's beliefs identically, and an
+# empty mapping is the published form leaving every run_id unchanged.
+MODEL_FORM_KEYS = {
+    "congestion_exponent",       # a in g(rho) = (1-rho)^(-a)
+    "p95_tail_f0", "p95_tail_b",  # p95/mean = f0*(1-min(rho,sat))^(-b), paired
+    "mixture_p95",               # 1: ai_p95 is the true hit/miss mixture percentile
+    "wu_tier_mid", "wu_tier_large",  # per-AI-request capacity multiplier vs small
+}
+
 
 @dataclass(frozen=True)
 class RunSpec:
@@ -51,6 +62,8 @@ class RunSpec:
     # (key, value) pairs, empty for the published economy. Kept as a tuple
     # so the frozen spec stays hashable and deterministic.
     economy: tuple = ()
+    # Structural model-form override (Wave 5 preregs), same tuple contract.
+    model_form: tuple = ()
 
 
 @dataclass
@@ -80,6 +93,9 @@ class ExperimentSpec:
     # cache_half_mb. An empty mapping is the published economy and leaves
     # every pre-existing run_id unchanged.
     economy: dict = field(default_factory=dict)
+    # Structural model-form override, sim backend only. Known keys:
+    # MODEL_FORM_KEYS above. Empty mapping = the published forms.
+    model_form: dict = field(default_factory=dict)
 
     def total_runs(self) -> int:
         return (
@@ -127,6 +143,20 @@ def load(path: str | Path) -> ExperimentSpec:
                if not isinstance(v, (int, float)) or v < 0}
         if bad:
             raise ValueError(f"economy values must be non-negative numbers: {bad}")
+    if spec.model_form:
+        if spec.backend != "sim":
+            raise ValueError("model_form overrides are sim-only; the live data "
+                             "plane's physics are physical, not configurable")
+        unknown = set(spec.model_form) - MODEL_FORM_KEYS
+        if unknown:
+            raise ValueError(f"unknown model_form keys {sorted(unknown)} "
+                             f"(known: {sorted(MODEL_FORM_KEYS)})")
+        bad = {k: v for k, v in spec.model_form.items()
+               if not isinstance(v, (int, float)) or v < 0}
+        if bad:
+            raise ValueError(f"model_form values must be non-negative numbers: {bad}")
+        if ("p95_tail_f0" in spec.model_form) != ("p95_tail_b" in spec.model_form):
+            raise ValueError("p95_tail_f0 and p95_tail_b must be set together")
     return spec
 
 
@@ -143,6 +173,10 @@ def run_identity(spec: ExperimentSpec, system: str, workload: str, mix: str,
     if spec.economy:
         material += "|econ:" + ",".join(
             f"{k}={spec.economy[k]:g}" for k in sorted(spec.economy)
+        )
+    if spec.model_form:
+        material += "|form:" + ",".join(
+            f"{k}={spec.model_form[k]:g}" for k in sorted(spec.model_form)
         )
     digest = hashlib.sha256(material.encode()).hexdigest()
     run_id = digest[:16]
@@ -175,5 +209,6 @@ def expand(spec: ExperimentSpec) -> list[RunSpec]:
                             transition_costs=spec.transition_costs,
                             interference=spec.interference,
                             economy=tuple(sorted(spec.economy.items())),
+                            model_form=tuple(sorted(spec.model_form.items())),
                         ))
     return runs

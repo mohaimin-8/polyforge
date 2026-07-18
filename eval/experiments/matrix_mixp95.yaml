@@ -1,0 +1,19 @@
+# PREREG_MIXTURE_P95.md (Wave 5): the v1 headline matrix with ai_p95 computed
+# as the true 95th percentile of the hit/miss latency mixture instead of the
+# published mean*1.4 rescaling — a cache hit only moves p95 once hits cross
+# the quantile, so this form withdraws the tail credit the mean-based
+# estimator granted the cache knob. Exact mirror of full.yaml except
+# `model_form`; identical form for world and every controller's beliefs.
+name: matrix_mixp95
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, hpa, keda, firm, static, gptcache]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_mixp95.duckdb
+retries: 2
+timeseries_reps: 1
+model_form:
+  mixture_p95: 1

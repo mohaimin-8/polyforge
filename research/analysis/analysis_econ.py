@@ -1,9 +1,14 @@
 """Analysis for the Wave 2 economy reruns (PREREG_TIER_RATIO.md /
-PREREG_HK_ADOPTION.md). Tests, pairing and alpha are frozen in the preregs;
-this script only mechanizes them (analysis_v2.py precedent).
+PREREG_HK_ADOPTION.md) and the Wave 5 structural-form reruns
+(PREREG_LM_ADOPTION.md / PREREG_MIXTURE_P95.md / PREREG_TIER_WU.md).
+Tests, pairing and alpha are frozen in the preregs; this script only
+mechanizes them (analysis_v2.py precedent).
 
-  python analysis_econ.py tier   -> RESULTS_TIER_RATIO.md
-  python analysis_econ.py hk     -> RESULTS_HK_ADOPTION.md
+  python analysis_econ.py tier    -> RESULTS_TIER_RATIO.md
+  python analysis_econ.py hk      -> RESULTS_HK_ADOPTION.md
+  python analysis_econ.py lm      -> RESULTS_LM_ADOPTION.md
+  python analysis_econ.py mixp95  -> RESULTS_MIXTURE_P95.md
+  python analysis_econ.py tierwu  -> RESULTS_TIER_WU.md
 
 Primary/secondary tests per prereg: per-cell pairing on CELL_KEYS
 (workload, tenant_mix, cluster_size, rep) = 300 pairs per baseline,
@@ -51,6 +56,46 @@ CAMPAIGNS = {
         "primary_name": "HK-H1 composite-J win vs every baseline",
         "secondary_metric": "total_cost_usd",
         "secondary_name": "HK-H2 cost win vs every baseline",
+        "accounting": None,
+    },
+    "lm": {
+        "db": "raw_sim_lm.duckdb",
+        "out": "RESULTS_LM_ADOPTION.md",
+        "title": "Measured latency-model rerun (a 0.86, tail 1.6909·(1−ρ)^−0.1303) — as measured",
+        "prereg": "PREREG_LM_ADOPTION.md",
+        "primary_metric": "J",
+        "primary_name": "LM-H1 composite-J win vs every baseline",
+        "secondary_metric": "total_cost_usd",
+        "secondary_name": "LM-H2 cost win vs every baseline",
+        "accounting": None,
+        # LM-H3: violation non-inferiority vs the tuned reactive scalers.
+        # PASS iff the one-sided 99% upper bound of the paired mean-violation
+        # diff stays within (v1 paired diff + margin), per baseline.
+        "noninferiority": {"tag": "LM-H3", "metric": "mean_violation",
+                           "baselines": ["hpa", "keda"], "margin": 0.02},
+    },
+    "mixp95": {
+        "db": "raw_sim_mixp95.duckdb",
+        "out": "RESULTS_MIXTURE_P95.md",
+        "title": "Mixture-percentile rerun (ai_p95 = true hit/miss mixture p95) — as measured",
+        "prereg": "PREREG_MIXTURE_P95.md",
+        "primary_metric": "J",
+        "primary_name": "MX-H1 composite-J win vs every baseline",
+        "secondary_metric": "total_cost_usd",
+        "secondary_name": "MX-H2 cost win vs every baseline",
+        "accounting": None,
+        "noninferiority": {"tag": "MX-H3", "metric": "mean_violation",
+                           "baselines": ["hpa", "keda"], "margin": 0.02},
+    },
+    "tierwu": {
+        "db": "raw_sim_tierwu.duckdb",
+        "out": "RESULTS_TIER_WU.md",
+        "title": "Tier-scaled work-unit rerun (mid 1.516×, large 16.64×) — as measured",
+        "prereg": "PREREG_TIER_WU.md",
+        "primary_metric": "J",
+        "primary_name": "TW-H1 composite-J win vs every baseline",
+        "secondary_metric": "total_cost_usd",
+        "secondary_name": "TW-H2 cost win vs every baseline",
         "accounting": None,
     },
 }
@@ -126,6 +171,39 @@ def main() -> None:
         w("")
         w(f"**{role.capitalize()} hypothesis: {verdict}** "
           f"({sum(outcomes)}/{len(outcomes)} baselines beaten at p < {ALPHA}).")
+        w("")
+
+    if spec.get("noninferiority"):
+        ni = spec["noninferiority"]
+        w(f"## {ni['tag']} violation non-inferiority vs tuned reactive scalers")
+        w("")
+        w(f"PASS per baseline iff the one-sided 99% upper confidence bound of the")
+        w(f"paired `{ni['metric']}` diff (jcac − baseline) stays within the v1")
+        w(f"paired diff + {ni['margin']:.2f} (margin frozen in the prereg). The v1")
+        w("reference is recomputed live from the committed `raw_sim.duckdb`.")
+        w("")
+        w("| baseline | pairs | paired diff | 99% UB (one-sided) | v1 paired diff "
+          "| bound (v1 + margin) | verdict |")
+        w("|---|---|---|---|---|---|---|")
+        outcomes = []
+        for baseline in ni["baselines"]:
+            t = df[df.system == "jcac"]
+            b = df[df.system == baseline]
+            m = t.merge(b, on=stats.CELL_KEYS, suffixes=("_t", "_b"))
+            diff = m[f"{ni['metric']}_t"] - m[f"{ni['metric']}_b"]
+            n = len(diff)
+            ub = float(diff.mean()) + sps.t.ppf(0.99, n - 1) * float(diff.std(ddof=1)) / n ** 0.5
+            rt = ref[ref.system == "jcac"].merge(
+                ref[ref.system == baseline], on=stats.CELL_KEYS, suffixes=("_t", "_b"))
+            ref_diff = float((rt[f"{ni['metric']}_t"] - rt[f"{ni['metric']}_b"]).mean())
+            bound = ref_diff + ni["margin"]
+            ok = ub <= bound
+            outcomes.append(ok)
+            w(f"| {baseline} | {n} | {diff.mean():+.4f} | {ub:+.4f} | {ref_diff:+.4f} "
+              f"| {bound:+.4f} | {'PASS' if ok else 'FAIL'} |")
+        verdict = "PASS" if all(outcomes) else "FAIL"
+        w("")
+        w(f"**{ni['tag']}: {verdict}** ({sum(outcomes)}/{len(outcomes)} within the margin).")
         w("")
 
     if spec["accounting"]:

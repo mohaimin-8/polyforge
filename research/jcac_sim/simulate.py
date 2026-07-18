@@ -184,7 +184,7 @@ def interference_scores(
     caps its executed work, so a controller acting on this score causally
     reduces the interference (unlike raw demand, which is exogenous)."""
     served = {
-        tid: min(d.work_units(states[tid].cache_mb),
+        tid: min(d.work_units(states[tid].cache_mb, states[tid].tier),
                  states[tid].replicas * REPLICA_CAPACITY_WU)
         for tid, d in demands.items()
     }

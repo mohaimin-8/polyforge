@@ -41,11 +41,33 @@ def _apply_economy(economy: tuple) -> None:
     )
 
 
+def _apply_model_form(form: tuple) -> None:
+    """Set the structural model form for this run (Wave 5). Called
+    unconditionally, same statelessness contract as _apply_economy: an
+    empty override restores the published forms exactly."""
+    f = dict(form)
+    p95_tail = None
+    if "p95_tail_f0" in f:
+        p95_tail = (f["p95_tail_f0"], f["p95_tail_b"])
+    wu = {
+        tier: f[key]
+        for tier, key in (("mid", "wu_tier_mid"), ("large", "wu_tier_large"))
+        if key in f
+    }
+    model.set_model_form(
+        congestion_exponent=f.get("congestion_exponent"),
+        p95_tail=p95_tail,
+        mixture_p95=bool(f.get("mixture_p95", 0)),
+        wu_tier_factor=wu or None,
+    )
+
+
 def execute(run: RunSpec) -> dict:
     """Run one cell. Returns the standardized result dict the writer
     stores; raises on execution failure (the runner owns retry)."""
     spec = SYSTEMS[run.system]
     _apply_economy(run.economy)
+    _apply_model_form(run.model_form)
     tenant_ids, buckets, configs, limits = workloads.build(
         run.workload, run.tenant_mix, run.cluster_size, run.seed, run.steps
     )

@@ -467,3 +467,123 @@ class VTCReplicaTests(unittest.TestCase):
         ctl.plan(states, {"t0": same, "t1": same})
         # Same served work, 10x budget -> 10x slower counter accrual.
         self.assertAlmostEqual(ctl.counters["t1"] / ctl.counters["t0"], 10.0, places=6)
+
+
+class ModelFormTests(unittest.TestCase):
+    """Wave 5 structural overrides (set_model_form): defaults must stay
+    bit-identical to the published forms; each override must move the
+    world in the measured direction."""
+
+    def tearDown(self):
+        model.set_model_form()  # never leak a form into other tests
+
+    def test_reset_restores_published_forms_exactly(self):
+        config = TenantConfig(tenant_id="t")
+        state = TenantState(replicas=2, cache_mb=256, tier="small")
+        d = demand({"chat": 2.0, "crud_read": 5.0})
+        before = evaluate_step(config, state, d)
+        model.set_model_form(congestion_exponent=0.86, p95_tail=(1.69, 0.13),
+                             mixture_p95=True, wu_tier_factor={"large": 16.6})
+        model.set_model_form()
+        after = evaluate_step(config, state, d)
+        self.assertEqual(before, after)
+        self.assertEqual(model.CONGESTION_EXPONENT, 1.0)
+        self.assertIsNone(model.P95_TAIL)
+        self.assertFalse(model.MIXTURE_P95)
+        self.assertEqual(model.WU_TIER_FACTOR, model._DEFAULT_WU_TIER_FACTOR)
+
+    def test_congestion_exponent_softens_below_saturation(self):
+        base = model.congestion(120.0, 2)  # rho 0.6 -> 1/(1-0.6) = 2.5
+        self.assertAlmostEqual(base, 2.5)
+        model.set_model_form(congestion_exponent=0.86)
+        softened = model.congestion(120.0, 2)
+        self.assertAlmostEqual(softened, (1.0 - 0.6) ** -0.86)
+        self.assertLess(softened, base)
+        # Overload branch still graded and capped.
+        self.assertLessEqual(model.congestion(1000.0, 1), model.MAX_CONGESTION)
+
+    def test_p95_tail_rises_with_utilization_and_clamps(self):
+        self.assertEqual(model.p95_factor(0.2), model.P95_FACTOR)
+        model.set_model_form(p95_tail=(1.6909, 0.1303))
+        low, high = model.p95_factor(0.2), model.p95_factor(0.91)
+        self.assertGreater(high, low)
+        self.assertGreater(low, model.P95_FACTOR)  # measured floor 1.59 > 1.4
+        # Clamped: deep overload uses the saturation factor, stays finite.
+        self.assertEqual(model.p95_factor(3.0), model.p95_factor(model.SATURATION_RHO))
+
+    def test_p95_tail_raises_crud_violation_pressure(self):
+        config = TenantConfig(tenant_id="t", slo_class="premium")
+        state = TenantState(replicas=1, cache_mb=0)
+        d = demand({"crud_read": 70.0})  # rho 0.7: busy but below saturation
+        flat = evaluate_step(config, state, d)
+        model.set_model_form(p95_tail=(1.6909, 0.1303))
+        measured = evaluate_step(config, state, d)
+        self.assertGreater(measured.crud_p95_ms, flat.crud_p95_ms)
+        self.assertGreaterEqual(measured.violation, flat.violation)
+
+    def test_mixture_single_branch_matches_tail_closed_form(self):
+        # One lognormal branch: p95 must equal mean * tail by construction.
+        p95 = model._mixture_p95_ms([(1.0, 800.0, False)], 1.4)
+        self.assertAlmostEqual(p95 / 800.0, 1.4, places=4)
+
+    def test_mixture_denies_cache_tail_credit_below_quantile(self):
+        # 40% hits at 20 ms barely move a 95th percentile (the miss branch
+        # quantile shifts 95th -> 91.7th, ~6%); the mean-based form drops
+        # ~39%. The contrast is the finding this mode exists to measure.
+        miss_only = model._mixture_p95_ms([(1.0, 800.0, False)], 1.4)
+        mixed = model._mixture_p95_ms(
+            [(0.4, model.CACHE_HIT_LATENCY_MS, True), (0.6, 800.0, False)], 1.4)
+        mean_based_ratio = (0.4 * model.CACHE_HIT_LATENCY_MS + 0.6 * 800.0) / 800.0
+        self.assertGreater(mixed / miss_only, 0.90)
+        self.assertLess(mean_based_ratio, 0.65)
+        # Past the quantile the hits do win: 96% hits pin p95 at hit latency.
+        hit_dominated = model._mixture_p95_ms(
+            [(0.96, model.CACHE_HIT_LATENCY_MS, True), (0.04, 800.0, False)], 1.4)
+        self.assertAlmostEqual(hit_dominated, model.CACHE_HIT_LATENCY_MS, places=3)
+
+    def test_mixture_mode_flows_into_evaluate_step(self):
+        config = TenantConfig(tenant_id="t")
+        state = TenantState(replicas=4, cache_mb=512, tier="small")
+        d = demand({"chat": 2.0})
+        mean_based = evaluate_step(config, state, d)
+        model.set_model_form(mixture_p95=True)
+        percentile = evaluate_step(config, state, d)
+        # With a warm cache the mean-based estimator credits hits against
+        # the tail; the true percentile refuses (hit share < 0.95).
+        self.assertGreater(percentile.ai_p95_ms, mean_based.ai_p95_ms)
+        # Cost accounting is untouched by the latency form.
+        self.assertEqual(percentile.cost_usd, mean_based.cost_usd)
+
+    def test_wu_tier_factor_scales_ai_work_only(self):
+        d = demand({"chat": 2.0, "crud_read": 10.0})
+        base_small = d.work_units(0, "small")
+        model.set_model_form(wu_tier_factor={"mid": 1.516, "large": 16.64})
+        self.assertEqual(d.work_units(0, "small"), base_small)
+        crud_wu = 10.0 * model.WORK_UNITS["crud_read"]
+        ai_wu = base_small - crud_wu
+        self.assertAlmostEqual(d.work_units(0, "mid"), crud_wu + ai_wu * 1.516)
+        self.assertAlmostEqual(d.work_units(0, "large"), crud_wu + ai_wu * 16.64)
+
+    def test_wu_tier_factor_reaches_congestion_through_evaluate_step(self):
+        config = TenantConfig(tenant_id="t")
+        d = demand({"chat": 3.0})
+        model.set_model_form(wu_tier_factor={"large": 16.64})
+        small = evaluate_step(config, TenantState(replicas=2, cache_mb=0, tier="small"), d)
+        large = evaluate_step(config, TenantState(replicas=2, cache_mb=0, tier="large"), d)
+        # The heavier model congests the same pool: worse than its own
+        # base-latency ratio alone would predict at these settings.
+        self.assertGreater(large.ai_p95_ms / small.ai_p95_ms,
+                           model.TIER_BASE_LATENCY_MS["chat"]["large"]
+                           / model.TIER_BASE_LATENCY_MS["chat"]["small"])
+
+    def test_set_model_form_validation(self):
+        with self.assertRaises(ValueError):
+            model.set_model_form(congestion_exponent=0.0)
+        with self.assertRaises(ValueError):
+            model.set_model_form(p95_tail=(0.9, 0.1))
+        with self.assertRaises(ValueError):
+            model.set_model_form(p95_tail=(2.0, 5.0))  # blows past the lognormal bound
+        with self.assertRaises(ValueError):
+            model.set_model_form(wu_tier_factor={"huge": 2.0})
+        with self.assertRaises(ValueError):
+            model.set_model_form(wu_tier_factor={"mid": 0.0})

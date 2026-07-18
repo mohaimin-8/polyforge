@@ -1,0 +1,21 @@
+# PREREG_LM_ADOPTION.md (Wave 5): the v1 headline matrix under the *measured*
+# latency model — congestion exponent a = 0.86 and the rho-dependent p95/mean
+# tail F(rho) = 1.6909*(1-min(rho,0.95))^(-0.1303), both fitted from the
+# committed Phase 6 calibration (CALIBRATION.md, congestion_runs.csv,
+# fit_p95_factor.py). Exact mirror of full.yaml except `model_form`; the form
+# applies to the world and every controller's beliefs identically.
+name: matrix_lm
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, hpa, keda, firm, static, gptcache]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_lm.duckdb
+retries: 2
+timeseries_reps: 1
+model_form:
+  congestion_exponent: 0.86
+  p95_tail_f0: 1.6909
+  p95_tail_b: 0.1303

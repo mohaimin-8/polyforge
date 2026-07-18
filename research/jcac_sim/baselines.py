@@ -75,7 +75,7 @@ class HPAController:
         for tid, state in states.items():
             config = self.configs[tid]
             demand = demands.get(tid, Demand())
-            rho = demand.work_units(state.cache_mb) / max(1, state.replicas * REPLICA_CAPACITY_WU)
+            rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * REPLICA_CAPACITY_WU)
             desired = math.ceil(state.replicas * rho / self.target_rho) if rho > 0 else config.replica_min
             delta = max(-2, min(2, desired - state.replicas))
             out[tid] = apply_action(config, state, delta, state.cache_mb, state.tier)
@@ -128,7 +128,7 @@ class LayeredController:
             config = self.configs[tid]
             demand = demands.get(tid, Demand())
 
-            rho = demand.work_units(state.cache_mb) / max(1, state.replicas * REPLICA_CAPACITY_WU)
+            rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * REPLICA_CAPACITY_WU)
             desired = math.ceil(state.replicas * rho / self.target_rho) if rho > 0 else config.replica_min
             delta = max(-2, min(2, desired - state.replicas))
 
@@ -211,7 +211,7 @@ class FIRMReplicaController:
         self._last: dict[str, tuple[tuple[int, bool], int]] = {}
 
     def _observe(self, config: TenantConfig, state: TenantState, demand: Demand):
-        rho = demand.work_units(state.cache_mb) / max(1, state.replicas * REPLICA_CAPACITY_WU)
+        rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * REPLICA_CAPACITY_WU)
         m = evaluate_step(config, state, demand)
         bucket = min(9, int(rho * 5.0))  # 0..9 in ρ steps of 0.2
         s = (bucket, m.violation > 0.0)
@@ -274,7 +274,7 @@ class GPTCacheLRUController:
             config = self.configs[tid]
             demand = demands.get(tid, Demand())
 
-            rho = demand.work_units(state.cache_mb) / max(1, state.replicas * REPLICA_CAPACITY_WU)
+            rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * REPLICA_CAPACITY_WU)
             desired = math.ceil(state.replicas * rho / self.target_rho) if rho > 0 else config.replica_min
             delta = max(-2, min(2, desired - state.replicas))
 
@@ -359,7 +359,7 @@ class VTCReplicaController:
         needs = {}
         for tid, state in states.items():
             config = self.configs[tid]
-            offered = demands.get(tid, Demand()).work_units(state.cache_mb)
+            offered = demands.get(tid, Demand()).work_units(state.cache_mb, state.tier)
             served = min(offered, state.replicas * REPLICA_CAPACITY_WU)
             weight = max(config.hourly_budget_usd, 1e-9)
             self.counters[tid] += served / weight

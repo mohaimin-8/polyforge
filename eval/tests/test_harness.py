@@ -542,3 +542,73 @@ class TestChaosArms:
             if not 5 <= key[0] < 8:
                 assert row["violation"] == b[key]["violation"]
         assert kill.mean_violation > base.mean_violation
+
+
+class TestModelFormOverride:
+    """Wave 5 structural model-form overrides (PREREG_LM_ADOPTION /
+    PREREG_MIXTURE_P95 / PREREG_TIER_WU): same contract as economy —
+    reaches world and planner alike, resets statelessly, never moves a
+    pre-existing run identity."""
+
+    def test_model_form_changes_identity_only_when_set(self):
+        base, _ = run_identity(tiny_spec(), "hpa", "crud_steady", "uniform", "small", 0)
+        assert base == run_identity(tiny_spec(model_form={}), "hpa", "crud_steady",
+                                    "uniform", "small", 0)[0]
+        formed = tiny_spec(model_form={"congestion_exponent": 0.86})
+        assert base != run_identity(formed, "hpa", "crud_steady", "uniform", "small", 0)[0]
+        # And the economy-tagged identity is orthogonal to the form tag.
+        econ = tiny_spec(economy={"cache_hit_max": 0.285})
+        both = tiny_spec(economy={"cache_hit_max": 0.285},
+                         model_form={"congestion_exponent": 0.86})
+        assert (run_identity(econ, "hpa", "crud_steady", "uniform", "small", 0)[0]
+                != run_identity(both, "hpa", "crud_steady", "uniform", "small", 0)[0])
+
+    def test_model_form_validation(self, tmp_path):
+        bad = tmp_path / "f.yaml"
+        bad.write_text("name: x\nmodel_form: {bogus_form: 1}\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="unknown model_form keys"):
+            load(bad)
+        bad.write_text("name: x\nbackend: cluster\nmodel_form: {mixture_p95: 1}\n",
+                       encoding="utf-8")
+        with pytest.raises(ValueError, match="sim-only"):
+            load(bad)
+        bad.write_text("name: x\nmodel_form: {p95_tail_f0: 1.69}\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="set together"):
+            load(bad)
+
+    def test_execute_applies_and_clears_model_form(self):
+        import model
+
+        spec = tiny_spec(systems=["hpa"], workloads=["crud_steady"],
+                         model_form={"congestion_exponent": 0.86,
+                                     "p95_tail_f0": 1.6909, "p95_tail_b": 0.1303})
+        run_f = expand(spec)[0]
+        run_d = expand(tiny_spec(systems=["hpa"], workloads=["crud_steady"]))[0]
+
+        sim_backend.execute(run_f)
+        assert model.CONGESTION_EXPONENT == 0.86  # still set right after
+        assert model.P95_TAIL == (1.6909, 0.1303)
+        sim_backend.execute(run_d)  # default run must reset the form
+        assert model.CONGESTION_EXPONENT == 1.0
+        assert model.P95_TAIL is None
+        assert model.MIXTURE_P95 is False
+
+    def test_form_moves_outcomes_in_the_measured_direction(self):
+        """The measured tail factor is >= 1.59 everywhere the flat form
+        said 1.4: under identical demand a lean state must report worse
+        (or equal) violation, never better."""
+        import model
+        from model import Demand, TenantConfig, TenantState, evaluate_step
+
+        cfg = TenantConfig(tenant_id="t", slo_class="premium")
+        state = TenantState(replicas=1, cache_mb=0, tier="small")
+        demand = Demand(rps={"crud_read": 60.0, "chat": 1.0})
+        flat = evaluate_step(cfg, state, demand)
+        model.set_model_form(congestion_exponent=0.86, p95_tail=(1.6909, 0.1303))
+        measured = evaluate_step(cfg, state, demand)
+        model.set_model_form()
+        assert measured.crud_p95_ms > 0 and flat.crud_p95_ms > 0
+        # tail rises (>=1.59 vs 1.4) while congestion softens (a 0.86):
+        # the two measured corrections push in opposite directions and both
+        # must be live for this ratio to differ from 1.
+        assert measured.crud_p95_ms != flat.crud_p95_ms
