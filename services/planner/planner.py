@@ -181,18 +181,29 @@ class PlannerCore:
             pass  # durability is best-effort; never fail a plan on a disk error
 
     def _plan_locked(self, payload: dict) -> dict:
+        # The body is untrusted JSON; every shape error must raise a type the
+        # handler turns into 400, never an uncaught AttributeError (500).
+        if not isinstance(payload, dict):
+            raise ValueError("request body must be a JSON object")
         weights = payload.get("weights") or {}
         limits = payload.get("limits") or {}
+        if not isinstance(weights, dict) or not isinstance(limits, dict):
+            raise ValueError("weights and limits must be JSON objects")
         tenants = payload.get("tenants")
         if not isinstance(tenants, list) or not tenants:
             raise ValueError("tenants must be a non-empty list")
 
         configs, states, demands, interference = {}, {}, {}, {}
         for entry in tenants:
+            if not isinstance(entry, dict):
+                raise ValueError("each tenant must be a JSON object")
             tid = entry.get("tenant_id")
-            if not tid:
-                raise ValueError("tenant_id is required")
+            if not tid or not isinstance(tid, str):
+                raise ValueError("tenant_id is required and must be a string")
             state = entry.get("state") or {}
+            demand_obj = entry.get("demand") or {}
+            if not isinstance(state, dict) or not isinstance(demand_obj, dict):
+                raise ValueError("tenant state and demand must be JSON objects")
             tier = state.get("tier", "small")
             if tier not in TIERS:
                 raise ValueError(f"unknown tier {tier!r}")
@@ -209,10 +220,12 @@ class PlannerCore:
                 cache_mb=int(state.get("cache_mb", 128)),
                 tier=tier,
             )
-            demand = entry.get("demand") or {}
+            rps = demand_obj.get("rps") or {}
+            if not isinstance(rps, dict):
+                raise ValueError("demand.rps must be a JSON object of kind->rate")
             demands[tid] = Demand(
-                rps={str(k): float(v) for k, v in (demand.get("rps") or {}).items()},
-                crud_base_ms=float(demand.get("crud_base_ms", 50.0)),
+                rps={str(k): float(v) for k, v in rps.items()},
+                crud_base_ms=float(demand_obj.get("crud_base_ms", 50.0)),
             )
             interference[tid] = float(entry.get("interference", 0.0))
 

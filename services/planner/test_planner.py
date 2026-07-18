@@ -294,5 +294,64 @@ class PublishedPhysicsTests(unittest.TestCase):
         self.assertEqual(clean["plans"], dirty["plans"])
 
 
+class PlannerFuzzTests(unittest.TestCase):
+    """4.5c fuzz: PlannerCore.plan parses an untrusted JSON body. The HTTP
+    handler turns (ValueError, KeyError, TypeError) into 400 and lets
+    anything else become a 500, so plan() must raise ONLY those three on
+    malformed input (or return a valid dict) - never an uncaught
+    AttributeError/IndexError/ZeroDivisionError/etc."""
+
+    ALLOWED = (ValueError, KeyError, TypeError)
+
+    def _fuzz_values(self, rng):
+        pool = [None, 0, -1, 1, 1e18, -1e18, float("inf"), float("nan"),
+                "", "x", "tier", "small", chr(0), True, False, [], {},
+                [1, 2, 3], {"a": 1}, {"rps": None}, {"rps": "no"},
+                {"rps": {"chat": "notnum"}}, {"rps": {"chat": float("nan")}}]
+        return rng.choice(pool)
+
+    def _random_payload(self, rng):
+        # Build a plausibly-shaped but often-broken tenant entry.
+        entry = {}
+        for field in ("tenant_id", "slo_class", "hourly_budget_usd", "replica_min",
+                      "replica_max", "fairness_weight", "interference", "state", "demand"):
+            if rng.random() < 0.7:
+                entry[field] = self._fuzz_values(rng)
+        tenants = self._fuzz_values(rng)
+        if rng.random() < 0.5:
+            tenants = [entry] * rng.randint(0, 3)
+        payload = {}
+        if rng.random() < 0.8:
+            payload["tenants"] = tenants
+        for k in ("weights", "limits"):
+            if rng.random() < 0.5:
+                payload[k] = self._fuzz_values(rng)
+        return payload
+
+    def test_malformed_payloads_only_raise_allowed_types(self):
+        import random
+        core = PlannerCore()
+        for seed in range(2000):
+            rng = random.Random(seed)
+            payload = self._random_payload(rng)
+            try:
+                out = core.plan(payload)
+            except self.ALLOWED:
+                continue  # a clean 400
+            except Exception as err:  # noqa: BLE001
+                self.fail(f"seed {seed}: plan() raised {type(err).__name__} "
+                          f"({err}) on {payload!r} - would be a 500")
+            else:
+                # If it returned, it must be a well-formed response.
+                self.assertIn("plans", out)
+                self.assertIsInstance(out["plans"], dict)
+
+    def test_non_dict_bodies_are_rejected_cleanly(self):
+        core = PlannerCore()
+        for body in [None, [], "string", 42, True, [1, 2]]:
+            with self.assertRaises(self.ALLOWED):
+                core.plan(body)
+
+
 if __name__ == "__main__":
     unittest.main()
