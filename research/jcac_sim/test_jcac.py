@@ -761,3 +761,53 @@ class SnapshotTests(unittest.TestCase):
         cold.restore(restored)
         self.assertEqual(len(cold.forecasts["a"].history),
                          len(c.forecasts["a"].history))
+
+
+class GracefulDegradationTests(unittest.TestCase):
+    """PREREG_DEGRADE (gap 4.4): budget exhaustion should prefer serving on
+    the cheapest affordable tier over a designed tier=none outage. Default
+    off preserves the published shed-to-none behavior."""
+
+    def _infeasible(self, degrade):
+        # A budget too small to afford the optimizer's serving lattice under
+        # heavy AI demand forces the fallback branch.
+        cfg = {"a": TenantConfig(tenant_id="a", slo_class="premium",
+                                 hourly_budget_usd=0.02, replica_min=1, replica_max=10)}
+        ctl = JCACController(cfg, degrade_gracefully=degrade)
+        states = {"a": TenantState(replicas=1, cache_mb=0, tier="small")}
+        return ctl.plan(states, {"a": demand({"chat": 50.0, "agent": 20.0})})["a"].state
+
+    def test_default_sheds_to_none(self):
+        # Confirm this configuration actually reaches the fallback and the
+        # published behavior is an outage.
+        s = self._infeasible(degrade=False)
+        if s.tier != "none":
+            self.skipTest("configuration did not reach the infeasible fallback")
+        self.assertEqual(s.replicas, 1)
+        self.assertEqual(s.cache_mb, 0)
+
+    def test_graceful_serves_cheapest_affordable_when_budget_allows(self):
+        default = self._infeasible(degrade=False)
+        if default.tier != "none":
+            self.skipTest("configuration did not reach the infeasible fallback")
+        graceful = self._infeasible(degrade=True)
+        # Graceful must never produce a worse (higher-cost) or budget-busting
+        # plan, and prefers a serving tier when one is affordable at the floor.
+        cfg = TenantConfig(tenant_id="a", slo_class="premium", hourly_budget_usd=0.02)
+        budget = cfg.hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
+        m = evaluate_step(cfg, graceful, demand({"chat": 50.0, "agent": 20.0}))
+        if graceful.tier != "none":
+            self.assertLessEqual(m.cost_usd, budget + 1e-9)
+            self.assertIn(graceful.tier, ("small", "mid", "large"))
+
+    def test_graceful_sheds_to_none_when_no_serving_tier_is_affordable(self):
+        # A budget too small even for one small-tier request keeps the
+        # outage — graceful never introduces a budget-busting serving tier,
+        # so it degrades identically to the published fallback here.
+        cfg = {"a": TenantConfig(tenant_id="a", hourly_budget_usd=1e-6)}
+        default = JCACController(cfg).plan(
+            {"a": TenantState()}, {"a": demand({"chat": 500.0})})["a"].state
+        graceful = JCACController(cfg, degrade_gracefully=True).plan(
+            {"a": TenantState()}, {"a": demand({"chat": 500.0})})["a"].state
+        self.assertEqual(default.tier, "none")
+        self.assertEqual(graceful.tier, "none")

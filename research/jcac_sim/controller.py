@@ -293,6 +293,7 @@ class JCACController:
         forecast_method: str = "trend",
         adaptive_capacity: bool = False,
         anchor_moves: bool = False,
+        degrade_gracefully: bool = False,
     ):
         self.configs = configs
         self.weights = weights or Weights()
@@ -308,6 +309,13 @@ class JCACController:
         # lattice at the interval-start state; the default preserves the
         # published behavior bit-for-bit (committed campaigns replay).
         self.anchor_moves = anchor_moves
+        # PREREG_DEGRADE (gap 4.4): when the lattice is entirely infeasible
+        # (budget + cluster caps admit nothing), the published fallback sheds
+        # to tier="none" — a designed AI outage. `degrade_gracefully=True`
+        # instead serves on the cheapest AFFORDABLE tier at the replica floor,
+        # shedding to "none" only if even that exceeds budget or the cluster
+        # cap. Default off preserves the published behavior bit-for-bit.
+        self.degrade_gracefully = degrade_gracefully
         self.capacity_scale = {tid: 1.0 for tid in configs}
         self._projected: dict[str, float] = {}
 
@@ -487,5 +495,17 @@ class JCACController:
         # An entirely infeasible lattice (tight budget + tight cluster)
         # falls back to shedding cost: floor replicas, no cache, no model.
         if best_score == float("inf"):
-            return TenantState(replicas=config.replica_min, cache_mb=0, tier="none")
+            shed = TenantState(replicas=config.replica_min, cache_mb=0, tier="none")
+            if not self.degrade_gracefully:
+                return shed
+            # Graceful degradation (PREREG_DEGRADE): prefer serving on the
+            # cheapest affordable tier at the replica floor over a designed
+            # outage. Never violates budget or the cluster replica cap.
+            if others_replicas + config.replica_min <= self.limits.replicas:
+                for tier in ("small", "mid", "large"):
+                    cand = TenantState(replicas=config.replica_min, cache_mb=0, tier=tier)
+                    cost, _, _ = self._project(tid, cand, horizons[tid])
+                    if cost <= budget_per_step:
+                        return cand
+            return shed
         return best_state
