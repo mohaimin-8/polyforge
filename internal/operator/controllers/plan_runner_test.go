@@ -10,6 +10,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	pfv1alpha1 "polyforge/internal/operator/api/v1alpha1"
 	"polyforge/internal/operator/fairness"
@@ -240,5 +242,137 @@ func TestPlanRunnerForwardsInterference(t *testing.T) {
 	}
 	if got := stub.requests[0].Tenants[0].Interference; got != 0.8 {
 		t.Errorf("interference = %v, want 0.8", got)
+	}
+}
+
+// TestPlanRunnerRecoversFromFallback is the untested other half of the
+// fallback path: once the planner returns, the next cycle must apply a
+// real plan and flip status back to "planner", clearing the degradation.
+func TestPlanRunnerRecoversFromFallback(t *testing.T) {
+	c, _ := plannerFixtures(t)
+	stub := &stubPlanner{err: errors.New("solver exploded")}
+	audit := &recordingAudit{}
+	runner := &PlanRunner{Client: c, Planner: stub, Demands: demandFor("acme"), Audit: audit}
+
+	// Cycle 1: planner down -> fallback.
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var mid pfv1alpha1.Policy
+	_ = c.Get(context.Background(), types.NamespacedName{Name: "acme"}, &mid)
+	if mid.Status.LastPlanSource != pfv1alpha1.PlanSourceFallback {
+		t.Fatalf("cycle 1 did not fall back: %q", mid.Status.LastPlanSource)
+	}
+
+	// Cycle 2: planner recovers and returns a plan.
+	stub.err = nil
+	stub.response = planner.Response{
+		Solver: "jcac-lattice-v1",
+		Plans:  map[string]planner.Plan{"acme": {Replicas: 4, CacheMB: 256, Tier: "mid"}},
+	}
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var got pfv1alpha1.Policy
+	_ = c.Get(context.Background(), types.NamespacedName{Name: "acme"}, &got)
+	if got.Status.LastPlanSource != pfv1alpha1.PlanSourcePlanner {
+		t.Errorf("plan source after recovery = %q, want planner", got.Status.LastPlanSource)
+	}
+	if got.Spec.Replicas != 4 || got.Spec.ModelTier != pfv1alpha1.ModelTierMid {
+		t.Errorf("recovery did not apply the plan: %+v", got.Spec)
+	}
+}
+
+// TestPlanRunnerIsolatesPerTenantApplyFailure: an Update error for one
+// tenant must not stop the others from being applied — the loop logs and
+// continues (partial progress beats a stuck cycle).
+func TestPlanRunnerIsolatesPerTenantApplyFailure(t *testing.T) {
+	tenants := []*pfv1alpha1.Tenant{
+		{ObjectMeta: metav1.ObjectMeta{Name: "a", UID: "ua"}, Spec: pfv1alpha1.TenantSpec{SLOClass: pfv1alpha1.SLOPremium}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "b", UID: "ub"}, Spec: pfv1alpha1.TenantSpec{SLOClass: pfv1alpha1.SLOStandard}},
+	}
+	objs := []client.Object{}
+	for _, name := range []string{"a", "b"} {
+		objs = append(objs, &pfv1alpha1.Policy{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: pfv1alpha1.PolicySpec{
+				TenantRef: name, Replicas: 2, ReplicaMin: 1, ReplicaMax: 5,
+				CacheSizeMB: 128, ModelTier: pfv1alpha1.ModelTierSmall,
+			},
+		})
+	}
+	for _, tn := range tenants {
+		objs = append(objs, tn)
+	}
+	// Fail the spec Update for tenant "a" only.
+	base := fake.NewClientBuilder().
+		WithScheme(newScheme(t)).
+		WithObjects(objs...).
+		WithStatusSubresource(&pfv1alpha1.Tenant{}, &pfv1alpha1.Policy{}, &pfv1alpha1.Budget{}, &pfv1alpha1.WorkloadProfile{})
+	c := base.WithInterceptorFuncs(interceptor.Funcs{
+		Update: func(ctx context.Context, cl client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+			if p, ok := obj.(*pfv1alpha1.Policy); ok && p.Name == "a" {
+				return errors.New("conflict on a")
+			}
+			return cl.Update(ctx, obj, opts...)
+		},
+	}).Build()
+
+	stub := &stubPlanner{response: planner.Response{
+		Solver: "jcac-lattice-v1",
+		Plans: map[string]planner.Plan{
+			"a": {Replicas: 5, CacheMB: 256, Tier: "mid"},
+			"b": {Replicas: 4, CacheMB: 256, Tier: "mid"},
+		},
+	}}
+	runner := &PlanRunner{Client: c, Planner: stub,
+		Demands: stubDemand{demands: map[string]planner.Demand{
+			"a": {RPS: map[string]float64{"chat": 2.0}, CrudBaseMs: 50},
+			"b": {RPS: map[string]float64{"chat": 2.0}, CrudBaseMs: 50},
+		}}}
+
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatalf("a per-tenant apply error must not fail the cycle: %v", err)
+	}
+	var b pfv1alpha1.Policy
+	_ = c.Get(context.Background(), types.NamespacedName{Name: "b"}, &b)
+	if b.Spec.Replicas != 4 || b.Spec.ModelTier != pfv1alpha1.ModelTierMid {
+		t.Errorf("tenant b was not applied despite a's failure: %+v", b.Spec)
+	}
+	var a pfv1alpha1.Policy
+	_ = c.Get(context.Background(), types.NamespacedName{Name: "a"}, &a)
+	if a.Spec.Replicas != 2 { // unchanged; its update was rejected
+		t.Errorf("tenant a spec should be unchanged after a failed update: %+v", a.Spec)
+	}
+}
+
+// TestPlanRunnerDefaultsBudgetWhenAbsent: a tenant without a Budget CR must
+// plan at the documented $5/hr default, not crash or skip.
+func TestPlanRunnerDefaultsBudgetWhenAbsent(t *testing.T) {
+	tenant := &pfv1alpha1.Tenant{
+		ObjectMeta: metav1.ObjectMeta{Name: "acme", UID: "uid-acme"},
+		Spec:       pfv1alpha1.TenantSpec{SLOClass: pfv1alpha1.SLOPremium},
+	}
+	policy := &pfv1alpha1.Policy{
+		ObjectMeta: metav1.ObjectMeta{Name: "acme"},
+		Spec: pfv1alpha1.PolicySpec{
+			TenantRef: "acme", Replicas: 2, ReplicaMin: 1, ReplicaMax: 5,
+			CacheSizeMB: 128, ModelTier: pfv1alpha1.ModelTierSmall,
+		},
+	}
+	c := newTenantClient(t, tenant, policy) // no Budget CR
+	stub := &stubPlanner{response: planner.Response{
+		Solver: "jcac-lattice-v1",
+		Plans:  map[string]planner.Plan{"acme": {Replicas: 3, CacheMB: 128, Tier: "small"}},
+	}}
+	runner := &PlanRunner{Client: c, Planner: stub, Demands: demandFor("acme")}
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(stub.requests) != 1 {
+		t.Fatalf("expected one plan call, got %d", len(stub.requests))
+	}
+	if got := stub.requests[0].Tenants[0].HourlyBudgetUSD; got != 5.0 {
+		t.Errorf("absent budget default = %v, want 5.0", got)
 	}
 }
