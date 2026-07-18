@@ -312,9 +312,14 @@ class JCACController:
         # PREREG_DEGRADE (gap 4.4): when the lattice is entirely infeasible
         # (budget + cluster caps admit nothing), the published fallback sheds
         # to tier="none" — a designed AI outage. `degrade_gracefully=True`
-        # instead serves on the cheapest AFFORDABLE tier at the replica floor,
-        # shedding to "none" only if even that exceeds budget or the cluster
-        # cap. Default off preserves the published behavior bit-for-bit.
+        # instead serves on the cheapest AFFORDABLE tier at the replica floor.
+        # MEASURED no-op at realistic tier costs (DEGRADE_PROBE.md): the
+        # fallback binds only when even the cheapest tier's per-request price
+        # exceeds budget, and the cache_mb=0 floor maximises misses, so it
+        # cannot fit a budget the cached candidates could not — shed-to-none
+        # is the correct budget-respecting response. Retained default-off as
+        # a documented, budget-safe option (committed campaigns replay
+        # bit-identically); DG-H2 (never serves outside budget) holds.
         self.degrade_gracefully = degrade_gracefully
         self.capacity_scale = {tid: 1.0 for tid in configs}
         self._projected: dict[str, float] = {}

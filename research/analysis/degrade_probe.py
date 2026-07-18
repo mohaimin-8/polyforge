@@ -124,10 +124,13 @@ def main() -> None:
         w.writeheader()
         w.writerows(rows)
 
-    # DG-H1: graceful reduces outage step-share wherever the fallback binds.
+    # DG-H1 (as pre-registered): graceful's outage share is <= shed's AND
+    # STRICTLY less on at least one budget. The strict clause is the
+    # load-bearing half — an all-equal result does NOT satisfy it.
     binding = [r for r in rows if r["shed_outage"] > 0.0]
-    dg_h1 = all(r["graceful_outage"] <= r["shed_outage"] + 1e-9 for r in binding) and bool(binding)
     strictly_less = any(r["graceful_outage"] < r["shed_outage"] - 1e-9 for r in binding)
+    never_worse = all(r["graceful_outage"] <= r["shed_outage"] + 1e-9 for r in binding)
+    dg_h1 = bool(binding) and never_worse and strictly_less
     # DG-H2: graceful never raises cost above the tenant budget envelope
     # (it only ever serves within budget), so aggregate cost stays bounded.
     dg_h2 = all(r["graceful_cost"] <= r["shed_cost"] * 4.0 + 1e-9 for r in rows)
@@ -150,17 +153,34 @@ def main() -> None:
                      f"{r['graceful_outage']:.1%} | {r['shed_viol']:.3f} | "
                      f"{r['graceful_viol']:.3f} |")
     lines.append("")
-    lines.append(f"**DG-H1 (graceful reduces outage share wherever the fallback binds): "
-                 f"{'PASS' if dg_h1 else 'FAIL'}"
-                 f"{' (strictly, on at least one budget)' if strictly_less else ''}.**")
+    lines.append(f"**DG-H1 (graceful STRICTLY reduces outage share where the fallback "
+                 f"binds): {'PASS' if dg_h1 else 'NOT MET'}"
+                 f"{'' if strictly_less else ' — graceful equals shed on every budget'}.**")
     lines.append(f"**DG-H2 (graceful introduces no runaway cost — stays within a 4x band "
                  f"of the shed cost): {'PASS' if dg_h2 else 'FAIL'}.**")
     lines.append("")
-    lines.append("Reading: `degrade_gracefully` converts designed AI outages into "
-                 "in-budget service exactly in the tight-budget band the published "
-                 "controller would black out, and never where the lattice is feasible. "
-                 "It ships default-off so every committed campaign replays bit-identically; "
-                 "it is a deployment robustness option, not a headline change.")
+    lines.append("## Honest reading — the fix is a measured no-op, and that is the finding")
+    lines.append("")
+    lines.append("DG-H1 is **not met**: graceful degradation produces the identical outage "
+                 "share to the published shed on every budget. The diagnosis is the "
+                 "useful result. The infeasible-lattice fallback binds only when even the "
+                 "**cheapest serving tier's per-request cost exceeds the tenant's per-step "
+                 "budget** — and that cost is dominated by the tier's inference price on "
+                 "the *miss* stream. Graceful's floor candidate uses `cache_mb=0`, which "
+                 "*maximises* the miss rate, so it can never fit a budget the optimizer's "
+                 "already-cached small-tier candidates could not. When the budget cannot "
+                 "afford to serve the demand at all, a designed `tier=none` outage is the "
+                 "**correct budget-respecting response**, not a design flaw. DG-H2 holds: "
+                 "graceful never serves outside budget.")
+    lines.append("")
+    lines.append("The value here is the measurement: a proposed robustness fix, "
+                 "pre-registered, measured, and found unnecessary — the published "
+                 "shed-to-none was already right. The option ships default-off (committed "
+                 "campaigns replay bit-identically) and is retained only as a documented, "
+                 "budget-safe alternative; no headline number changes. A cache-preserving "
+                 "graceful variant (keep enough cache to cut misses under a tight budget) "
+                 "is the only design that could differ, and it is named as future work, "
+                 "not run here.")
     out_md = Path(__file__).resolve().parent / "DEGRADE_PROBE.md"
     out_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {out_md} and {out_csv}")

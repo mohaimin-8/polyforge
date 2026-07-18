@@ -786,19 +786,19 @@ class GracefulDegradationTests(unittest.TestCase):
         self.assertEqual(s.replicas, 1)
         self.assertEqual(s.cache_mb, 0)
 
-    def test_graceful_serves_cheapest_affordable_when_budget_allows(self):
-        default = self._infeasible(degrade=False)
-        if default.tier != "none":
-            self.skipTest("configuration did not reach the infeasible fallback")
+    def test_graceful_never_serves_outside_budget(self):
+        # DG-H2: whatever graceful returns at the fallback, if it serves a
+        # tier that tier's projected cost is within budget — it never trades
+        # the outage for a budget violation. (DEGRADE_PROBE.md: at realistic
+        # tier costs graceful equals shed, because cache_mb=0 maximises
+        # misses; the finding is that shed-to-none is already correct.)
         graceful = self._infeasible(degrade=True)
-        # Graceful must never produce a worse (higher-cost) or budget-busting
-        # plan, and prefers a serving tier when one is affordable at the floor.
         cfg = TenantConfig(tenant_id="a", slo_class="premium", hourly_budget_usd=0.02)
         budget = cfg.hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
-        m = evaluate_step(cfg, graceful, demand({"chat": 50.0, "agent": 20.0}))
         if graceful.tier != "none":
+            m = evaluate_step(cfg, graceful, demand({"chat": 50.0, "agent": 20.0}))
             self.assertLessEqual(m.cost_usd, budget + 1e-9)
-            self.assertIn(graceful.tier, ("small", "mid", "large"))
+            self.assertEqual(graceful.cache_mb, 0)  # floor config by construction
 
     def test_graceful_sheds_to_none_when_no_serving_tier_is_affordable(self):
         # A budget too small even for one small-tier request keeps the
