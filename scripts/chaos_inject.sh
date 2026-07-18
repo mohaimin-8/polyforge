@@ -82,7 +82,7 @@ kind: FlowSchema
 metadata:
   name: pf-chaos-throttle
 spec:
-  matchingPrecedence: 1
+  matchingPrecedence: 1000
   priorityLevelConfiguration:
     name: pf-chaos-throttle
   rules:
