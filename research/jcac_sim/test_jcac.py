@@ -653,3 +653,56 @@ class AnchorMovesTests(unittest.TestCase):
         default = JCACController(configs).plan(states, demands)["a"].state
         anchored = JCACController(configs, anchor_moves=True).plan(states, demands)["a"].state
         self.assertEqual(default, anchored)
+
+
+class SeasonalMRTests(unittest.TestCase):
+    """Wave 5 multi-resolution forecaster: the fine 96-step window
+    (16 min at 10 s) is physically blind to day-scale cycles; seasonal_mr
+    must see them through its 10-min coarse buckets while deferring to
+    the fine season when one exists."""
+
+    PERIOD_BUCKETS = 40  # "daily" cycle: 40 coarse buckets (6.7 h at 10 s)
+    HIGH, LOW = 8.0, 0.5
+
+    def _feed_cycle(self, f: Forecast, periods: int):
+        agg = Forecast.COARSE_AGG
+        half = self.PERIOD_BUCKETS // 2
+        for p in range(periods):
+            for b in range(self.PERIOD_BUCKETS):
+                rate = self.HIGH if b < half else self.LOW
+                for _ in range(agg):
+                    f.observe(demand({"chat": rate}))
+
+    def test_daily_cycle_visible_only_to_mr(self):
+        mr = Forecast(method="seasonal_mr")
+        fine = Forecast(method="seasonal")
+        tr = Forecast(method="trend")
+        for f in (mr, fine, tr):
+            self._feed_cycle(f, 3)  # ends just before the high phase returns
+        mr_next = mr.horizon()[0].rps["chat"]
+        fine_next = fine.horizon()[0].rps["chat"]
+        tr_next = tr.horizon()[0].rps["chat"]
+        self.assertAlmostEqual(mr_next, self.HIGH, places=6,
+                               msg="mr must forecast the returning high phase")
+        self.assertLessEqual(fine_next, 1.0,
+                             "the 16-min fine window cannot see the cycle")
+        self.assertLessEqual(tr_next, 1.0)
+
+    def test_fine_season_takes_precedence(self):
+        mr = Forecast(method="seasonal_mr")
+        fine = Forecast(method="seasonal")
+        for f in (mr, fine):
+            for i in range(96):
+                rate = 5.0 if (i // 6) % 2 == 0 else 1.0  # 12-step square wave
+                f.observe(demand({"chat": rate}))
+        mr_h = [d.rps["chat"] for d in mr.horizon()]
+        fine_h = [d.rps["chat"] for d in fine.horizon()]
+        self.assertEqual(mr_h, fine_h,
+                         "with a credible fine season, mr must match seasonal")
+
+    def test_coarse_memory_is_bounded(self):
+        f = Forecast(method="seasonal_mr")
+        for _ in range(Forecast.COARSE_AGG * (Forecast.COARSE_KEEP + 20)):
+            f.observe(demand({"chat": 1.0}))
+        self.assertLessEqual(len(f.coarse), Forecast.COARSE_KEEP)
+        self.assertLessEqual(len(f.history), 96)

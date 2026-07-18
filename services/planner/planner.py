@@ -58,11 +58,16 @@ class PlannerCore:
     names its weights always wins, the operator stays the source of truth.
     """
 
-    def __init__(self, default_weights: dict | None = None) -> None:
+    def __init__(self, default_weights: dict | None = None,
+                 forecast_method: str = "trend") -> None:
         self._controller: JCACController | None = None
         self._signature: tuple | None = None
         self._defaults = {"alpha": 1.0, "beta": 2.0, "gamma": 0.5}
         self._defaults.update(default_weights or {})
+        # Deployment-selected forecaster (Wave 5): the service could
+        # previously only run the controller default, so the live planner
+        # was unable to exploit the measured forecasting results at all.
+        self._forecast_method = forecast_method
         # ThreadingHTTPServer serves each request on its own thread; the
         # controller and its forecast state are shared and not re-entrant.
         # One operator calling every 10 s never contends, but a second
@@ -127,6 +132,7 @@ class PlannerCore:
                 configs,
                 weights=Weights(alpha=signature[0], beta=signature[1], gamma=signature[2]),
                 limits=ClusterLimits(cache_mb=signature[3], replicas=signature[4]),
+                forecast_method=self._forecast_method,
             )
             self._signature = signature
             if old is not None:
@@ -146,7 +152,7 @@ class PlannerCore:
             # (matching the fleet's method), departures are dropped,
             # survivors keep their history untouched.
             method = (next(iter(ctl.forecasts.values())).method
-                      if ctl.forecasts else "trend")
+                      if ctl.forecasts else self._forecast_method)
             for tid in configs:
                 if tid not in ctl.forecasts:
                     ctl.forecasts[tid] = Forecast(method=method)
@@ -217,9 +223,15 @@ def main() -> None:
     ap.add_argument("--gamma", type=float, default=0.5,
                     help="default fairness weight when a request omits weights "
                          "(0 disables the fairness objective, e.g. for ablation)")
+    ap.add_argument("--forecast", default="trend",
+                    choices=("persistence", "trend", "holt", "seasonal", "seasonal_mr"),
+                    help="demand forecaster (holt is the evidence-based "
+                         "recommendation; seasonal_mr adds the multi-resolution "
+                         "layer that can see daily cycles live)")
     args = ap.parse_args()
     core = PlannerCore(
-        default_weights={"alpha": args.alpha, "beta": args.beta, "gamma": args.gamma}
+        default_weights={"alpha": args.alpha, "beta": args.beta, "gamma": args.gamma},
+        forecast_method=args.forecast,
     )
     server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(core))
     print(f"jcac planner ({SOLVER_NAME}) listening on :{args.port}")

@@ -171,5 +171,23 @@ class PlannerLifecycleTests(unittest.TestCase):
         self.assertEqual(set(core._controller.forecasts), {"a", "b", "c"})
 
 
+class ForecastMethodPlumbingTests(unittest.TestCase):
+    """Wave 5: the service can select the forecaster at deployment time
+    (previously the live planner could only ever run the trend default)."""
+
+    def test_forecast_method_reaches_controller_and_arrivals(self):
+        core = PlannerCore(forecast_method="holt")
+        core.plan({"tenants": [tenant("a")]})
+        self.assertEqual(core._controller.forecasts["a"].method, "holt")
+        core.plan({"tenants": [tenant("a"), tenant("b")]})  # churn arrival
+        self.assertEqual(core._controller.forecasts["b"].method, "holt")
+
+    def test_seasonal_mr_is_a_valid_service_method(self):
+        core = PlannerCore(forecast_method="seasonal_mr")
+        out = core.plan({"tenants": [tenant("a")]})
+        self.assertIn("a", out["plans"])
+        self.assertEqual(core._controller.forecasts["a"].method, "seasonal_mr")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -86,6 +86,16 @@ class Forecast:
       `trend` until a period with correlation >= 0.4 emerges. Bursty
       square-wave tenants are periodic; this is the method that can see
       the next burst *before* it lands.
+    - `seasonal_mr` (Wave 5): multi-resolution seasonal. The fine window
+      above holds ~16 minutes at the 10 s control interval, so the plain
+      `seasonal` forecaster is physically blind to the daily cycles the
+      trace studies proved matter (FORECAST_TRACE_REAL, FORECAST_AZURE,
+      PSEUDO_TENANT). This method additionally aggregates every
+      COARSE_AGG observations into a coarse bucket (10 min at 10 s),
+      keeps COARSE_KEEP of them (3 days), detects periodicity at both
+      resolutions, and forecasts from whichever is stronger — the layer
+      that lets the *deployed* planner exploit measured daily
+      periodicity, not only the offline studies.
 
     All methods are per-request-kind and clamp at zero.
     """
@@ -93,14 +103,31 @@ class Forecast:
     history: list = field(default_factory=list)  # recent Demand objects
     window: int = 3
     method: str = "trend"
+    # seasonal_mr state: coarse per-kind means and the forming bucket.
+    coarse: list = field(default_factory=list)  # list[dict kind -> mean rps]
+    _accum: dict = field(default_factory=dict)  # kind -> running sum
+    _accum_n: int = 0
 
-    _KEEP = {"persistence": 1, "trend": 3, "holt": 48, "seasonal": 96}
+    _KEEP = {"persistence": 1, "trend": 3, "holt": 48, "seasonal": 96,
+             "seasonal_mr": 96}
+    COARSE_AGG = 60  # observations per coarse bucket (10 min at 10 s)
+    COARSE_KEEP = 432  # coarse buckets kept (3 days at 10 min)
 
     def observe(self, demand: Demand) -> None:
         self.history.append(demand)
         keep = max(self._KEEP.get(self.method, 3), self.window)
         if len(self.history) > keep:
             self.history.pop(0)
+        if self.method == "seasonal_mr":
+            for kind, rate in demand.rps.items():
+                self._accum[kind] = self._accum.get(kind, 0.0) + rate
+            self._accum_n += 1
+            if self._accum_n >= self.COARSE_AGG:
+                self.coarse.append(
+                    {k: v / self._accum_n for k, v in self._accum.items()})
+                self._accum, self._accum_n = {}, 0
+                if len(self.coarse) > self.COARSE_KEEP:
+                    self.coarse.pop(0)
 
     def horizon(self) -> list[Demand]:
         if not self.history:
@@ -115,6 +142,8 @@ class Forecast:
             per_kind = {k: self._holt(series[k]) for k in kinds}
         elif self.method == "seasonal":
             per_kind = {k: self._seasonal(series[k]) for k in kinds}
+        elif self.method == "seasonal_mr":
+            per_kind = {k: self._seasonal_mr(series[k], k) for k in kinds}
         else:
             per_kind = {k: self._trend(series[k]) for k in kinds}
 
@@ -144,12 +173,16 @@ class Forecast:
             out.append(level + damp * trend)
         return out
 
-    def _seasonal(self, y: list[float]) -> list[float]:
+    @staticmethod
+    def _best_period(y: list[float], hi: int) -> tuple[int, float]:
+        """Best autocorrelation lag in [8, hi] on the detrended series.
+
+        Detrend first: raw autocorrelation mistakes any monotone ramp
+        for a season (deviations from the mean stay same-signed for
+        long stretches). A least-squares line removed, only genuine
+        periodicity survives.
+        """
         n = len(y)
-        # Detrend first: raw autocorrelation mistakes any monotone ramp
-        # for a season (deviations from the mean stay same-signed for
-        # long stretches). A least-squares line removed, only genuine
-        # periodicity survives.
         xbar = (n - 1) / 2.0
         ybar = sum(y) / n
         sxx = sum((i - xbar) ** 2 for i in range(n)) or 1.0
@@ -158,14 +191,41 @@ class Forecast:
 
         best_lag, best_corr = 0, 0.0
         var = sum(v * v for v in resid) or 1.0
-        for lag in range(8, min(48, n // 2) + 1):
+        for lag in range(8, hi + 1):
             cov = sum(resid[i] * resid[i - lag] for i in range(lag, n))
             corr = cov / var
             if corr > best_corr:
                 best_lag, best_corr = lag, corr
+        return best_lag, best_corr
+
+    def _seasonal(self, y: list[float]) -> list[float]:
+        n = len(y)
+        best_lag, best_corr = self._best_period(y, min(48, n // 2))
         if best_corr < 0.4:  # no credible period yet: behave like trend
             return self._trend(y)
         return [y[n - best_lag + ((k - 1) % best_lag)] for k in range(1, HORIZON_STEPS + 1)]
+
+    def _seasonal_mr(self, y: list[float], kind: str) -> list[float]:
+        """Multi-resolution seasonal: prefer the fine-window season when
+        one exists (it can phase-align inside the horizon); otherwise use
+        the coarse (10-min-bucket) season, which is the only place a
+        daily cycle is visible from a 16-minute fine window. The horizon
+        (60 s) sits inside one coarse bucket, so the coarse forecast is
+        the seasonal-naive value one period back — the level the cycle
+        says is coming — held flat across the horizon."""
+        n = len(y)
+        fine_lag, fine_corr = self._best_period(y, min(48, n // 2))
+        if fine_corr >= 0.4:
+            return [y[n - fine_lag + ((k - 1) % fine_lag)]
+                    for k in range(1, HORIZON_STEPS + 1)]
+        series = [c.get(kind, 0.0) for c in self.coarse]
+        m = len(series)
+        if m >= 16:  # need at least two candidate periods of coarse history
+            coarse_lag, coarse_corr = self._best_period(series, m // 2)
+            if coarse_corr >= 0.4:
+                nxt = series[m - coarse_lag]  # one period back from the forming bucket
+                return [nxt] * HORIZON_STEPS
+        return self._trend(y)
 
 
 @dataclass
