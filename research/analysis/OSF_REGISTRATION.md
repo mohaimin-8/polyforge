@@ -38,6 +38,11 @@ listed for the user exactly as the Zenodo/GHCR/video items are in
 | `PREREG_PSEUDO_TENANT.md` | DEFENSE_QA #18 | `7deb6a3` | 2026-07-16T12:47:08+06:00 | yes (session 20, PSEUDO_TENANT.md) | _pending_ |
 | `PREREG_WIRE_ATTACK.md` | DEFENSE_QA #19 (security, live) | `c38bce6` | 2026-07-16T13:24:16+06:00 | deferred (Codespace) | _pending_ |
 | `PREREG_LIVE_CHAOS_P99.md` | DEFENSE_QA #19 (chaos, live) + #11 (p99) | `c38bce6` | 2026-07-16T13:24:16+06:00 | deferred (Codespace) | _pending_ |
+| `PREREG_LM_ADOPTION.md` | DEFENSE_QA #16 (latency-model half) + #24 | `7519958` | 2026-07-18T23:57:47+06:00 | yes (session 24, RESULTS_LM_ADOPTION.md) | _pending_ |
+| `PREREG_MIXTURE_P95.md` | DEFENSE_QA #24 (mixture percentile) | `7519958` | 2026-07-18T23:57:47+06:00 | session 24 | _pending_ |
+| `PREREG_TIER_WU.md` | DEFENSE_QA #24 (tier capacity coherence) | `7519958` | 2026-07-18T23:57:47+06:00 | session 24 | _pending_ |
+| `PREREG_COORD_GAP.md` | DEFENSE_QA #25 (solver exactness) | `fc7e72c` | 2026-07-19T00:02:30+06:00 | yes (session 24, COORD_GAP.md) | _pending_ |
+| `PREREG_MOVE_CLAMP.md` | DEFENSE_QA #25 (actuation-clamp violation) | `cfab691` | 2026-07-19T00:11:08+06:00 | session 24 | _pending_ |
 | `PREREG_PLANNER_CELLS.md` | DEFENSE_QA #13 (scale) | `264356a` | 2026-07-16 (session 21) | yes (session 21, PLANNER_CELLS.md) | _pending_ |
 | `PREREG_PLANNER_CELLS_DEALIAS.md` | DEFENSE_QA #13 (scale, confound follow-up) | `0a61c6a` | 2026-07-16 (session 21) | yes (session 21, PLANNER_CELLS_DEALIAS.md) | _pending_ |
 
