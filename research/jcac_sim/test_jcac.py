@@ -706,3 +706,58 @@ class SeasonalMRTests(unittest.TestCase):
             f.observe(demand({"chat": 1.0}))
         self.assertLessEqual(len(f.coarse), Forecast.COARSE_KEEP)
         self.assertLessEqual(len(f.history), 96)
+
+
+class SnapshotTests(unittest.TestCase):
+    """W31 failover: forecast state must survive a serialize/restore round
+    trip so a replacement replica resumes history instead of cold-starting."""
+
+    def test_forecast_round_trip_preserves_horizon(self):
+        f = Forecast(method="holt")
+        for v in (1.0, 2.0, 3.0, 4.0, 5.0):
+            f.observe(demand({"chat": v}))
+        before = f.horizon()
+        g = Forecast.from_snapshot(f.snapshot())
+        after = g.horizon()
+        self.assertEqual([d.rps["chat"] for d in before],
+                         [d.rps["chat"] for d in after])
+
+    def test_seasonal_mr_coarse_buckets_survive(self):
+        f = Forecast(method="seasonal_mr")
+        for i in range(Forecast.COARSE_AGG * 3 + 5):
+            f.observe(demand({"chat": float(i % 7)}))
+        g = Forecast.from_snapshot(f.snapshot())
+        self.assertEqual(len(g.coarse), len(f.coarse))
+        self.assertEqual(g.coarse, f.coarse)
+        self.assertEqual(g._accum_n, f._accum_n)
+
+    def test_controller_snapshot_restores_history_into_matching_tenants(self):
+        cfg = {"a": TenantConfig(tenant_id="a"), "b": TenantConfig(tenant_id="b")}
+        warm = JCACController(cfg, forecast_method="holt")
+        surge = {"a": demand({"crud_read": 100.0}), "b": demand({"crud_read": 5.0})}
+        for _ in range(6):
+            warm.plan({t: TenantState() for t in cfg}, surge)
+        snap = warm.snapshot()
+
+        # A fresh controller (the replacement replica) restores the history.
+        cold = JCACController(cfg, forecast_method="holt")
+        self.assertEqual(len(cold.forecasts["a"].history), 0)
+        cold.restore(snap)
+        self.assertEqual(len(cold.forecasts["a"].history),
+                         len(warm.forecasts["a"].history))
+        # A departed tenant in the snapshot is ignored, not an error.
+        cold.restore({"forecasts": {"ghost": {"method": "holt", "history": []}}})
+        self.assertNotIn("ghost", cold.forecasts)
+
+    def test_snapshot_is_json_serializable(self):
+        import json
+        cfg = {"a": TenantConfig(tenant_id="a")}
+        c = JCACController(cfg, forecast_method="seasonal_mr", adaptive_capacity=True)
+        for _ in range(5):
+            c.plan({"a": TenantState()}, {"a": demand({"chat": 2.0})})
+        # Must survive a JSON round trip untouched (the wire format).
+        restored = json.loads(json.dumps(c.snapshot()))
+        cold = JCACController(cfg, forecast_method="seasonal_mr")
+        cold.restore(restored)
+        self.assertEqual(len(cold.forecasts["a"].history),
+                         len(c.forecasts["a"].history))

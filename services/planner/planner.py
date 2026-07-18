@@ -59,7 +59,8 @@ class PlannerCore:
     """
 
     def __init__(self, default_weights: dict | None = None,
-                 forecast_method: str = "trend") -> None:
+                 forecast_method: str = "trend",
+                 state_file: str | None = None) -> None:
         self._controller: JCACController | None = None
         self._signature: tuple | None = None
         self._defaults = {"alpha": 1.0, "beta": 2.0, "gamma": 0.5}
@@ -73,10 +74,71 @@ class PlannerCore:
         # One operator calling every 10 s never contends, but a second
         # caller must serialize rather than corrupt forecast history.
         self._lock = threading.Lock()
+        # Failover (W31): forecast state is per-replica in-memory, so a
+        # replacement pod (or a restart) cold-starts every tenant's history.
+        # A snapshot pushed via POST /v1/state — or loaded from an optional
+        # durable state file — is buffered here and applied to matching
+        # tenants the moment the controller for them is (re)built.
+        self._state_file = Path(state_file) if state_file else None
+        self._pending_restore: dict | None = None
+        if self._state_file and self._state_file.exists():
+            try:
+                self._pending_restore = json.loads(
+                    self._state_file.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                self._pending_restore = None  # a corrupt file must not crash boot
 
     def plan(self, payload: dict) -> dict:
         with self._lock:
-            return self._plan_locked(payload)
+            result = self._plan_locked(payload)
+            self._persist_state_file()
+            return result
+
+    def snapshot(self) -> dict:
+        """Serializable planner state for failover/hand-off. Thread-safe."""
+        with self._lock:
+            return self._controller.snapshot() if self._controller else {}
+
+    def restore(self, data: dict) -> int:
+        """Buffer a snapshot; apply immediately to any tenants the live
+        controller already knows, and keep it pending for tenants that
+        appear on later requests. Returns how many tenants were applied now."""
+        if not isinstance(data, dict):
+            raise ValueError("state must be a JSON object")
+        with self._lock:
+            self._pending_restore = data
+            applied = self._apply_pending()
+            self._persist_state_file()
+            return applied
+
+    def _apply_pending(self) -> int:
+        """Apply the buffered snapshot to the current controller's tenants."""
+        if self._pending_restore is None or self._controller is None:
+            return 0
+        known = set(self._controller.forecasts)
+        snap_tids = set((self._pending_restore.get("forecasts") or {}))
+        self._controller.restore(self._pending_restore)
+        applied = known & snap_tids
+        # Drop tenants already reconciled so the buffer only carries the
+        # not-yet-seen remainder (and stops re-applying stale history).
+        remaining = {
+            "forecasts": {t: s for t, s in (self._pending_restore.get("forecasts") or {}).items()
+                          if t not in applied},
+            "capacity_scale": {t: s for t, s in (self._pending_restore.get("capacity_scale") or {}).items()
+                               if t not in applied},
+        }
+        self._pending_restore = remaining if remaining["forecasts"] else None
+        return len(applied)
+
+    def _persist_state_file(self) -> None:
+        if not self._state_file or self._controller is None:
+            return
+        try:
+            tmp = self._state_file.with_suffix(self._state_file.suffix + ".tmp")
+            tmp.write_text(json.dumps(self._controller.snapshot()), encoding="utf-8")
+            tmp.replace(self._state_file)  # atomic swap; no half-written file
+        except OSError:
+            pass  # durability is best-effort; never fail a plan on a disk error
 
     def _plan_locked(self, payload: dict) -> dict:
         weights = payload.get("weights") or {}
@@ -162,6 +224,10 @@ class PlannerCore:
                 ctl.capacity_scale.pop(tid, None)
                 ctl._projected.pop(tid, None)
 
+        # Seed restored history before planning, so the very first plan after
+        # a failover already reflects the pre-failover demand history.
+        self._apply_pending()
+
         plans = self._controller.plan(states, demands, interference=interference)
         return {
             "solver": SOLVER_NAME,
@@ -193,17 +259,27 @@ def make_handler(core: PlannerCore):
         def do_GET(self):
             if self.path == "/healthz":
                 self._send(200, b"ok", "text/plain")
+            elif self.path == "/v1/state":
+                # Export the forecast snapshot for hand-off/backup.
+                body = json.dumps(core.snapshot()).encode()
+                self._send(200, body, "application/json")
             else:
                 self._send(404, b"not found", "text/plain")
 
         def do_POST(self):
-            if self.path != "/v1/plan":
+            if self.path == "/v1/plan":
+                self._handle(core.plan)
+            elif self.path == "/v1/state":
+                # Import a snapshot into a replacement replica.
+                self._handle(lambda p: {"restored_tenants": core.restore(p)})
+            else:
                 self._send(404, b"not found", "text/plain")
-                return
+
+        def _handle(self, fn):
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 payload = json.loads(self.rfile.read(length) or b"{}")
-                response = core.plan(payload)
+                response = fn(payload)
             except (ValueError, KeyError, TypeError) as err:
                 body = json.dumps({"error": str(err)}).encode()
                 self._send(400, body, "application/json")
@@ -228,10 +304,16 @@ def main() -> None:
                     help="demand forecaster (holt is the evidence-based "
                          "recommendation; seasonal_mr adds the multi-resolution "
                          "layer that can see daily cycles live)")
+    ap.add_argument("--state-file", default=None,
+                    help="optional path for durable forecast state; loaded on "
+                         "boot and atomically rewritten after each plan, so a "
+                         "restart or a PVC-backed replacement pod resumes "
+                         "demand history instead of cold-starting")
     args = ap.parse_args()
     core = PlannerCore(
         default_weights={"alpha": args.alpha, "beta": args.beta, "gamma": args.gamma},
         forecast_method=args.forecast,
+        state_file=args.state_file,
     )
     server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(core))
     print(f"jcac planner ({SOLVER_NAME}) listening on :{args.port}")

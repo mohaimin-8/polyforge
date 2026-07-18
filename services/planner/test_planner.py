@@ -97,6 +97,17 @@ class PlannerHTTPTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("acme", body["plans"])
 
+    def test_state_export_import_round_trip(self):
+        # Warm one tenant, export the snapshot, import into a fresh core via HTTP.
+        self._post("/v1/plan", {"tenants": [tenant("acme")]})
+        import urllib.request
+        with urllib.request.urlopen(f"http://127.0.0.1:{self.port}/v1/state", timeout=5) as r:
+            snap = json.loads(r.read())
+        self.assertIn("acme", snap.get("forecasts", {}))
+        status, body = self._post("/v1/state", snap)
+        self.assertEqual(status, 200)
+        self.assertIn("restored_tenants", body)
+
     def test_bad_request_is_400_not_500(self):
         req = urllib.request.Request(
             f"http://127.0.0.1:{self.port}/v1/plan",
@@ -187,6 +198,65 @@ class ForecastMethodPlumbingTests(unittest.TestCase):
         out = core.plan({"tenants": [tenant("a")]})
         self.assertIn("a", out["plans"])
         self.assertEqual(core._controller.forecasts["a"].method, "seasonal_mr")
+
+
+class PlannerFailoverTests(unittest.TestCase):
+    """W31 failover: a replacement PlannerCore must resume forecast history
+    from a snapshot, whether pushed via restore() or loaded from a state
+    file, and the very first plan after failover must reflect it."""
+
+    def _warm(self, core, tid="a", n=6):
+        surge = tenant(tid, demand={"rps": {"crud_read": 300.0}, "crud_base_ms": 50.0})
+        for _ in range(n):
+            core.plan({"tenants": [surge]})
+        return core
+
+    def test_snapshot_restore_round_trip(self):
+        warm = self._warm(PlannerCore())
+        snap = warm.snapshot()
+        self.assertIn("a", snap["forecasts"])
+
+        cold = PlannerCore()
+        applied = cold.restore(snap)  # no controller yet -> buffered
+        self.assertEqual(applied, 0)
+        out = cold.plan({"tenants": [tenant("a")]})  # buffer applied on build
+        self.assertIn("a", out["plans"])
+        self.assertEqual(len(cold._controller.forecasts["a"].history),
+                         len(warm._controller.forecasts["a"].history))
+
+    def test_restore_applies_immediately_when_tenant_known(self):
+        warm = self._warm(PlannerCore())
+        snap = warm.snapshot()
+        cold = PlannerCore()
+        cold.plan({"tenants": [tenant("a")]})  # controller exists, 1 obs
+        applied = cold.restore(snap)
+        self.assertEqual(applied, 1)
+        self.assertEqual(len(cold._controller.forecasts["a"].history),
+                         len(warm._controller.forecasts["a"].history))
+
+    def test_state_file_survives_restart(self):
+        import tempfile, os
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, "state.json")
+        core = PlannerCore(state_file=path)
+        self._warm(core)
+        self.assertTrue(os.path.exists(path))
+
+        # A brand-new process (same PVC) loads the file and resumes history.
+        replacement = PlannerCore(state_file=path)
+        out = replacement.plan({"tenants": [tenant("a")]})
+        self.assertIn("a", out["plans"])
+        self.assertGreater(len(replacement._controller.forecasts["a"].history), 1)
+
+    def test_corrupt_state_file_does_not_crash_boot(self):
+        import tempfile, os
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, "state.json")
+        with open(path, "w") as f:
+            f.write("{ this is not json")
+        core = PlannerCore(state_file=path)  # must not raise
+        out = core.plan({"tenants": [tenant("a")]})
+        self.assertIn("a", out["plans"])
 
 
 if __name__ == "__main__":

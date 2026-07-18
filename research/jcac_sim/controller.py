@@ -113,6 +113,39 @@ class Forecast:
     COARSE_AGG = 60  # observations per coarse bucket (10 min at 10 s)
     COARSE_KEEP = 432  # coarse buckets kept (3 days at 10 min)
 
+    def snapshot(self) -> dict:
+        """JSON-serializable forecast state for planner failover (W31).
+
+        Captures everything horizon() reads — the fine window, the coarse
+        buckets, and the forming bucket — so a replacement replica resumes
+        the demand history instead of cold-starting (a seasonal method needs
+        minutes of observations to re-warm; seasonal_mr's coarse buckets are
+        worth days)."""
+        return {
+            "method": self.method,
+            "window": self.window,
+            "history": [{"rps": dict(d.rps), "crud_base_ms": d.crud_base_ms}
+                        for d in self.history],
+            "coarse": [dict(c) for c in self.coarse],
+            "accum": dict(self._accum),
+            "accum_n": self._accum_n,
+        }
+
+    @classmethod
+    def from_snapshot(cls, data: dict) -> "Forecast":
+        f = cls(method=str(data.get("method", "trend")),
+                window=int(data.get("window", 3)))
+        f.history = [
+            Demand(rps={str(k): float(v) for k, v in entry.get("rps", {}).items()},
+                   crud_base_ms=float(entry.get("crud_base_ms", 50.0)))
+            for entry in data.get("history", [])
+        ]
+        f.coarse = [{str(k): float(v) for k, v in bucket.items()}
+                    for bucket in data.get("coarse", [])]
+        f._accum = {str(k): float(v) for k, v in data.get("accum", {}).items()}
+        f._accum_n = int(data.get("accum_n", 0))
+        return f
+
     def observe(self, demand: Demand) -> None:
         self.history.append(demand)
         keep = max(self._KEEP.get(self.method, 3), self.window)
@@ -277,6 +310,29 @@ class JCACController:
         self.anchor_moves = anchor_moves
         self.capacity_scale = {tid: 1.0 for tid in configs}
         self._projected: dict[str, float] = {}
+
+    def snapshot(self) -> dict:
+        """Serializable planner state for failover (W31): per-tenant forecast
+        history and learned capacity corrections. Weights/limits are the
+        operator's to supply on the next request, so they are deliberately
+        not part of the snapshot — only the state that cannot be
+        reconstructed from a single request."""
+        return {
+            "forecasts": {tid: f.snapshot() for tid, f in self.forecasts.items()},
+            "capacity_scale": dict(self.capacity_scale),
+        }
+
+    def restore(self, data: dict) -> None:
+        """Load a snapshot into the tenants this controller already knows.
+        Tenants absent from the current config are ignored (they may have
+        departed); tenants present but absent from the snapshot keep their
+        fresh state (they are new)."""
+        for tid, fsnap in (data.get("forecasts") or {}).items():
+            if tid in self.forecasts:
+                self.forecasts[tid] = Forecast.from_snapshot(fsnap)
+        for tid, scale in (data.get("capacity_scale") or {}).items():
+            if tid in self.capacity_scale:
+                self.capacity_scale[tid] = float(scale)
 
     def observe_feedback(self, realized_violation: dict[str, float]) -> None:
         """Self-calibration hook the replay engine calls with what each
