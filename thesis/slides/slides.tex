@@ -47,7 +47,7 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
     dominates tuned per-layer baselines.
   \end{quote}
   \vfill
-  Tested under \textbf{7 pre-registered protocols} (pushed before runs),
+  Tested under \textbf{13 pre-registered protocols} (pushed before runs),
   \textbf{tuned} baselines, paired seeds, effect sizes with bootstrap CIs
   --- and \textbf{published nulls}.
 \end{frame}
@@ -71,7 +71,7 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
 
 \begin{frame}{Methodology: the part built to be attacked}
   \begin{itemize}
-    \item 7 pre-registrations committed \textbf{and pushed before any run};
+    \item 13 pre-registrations committed \textbf{and pushed before any run};
           closed campaigns immutable; stopping rules enforced.
     \item Baselines (HPA, KEDA, FIRM, GPTCache-LRU, static, VTC-replica,
           iso-cost) \textbf{grid-tuned on our own objective}.
@@ -79,7 +79,7 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
           p-values appear once, as prereg gates.
     \item Substrates never mixed; samples never pooled; p95 not p99
           (documented).
-    \item \textbf{Honest-nulls ledger}: 7 published negatives.
+    \item \textbf{Honest-nulls ledger}: 8 published negatives.
   \end{itemize}
 \end{frame}
 
@@ -173,6 +173,7 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
               alone.
         \item Per-tenant partitioning $\to$ chance (0.50) at 24\% latency
               cost, 76\% hits kept --- dominates padding \& TTL jitter.
+              \alert{Confirmed over the wire} (real gateway, AUC 0.502).
       \end{itemize}
     \end{column}
   \end{columns}
@@ -201,10 +202,11 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
           vs.\ assumed 1.0; GPU tier bench confirms ordering (1:1.5:16.6).
     \item \textbf{Real data carries the claims}: BurstGPT $+$ Azure demand,
           LMSYS prompts.
-    \item \textbf{Live check is ordinal-only}: HPA arm verified on a real
-          kind cluster; JCAC arm fully wired, gated by an executable
-          actuation check; analysis protocol $+$ figure caption frozen
-          \emph{before} any live number exists.
+    \item \textbf{Live check executed, ordinal-only}: both arms ran on a
+          real kind cluster (12/12 valid); the pre-frozen protocol recorded a
+          \alert{DISAGREE} --- live \emph{parity} where the sim separates the
+          arms (cache/tier knobs inert live by construction). Published as
+          measured; no claim rested on live-ranking transfer.
   \end{itemize}
   \vfill
   Not claimed: absolute dollars/latency on production fleets; token-level
@@ -221,7 +223,8 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
           confirmed; two failures published.
     \item Real-data cache results \emph{with a quality denominator}.
     \item Fairness wins at stated altitude; own term nulled in public.
-    \item Cache side-channel attack $+$ dominant defense frontier.
+    \item Cache side-channel attack $+$ dominant defense frontier,
+          confirmed over the wire.
     \item Two construction-level solver guarantees.
     \item A pre-registered, null-publishing systems methodology --- in git,
           diffable.
@@ -229,13 +232,16 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
 \end{frame}
 
 \begin{frame}{What remains, and closing}
-  \textbf{Remaining measurement (one Docker sitting):} the live JCAC ordinal
-  slice --- protocol, caption, and honesty gate already frozen; reported
-  ordinal-only whichever way it lands.
+  \textbf{Done since the proposal:} the live JCAC ordinal slice ran
+  (12/12, DISAGREE published); tier-price and empirical-cache-curve reruns
+  (both PASS 5/5); sim chaos (a dead planner still beats a healthy HPA);
+  planner cells to \textbf{1024 tenants}; the isolation attack executed
+  over the wire.
   \vfill
-  \textbf{Future work:} token-level demand signals (llm-d/AIBrix
-  substrate), p99 live restatement, planner scaling past 128 tenants,
-  pre-registered adoption of the empirical cache curve.
+  \textbf{Remaining (user-gated, GPU host):} the \alert{three-knob live
+  plane} --- the joint controller with cache \emph{and} tier as live levers,
+  not just replicas (pre-registered as the Wave 4 live plane); plus live
+  chaos and a live p99 number.
   \vfill
   \begin{quote}
     The strongest sentence in this thesis is not a percentage --- it is
