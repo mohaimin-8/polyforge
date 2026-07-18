@@ -108,5 +108,68 @@ class PlannerHTTPTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 400)
 
 
+class PlannerLifecycleTests(unittest.TestCase):
+    """W31 hardening: tenant churn and weight retunes must not cost the
+    fleet its forecast history, and concurrent callers must serialize."""
+
+    def _cycle(self, core, tenants, n=3):
+        out = None
+        for _ in range(n):
+            out = core.plan({"tenants": tenants})
+        return out
+
+    def test_tenant_arrival_preserves_survivor_forecasts(self):
+        core = PlannerCore()
+        self._cycle(core, [tenant("a"), tenant("b")])
+        history_a = list(core._controller.forecasts["a"].history)
+        self.assertGreaterEqual(len(history_a), 2)
+        out = core.plan({"tenants": [tenant("a"), tenant("b"), tenant("c")]})
+        self.assertIn("c", out["plans"])
+        # Survivor history grew by exactly the new observation — not reset.
+        self.assertEqual(len(core._controller.forecasts["a"].history),
+                         min(len(history_a) + 1, 3))
+        self.assertIn("c", core._controller.forecasts)
+
+    def test_tenant_departure_drops_state_keeps_survivors(self):
+        core = PlannerCore()
+        self._cycle(core, [tenant("a"), tenant("b")])
+        core.plan({"tenants": [tenant("a")]})
+        self.assertNotIn("b", core._controller.forecasts)
+        self.assertNotIn("b", core._controller.capacity_scale)
+        self.assertGreaterEqual(len(core._controller.forecasts["a"].history), 2)
+
+    def test_weight_retune_rebuilds_optimizer_not_observations(self):
+        core = PlannerCore()
+        self._cycle(core, [tenant("a")])
+        forecast_a = core._controller.forecasts["a"]
+        first = core._controller
+        core.plan({"tenants": [tenant("a")],
+                   "weights": {"alpha": 1, "beta": 2, "gamma": 1.5}})
+        self.assertIsNot(core._controller, first)  # optimizer rebuilt
+        self.assertIs(core._controller.forecasts["a"], forecast_a)  # history kept
+
+    def test_concurrent_plans_serialize_without_corruption(self):
+        core = PlannerCore()
+        errors = []
+
+        fleet = [tenant("a"), tenant("b"), tenant("c")]
+
+        def hammer():
+            try:
+                for _ in range(10):
+                    core.plan({"tenants": fleet})
+            except Exception as err:  # noqa: BLE001
+                errors.append(err)
+
+        threads = [threading.Thread(target=hammer) for _ in range(3)]
+        for th in threads:
+            th.start()
+        for th in threads:
+            th.join()
+        self.assertEqual(errors, [])
+        # All three tenants ended with live forecast state.
+        self.assertEqual(set(core._controller.forecasts), {"a", "b", "c"})
+
+
 if __name__ == "__main__":
     unittest.main()

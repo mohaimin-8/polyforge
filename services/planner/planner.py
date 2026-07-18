@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -43,7 +44,7 @@ from pathlib import Path
 # offline and online planner are provably the same code.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "research" / "jcac_sim"))
 
-from controller import ClusterLimits, JCACController, Weights  # noqa: E402
+from controller import ClusterLimits, Forecast, JCACController, Weights  # noqa: E402
 from model import TIERS, Demand, TenantConfig, TenantState  # noqa: E402
 
 SOLVER_NAME = "jcac-lattice-v1"
@@ -62,8 +63,17 @@ class PlannerCore:
         self._signature: tuple | None = None
         self._defaults = {"alpha": 1.0, "beta": 2.0, "gamma": 0.5}
         self._defaults.update(default_weights or {})
+        # ThreadingHTTPServer serves each request on its own thread; the
+        # controller and its forecast state are shared and not re-entrant.
+        # One operator calling every 10 s never contends, but a second
+        # caller must serialize rather than corrupt forecast history.
+        self._lock = threading.Lock()
 
     def plan(self, payload: dict) -> dict:
+        with self._lock:
+            return self._plan_locked(payload)
+
+    def _plan_locked(self, payload: dict) -> dict:
         weights = payload.get("weights") or {}
         limits = payload.get("limits") or {}
         tenants = payload.get("tenants")
@@ -99,23 +109,52 @@ class PlannerCore:
             )
             interference[tid] = float(entry.get("interference", 0.0))
 
+        # Weights/limits only: the tenant *set* is deliberately not part of
+        # the rebuild signature. Multi-tenant platforms churn tenants, and a
+        # rebuild costs every tenant its forecast history (the seasonal
+        # forecaster needs minutes of observations to re-warm) — one tenant
+        # arriving must never cold-start the fleet's demand forecasts.
         signature = (
             float(weights.get("alpha", self._defaults["alpha"])),
             float(weights.get("beta", self._defaults["beta"])),
             float(weights.get("gamma", self._defaults["gamma"])),
             int(limits.get("cache_mb", 4096)),
             int(limits.get("replicas", 60)),
-            tuple(sorted(configs)),
         )
         if self._controller is None or signature != self._signature:
+            old = self._controller
             self._controller = JCACController(
                 configs,
                 weights=Weights(alpha=signature[0], beta=signature[1], gamma=signature[2]),
                 limits=ClusterLimits(cache_mb=signature[3], replicas=signature[4]),
             )
             self._signature = signature
+            if old is not None:
+                # A weights/limits retune rebuilds the optimizer, not the
+                # observations: surviving tenants keep their demand history
+                # and learned capacity corrections.
+                for tid, forecast in old.forecasts.items():
+                    if tid in self._controller.forecasts:
+                        self._controller.forecasts[tid] = forecast
+                for tid, scale in old.capacity_scale.items():
+                    if tid in self._controller.capacity_scale:
+                        self._controller.capacity_scale[tid] = scale
         else:
-            self._controller.configs = configs  # budgets/SLO may be retuned live
+            ctl = self._controller
+            ctl.configs = configs  # budgets/SLO may be retuned live
+            # Tenant churn reconciliation: arrivals get a fresh forecaster
+            # (matching the fleet's method), departures are dropped,
+            # survivors keep their history untouched.
+            method = (next(iter(ctl.forecasts.values())).method
+                      if ctl.forecasts else "trend")
+            for tid in configs:
+                if tid not in ctl.forecasts:
+                    ctl.forecasts[tid] = Forecast(method=method)
+                    ctl.capacity_scale[tid] = 1.0
+            for tid in [t for t in ctl.forecasts if t not in configs]:
+                del ctl.forecasts[tid]
+                ctl.capacity_scale.pop(tid, None)
+                ctl._projected.pop(tid, None)
 
         plans = self._controller.plan(states, demands, interference=interference)
         return {
