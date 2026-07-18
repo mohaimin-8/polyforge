@@ -1,0 +1,99 @@
+# Shared Postgres for the eval data plane (namespace polyforge).
+#
+# WHY: the eval chart otherwise stores telemetry in a per-pod SQLite file on an
+# emptyDir. When the operator scales polyforge-control-plane to N replicas, the
+# run's telemetry splits across N separate per-pod stores, and `eval-export`
+# (which execs a SINGLE pod) reads only that pod's slice -> crud/ai p95+p99
+# computed on an unrepresentative (often ~empty) sample -> 0. A shared Postgres
+# means every replica writes one store and eval-export (any pod) sees every
+# event. Roles mirror .github/workflows/ci.yml exactly (Open() verifies them).
+#
+# Applied by eval/harness/cluster_backend.command_plan ONLY when
+# POLYFORGE_EVAL_SHARED_PG=1; the default SQLite path is unchanged.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: polyforge
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: polyforge
+data:
+  # Runs once, as the postgres superuser against POSTGRES_DB, during initdb.
+  init.sql: |
+    CREATE ROLE polyforge_admin LOGIN BYPASSRLS;
+    CREATE ROLE polyforge_app LOGIN NOBYPASSRLS;
+    ALTER DATABASE polyforge OWNER TO polyforge_admin;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: polyforge
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          # max_connections lifted well above the default 100: N control-plane
+          # replicas each open an admin + app pgxpool, which at default pool
+          # sizing can exceed 100 and CrashLoop the deployment.
+          args: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=256MB"]
+          env:
+            - name: POSTGRES_DB
+              value: polyforge
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: trust
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            # TCP (-h 127.0.0.1), NOT the unix socket: during initdb the entry
+            # point runs a socket-only temp server, so a socket check would pass
+            # before the init.sql roles exist. TCP is up only after init completes.
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-p", "5432", "-d", "polyforge"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+      volumes:
+        - name: initdb
+          configMap:
+            name: postgres-init
+        - name: pgdata
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: polyforge
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

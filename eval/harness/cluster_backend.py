@@ -58,6 +58,16 @@ OPERATOR_SYSTEMS = {"jcac"}
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADMIN_SECRET_NAME = "polyforge-admin"  # carries ADMIN_KEY for the operator
 
+# Opt-in shared-Postgres eval data plane. The default SQLite path stores
+# telemetry per-pod (emptyDir); under replica scaling a single-pod eval-export
+# then reads an unrepresentative slice (p95/p99 -> 0). With POLYFORGE_EVAL_SHARED_PG=1
+# every control-plane replica writes one Postgres and eval-export sees all
+# events. Default off so the SQLite path and the harness tests are unchanged.
+EVAL_SHARED_PG = os.environ.get("POLYFORGE_EVAL_SHARED_PG") == "1"
+PG_MANIFEST = REPO_ROOT / "eval" / "harness" / "manifests" / "postgres-eval.yaml"
+PG_ADMIN_URL = "postgres://polyforge_admin@postgres:5432/polyforge?sslmode=disable"
+PG_APP_URL = "postgres://polyforge_app@postgres:5432/polyforge?sslmode=disable"
+
 # Ablation/baseline toggles per system. Live-wired today: the hpa row
 # (autoscaling.hpa.* is a real HPA) and the jcac row (via OPERATOR_SYSTEMS
 # -> operator chart install; the polyforge-chart planner.*/classifier.*
@@ -286,6 +296,11 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         "autoscaling.hpa.maxReplicas": str(size.limits_replicas),
         **HELM_VALUES_BY_SYSTEM[run.system],
     }
+    if EVAL_SHARED_PG:
+        # URLs go via a values file (-f) to avoid --set '=' escaping; drop the
+        # SQLite-mode empties so they cannot override that file.
+        values.pop("postgres.adminURL", None)
+        values.pop("postgres.appURL", None)
     set_flags = [f"--set={k}={v}" for k, v in sorted(values.items())]
     live_operator = run.system in OPERATOR_SYSTEMS
     plan = [
@@ -311,13 +326,28 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
                '"value":"--kubelet-insecure-tls"}]'],
         ["kubectl", "--namespace", "kube-system", "rollout", "status",
          "deployment/metrics-server", "--timeout=180s"],
+    ]
+    # Shared Postgres (opt-in): stood up BEFORE the chart so the control-plane
+    # connects on startup and every replica writes one telemetry store.
+    if EVAL_SHARED_PG:
+        plan += [
+            ["kubectl", "apply", "-f", str(PG_MANIFEST)],
+            ["kubectl", "--namespace", "polyforge", "rollout", "status",
+             "deployment/postgres", "--timeout=240s"],
+        ]
+    helm_install = [
         # Absolute chart path: the runner's cwd is eval/, and a relative
         # path that does not exist makes helm parse "deploy/..." as a repo
         # reference ("repo deploy not found" — first live smoke, session 16d).
-        ["helm", "install", "polyforge",
-         str(REPO_ROOT / "deploy" / "helm" / "polyforge"),
-         "--namespace", "polyforge", "--create-namespace", "--wait", "--timeout", "300s",
-         *set_flags],
+        "helm", "install", "polyforge",
+        str(REPO_ROOT / "deploy" / "helm" / "polyforge"),
+        "--namespace", "polyforge", "--create-namespace", "--wait", "--timeout", "300s",
+        *set_flags,
+    ]
+    if EVAL_SHARED_PG:
+        helm_install += ["-f", str(workdir / "pg-values.yaml")]
+    plan += [
+        helm_install,
         ["kubectl", "--namespace", "polyforge", "rollout", "status",
          "deployment/polyforge-control-plane", "--timeout=180s"],
     ]
@@ -432,6 +462,11 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
         (workdir / "replay.js").write_text(k6_script(run), encoding="utf-8")
         if run.system in OPERATOR_SYSTEMS:
             (workdir / "operator-crs.yaml").write_text(operator_crs(run), encoding="utf-8")
+        if EVAL_SHARED_PG:
+            (workdir / "pg-values.yaml").write_text(
+                f"postgres:\n  adminURL: {PG_ADMIN_URL}\n  appURL: {PG_APP_URL}\n",
+                encoding="utf-8",
+            )
 
         plan = command_plan(run, workdir)
         portforward = None
