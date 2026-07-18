@@ -1,0 +1,22 @@
+# Makes the JCAC simulator installable as a proper package, so the planner
+# service (and any other consumer) can `import model, controller` after
+# `pip install ./research/jcac_sim` instead of relying on a runtime
+# sys.path injection. The modules stay flat (top-level `model`, `controller`,
+# …) so the simulator's own imports and unit tests — which run with this
+# directory as the working directory — are unchanged; packaging is additive.
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "polyforge-jcac-sim"
+version = "0.1.0"
+description = "PolyForge JCAC system model, controller, baselines, and replay engine (shared by the offline simulator and the online planner service)."
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.setuptools]
+# Flat modules, not a package tree: the offline simulator runs them with
+# jcac_sim as the working directory (`import model`), and this exposes the
+# same names on the path for the installed case.
+py-modules = ["model", "controller", "baselines", "simulate"]

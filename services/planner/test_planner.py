@@ -259,5 +259,40 @@ class PlannerFailoverTests(unittest.TestCase):
         self.assertIn("a", out["plans"])
 
 
+class PublishedPhysicsTests(unittest.TestCase):
+    """4.3: the live planner must always plan against published physics,
+    even if a sensitivity override was left in a module global by other
+    code sharing the process."""
+
+    def tearDown(self):
+        import model
+        model.set_economy()
+        model.set_model_form()
+
+    def test_planner_core_pins_published_physics_on_construction(self):
+        import model
+        # Simulate contamination: another consumer left an override active.
+        model.set_economy(cache_hit_max=0.285, cache_half_mb=19.0)
+        model.set_model_form(mixture_p95=True, congestion_exponent=0.86)
+        self.assertEqual(model.CACHE_HIT_MAX, 0.285)
+
+        PlannerCore()  # construction must reset the globals
+        self.assertEqual(model.CACHE_HIT_MAX, 0.85)   # published default
+        self.assertEqual(model.CACHE_HALF_MB, 256.0)
+        self.assertFalse(model.MIXTURE_P95)
+        self.assertEqual(model.CONGESTION_EXPONENT, 1.0)
+        self.assertIsNone(model.P95_TAIL)
+
+    def test_plan_is_identical_regardless_of_prior_override(self):
+        import model
+        clean = PlannerCore().plan({"tenants": [tenant("a", demand={
+            "rps": {"chat": 4.0}, "crud_base_ms": 50.0})]})
+        # Contaminate, then a fresh core must reproduce the clean plan.
+        model.set_economy(cache_hit_max=0.1)
+        dirty = PlannerCore().plan({"tenants": [tenant("a", demand={
+            "rps": {"chat": 4.0}, "crud_base_ms": 50.0})]})
+        self.assertEqual(clean["plans"], dirty["plans"])
+
+
 if __name__ == "__main__":
     unittest.main()

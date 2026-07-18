@@ -40,14 +40,50 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-# The controller implementation lives with the research simulator so the
-# offline and online planner are provably the same code.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "research" / "jcac_sim"))
+def _ensure_jcac_sim_importable() -> None:
+    """Make the shared simulator importable, robustly.
 
+    The controller/model implementation lives with the research simulator so
+    the offline and online planner are provably the same code (ADR 0014). We
+    prefer a normal import (works when jcac_sim is installed as a package —
+    see research/jcac_sim/pyproject.toml — or already on PYTHONPATH), and
+    fall back to the repo-relative path only if that fails, raising a clear
+    error rather than a bare ImportError if the layout is missing. This
+    replaces an unconditional sys.path.insert with an explicit, testable
+    bootstrap that fails loudly instead of silently importing the wrong
+    thing."""
+    try:
+        import model  # noqa: F401
+        import controller  # noqa: F401
+        return
+    except ImportError:
+        pass
+    sim_dir = Path(__file__).resolve().parents[2] / "research" / "jcac_sim"
+    if not (sim_dir / "model.py").exists():
+        raise ImportError(
+            f"jcac_sim not importable and not found at {sim_dir}; install it "
+            "(pip install ./research/jcac_sim) or run with the repo layout intact"
+        )
+    sys.path.insert(0, str(sim_dir))
+
+
+_ensure_jcac_sim_importable()
+
+import model  # noqa: E402
 from controller import ClusterLimits, Forecast, JCACController, Weights  # noqa: E402
 from model import TIERS, Demand, TenantConfig, TenantState  # noqa: E402
 
 SOLVER_NAME = "jcac-lattice-v1"
+
+
+def pin_published_physics() -> None:
+    """Reset the simulator's mutable economy/form globals to the published
+    defaults. The live planner must ALWAYS plan against real physics; the
+    set_economy/set_model_form globals exist only for the offline
+    sensitivity reruns and must never leak into a serving planner. Calling
+    this makes the invariant explicit and enforced rather than assumed."""
+    model.set_economy()
+    model.set_model_form()
 
 
 class PlannerCore:
@@ -61,6 +97,10 @@ class PlannerCore:
     def __init__(self, default_weights: dict | None = None,
                  forecast_method: str = "trend",
                  state_file: str | None = None) -> None:
+        # The live planner always runs the published physics; a stray
+        # sensitivity override in a module global would silently corrupt
+        # every plan, so pin it explicitly at construction.
+        pin_published_physics()
         self._controller: JCACController | None = None
         self._signature: tuple | None = None
         self._defaults = {"alpha": 1.0, "beta": 2.0, "gamma": 0.5}
