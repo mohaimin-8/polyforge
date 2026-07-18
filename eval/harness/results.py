@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS metrics (
     cache_hit_rate       DOUBLE NOT NULL,
     crud_p95_ms          DOUBLE NOT NULL,
     ai_p95_ms            DOUBLE NOT NULL,
+    crud_p99_ms          DOUBLE,
+    ai_p99_ms            DOUBLE,
     steps                INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS timeseries (
@@ -83,6 +85,10 @@ def connect(path: str | Path) -> duckdb.DuckDBPyConnection:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(path))
     con.execute(_SCHEMA)
+    # p99 is a live-only column added in Wave 3 (PREREG_LIVE_CHAOS_P99.md);
+    # migrate older dbs in place so a fresh schema and an existing one agree.
+    con.execute("ALTER TABLE metrics ADD COLUMN IF NOT EXISTS crud_p99_ms DOUBLE")
+    con.execute("ALTER TABLE metrics ADD COLUMN IF NOT EXISTS ai_p99_ms DOUBLE")
     return con
 
 
@@ -129,9 +135,16 @@ def record(con: duckdb.DuckDBPyConnection, run: RunSpec, status: str, attempts: 
         con.execute("DELETE FROM metrics WHERE run_id = ?", [run.run_id])
         con.execute("DELETE FROM timeseries WHERE run_id = ?", [run.run_id])
         if status == "valid" and metrics:
+            # p99 is live-only (cluster backend); sim runs leave it NULL. Named
+            # columns so the nullable p99 pair rides beside the required p95 set.
             con.execute(
-                "INSERT INTO metrics VALUES (?,?,?,?,?,?,?,?,?)",
-                [run.run_id] + [metrics[c] for c in METRIC_COLUMNS] + [metrics["steps"]],
+                "INSERT INTO metrics "
+                "(run_id, total_cost_usd, mean_violation, violation_step_share, "
+                "mean_jain, cache_hit_rate, crud_p95_ms, ai_p95_ms, "
+                "crud_p99_ms, ai_p99_ms, steps) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                [run.run_id] + [metrics[c] for c in METRIC_COLUMNS]
+                + [metrics.get("crud_p99_ms"), metrics.get("ai_p99_ms"), metrics["steps"]],
             )
             rows = outcome.get("timeseries") or []
             if rows:

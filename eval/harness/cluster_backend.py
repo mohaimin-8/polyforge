@@ -500,6 +500,10 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
             "cache_hit_rate": export["cache_hit_rate"],
             "crud_p95_ms": export["crud_p95_ms"],
             "ai_p95_ms": export["ai_p95_ms"],
+            # p99 is a live-only order statistic (evalexport.go); surfaced here
+            # so it persists through the harness (PREREG_LIVE_CHAOS_P99.md Part B).
+            "crud_p99_ms": export.get("crud_p99_ms"),
+            "ai_p99_ms": export.get("ai_p99_ms"),
             "steps": run.steps,
         },
         "timeseries": export.get("timeseries", []),
