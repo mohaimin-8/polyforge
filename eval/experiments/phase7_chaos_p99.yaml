@@ -1,0 +1,18 @@
+# Live chaos + p99 (PREREG_LIVE_CHAOS_P99.md), executed session 23.
+# One jcac run on the crud_bursty cell (validated live in session 19). Faults
+# are injected mid-run by scripts/chaos_inject.sh at the frozen offsets:
+# planner crash at T=8min (maps to the sim's chaos_planner_outage, CH-H1/H2),
+# apiserver throttle at T=14min (best-effort APF, logged if it cannot apply).
+# p99 rides through the harness via the Wave 3 metrics plumbing.
+# 135 steps x 10s = 22.5 min load window.
+name: phase7_chaos_p99
+backend: cluster
+steps: 135
+reps: 1
+systems: [jcac]
+workloads: [crud_bursty]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/phase7_chaos_p99.duckdb
+retries: 0
+timeseries_reps: 1
