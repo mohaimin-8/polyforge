@@ -7,6 +7,93 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-19 (session 24) — Wave 5: the structural-form program, and the audit that caught the controller breaking its own clamps
+
+Milestone status: **the sensitivity program's blind spot is closed.** User
+directive: solve every advanced-engineering weakness from the session-24 audit,
+override the small-slice scoping. Six findings went in; four pre-registered
+full-matrix campaigns (5,400 confirmatory runs + 1,800 adjudication runs), one
+solver audit, and three live-path engineering closures came out. Every
+hypothesis passed; one real defect was found, disclosed, and adjudicated.
+
+### The structural-form campaigns (PREREG at 7519958, pushed pre-run)
+
+The Wave 2 reruns varied the economy's *parameters*; these vary its *forms*,
+via `model.set_model_form()` + a `model_form` experiment channel mirroring the
+economy channel (sim-only, run-id-tagged, reset-first; defaults bit-identical —
+zero-drift spot-checks of v1/HK before running, and of all new DBs after).
+
+- **LM adoption** (`RESULTS_LM_ADOPTION.md`): measured congestion exponent
+  a=0.86 *and* the ρ-rising p95/mean tail (1.6909·(1−ρ)^−0.1303, fitted by
+  `fit_p95_factor.py` from the committed calibration CSV; flat-1.4 scores
+  log-R² −8.0 on the same points). LM-H1/H2 PASS 5/5; LM-H3 violation
+  non-inferiority PASS with jcac still below hpa (−0.0057, UB +0.0025).
+  Closes the "errs against us was only half true" asymmetry with data.
+- **Mixture percentile** (`RESULTS_MIXTURE_P95.md`): ai_p95 as the true
+  hit/miss mixture quantile (lognormal branches, deterministic log-space
+  bisection) instead of mean×1.4. MX-H1/H2 PASS 5/5, MX-H3 PASS; violations
+  rise for everyone, jcac sheds devalued cache (362→329 MB) as declared.
+- **Tier-scaled WU** (`RESULTS_TIER_WU.md`): mid 1.516× / large 16.64×
+  capacity per AI request (measured serving-time ratios; all seven
+  work_units call sites tier-aware so world and beliefs move together).
+  TW-H1/H2 PASS 5/5; gptcache's tier-up posture pays (violation 0.049→0.133).
+
+### The audit and the defect (PREREG_COORD_GAP at fc7e72c, PREREG_MOVE_CLAMP at cfab691)
+
+Coordination-gap audit: two-sweep CD vs the exact joint optimum on full
+product lattices, N=2,3, 120 frozen instances. Scored gap: **zero,
+everywhere**. The 37 out-of-lattice instances were the discovery: the second
+sweep re-anchors the move clamps at its own sweep-1 choice — the published
+jcac could move ±4 replicas / two cache levels per interval where every
+baseline is clamped ±2 / one (the v3 cells' arithmetic assumed the clamp was
+shared; every committed jcac run contains the behavior). Fix:
+`anchor_moves=True` (default off; property-tested both ways). Adjudication:
+MC-H1/H2 PASS 5/5 each, MC-H3 PASS — the clamp-fixed controller is
+*marginally better* (J −27.9% vs hpa against v1's −27.5%): the advantage
+carried nothing, and per the frozen outcome rule the anchored numbers are now
+the quotable ones. Anchored audit rerun: 0 illegal moves, CD = exact optimum
+**120/120**.
+
+### Live-path engineering (no committed number touched)
+
+- Planner service: tenant churn no longer cold-starts fleet forecasts
+  (reconciliation, not rebuild); weights retunes transplant history; a lock
+  serializes ThreadingHTTPServer callers; `--forecast` selects the
+  forecaster (the service was hard-wired to trend — the live artifact
+  could not exploit the thesis's own forecasting result).
+- `seasonal_mr`: multi-resolution forecaster (96-step fine window + 3 days
+  of 10-min coarse buckets, `_best_period` factored out arithmetic-identical)
+  so day-scale periodicity is visible at the 10 s control interval.
+  Unit-validated; `FORECAST_MR.md` scopes it as engineering, not a claim.
+
+### Verification
+
+```
+python -m pytest eval/tests research/jcac_sim services/planner  -> 119 passed
+spot_check full/matrix_hk/matrix_lm/matrix_tierwu/matrix_clamp/matrix_mixp95
+                                                              -> 0.00e+00 drift
+validate_results on all four new matrices                      -> all green
+```
+
+Docs: DEFENSE_QA §24–25, README (feature bullet + two limitations),
+RESULTS_MASTER §13 + two disambiguation rows, OSF_REGISTRATION rows for the
+five new preregs, REMAINING_WORK reconciliation. Exploratory `matrix_structreal`
+(all forms together, declared in PREREG_MIXTURE_P95) left running; its
+descriptive reading is a named Bucket-A item.
+
+### What to be able to explain next
+
+- Why the clamp defect surviving 1,800 adjudication runs *strengthens* the
+  record instead of weakening it (audit-caught, pre-registered adjudication,
+  frozen outcome rule, disclosed lineage).
+- Why LM adopts both measured latency elements together (adopting only the
+  favorable one would repeat §16's one-sidedness in reverse).
+- What "exact" now means for the solver: a measured property at N≤3 on the
+  legal lattice, not a docstring adjective — and what remains unmeasured
+  (order-dependence, N=8 bound).
+
+---
+
 ## 2026-07-16 (session 22) — the over-the-wire cache attack executed on the real gateway (WA-H1 PASS)
 
 Milestone status: **the security half of Wave 3 ran for real.** User granted

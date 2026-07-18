@@ -1,6 +1,6 @@
 # Remaining work — the honest ledger of what is left and who owns it
 
-Last updated 2026-07-17 (session 23). This is the single place that answers
+Last updated 2026-07-19 (session 24). This is the single place that answers
 "what is left and who does it." It reconciles `docs/RELEASE_CHECKLIST.md`
 (human-action items), the deferred live campaigns, and the thesis fill-ins into
 one owner-split view. When it disagrees with a campaign file, the campaign file
@@ -12,9 +12,19 @@ The research is effectively complete and honestly reported. All five contested
 segments are resolved (cost WON, SLO closed-honest, fairness WON, forecasting
 WON, cache CLOSED) plus the security/isolation segment WON and confirmed over
 the wire; the Wave 1–4 leak-fill closed the six examiner-audit gaps; the thesis
-compiles (44-page PDF) and the discussion chapter is now reconciled with Waves
-2–4. What remains is **not new measurement** — it is one gated confirmatory
-experiment, plus submission mechanics and thesis polish.
+compiles (44-page PDF) and the discussion chapter is reconciled with Waves
+2–4. **Session 24 added the Wave 5 structural-form program**: the simulator's
+functional forms (measured latency model, mixture-percentile p95, tier-scaled
+work units) stress-tested by three pre-registered full-matrix reruns — all
+PASS with SLO non-inferiority held; a solver audit that measured the
+coordination gap at zero (120/120) and *caught the published controller
+exceeding its per-interval actuation clamps*, adjudicated by a pre-registered
+clamp-fixed rerun (all PASS, slightly stronger — `anchor_moves` is now the
+quotable controller); plus live-path engineering (churn-safe/thread-safe
+planner, selectable forecasters, multi-resolution `seasonal_mr` for day-scale
+periodicity). DEFENSE_QA #24–25 carry the new record. What remains is **not
+new measurement** — it is one gated confirmatory experiment, plus submission
+mechanics and thesis polish.
 
 The three buckets below are ordered by owner, not by priority. The single
 highest-*value* remaining item is in bucket B: the three-knob live plane, which
@@ -33,6 +43,8 @@ These need no account, host, or payment. They are the natural next agent tasks.
 | Title-page macros | placeholder author/roll/supervisor/date macros on the title page | `thesis/report/main.tex` |
 | Harness prep for the Wave 4 live plane | wire the tier-routing data plane + real cache hit/miss latency gap so the knobs are live levers (buildable before the GPU host exists) | `PREREG_WAVE4_LIVE_PLANE.md` §Substrate 2–3 |
 | Slides ↔ thesis consistency pass | ensure the deck's numbers match the reconciled discussion chapter (−70% not −76%; eight nulls; over-the-wire done) | `thesis/slides/`, `PolyForge_Pre-defence_Presentation.pptx` |
+| Thesis ↔ Wave 5 reconciliation | fold DEFENSE_QA #24–25 into the discussion/limitations chapters: structural-form robustness, the clamp disclosure + anchored-controller quotability, the coordination-gap result | `thesis/report/`, sources in `RESULTS_MASTER.md` §13 |
+| Exploratory all-forms reading | when `matrix_structreal` completes, a descriptive (non-gated) reading for future-work text — declared in `PREREG_MIXTURE_P95.md` | `eval/results/raw_sim_structreal.duckdb` |
 
 ## Bucket B — user-gated live-cluster experiments (agent prepares, user opens the gate)
 

@@ -58,6 +58,7 @@ The current implementation provides a persistent control-plane backend:
 - **real-trace evaluation (BurstGPT v2.0, 10,632,194 real Azure OpenAI/ChatGPT requests):** reproducible fetch+ETL (`research/traces/fetch_burstgpt.py`); forecast ablation on real periodicity — damped Holt −26.9% one-step RMSE vs the trend default, and the synthetic stand-in's seasonal prediction published as *not transferring* (`FORECAST_TRACE_REAL.md`); pre-registered headline replay on real demand shape — first sample (n=16) underpowered but directionally consistent (`RESULTS_TRACE.md`); **powered second sample (n=96) confirmatory: PolyForge beats tuned HPA/KEDA/FIRM on the composite objective at p ≤ 5.5e-05 with cost −70% (p ≤ 4.3e-06), disclosed violation trade +0.07** (`RESULTS_TRACE2.md`)
 - **VTC-replica baseline (OSDI '24 fair-scheduler re-implementation) beaten on its own turf:** tuned least-weighted-service-first pool division loses the joint objective to PolyForge (d_z=−1.12, p=3e-19) *and* is less fair on Jain (0.9599 vs 0.9705, p=1.5e-6) at 55% higher cost with 57% higher worst-tenant p95 — fairness emerges from joint optimization more cheaply than from a fairness-only rule (`VTC_FAIRNESS.md`, pre-registered)
 - **related-work position:** capability + performance matrix vs SageServe (POMACS '25), Chiron, Aladdin, VTC/Equinox/D²LPM, GPTCache/SCALM/InstCache/MeanCache — no surveyed system co-optimizes replicas, semantic cache, and model tier against one multi-tenant objective, and none publishes pre-registered nulls (`docs/RELATED_WORK.md`)
+- **Wave 5 structural-form program (session 24):** the sensitivity axis the economy reruns never touched — the simulator's *functional forms*. Three pre-registered full-matrix reruns (measured latency model, mixture-percentile p95, tier-scaled work units) all PASS with narrowed margins and SLO non-inferiority held; a solver audit measured the coordination gap **zero on 120/120 frozen instances** and en route caught the second CD sweep exceeding the per-interval actuation clamps — adjudicated by a pre-registered clamp-fixed rerun that wins slightly *more* (MC 5/5, 5/5, 2/2), making `anchor_moves` the quotable controller; plus churn-safe/thread-safe planner state, deployment-selectable forecasters, and a multi-resolution seasonal forecaster that lets the *live* planner see daily cycles (`FORECAST_MR.md`, DEFENSE_QA #24–25)
 
 SQLite remains the zero-infrastructure development path. PostgreSQL is the production path and requires separate admin and application roles so row-level security is testable rather than bypassed accidentally.
 
@@ -241,8 +242,25 @@ are the committed artifacts.
   quality under the stated system model (`research/jcac_sim/model.py`),
   driven by real traces where claimed. The congestion form and tier
   ordering are calibrated against real inference servers
-  (`research/calibration/`); the calibration shows the model errs
-  *against* PolyForge's lean postures at high utilization.
+  (`research/calibration/`), and the model's *functional forms* — not
+  just its parameters — were stress-tested by three pre-registered
+  reruns of the full matrix (Wave 5): the measured latency model
+  (a=0.86 + ρ-dependent p95/mean tail), a true mixture-percentile
+  `ai_p95`, and tier-scaled work units. All rankings survived with
+  narrowed margins and the SLO-parity claim held under a frozen
+  non-inferiority margin (`RESULTS_LM_ADOPTION.md`,
+  `RESULTS_MIXTURE_P95.md`, `RESULTS_TIER_WU.md`, DEFENSE_QA #24).
+  Still unvaried: intra-interval demand is deterministic, and p95 is
+  the finest latency statistic the sim reports.
+- **Actuation clamps.** The project's own coordination-gap audit caught
+  the published controller exceeding its declared per-interval move
+  clamps through its second coordination sweep (±4 replicas / two cache
+  levels where every baseline gets ±2 / one). The pre-registered
+  adjudication rerun shows the advantage carried nothing — the
+  clamp-fixed controller (`anchor_moves`) wins slightly *more* and is
+  the quotable configuration; the published matrices remain the
+  bit-reproducible record (`COORD_GAP.md`, `RESULTS_MOVE_CLAMP.md`,
+  DEFENSE_QA #25).
 - **SLO.** Two pre-registered attempts to beat tuned reactive scalers on
   raw violation failed and are published (v2 H1, v3 H1'). The earned
   claim is violation parity at −43…−48% cost, plus the confirmed

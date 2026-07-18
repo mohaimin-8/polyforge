@@ -1,0 +1,24 @@
+# Exploratory arm declared in PREREG_MIXTURE_P95.md: all three Wave 5
+# structural forms together (measured latency model + mixture percentile +
+# tier-scaled work units) — the "structurally realistic" world. Exploratory:
+# its reading informs future-work text, not the headline. The three
+# model_form blocks are copied verbatim from matrix_lm / matrix_mixp95 /
+# matrix_tierwu per the declaration.
+name: matrix_structreal
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, hpa, keda, firm, static, gptcache]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_structreal.duckdb
+retries: 2
+timeseries_reps: 1
+model_form:
+  congestion_exponent: 0.86
+  p95_tail_f0: 1.6909
+  p95_tail_b: 0.1303
+  mixture_p95: 1
+  wu_tier_mid: 1.516
+  wu_tier_large: 16.64

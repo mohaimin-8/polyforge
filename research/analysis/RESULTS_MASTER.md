@@ -7,8 +7,10 @@ The per-campaign files it consolidates (`RESULTS.md`, `RESULTS_V2.md`, `RESULTS_
 `CACHE_PRECISION.md`, `EFFECT_SIZES.md`, `PLANNER_SCALING.md`, `FORECAST_AZURE.md`,
 `PHASE7_ORDINAL.md`, and the Wave 1–2 robustness records `BREAKEVEN_TIER.md`,
 `OBJECTIVE_FORM.md`, `RESULTS_TIER_RATIO.md`, `RESULTS_HK_ADOPTION.md`,
-`RESULTS_CHAOS_SIM.md`, `PSEUDO_TENANT.md`, and the Wave 4 scaling records
-`PLANNER_CELLS.md`, `PLANNER_CELLS_DEALIAS.md`) are
+`RESULTS_CHAOS_SIM.md`, `PSEUDO_TENANT.md`, the Wave 4 scaling records
+`PLANNER_CELLS.md`, `PLANNER_CELLS_DEALIAS.md`, and the Wave 5 structural-form and
+solver-audit records `RESULTS_LM_ADOPTION.md`, `RESULTS_MIXTURE_P95.md`,
+`RESULTS_TIER_WU.md`, `COORD_GAP.md`, `COORD_GAP_ANCHORED.md`, `RESULTS_MOVE_CLAMP.md`) are
 **machine-generated measurement records**: each is written by its analysis script from
 the raw run databases and is immutable once its campaign closes (pre-registration ground
 rules). They stay exactly as they are — this file summarizes and reconciles them but
@@ -241,6 +243,43 @@ chaos *campaign* (fault injection wired into the harness) and a live p99 *number
 export is landed + unit-tested; persisting it through the harness remains). Runbook:
 `docs/WAVE3_LIVE_RUNBOOK.md`.
 
+### 13. Wave 5 — structural-form program + solver audit (session 24)
+
+The sensitivity axis Waves 1–2 never varied: the simulator's *functional forms*. Four
+pre-registered campaigns (protocols pushed at `7519958`/`fc7e72c`/`cfab691` before their
+runs), each a full 1,800-run headline-matrix mirror, all validation-green and
+spot-checked bit-identical:
+
+- **Measured latency model** (a = 0.86 + ρ-dependent p95/mean tail fitted from the
+  committed calibration — the correction that errs *against* lean postures, closing the
+  one-sided half of DEFENSE_QA #16): **LM-H1/H2 PASS 5/5 each, LM-H3 (violation
+  non-inferiority vs tuned hpa/keda, frozen +0.02 margin) PASS** — jcac still violates
+  less than hpa paired (−0.0057). → `RESULTS_LM_ADOPTION.md`
+- **Mixture-percentile p95** (ai_p95 as the true hit/miss mixture quantile instead of
+  mean×1.4 — withdraws the cache's cosmetic tail credit): **MX-H1/H2 PASS 5/5,
+  MX-H3 PASS**; violations rise for everyone (the honest tail), jcac trims cache
+  362 → 329 MB (declared devalued-knob adaptation). → `RESULTS_MIXTURE_P95.md`
+- **Tier-scaled work units** (mid 1.516×, large 16.64× — the measured serving-time
+  ratios; a heavier model can no longer congest the pool for free): **TW-H1/H2 PASS
+  5/5**; jcac's small-heavy posture untouched, gptcache's tier-up posture pays
+  (violation 0.049 → 0.133), exactly the pre-declared mechanism. → `RESULTS_TIER_WU.md`
+- **Solver audit + clamp adjudication:** the coordination gap is **zero on every scored
+  instance** (83/83, then 120/120 anchored) — and the audit *caught the published
+  controller exceeding its per-interval move clamps* via the second CD sweep (±4
+  replicas / two cache levels vs every baseline's ±2 / one; present in every committed
+  jcac run; the v3 cells' arithmetic assumed the clamp was shared). The pre-registered
+  clamp-fixed rerun: **MC-H1/H2 PASS 5/5 each, MC-H3 PASS 2/2**, and the fixed
+  controller is marginally *better* (J −27.9% vs hpa against v1's −27.5%) — the
+  advantage carried nothing, and `anchor_moves=True` is the quotable configuration.
+  → `COORD_GAP.md`, `COORD_GAP_ANCHORED.md`, `RESULTS_MOVE_CLAMP.md`
+
+Engineering landed alongside (live path, no committed number changed): churn-safe +
+thread-safe planner state, deployment-selectable forecasters (`--forecast`), and the
+multi-resolution `seasonal_mr` forecaster that makes day-scale periodicity visible to
+the deployed planner (`FORECAST_MR.md` — engineering validation, explicitly not a
+thesis claim). The exploratory all-forms arm (`matrix_structreal`, declared in
+PREREG_MIXTURE_P95) informs future-work text only.
+
 ---
 
 ## Which number to cite (disambiguation)
@@ -261,6 +300,8 @@ export is landed + unit-tested; persisting it through the harness remains). Runb
 | Live validation | **both arms live-verified end-to-end; ordinal check recorded DISAGREE — live parity at the replica-only projection** (`PHASE7_ORDINAL.md`) | any "sim ranking confirmed live" claim | the frozen protocol's primary reading flips in both cells; live separations (0.002 in J) are within rep spread, and the cache lever behind the sim's `ai_cacheable` separation is inert live by construction |
 | Cost/J win robustness to prices & cache curve | **survives both: TR-H1/H2 PASS 5/5 at the measured GPU price corner (`RESULTS_TIER_RATIO.md`); HK-H1/H2 PASS 5/5 under the measured cache curve (`RESULTS_HK_ADOPTION.md`)** | the published-economy numbers as if they were the only economy | the headline still runs on the published economy for bit-reproducibility; these two pre-registered reruns are the sensitivity evidence, cite them *as* robustness, not as replacements |
 | Fallback under failure | **jcac with a 1-min-dead planner beats a healthy HPA (CH-H1, dz −1.69); a freeze costs jcac *less* than HPA (`RESULTS_CHAOS_SIM.md`)** | any live-chaos claim | the chaos campaign is sim-substrate (controllers blind, engine-injected); the live chaos demonstration is pre-registered and deferred |
+| Robustness to the model's *forms* | **LM/MX/TW all PASS with narrowed margins; SLO non-inferiority held in all three (`RESULTS_LM_ADOPTION.md`, `RESULTS_MIXTURE_P95.md`, `RESULTS_TIER_WU.md`)** | the published-form numbers as if forms were validated wholesale | same rule as the economy reruns: cite these *as* structural robustness; intra-interval determinism and p95-as-finest-statistic remain unvaried |
+| Controller spec & solver quality | **anchored controller: clamps honored, CD = exact joint optimum 120/120 at N≤3, MC 5/5-5/5-2/2 (`RESULTS_MOVE_CLAMP.md`, `COORD_GAP_ANCHORED.md`)** | the published controller's numbers as the quotable config | the published jcac exceeded its own per-interval clamps (audit-caught, disclosed); its matrices stand as the bit-reproducible record, but the anchored numbers are what the thesis quotes |
 | Per-tenant forecasting | **boundary reproduces one level down: 0 counterexamples, 3 distinct winners across 19 sub-streams (`PSEUDO_TENANT.md`)** | "validated on per-tenant SaaS series" | the decomposition is Model×Log-Type of aggregate traces; true per-tenant series remain unavailable (stated) |
 | Planner scale to 1024 | **planning cells: per-cell p95 ~195 ms flat vs 71 s monolithic (PS-H1); fairness preserved under hash assignment, ΔJain −0.0053 (PF-H1)** (`PLANNER_CELLS*.md`) | round-robin's ΔJain −0.089 as the fairness cost | that drop is a whale-period/cell-count aliasing artifact (PS-H2 FAIL, diagnosed); hash-based cell assignment is the measured fix |
 

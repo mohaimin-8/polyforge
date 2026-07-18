@@ -465,3 +465,93 @@ Three parts, and the third is the one that matters.
 **Do not say:** "we solved cache side channels." We characterised them, showed
 the cheap-and-obvious mitigations are the weak ones, and left secure sharing
 as explicit open work.
+
+---
+
+*The two questions below were added 2026-07-19 (session 24), when the Wave 5
+structural-form program ran. They are answered with measurements that did not
+exist when §1–23 were written; §24's campaign table is the direct closure of
+the "only half true" asymmetry conceded in §16.*
+
+## 24. "Your sensitivity program varied the simulator's *parameters* — prices, curves, weights — but never its *functional forms*. The forms are where a model flatters its author."
+
+Correct until session 24, and now measured. Three pre-registered
+structural-form reruns of the full 1,800-run headline matrix (protocols
+pushed at `7519958` before any run; same pairing, alpha, and no-retuning
+rules as the Wave 2 economy reruns):
+
+1. **Measured latency model** (`RESULTS_LM_ADOPTION.md`): the calibration
+   had measured a congestion exponent a = 0.86 *and* a p95/mean tail of
+   1.59–2.41 **rising with ρ** where the sim asserts a flat 1.4 — and only
+   the favorable half of that pair had ever been quoted ("errs against
+   us"). Adopting both together (tail fitted from the committed
+   calibration CSV, `fit_p95_factor.py`): **LM-H1 PASS 5/5** on composite
+   J (margins narrow exactly as a heavier-tailed world implies, −27.5% →
+   −22.9% vs hpa, and nothing flips), **LM-H2 PASS 5/5** on cost, and
+   **LM-H3 PASS** — violation non-inferiority vs tuned hpa/keda under a
+   frozen +0.02 margin, with jcac still violating *less* than hpa
+   (paired diff −0.0057, 99% UB +0.0025 vs bound +0.0155).
+2. **Mixture percentile** (`RESULTS_MIXTURE_P95.md`): the published
+   `ai_p95` is a rescaled *mean* of a bimodal hit/miss mixture — a
+   statistic that credits the cache with tail improvements a true
+   percentile denies (a hit share below 0.95 cannot move a p95). With the
+   true mixture quantile: **MX-H1 PASS 5/5, MX-H2 PASS 5/5, MX-H3
+   PASS 2/2**. The tail-honest world raises every system's violations
+   (jcac 0.086 → 0.114, hpa 0.073 → 0.121 — the percentile refuses the
+   cache's cosmetic tail credit), narrows jcac's J margins (−27.5% →
+   −22.2% vs hpa), trims its cache posture (mean 362 → 329 MB, the
+   declared abandonment-of-a-devalued-knob adaptation) — and jcac still
+   violates *less* than hpa paired (−0.0078, 99% UB +0.0011).
+3. **Tier-scaled work units** (`RESULTS_TIER_WU.md`): the published model
+   let a 16.64×-heavier model congest the pool for free (capacity was
+   tier-blind while latency was tier-coupled). With the measured
+   serving-time ratios as capacity multipliers: **TW-H1/H2 PASS 5/5
+   each**, jcac's small-heavy posture essentially untouched while the
+   reactive tier-up posture pays the capacity price it used to get free
+   (gptcache violation 0.049 → 0.133) — the mechanism expectation
+   declared in the prereg before the run.
+
+The honest summary: the forms were varied, the rankings survived, and
+every direction-of-error is now stated with a measurement attached rather
+than a one-sided sentence.
+
+**Do not say:** "the simulator was validated." Three named forms were
+stress-tested; others (demand is still deterministic within an interval,
+p95 is still the finest latency statistic) remain, and the limitations
+list them.
+
+## 25. "Is your solver actually 'exact'? And did your controller even obey its own actuation clamps?"
+
+The first question was measured, and measuring it caught the second — the
+most instructive sequence in the project.
+
+- **Coordination gap** (`PREREG_COORD_GAP` → `COORD_GAP.md`): the
+  docstring's "solved exactly by enumeration" is per-tenant; cross-tenant
+  coordination is two fixed sweeps of coordinate descent with no bound.
+  On 120 frozen instances at N = 2, 3 the scored gap to the exact
+  joint optimum was **zero on every scored instance** — but 37 instances
+  landed *outside the legal one-move lattice entirely*, and the diagnosis
+  is the real finding: the second sweep re-anchored the move clamps at
+  its own sweep-1 choice, so the published jcac could move **±4 replicas
+  and two cache levels per interval** while every baseline was genuinely
+  clamped at ±2 / one level. The v3 overload cells' arithmetic assumed
+  that clamp was shared. Every committed jcac run contains the behavior.
+- **Adjudication** (`PREREG_MOVE_CLAMP` → `RESULTS_MOVE_CLAMP.md`,
+  pushed before the run with the outcome rule "the anchored numbers
+  become the quotable ones either way"): with moves anchored at the
+  interval start — same clamps as every baseline — **MC-H1 PASS 5/5,
+  MC-H2 PASS 5/5, MC-H3 PASS 2/2**, and the clamp-fixed controller is
+  marginally *better* than the published one (J −27.9% vs hpa against
+  −27.5%; mean violation 0.0682 vs 0.0689). The unfair advantage was
+  carrying nothing; interval-anchored hysteresis helps. The audit rerun
+  under the fixed controller (`COORD_GAP_ANCHORED.md`) closes the loop:
+  the illegal-move class vanishes and coordinate descent matches the
+  exact joint optimum on **120/120** instances, zero gap — "exact" is now
+  a measured property of the deployed solver on the legal lattice at
+  N ≤ 3, with the N-scaling caveat stated.
+
+**Do not say:** "the bug didn't matter so it wasn't a bug." It was a
+spec violation affecting every committed jcac run, found by our own
+audit, adjudicated by a pre-registered rerun whose outcome rule was
+frozen before the result was known — and the fixed controller is the one
+the thesis now quotes.
