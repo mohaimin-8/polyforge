@@ -44,7 +44,7 @@ These need no account, host, or payment. They are the natural next agent tasks.
 | Harness prep for the Wave 4 live plane | wire the tier-routing data plane + real cache hit/miss latency gap so the knobs are live levers (buildable before the GPU host exists) | `PREREG_WAVE4_LIVE_PLANE.md` §Substrate 2–3 |
 | Slides ↔ thesis consistency pass | ensure the deck's numbers match the reconciled discussion chapter (−70% not −76%; eight nulls; over-the-wire done) | `thesis/slides/`, `PolyForge_Pre-defence_Presentation.pptx` |
 | Thesis ↔ Wave 5 reconciliation | fold DEFENSE_QA #24–25 into the discussion/limitations chapters: structural-form robustness, the clamp disclosure + anchored-controller quotability, the coordination-gap result | `thesis/report/`, sources in `RESULTS_MASTER.md` §13 |
-| Exploratory all-forms reading | when `matrix_structreal` completes, a descriptive (non-gated) reading for future-work text — declared in `PREREG_MIXTURE_P95.md` | `eval/results/raw_sim_structreal.duckdb` |
+| B2/B3 formal write-up | the live chaos + p99 data is committed (`live_chaos_p99_runs.csv`); the RESULTS doc against the prereg's frozen readings is unwritten | `PREREG_LIVE_CHAOS_P99.md` |
 
 ## Bucket B — user-gated live-cluster experiments (agent prepares, user opens the gate)
 
@@ -57,8 +57,8 @@ the joint controller.
 | Item | Status | Gate | Spec |
 |---|---|---|---|
 | **B1. Three-knob live plane** (joint controller, all knobs live) | prereg written this session; harness prep is a Bucket-A task | GPU-capable host (paid GPU or GPU Codespace) | `PREREG_WAVE4_LIVE_PLANE.md` |
-| **B2. Live chaos campaign** (planner crash + apiserver throttle) | prereg + runbook ready | Docker host (kind on a Codespace) | `PREREG_LIVE_CHAOS_P99.md`, `docs/WAVE3_LIVE_RUNBOOK.md` §2 |
-| **B3. Live p99 number** | export landed + unit-tested; needs a live run to populate | rides on B2's cluster | `PREREG_LIVE_CHAOS_P99.md` Part B |
+| **B2. Live chaos campaign** (planner crash + apiserver throttle) | **EXECUTED** (session 23, Codespace, shared-PG data plane): both faults injected live under load, run valid, violations 0 through both — data in `eval/results/live_chaos_p99_runs.csv` (commit 7bdbd4f). Remaining: the formal RESULTS write-up against the prereg's frozen readings | done (write-up = Bucket A) | `PREREG_LIVE_CHAOS_P99.md`, `eval/results/live_chaos_p99_runs.csv` |
+| **B3. Live p99 number** | **EXECUTED** (same sitting): first real live p99 — ai 20.043 ms / crud 1.191 ms (ai_cacheable), crud 8.01 ms (crud_bursty) — same CSV; write-up rides with B2's | done (write-up = Bucket A) | `PREREG_LIVE_CHAOS_P99.md` Part B |
 
 Notes: B2/B3 share one Codespace sitting and reuse the proven session-19
 harness. B1 additionally needs the Bucket-A harness prep and real model tiers
