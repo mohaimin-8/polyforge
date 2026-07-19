@@ -43,6 +43,24 @@ planner:
   alpha: 1.0
   beta: 2.0
   gamma: 0.5
+  # Demand forecaster. `holt` is the pre-registered jcac_v2 configuration
+  # (research/analysis/PREREG_V2.md) and the evidence-based recommendation;
+  # before this key existed the chart silently ran the planner's argparse
+  # default (`trend`), which is not the published configuration. Choices:
+  # persistence | trend | holt | seasonal | seasonal_mr (multi-resolution,
+  # can see day-scale cycles live — Wave 5).
+  forecast: holt
+  # Durable forecast state (`--state-file`, Wave 5): the planner atomically
+  # rewrites this file after every plan, so a restart resumes every
+  # tenant's demand history instead of cold-starting it. Always on: with
+  # `persistence.enabled: false` the file lives on an emptyDir, which
+  # survives container crashes/OOM restarts but not pod rescheduling; flip
+  # to a PVC when reschedule survival matters — with `seasonal`/
+  # `seasonal_mr` especially, day-scale history takes a day to rebuild.
+  persistence:
+    enabled: false
+    size: 100Mi
+    storageClass: ""   # "" = the cluster's default StorageClass
   # Cluster-wide capacity ceilings the plan may never exceed. The eval
   # harness overrides these per cluster size so live and sim arms face the
   # same bounds (workloads.CLUSTER_SIZES parity).
@@ -55,6 +73,16 @@ planner:
       memory: 128Mi
     limits:
       memory: 256Mi
+
+# The planner speaks plain unauthenticated HTTP (ADR 0014) and its
+# /v1/state endpoints export/overwrite per-tenant demand history, so its
+# only defense is the network layer. This NetworkPolicy restricts planner
+# ingress to the operator's pods. Inert on CNIs that do not enforce
+# NetworkPolicy (e.g. kind's default kindnet); on enforcing CNIs, anything
+# else that must reach the planner (a debug shell, the eval harness)
+# needs this disabled or its own allow rule.
+networkPolicy:
+  enabled: true
 
 nameOverride: ""
 fullnameOverride: ""

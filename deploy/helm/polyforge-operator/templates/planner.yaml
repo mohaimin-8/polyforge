@@ -1,7 +1,11 @@
 {{- if .Values.planner.enabled }}
-# JCAC planner (W31). Stateless apart from in-memory demand forecasts,
-# which rebuild within 3 control cycles after a restart — hence one
-# replica and no persistence.
+# JCAC planner (W31). Demand forecasts are in-memory but durably
+# snapshotted via --state-file after every plan (Wave 5): a trend-class
+# forecaster rebuilds within ~3 control cycles, but seasonal history
+# takes a day — so the state file, not statelessness, is the failover
+# story. One replica: the state file has a single writer, and the
+# Recreate strategy below keeps it that way across upgrades (and avoids
+# the RWO-attach deadlock a rolling update would hit with the PVC).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -10,6 +14,8 @@ metadata:
   labels: {{- include "polyforge-operator.labels" . | nindent 4 }}
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "polyforge-operator.name" . }}-planner
@@ -22,6 +28,10 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+        # The planner image runs as 65532 (services/planner/Dockerfile);
+        # fsGroup makes the state volume writable for that user under
+        # readOnlyRootFilesystem.
+        fsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -35,6 +45,8 @@ spec:
             - --alpha={{ .Values.planner.alpha }}
             - --beta={{ .Values.planner.beta }}
             - --gamma={{ .Values.planner.gamma }}
+            - --forecast={{ .Values.planner.forecast }}
+            - --state-file=/var/lib/polyforge/planner-state.json
           ports:
             - name: http
               containerPort: {{ .Values.planner.port }}
@@ -44,6 +56,9 @@ spec:
               drop: ["ALL"]
             readOnlyRootFilesystem: true
           resources: {{- toYaml .Values.planner.resources | nindent 12 }}
+          volumeMounts:
+            - name: state
+              mountPath: /var/lib/polyforge
           livenessProbe:
             httpGet:
               path: /healthz
@@ -54,6 +69,34 @@ spec:
               path: /healthz
               port: {{ .Values.planner.port }}
             initialDelaySeconds: 3
+      volumes:
+        - name: state
+          {{- if .Values.planner.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "polyforge-operator.fullname" . }}-planner-state
+          {{- else }}
+          # emptyDir survives container crashes/OOM restarts (the pod
+          # keeps the volume) but not rescheduling; see
+          # planner.persistence in values.yaml.
+          emptyDir: {}
+          {{- end }}
+{{- if .Values.planner.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "polyforge-operator.fullname" . }}-planner-state
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "polyforge-operator.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- if .Values.planner.persistence.storageClass }}
+  storageClassName: {{ .Values.planner.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.planner.persistence.size }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service

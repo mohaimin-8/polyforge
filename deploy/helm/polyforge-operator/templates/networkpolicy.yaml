@@ -1,0 +1,30 @@
+{{- if and .Values.planner.enabled .Values.networkPolicy.enabled }}
+# The planner speaks plain unauthenticated HTTP (ADR 0014): POST /v1/plan
+# drives every tenant's scaling decision, and GET/POST /v1/state
+# export/overwrite per-tenant demand history. Its only defense is the
+# network layer, so restrict ingress to the operator's pods. Kubelet
+# health probes are unaffected on mainstream CNIs (they originate from
+# the node, not a pod). Inert where the CNI does not enforce
+# NetworkPolicy (e.g. kind's default kindnet).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "polyforge-operator.fullname" . }}-planner
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "polyforge-operator.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "polyforge-operator.name" . }}-planner
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ include "polyforge-operator.name" . }}
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.planner.port }}
+{{- end }}
