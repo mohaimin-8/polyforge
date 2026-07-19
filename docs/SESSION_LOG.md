@@ -7,6 +7,96 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-19 (session 26) — chart-drift audit: three gaps between the code's story and the shipped artifact, closed
+
+Milestone status: no thesis claim changed; the deployable artifact caught up
+with three things the code already supported but the Helm chart did not ship.
+User directive: audit for weaknesses, then fix what the audit found. The audit
+first *cleared* the usual suspects — cache isolation is structural
+(`vector.Index` per-tenant maps), RLS has both footguns covered (`FORCE ROW
+LEVEL SECURITY` on every table; `set_config(..., true)` is transaction-local),
+no SQL string-building, no TODO/FIXME debt. The real findings were all
+**artifact drift**: the chart deployed a weaker planner than the one the
+thesis measured.
+
+### Finding 1 — the chart ran the wrong forecaster (values.yaml `planner.forecast`)
+
+The promoted `jcac_v2` configuration pre-registered `forecast_method: "holt"`
+(PREREG_V2.md), and session 24 made the planner's forecaster selectable — but
+the chart passed no `--forecast`, so every install silently ran the argparse
+default `trend`. New `planner.forecast: holt` value, wired into the planner
+args. Not a deliberate deviation: the template predates the Wave 5 selectable-
+forecaster work and was never reconciled.
+
+### Finding 2 — the failover story existed in code but not in the artifact (planner state)
+
+`--state-file` (session 24: atomic tmp-write + rename after every plan,
+corrupt-file-safe boot) was reachable only by hand. The chart now always
+passes `--state-file=/var/lib/polyforge/planner-state.json` on a volume:
+emptyDir by default (survives container/OOM restarts; zero install friction),
+PVC when `planner.persistence.enabled=true` (survives rescheduling — the case
+that matters for `seasonal`/`seasonal_mr`, whose day-scale history does not
+rebuild in 3 control cycles the way the template's old "hence no persistence"
+comment assumed). Supporting changes: `fsGroup: 65532` (the image's UID under
+`readOnlyRootFilesystem`), `strategy: Recreate` (single writer for the state
+file; no RWO-attach deadlock on upgrade), and the stale template comment
+rewritten to tell the true story.
+
+### Finding 3 — the unauthenticated planner API had no shipped network boundary
+
+The planner speaks plain HTTP by design (ADR 0014) and `GET/POST /v1/state`
+export/overwrite per-tenant demand history — but `deploy/k8s/networkpolicies.yaml`
+never covered the operator chart's namespace, so any in-namespace pod could
+read or poison forecast state. New `templates/networkpolicy.yaml`
+(`networkPolicy.enabled: true` default): planner ingress restricted to the
+operator's pods on the planner port. Inert on non-enforcing CNIs (kind's
+kindnet), so smoke installs are unaffected; on enforcing CNIs the eval
+harness would need its own allow rule — documented in values.yaml.
+
+Chart `version` bumped 0.1.0 → 0.2.0; README key-values table and a new
+"Planner forecast state" section updated to match.
+
+### How it was verified
+
+No helm on this machine, so a standalone helm v3.16.4 binary was fetched to
+the session scratchpad:
+
+```text
+helm lint deploy/helm/polyforge-operator            -> 0 failures (icon INFO only)
+helm template (defaults)                            -> --forecast=holt, --state-file,
+                                                       emptyDir, Recreate, fsGroup 65532,
+                                                       NetworkPolicy, no PVC
+helm template --set planner.persistence.enabled=true -> PVC rendered, claimName wired,
+                                                       storageClassName honored
+helm template --set planner.enabled=false           -> no planner, no NetworkPolicy
+python -m pytest services/planner -q                -> 22 passed
+```
+
+The runtime path the chart now enables was exercised live: planner booted
+locally with `--forecast holt --state-file`, one `/v1/plan` call wrote the
+snapshot (holt method, 1-entry history), the process was killed and
+restarted, and after one more plan `/v1/state` showed the restored entry
+*plus* the new one — resume, not cold-start. NetworkPolicy selectors were
+checked against the rendered pod labels (planner pods
+`name=polyforge-operator-planner`, allow-from `name=polyforge-operator`).
+Not verified: NetworkPolicy enforcement itself (needs an enforcing-CNI
+cluster; kind/kindnet cannot test it) and PVC mount/ownership on a real
+cluster — both ride along with the next live sitting.
+
+### Immediate next tasks
+
+1. On the next kind/Codespace sitting: `helm install` the 0.2.0 chart and
+   confirm the planner writes `/var/lib/polyforge/planner-state.json` in-pod
+   (fsGroup + readOnlyRootFilesystem interaction is the one thing only a real
+   kubelet proves).
+2. The audit's remaining unfixed observation, for the ledger: planner API
+   authentication (mTLS via the optional Linkerd mesh, or a bearer token)
+   stays open by design — ADR 0014's plain-HTTP choice now has a shipped
+   network boundary but still no identity. Worth an ADR amendment if the
+   chart is ever pointed at a shared cluster.
+
+---
+
 ## 2026-07-19 (session 25) — platform-maturity hardening: the five advanced-engineering gaps closed
 
 Milestone status: **the five non-thesis platform gaps from the session-24
