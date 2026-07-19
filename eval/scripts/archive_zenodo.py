@@ -27,14 +27,20 @@ from pathlib import Path
 EVAL_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EVAL_DIR))
 
+# Globs are supported. results/*.duckdb picks up every campaign database
+# (v1 matrix + ablations, v2/v3, VTC, fairness, iso-cost, chaos, the five
+# Wave-5 reruns, scale32/64, concurrency, forecasters, realism, phase7);
+# restoring these into eval/results/ is exactly what unlocks the "archive"
+# tier of docs/REPRODUCE.md. The csv/csv.gz exports and security data are
+# also in git, but the deposit is self-contained by design.
 INCLUDE = [
-    "results/raw_sim.duckdb",
-    "results/ablations.duckdb",
-    "results/smoke.duckdb",
+    "results/*.duckdb",
+    "results/*.csv",
+    "results/*.csv.gz",
     "results/DAILY.md",
-    "experiments/smoke.yaml",
-    "experiments/full.yaml",
-    "experiments/ablations.yaml",
+    "results/security",
+    "results/figures",
+    "experiments",
     "baselines/tuned.yaml",
     "baselines/TUNING.md",
     "baselines/grids",
@@ -44,16 +50,24 @@ INCLUDE = [
 
 DEPOSIT_METADATA = {
     "metadata": {
-        "title": "PolyForge evaluation artifact: 1,800-run controller comparison "
-                 "+ ablations (harness, baselines, raw results, IaC)",
+        "title": "PolyForge evaluation artifact: pre-registered controller-"
+                 "comparison campaigns (harness, baselines, raw results, "
+                 "live-run data, IaC)",
         "upload_type": "dataset",
         "description": (
             "Raw results and full provenance for the PolyForge multi-tenant "
             "serving-controller evaluation: the YAML-driven harness inputs, "
-            "tuned baseline parameters with their grid-search evidence, raw "
-            "DuckDB result databases (full matrix, ablations, smoke), and the "
-            "Terraform IaC for the experiment cluster. See eval/README.md in "
-            "the PolyForge repository for the schema and replay instructions."
+            "tuned baseline parameters with their grid-search evidence, every "
+            "pre-registered campaign's raw DuckDB result database (v1 matrix "
+            "and ablations, v2/v3, VTC and fairness slices, iso-cost, chaos, "
+            "the Wave-5 structural-form reruns, tenant-scale, concurrency, "
+            "phase-7 live reference), the live-campaign and trace-replay "
+            "CSVs, the security study data, and the Terraform IaC for the "
+            "experiment cluster. Restoring the DuckDB files into "
+            "eval/results/ of the PolyForge repository enables the archive "
+            "tier of docs/REPRODUCE.md: scripts/reproduce.py then re-derives "
+            "every published record byte-identically. See eval/README.md for "
+            "the schema and replay instructions."
         ),
         "creators": [{"name": "PolyForge author"}],  # fill in before upload
         "keywords": ["kubernetes", "autoscaling", "multi-tenancy", "LLM serving",
@@ -83,6 +97,13 @@ def main() -> None:
     files: list[Path] = []
     missing: list[str] = []
     for rel in INCLUDE:
+        if "*" in rel or "?" in rel:
+            matches = [p for p in sorted(EVAL_DIR.glob(rel)) if p.is_file()]
+            if matches:
+                files.extend(matches)
+            else:
+                missing.append(rel)
+            continue
         path = EVAL_DIR / rel
         if path.is_dir():
             files.extend(p for p in sorted(path.rglob("*")) if p.is_file()

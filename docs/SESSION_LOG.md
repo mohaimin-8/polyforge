@@ -56,6 +56,22 @@ every touched file.
 What is left (unchanged): B1 GPU sitting, OSF/Zenodo mechanics, the
 manuscript carve (user-owned writing).
 
+Part 2 (same sitting, "I give you all the access"): access audit executed —
+gh authenticated (codespace scope) but the account's only Codespace machine
+type is 4-CPU/16GB with **no GPU**, and the frozen B1 substrate requires
+GPU-held model tiers (CPU offload explicitly forbidden), so B1 stays gated
+on a paid GPU host; no OSF/Zenodo tokens exist on this machine (they are
+account-bound and only the user can mint them). What was automatable was
+done: `archive_zenodo.py`'s INCLUDE list was stale at the W35c three-DB era
+— refreshed (glob support) to the full artifact set and rebuilt: 25 campaign
+DuckDBs + live/trace CSVs + exports + security data + figures + experiments
++ tuning evidence + IaC, 136 files, 29.1 MB, manifest + deposit metadata
+regenerated; the deposit description now documents that restoring the DBs
+enables REPRODUCE.md's archive tier. Zenodo is now upload-and-click; with a
+Zenodo/OSF personal access token the upload/draft can be driven by API from
+here. `deposit.json` creators field stays the placeholder — real name is
+user-owned, not fabricated.
+
 ## 2026-07-19 (session 27) — journal-gap batch: B1 harness desk-complete, three new pre-registered campaigns executed, B2/B3 record written
 
 Milestone status: the session executed the publishability gap list end to
