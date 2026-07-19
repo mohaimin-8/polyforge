@@ -141,6 +141,27 @@ jobs:
           python semantic_cache_eval.py
           git checkout -- SEMANTIC_CACHE.md
 
+  # Session 28: every push proves the paper's numbers re-derive on a clean
+  # checkout — the "git tier" of scripts/reproduce.py rebuilds RESULTS.md,
+  # ADVANCED.md, and the figures from the committed metrics_*.csv.gz
+  # exports into a scratch dir (archive-only inputs are skipped by design)
+  # and the frozen committed records must come through untouched.
+  reproduce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install analysis dependencies
+        run: pip install -r eval/requirements.txt
+      - name: Verify inputs and dependencies
+        run: python scripts/reproduce.py --check
+      - name: Rebuild records + figures from committed exports
+        run: python scripts/reproduce.py --out /tmp/reproduce_out
+      - name: Committed records untouched
+        run: git diff --exit-code
+
   # W39: both Helm charts must lint and render.
   helm:
     runs-on: ubuntu-latest

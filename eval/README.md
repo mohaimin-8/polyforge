@@ -138,3 +138,8 @@ python scripts/archive_zenodo.py    # ready-to-upload Zenodo bundle
 ```
 
 Statistical analysis and figures: `research/analysis/` (W36).
+
+One-command reproduction of every generated record and figure from the
+committed data (never touching the frozen originals): `python
+scripts/reproduce.py` from the repo root — tiers and mechanics in
+`docs/REPRODUCE.md`.

@@ -26,7 +26,7 @@ import stats
 from run_analysis import METRIC_LABELS, md_table
 
 DB = stats.REPO_ROOT / "eval" / "results" / "fairness_v2.duckdb"
-OUT = Path(__file__).resolve().parent / "FAIRNESS_V2.md"
+OUT = stats.record_path("FAIRNESS_V2.md")
 
 FULL, ABLATED = "jcac", "jcac_nofairness"
 CELLS = ["workload", "tenant_mix", "cluster_size", "rep"]

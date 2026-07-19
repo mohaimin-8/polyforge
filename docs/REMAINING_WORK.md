@@ -1,6 +1,6 @@
 # Remaining work — the honest ledger of what is left and who owns it
 
-Last updated 2026-07-19 (session 27). This is the single place that answers
+Last updated 2026-07-19 (session 28). This is the single place that answers
 "what is left and who does it." It reconciles `docs/RELEASE_CHECKLIST.md`
 (human-action items), the deferred live campaigns, and the thesis fill-ins into
 one owner-split view. When it disagrees with a campaign file, the campaign file
@@ -38,7 +38,13 @@ strongest reactive arm, and beaten at violation parity
 PASS, TS-H1b honest FAIL direction-consistent, margin grows with width).
 DEFENSE_QA #12/#13/#22 carry the new records. What remains is **not new
 desk measurement** — it is one gated confirmatory experiment (B1), plus
-submission mechanics and thesis polish.
+submission mechanics and thesis polish. **Session 28 closed the
+artifact-evaluation front**: `python scripts/reproduce.py` re-derives every
+generated record and figure from the committed data (verified: 5/5 records
+byte-identical, 17/17 figures; CI proves the clean-clone tier on every
+push — `docs/REPRODUCE.md`), every campaign now has a committed run-level
+csv.gz export, and `research/paper/main.tex` is a compiling FGCS scaffold
+awaiting the user's manuscript carve.
 
 The three buckets below are ordered by owner, not by priority. The single
 highest-*value* remaining item is in bucket B: the three-knob live plane, which

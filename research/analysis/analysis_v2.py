@@ -12,7 +12,7 @@ RESULTS.md and the v1 database are never touched.
 
 from __future__ import annotations
 
-from pathlib import Path
+
 
 import pandas as pd
 from scipy import stats as sps
@@ -23,7 +23,7 @@ from run_analysis import METRIC_LABELS, md_table
 
 V2_DB = stats.REPO_ROOT / "eval" / "results" / "raw_sim_v2.duckdb"
 ISOCOST_DB = stats.REPO_ROOT / "eval" / "results" / "isocost.duckdb"
-OUT = Path(__file__).resolve().parent / "RESULTS_V2.md"
+OUT = stats.record_path("RESULTS_V2.md")
 
 TREATMENT = "jcac_v2"
 V1 = "jcac"

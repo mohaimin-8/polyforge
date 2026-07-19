@@ -7,6 +7,55 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-19 (session 28) — artifact-evaluation readiness: one-command reproduction, every campaign's data committed, manuscript scaffold
+
+Milestone status: no measurement changed; the submission mechanics advanced.
+The user's directive was Q1 readiness excluding writing; the slice chosen was
+the reproducibility package my own audit found missing: the analysis entry
+point (`run_analysis.py`) read four DuckDB files that are Zenodo-bound and
+not committed, so a clean clone could not re-derive a single figure.
+
+What changed:
+
+- `research/analysis/stats.py`: `load_runs` falls back to the campaign's
+  committed `metrics_*.csv.gz` export when the DuckDB is absent
+  (`CSV_EXPORTS`); verified frame-identical to the DuckDB path within
+  float32 export precision (~1e-11, vs 4-sig-fig reporting). New
+  `runs_available()` and `record_path()` helpers; `load_timeseries` now
+  raises a clear "archive-only" error instead of a DuckDB traceback.
+- All five generated records (`RESULTS.md`, `ADVANCED.md`, `RESULTS_V2.md`,
+  `FAIRNESS_V2.md`, `RESULTS_V3.md`) and the figure dir honor
+  `POLYFORGE_ANALYSIS_OUT`/`POLYFORGE_FIG_DIR`, so reproduction can never
+  overwrite a pre-registration-frozen record. fig09 (the only
+  timeseries-dependent figure) skips with a notice in the git tier.
+- `scripts/reproduce.py` (new): tier detection (git/archive), scratch-dir
+  rebuild, per-record unified diff vs the committed originals.
+  **Verified: all 5 records byte-identical, 17/17 figures rebuilt.**
+- Ten campaigns that had no committed run-level artifact now do:
+  v2 (2,100 runs), v3 overload (1,200), VTC (200), fairness γ (200),
+  iso-cost (600), and the five Wave-5 reruns (1,800 each) — exported via
+  the existing `export_metrics_csv.py`, ~2 MB total.
+- CI `reproduce` job: every push rebuilds the records from the committed
+  exports on a clean checkout and asserts the frozen records untouched —
+  the artifact-track claim is now continuously proven, not asserted.
+- `research/paper/main.tex` (new): elsarticle/FGCS scaffold, structure
+  only — every stub section is a TODO(author) pointer at its
+  source-of-truth doc; `sec-eviction`/`sec-jcac` included as-is; figures
+  resolve from `eval/results/figures/`; bibliography is the thesis bib
+  (single source). Compiles clean (pdflatex+bibtex, zero errors; one
+  documented TODO ref). Fixed a stale cite key (`bang2023gptcache` →
+  `gptcache2023`) and added the missing `cao1997greedydual` (Cao & Irani,
+  USITS '97) to `references.bib`.
+- `docs/REPRODUCE.md` (new): the four-tier reproduction map.
+
+Verified by: the archive-tier reproduction run (all records
+byte-identical); the git tier via a `git worktree` clean checkout
+(tracked files only, no DuckDBs) run before push; compile checks on
+every touched file.
+
+What is left (unchanged): B1 GPU sitting, OSF/Zenodo mechanics, the
+manuscript carve (user-owned writing).
+
 ## 2026-07-19 (session 27) — journal-gap batch: B1 harness desk-complete, three new pre-registered campaigns executed, B2/B3 record written
 
 Milestone status: the session executed the publishability gap list end to

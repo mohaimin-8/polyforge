@@ -38,3 +38,11 @@ thesis/**/*.snm
 thesis/**/*.fls
 thesis/**/*.fdb_latexmk
 *.exe
+reproduce_out/
+research/paper/*.aux
+research/paper/*.bbl
+research/paper/*.blg
+research/paper/*.log
+research/paper/*.out
+research/paper/*.spl
+research/paper/main.pdf

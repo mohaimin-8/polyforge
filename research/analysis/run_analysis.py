@@ -11,14 +11,12 @@ RESULTS.md and eval/results/figures/.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
 
 import figures
 import stats
 
-OUT = Path(__file__).resolve().parent / "RESULTS.md"
+OUT = stats.record_path("RESULTS.md")
 
 METRIC_LABELS = {
     "total_cost_usd": "cost (USD/run)",
@@ -203,8 +201,8 @@ def main() -> None:
     figures.main()
 
     # Advanced work (forecast ablation, realism, security) if its result
-    # databases are present; skipped cleanly on a base-only checkout.
-    if stats.FORECASTERS_DB.exists() and stats.REALISM_DB.exists():
+    # databases or committed exports are present; skipped cleanly otherwise.
+    if stats.runs_available(stats.FORECASTERS_DB) and stats.runs_available(stats.REALISM_DB):
         import advanced
 
         advanced.main()

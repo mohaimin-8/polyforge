@@ -326,7 +326,7 @@ def main() -> None:
       f"while retaining {part['hits_retained']:.0%} of hits — strictly lower-left of "
       "either mitigation curve. No point on either curve dominates it.")
 
-    out = Path(__file__).resolve().parent / "ADVANCED.md"
+    out = stats.record_path("ADVANCED.md")
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {out}")
 

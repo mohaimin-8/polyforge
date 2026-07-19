@@ -10,7 +10,7 @@ touched; v3 numbers are reported alongside, never instead.
 
 from __future__ import annotations
 
-from pathlib import Path
+
 
 import pandas as pd
 
@@ -19,7 +19,7 @@ from analysis_v2 import paired
 from run_analysis import METRIC_LABELS, md_table
 
 V3_DB = stats.REPO_ROOT / "eval" / "results" / "raw_sim_v3.duckdb"
-OUT = Path(__file__).resolve().parent / "RESULTS_V3.md"
+OUT = stats.record_path("RESULTS_V3.md")
 
 TREATMENT = "jcac_seasonal"
 MECHANISM_CONTROL = "jcac"

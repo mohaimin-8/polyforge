@@ -12,6 +12,7 @@ lies). One axis per plot, no dual scales.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import matplotlib
@@ -23,7 +24,12 @@ import pandas as pd  # noqa: E402
 
 import stats  # noqa: E402  (research/analysis/stats.py)
 
-FIG_DIR = stats.REPO_ROOT / "eval" / "results" / "figures"
+# POLYFORGE_FIG_DIR redirects output so scripts/reproduce.py can regenerate
+# into a scratch dir and diff against the committed figures without touching
+# them.
+FIG_DIR = (Path(os.environ["POLYFORGE_FIG_DIR"])
+           if "POLYFORGE_FIG_DIR" in os.environ
+           else stats.REPO_ROOT / "eval" / "results" / "figures")
 
 # Fixed slot order of the validated categorical palette; color follows the
 # system entity in every figure.
@@ -377,11 +383,14 @@ def main() -> None:
     # agentic/uniform/medium is the rep-0 cell with the richest cache
     # dynamics (all three knobs move) — crud cells leave the cache flat
     # because there is nothing cacheable in them.
-    ts_jcac = stats.load_timeseries(stats.FULL_DB, system="jcac", workload="agentic",
-                                    tenant_mix="uniform", cluster_size="medium", rep=0)
-    ts_hpa = stats.load_timeseries(stats.FULL_DB, system="hpa", workload="agentic",
-                                   tenant_mix="uniform", cluster_size="medium", rep=0)
-    fig_adaptation(ts_jcac, ts_hpa)
+    try:
+        ts_jcac = stats.load_timeseries(stats.FULL_DB, system="jcac", workload="agentic",
+                                        tenant_mix="uniform", cluster_size="medium", rep=0)
+        ts_hpa = stats.load_timeseries(stats.FULL_DB, system="hpa", workload="agentic",
+                                       tenant_mix="uniform", cluster_size="medium", rep=0)
+        fig_adaptation(ts_jcac, ts_hpa)
+    except FileNotFoundError as exc:
+        print(f"fig09_adaptation_trace skipped: {exc}")
     fig_p95(summary)
     fig_violation_share(summary)
     fig_objective(df)

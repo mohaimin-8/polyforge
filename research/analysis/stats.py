@@ -14,6 +14,7 @@ figures.py consumes the same frames so tables and plots cannot drift.
 from __future__ import annotations
 
 import math
+import os
 from pathlib import Path
 
 import duckdb
@@ -27,6 +28,24 @@ FULL_DB = REPO_ROOT / "eval" / "results" / "raw_sim.duckdb"
 ABLATIONS_DB = REPO_ROOT / "eval" / "results" / "ablations.duckdb"
 FORECASTERS_DB = REPO_ROOT / "eval" / "results" / "forecasters.duckdb"
 REALISM_DB = REPO_ROOT / "eval" / "results" / "realism.duckdb"
+
+# Committed run-level exports (eval/scripts/export_metrics_csv.py). The raw
+# DuckDB files carry the timeseries and are Zenodo-archived, not committed;
+# these gzipped CSVs live in git so a clean clone can re-derive every
+# run-level statistic and figure without the archives.
+_RESULTS_DIR = REPO_ROOT / "eval" / "results"
+CSV_EXPORTS = {
+    FULL_DB: _RESULTS_DIR / "metrics_full.csv.gz",
+    ABLATIONS_DB: _RESULTS_DIR / "metrics_ablations.csv.gz",
+    FORECASTERS_DB: _RESULTS_DIR / "metrics_forecasters.csv.gz",
+    REALISM_DB: _RESULTS_DIR / "metrics_realism.csv.gz",
+}
+
+RUN_COLUMNS = [
+    "system", "workload", "tenant_mix", "cluster_size", "rep",
+    "total_cost_usd", "mean_violation", "violation_step_share",
+    "mean_jain", "cache_hit_rate", "crud_p95_ms", "ai_p95_ms",
+]
 
 METRICS = [
     "total_cost_usd",
@@ -49,7 +68,34 @@ BASELINES = ["hpa", "keda", "firm", "static", "gptcache"]
 ABLATIONS = ["jcac_noclassifier", "jcac_nojoint", "jcac_noeviction", "jcac_nofairness"]
 
 
+def record_path(filename: str) -> Path:
+    """Where a generated analysis record is written: research/analysis by
+    default, or $POLYFORGE_ANALYSIS_OUT when scripts/reproduce.py redirects
+    output so the frozen committed records are never overwritten."""
+    base = (Path(os.environ["POLYFORGE_ANALYSIS_OUT"])
+            if "POLYFORGE_ANALYSIS_OUT" in os.environ
+            else Path(__file__).resolve().parent)
+    return base / filename
+
+
+def runs_available(db_path: Path) -> bool:
+    """True when this campaign's run-level metrics are loadable — from the
+    DuckDB if present, else from its committed csv.gz export."""
+    export = CSV_EXPORTS.get(db_path)
+    return db_path.exists() or (export is not None and export.exists())
+
+
 def load_runs(db_path: Path = FULL_DB) -> pd.DataFrame:
+    if not db_path.exists():
+        export = CSV_EXPORTS.get(db_path)
+        if export is not None and export.exists():
+            df = pd.read_csv(export)[RUN_COLUMNS]
+            for col in RUN_COLUMNS[5:]:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+            return df
+        raise FileNotFoundError(
+            f"{db_path} missing and no committed csv.gz export covers it; "
+            "run the experiment or fetch the Zenodo archive")
     con = duckdb.connect(str(db_path), read_only=True)
     df = con.execute(
         """
@@ -66,6 +112,10 @@ def load_runs(db_path: Path = FULL_DB) -> pd.DataFrame:
 
 
 def load_timeseries(db_path: Path, **filters) -> pd.DataFrame:
+    if not db_path.exists():
+        raise FileNotFoundError(
+            f"{db_path.name}: timeseries exist only in the DuckDB archives "
+            "(Zenodo deposit), not in the committed csv.gz exports")
     where = " AND ".join(f"r.{k} = ?" for k in filters)
     con = duckdb.connect(str(db_path), read_only=True)
     df = con.execute(
