@@ -31,23 +31,52 @@ import (
 	"polyforge/internal/ai/embed"
 	"polyforge/internal/ai/gateway"
 	"polyforge/internal/secrets"
+	postgresstore "polyforge/internal/storage/postgres"
 	sqlitestore "polyforge/internal/storage/sqlite"
+	"polyforge/internal/telemetry"
+	"polyforge/internal/tenant"
 )
+
+// gatewayStore is the slice of the shared store the gateway needs: API-key
+// auth and telemetry. Both the SQLite and PostgreSQL stores satisfy it.
+type gatewayStore interface {
+	tenant.Repository
+	telemetry.Repository
+}
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	ctx := context.Background()
 
-	dbPath := os.Getenv("POLYFORGE_DB_PATH")
-	if dbPath == "" {
-		dbPath = filepath.Join("data", "polyforge.db")
+	// Same store contract as the control plane (and eval-export): shared
+	// PostgreSQL when configured — required for the live eval plane, where
+	// gateway telemetry must land in the store eval-export reads — SQLite
+	// otherwise.
+	var store gatewayStore
+	if adminURL := os.Getenv("POLYFORGE_POSTGRES_ADMIN_URL"); adminURL != "" {
+		pg, err := postgresstore.Open(ctx, postgresstore.Config{
+			AdminURL: adminURL,
+			AppURL:   os.Getenv("POLYFORGE_POSTGRES_APP_URL"),
+		})
+		if err != nil {
+			log.Error("open PostgreSQL", "error", err)
+			os.Exit(1)
+		}
+		defer pg.Close()
+		store = pg
+	} else {
+		dbPath := os.Getenv("POLYFORGE_DB_PATH")
+		if dbPath == "" {
+			dbPath = filepath.Join("data", "polyforge.db")
+		}
+		sq, err := sqlitestore.Open(ctx, dbPath)
+		if err != nil {
+			log.Error("open SQLite", "path", dbPath, "error", err)
+			os.Exit(1)
+		}
+		defer func() { _ = sq.Close() }()
+		store = sq
 	}
-	store, err := sqlitestore.Open(ctx, dbPath)
-	if err != nil {
-		log.Error("open SQLite", "path", dbPath, "error", err)
-		os.Exit(1)
-	}
-	defer func() { _ = store.Close() }()
 
 	// Embedder: local by default (deterministic, offline); OpenAI-compatible
 	// when an endpoint is configured.
@@ -150,17 +179,30 @@ func main() {
 		&agent.SearchTool{Search: duckDuckGoSearch},
 	}, tracerProvider, agent.DefaultMaxSteps)
 
+	// Tier backends (PREREG_WAVE4_LIVE_PLANE.md §Substrate 2): a JSON map
+	// tier -> backend makes the per-tenant tier knob a real routing lever.
+	tierProviders, err := gateway.BuildTierProviders(os.Getenv("POLYFORGE_TIER_BACKENDS"))
+	if err != nil {
+		log.Error("parse POLYFORGE_TIER_BACKENDS", "error", err)
+		os.Exit(1)
+	}
+	if len(tierProviders) > 0 {
+		log.Info("tier backends active", "tiers", len(tierProviders))
+	}
+
 	server := &http.Server{
 		Addr: envOr("POLYFORGE_AI_ADDR", ":8081"),
 		Handler: gateway.NewServer(log, gateway.Config{
-			Provider:    chatProvider,
-			Router:      router,
-			Embedder:    embedder,
-			Tenants:     store,
-			Telemetry:   store,
-			Agent:       runner.GatewayFunc(),
-			ModelTier:   envOr("POLYFORGE_MODEL_TIER", "mid"),
-			CacheShared: os.Getenv("POLYFORGE_CACHE_SHARED") == "1",
+			Provider:      chatProvider,
+			Router:        router,
+			Embedder:      embedder,
+			Tenants:       store,
+			Telemetry:     store,
+			Agent:         runner.GatewayFunc(),
+			ModelTier:     envOr("POLYFORGE_MODEL_TIER", "mid"),
+			CacheShared:   os.Getenv("POLYFORGE_CACHE_SHARED") == "1",
+			TierProviders: tierProviders,
+			AdminKey:      os.Getenv("POLYFORGE_ADMIN_KEY"),
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,

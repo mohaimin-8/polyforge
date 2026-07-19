@@ -88,6 +88,86 @@ def test_helm_chart_path_is_absolute(tmp_path):
     assert Path(chart).is_absolute(), "relative chart path misparses as a repo ref"
 
 
+# --- three-knob live plane (PREREG_WAVE4_LIVE_PLANE.md) ----------------
+
+TIER_JSON = '{"small": {"kind": "openai", "base_url": "http://h:9101/v1", "model": "m0"}}'
+
+
+def _live_ai(monkeypatch, shared_pg=True, tiers=TIER_JSON):
+    monkeypatch.setattr(cb, "EVAL_LIVE_AI", True)
+    monkeypatch.setattr(cb, "EVAL_SHARED_PG", shared_pg)
+    monkeypatch.setattr(cb, "TIER_BACKENDS_JSON", tiers)
+
+
+def test_live_ai_without_shared_pg_fails_loudly(monkeypatch, tmp_path):
+    _live_ai(monkeypatch, shared_pg=False)
+    with pytest.raises(RuntimeError, match="SHARED_PG"):
+        cb.command_plan(_run(), tmp_path)
+
+
+def test_live_ai_without_tier_backends_fails_loudly(monkeypatch, tmp_path):
+    _live_ai(monkeypatch, tiers="")
+    with pytest.raises(RuntimeError, match="TIER_BACKENDS"):
+        cb.command_plan(_run(), tmp_path)
+
+
+def test_live_ai_plan_deploys_gateway(monkeypatch, tmp_path):
+    _live_ai(monkeypatch)
+    plan = cb.command_plan(_run(system="jcac", workload="joint_stress"), tmp_path)
+    flat = [" ".join(c) for c in plan]
+    assert any(cb.GATEWAY_IMAGE in c and c.startswith("kind load") for c in flat)
+    install = next(c for c in plan if c and c[0] == "helm" and "install" in c)
+    flags = " ".join(install)
+    assert "gateway.enabled=true" in flags
+    assert "gw-values.yaml" in flags, "tierBackends JSON must travel via -f, not --set"
+    # The operator must be told to push knobs at the gateway.
+    operator_install = next(c for c in plan if c and c[0] == "helm" and "polyforge-operator" in " ".join(c))
+    assert "gateway.adminURL=" in " ".join(operator_install)
+    # And the gateway rollout must gate the run like the control plane's.
+    assert any("deployment/polyforge-ai-gateway" in c for c in flat)
+
+
+def test_default_plan_has_no_gateway_leg(tmp_path):
+    plan = cb.command_plan(_run(system="hpa"), tmp_path)
+    flat = [" ".join(c) for c in plan]
+    assert not any(cb.GATEWAY_IMAGE in c for c in flat)
+    assert not any("gateway.enabled=true" in c for c in flat)
+
+
+def test_k6_script_routes_ai_kinds_to_gateway_when_live(monkeypatch):
+    _live_ai(monkeypatch)
+    script = cb.k6_script(_run(system="jcac", workload="ai_cacheable"))
+    assert "/ai/chat" in script
+    assert "const LIVE_AI = true" in script
+    # The cacheable cell must carry its reuse pool (64 prompts per tenant).
+    pools = json.loads(script.split("const POOLS = ")[1].split(";\n")[0])
+    sizes = {len(v) for v in pools.values() if v}
+    assert sizes == {64}
+
+
+def test_k6_script_default_mode_never_touches_gateway():
+    script = cb.k6_script(_run(system="hpa", workload="ai_cacheable"))
+    assert "const LIVE_AI = false" in script
+
+
+def test_prompt_pools_deterministic_distinct_and_class_scoped():
+    run = _run(system="jcac", workload="ai_cacheable")
+    ids = ["t00", "t01"]
+    a, b = cb.prompt_pools(run, ids), cb.prompt_pools(run, ids)
+    assert a == b, "pools must be deterministic in the run seed"
+    assert len(set(a["t00"])) == 64, "pool prompts must be distinct"
+    assert a["t00"] != a["t01"], "tenants must not share pools"
+    uncacheable = cb.prompt_pools(_run(system="jcac", workload="agentic"), ids)
+    assert uncacheable["t00"] is None, "unlisted classes are uncacheable by construction"
+
+
+def test_wave4_cells_build():
+    from harness import workloads
+    for cell in ("tier_mixed", "joint_stress"):
+        tenant_ids, buckets, _, _ = workloads.build(cell, "uniform", "small", 3, 12)
+        assert len(tenant_ids) == 8 and len(buckets) == 13
+
+
 # --- kind_mix normalization -------------------------------------------
 
 def test_kind_mix_cumulative_reaches_exactly_one():

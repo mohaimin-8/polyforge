@@ -153,3 +153,21 @@ Until both are met, this protocol is the frozen anchor and the run is deferred,
 exactly as `PREREG_WIRE_ATTACK.md` and `PREREG_LIVE_CHAOS_P99.md` were before
 their live sittings. The push of this file is the pre-registration; no result
 exists yet, and none is implied.
+
+**Status update, 2026-07-19 (harness work landed; still no result):** gate 2
+is closed. The §Substrate 2-3 harness work is committed and desk-verified
+end-to-end: per-tenant tier routing + cache byte budgets on the production
+gateway (`internal/ai/gateway/knobs.go`), operator knob push covered by the
+Applied actuation gate (`internal/operator/controllers/gateway_knobs.go`),
+cache-hit-costs-nothing metering + tier histogram in `eval-export`, the
+gateway deploy leg (`Dockerfile.gateway`, chart `gateway.*` values, harness
+`POLYFORGE_EVAL_LIVE_AI` mode with per-cell prompt-reuse pools), the frozen
+cell classes `tier_mixed` / `joint_stress` in `eval/harness/workloads.py`,
+and the executable WL-H2 gate (`eval/scripts/knob_preflight.py`). The gate
+was exercised at the desk against the real gateway binary with two
+mock-latency tier backends: cache knob hit-rate 1.00 @64MB vs 0.00 @0MB,
+tier knob 61.6 ms vs 245.0 ms with routing verified — **WL-H2 PASS on the
+desk substrate** (mock backends stand in for the GPU host's model servers;
+the live run must re-run the gate on the provisioned host). Gate 1 — the
+GPU-capable host — remains the only blocker, and no comparison number
+exists.

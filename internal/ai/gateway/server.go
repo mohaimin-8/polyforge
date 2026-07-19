@@ -25,18 +25,21 @@ const maxBodyBytes = 1 << 20
 type AgentFunc func(ctx context.Context, tenantID, prompt string) (any, int, error)
 
 type Server struct {
-	log       *slog.Logger
-	provider  Provider
-	router    *Router
-	cache     *SemanticCache
-	embedder  embed.Embedder
-	search    *vector.Index
-	tenants   tenant.Repository
-	telemetry telemetry.Repository
-	agent     AgentFunc
-	modelTier string
-	mux       *http.ServeMux
-	requests  atomic.Int64
+	log           *slog.Logger
+	provider      Provider
+	router        *Router
+	cache         *SemanticCache
+	embedder      embed.Embedder
+	search        *vector.Index
+	tenants       tenant.Repository
+	telemetry     telemetry.Repository
+	agent         AgentFunc
+	modelTier     string
+	tierProviders map[string]Provider
+	knobs         *knobStore
+	adminKey      string
+	mux           *http.ServeMux
+	requests      atomic.Int64
 }
 
 type Config struct {
@@ -59,6 +62,15 @@ type Config struct {
 	// (off by default). Only the wire-attack baseline sets it; a production
 	// gateway must not. See SemanticCache.shared.
 	CacheShared bool
+	// TierProviders, when set, makes the per-tenant model-tier knob a real
+	// routing lever: tier name -> backend (PREREG_WAVE4_LIVE_PLANE.md
+	// §Substrate 2). Requests from a tenant whose knob pins a tier are
+	// served by that tier's provider, and telemetry records the tier
+	// actually hit.
+	TierProviders map[string]Provider
+	// AdminKey guards PUT/GET /admin/tenants/{id}/knobs, the operator's
+	// knob push target. Empty disables the admin surface entirely.
+	AdminKey string
 }
 
 func NewServer(log *slog.Logger, cfg Config) *Server {
@@ -69,17 +81,20 @@ func NewServer(log *slog.Logger, cfg Config) *Server {
 		cfg.ModelTier = "mid"
 	}
 	s := &Server{
-		log:       log,
-		provider:  cfg.Provider,
-		router:    cfg.Router,
-		cache:     NewSemanticCache(cfg.Embedder, cfg.CacheThreshold).WithShared(cfg.CacheShared),
-		embedder:  cfg.Embedder,
-		search:    vector.NewIndex(cfg.Embedder.Dimensions()),
-		tenants:   cfg.Tenants,
-		telemetry: cfg.Telemetry,
-		agent:     cfg.Agent,
-		modelTier: cfg.ModelTier,
-		mux:       http.NewServeMux(),
+		log:           log,
+		provider:      cfg.Provider,
+		router:        cfg.Router,
+		cache:         NewSemanticCache(cfg.Embedder, cfg.CacheThreshold).WithShared(cfg.CacheShared),
+		embedder:      cfg.Embedder,
+		search:        vector.NewIndex(cfg.Embedder.Dimensions()),
+		tenants:       cfg.Tenants,
+		telemetry:     cfg.Telemetry,
+		agent:         cfg.Agent,
+		modelTier:     cfg.ModelTier,
+		tierProviders: cfg.TierProviders,
+		knobs:         newKnobStore(),
+		adminKey:      cfg.AdminKey,
+		mux:           http.NewServeMux(),
 	}
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("GET /metrics", s.metrics)
@@ -87,6 +102,8 @@ func NewServer(log *slog.Logger, cfg Config) *Server {
 	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/ai/index", s.indexDoc)
 	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/ai/search", s.searchDocs)
 	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/ai/agent", s.runAgent)
+	s.mux.HandleFunc("PUT /admin/tenants/{tenant_id}/knobs", s.putKnobs)
+	s.mux.HandleFunc("GET /admin/tenants/{tenant_id}/knobs", s.getKnobs)
 	return s
 }
 
@@ -166,14 +183,17 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 		} else {
 			writeJSON(w, http.StatusOK, response)
 		}
-		s.record(r.Context(), tenantID, input.Messages, completion, start, true, 1)
+		// A hit still belongs to the AI latency family, so it carries the
+		// tier it *would* have been served from; eval-export charges no
+		// tier cost for cache-hit events.
+		s.record(r.Context(), tenantID, input.Messages, completion, start, true, 1, s.tierFor(tenantID))
 		return
 	}
 	w.Header().Set("X-PolyForge-Cache", "miss")
 
 	// Routing happens only on a cache miss: a cached answer costs nothing,
 	// so charging or routing it would distort the budget ledger.
-	provider, backendName := s.pickProvider(r.Context(), w, tenantID, input.Messages)
+	provider, backendName, tier := s.pickProvider(r.Context(), w, tenantID, input.Messages)
 
 	req := ChatRequest{Model: input.Model, Messages: input.Messages}
 	if input.Stream {
@@ -205,7 +225,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 		s.chargeUsage(tenantID, backendName, response)
 		s.cache.Store(r.Context(), tenantID, input.Messages, response.Message.Content)
-		s.record(r.Context(), tenantID, input.Messages, response.Message.Content, start, false, 1)
+		s.record(r.Context(), tenantID, input.Messages, response.Message.Content, start, false, 1, tier)
 		return
 	}
 
@@ -218,15 +238,36 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 	s.chargeUsage(tenantID, backendName, response)
 	s.cache.Store(r.Context(), tenantID, input.Messages, response.Message.Content)
 	writeJSON(w, http.StatusOK, response)
-	s.record(r.Context(), tenantID, input.Messages, response.Message.Content, start, false, 1)
+	s.record(r.Context(), tenantID, input.Messages, response.Message.Content, start, false, 1, tier)
 }
 
-// pickProvider consults the router when one is configured, exposing the
-// decision in response headers so the routing policy is observable from the
-// outside (and assertable in tests).
-func (s *Server) pickProvider(ctx context.Context, w http.ResponseWriter, tenantID string, messages []Message) (Provider, string) {
+// tierFor is the tier a tenant's request is attributed to: the knob-pinned
+// tier when one is set, the gateway-wide label otherwise.
+func (s *Server) tierFor(tenantID string) string {
+	if tier := s.knobTier(tenantID); tier != "" {
+		return tier
+	}
+	return s.modelTier
+}
+
+// pickProvider resolves the backend for a cache miss. Order: the tenant's
+// tier knob when it names a configured tier backend (the live tier lever,
+// PREREG_WAVE4_LIVE_PLANE.md §Substrate 2), then the router policy, then
+// the default provider. The decision is exposed in response headers so the
+// routing is observable from the outside (and assertable in tests). The
+// third return is the tier the request is served from, recorded per event
+// so eval-export meters $-cost from the tier actually hit.
+func (s *Server) pickProvider(ctx context.Context, w http.ResponseWriter, tenantID string, messages []Message) (Provider, string, string) {
+	if tier := s.knobTier(tenantID); tier != "" {
+		if provider, ok := s.tierProviders[tier]; ok {
+			w.Header().Set("X-PolyForge-Backend", "tier:"+tier)
+			w.Header().Set("X-PolyForge-Tier", tier)
+			w.Header().Set("X-PolyForge-Route-Reason", "policy-tier")
+			return provider, "tier:" + tier, tier
+		}
+	}
 	if s.router == nil {
-		return s.provider, ""
+		return s.provider, "", s.modelTier
 	}
 	plan := ""
 	if t, ok, err := s.tenants.Tenant(ctx, tenantID); err == nil && ok {
@@ -239,7 +280,7 @@ func (s *Server) pickProvider(ctx context.Context, w http.ResponseWriter, tenant
 	decision := s.router.Route(tenantID, plan, chars)
 	w.Header().Set("X-PolyForge-Backend", decision.Backend.Name)
 	w.Header().Set("X-PolyForge-Route-Reason", decision.Reason)
-	return decision.Backend.Provider, decision.Backend.Name
+	return decision.Backend.Provider, decision.Backend.Name, s.modelTier
 }
 
 func (s *Server) chargeUsage(tenantID, backendName string, response ChatResponse) {
@@ -323,7 +364,7 @@ func (s *Server) searchDocs(w http.ResponseWriter, r *http.Request) {
 	}
 	matches := s.search.Search(tenantID, vecs[0], input.K)
 	writeJSON(w, http.StatusOK, map[string]any{"matches": matches})
-	s.record(r.Context(), tenantID, nil, input.Query, start, false, 0)
+	s.record(r.Context(), tenantID, nil, input.Query, start, false, 0, s.modelTier)
 }
 
 type agentInput struct {
@@ -357,13 +398,15 @@ func (s *Server) runAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
-	s.record(r.Context(), tenantID, nil, input.Prompt, start, false, spans)
+	s.record(r.Context(), tenantID, nil, input.Prompt, start, false, spans, s.tierFor(tenantID))
 }
 
 // record feeds the classifier: every AI request becomes a telemetry event,
 // which is how the agentic-multistep and ai-cacheable workload classes
-// become observable to the JCAC loop.
-func (s *Server) record(ctx context.Context, tenantID string, messages []Message, completion string, start time.Time, cacheHit bool, childSpans int) {
+// become observable to the JCAC loop. The tier is per-request — the tier
+// the request was actually served from (or would have been, for a cache
+// hit) — so eval-export's $-metering follows the tier knob.
+func (s *Server) record(ctx context.Context, tenantID string, messages []Message, completion string, start time.Time, cacheHit bool, childSpans int, tier string) {
 	if s.telemetry == nil {
 		return
 	}
@@ -379,7 +422,7 @@ func (s *Server) record(ctx context.Context, tenantID string, messages []Message
 		LatencyMS:        float64(time.Since(start).Microseconds()) / 1000,
 		CacheHit:         cacheHit,
 		EmbeddingDensity: 1,
-		ModelTier:        s.modelTier,
+		ModelTier:        tier,
 		ChildSpans:       childSpans,
 	})
 	if err != nil {

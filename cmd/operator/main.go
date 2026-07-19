@@ -113,9 +113,17 @@ func main() {
 		log.Error("setup tenant controller", "error", err)
 		os.Exit(1)
 	}
-	if err := (&controllers.PolicyReconciler{
-		Client: mgr.GetClient(),
-	}).SetupWithManager(mgr); err != nil {
+	policyReconciler := &controllers.PolicyReconciler{Client: mgr.GetClient()}
+	// The gateway knob push is opt-in like the JCAC loop: without a gateway
+	// URL the Policy's cache/tier levers actuate on the ConfigMap only (the
+	// pre-B1 behavior); with it they reach the live data plane and the
+	// Applied condition covers them.
+	if gatewayURL := os.Getenv("POLYFORGE_GATEWAY_ADMIN_URL"); gatewayURL != "" {
+		policyReconciler.GatewayKnobs = controllers.NewHTTPGatewayKnobs(
+			gatewayURL, os.Getenv("POLYFORGE_GATEWAY_ADMIN_KEY"))
+		log.Info("gateway knob push enabled", "gateway", gatewayURL)
+	}
+	if err := policyReconciler.SetupWithManager(mgr); err != nil {
 		log.Error("setup policy controller", "error", err)
 		os.Exit(1)
 	}

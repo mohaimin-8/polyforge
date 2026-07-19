@@ -67,12 +67,16 @@ type evalExportDoc struct {
 	AIP95MS            float64 `json:"ai_p95_ms"`
 	// p99 is a live-only order statistic (PREREG_LIVE_CHAOS_P99.md); the sim
 	// estimates p95 only, so these stay out of the sim-comparison tables.
-	CrudP99MS           float64 `json:"crud_p99_ms"`
-	AIP99MS             float64 `json:"ai_p99_ms"`
-	NEvents             int     `json:"n_events"`
-	NTenants            int     `json:"n_tenants"`
-	GeneratedAtUTC      string  `json:"generated_at_utc"`
-	CostInfraSourceNote string  `json:"cost_infra_source_note"`
+	CrudP99MS float64 `json:"crud_p99_ms"`
+	AIP99MS   float64 `json:"ai_p99_ms"`
+	// TierRequests counts backend-serving AI requests per tier (cache hits
+	// excluded) — the tier histogram the three-knob live plane meters $-cost
+	// from (PREREG_WAVE4_LIVE_PLANE.md §Metrics).
+	TierRequests        map[string]int `json:"tier_requests"`
+	NEvents             int            `json:"n_events"`
+	NTenants            int            `json:"n_tenants"`
+	GeneratedAtUTC      string         `json:"generated_at_utc"`
+	CostInfraSourceNote string         `json:"cost_infra_source_note"`
 }
 
 func evalExport(args []string) int {
@@ -172,6 +176,7 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 		GeneratedAtUTC:      time.Now().UTC().Format(time.RFC3339),
 		CostInfraSourceNote: "infra component injected via --infra-cost-usd; replica-hours are not visible in-pod",
 		MeanJain:            1.0,
+		TierRequests:        map[string]int{},
 	}
 
 	var crudLatencies, aiLatencies []float64
@@ -194,9 +199,16 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 				aiLatencies = append(aiLatencies, e.LatencyMS)
 				aiTotal++
 				if e.CacheHit {
+					// A cache hit never touched a model backend: it costs
+					// nothing and belongs to no tier's serving histogram.
+					// (The gateway records the hit's would-be tier so the
+					// event stays in the AI latency family.)
 					cacheHits++
+				} else {
+					tier := strings.TrimSpace(e.ModelTier)
+					doc.CostTierUSD += evalTierCostUSD[tier]
+					doc.TierRequests[tier]++
 				}
-				doc.CostTierUSD += evalTierCostUSD[strings.TrimSpace(e.ModelTier)]
 			} else {
 				crudLatencies = append(crudLatencies, e.LatencyMS)
 			}

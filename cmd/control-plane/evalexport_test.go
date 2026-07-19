@@ -57,9 +57,14 @@ func TestComputeEvalExportAggregatesHarnessSchema(t *testing.T) {
 	if doc.CrudP99MS != 400 || doc.AIP99MS != 7000 {
 		t.Fatalf("expected p99s 400/7000, got %v/%v", doc.CrudP99MS, doc.AIP99MS)
 	}
-	// Tier cost: small + mid + large = 0.0001 + 0.001 + 0.01.
-	if diff := doc.CostTierUSD - 0.0111; diff > 1e-9 || diff < -1e-9 {
-		t.Fatalf("expected tier cost 0.0111, got %v", doc.CostTierUSD)
+	// Tier cost: mid + large = 0.001 + 0.01. The small-tier event is a cache
+	// hit — it never touched a backend, so it is charged nothing and appears
+	// in no tier's serving histogram (the B1 cache knob's economy).
+	if diff := doc.CostTierUSD - 0.011; diff > 1e-9 || diff < -1e-9 {
+		t.Fatalf("expected tier cost 0.011, got %v", doc.CostTierUSD)
+	}
+	if doc.TierRequests["mid"] != 1 || doc.TierRequests["large"] != 1 || doc.TierRequests["small"] != 0 {
+		t.Fatalf("expected tier histogram mid=1 large=1 small=0, got %v", doc.TierRequests)
 	}
 	if doc.CostInfraUSD != 1.5 || doc.TotalCostUSD != doc.CostTierUSD+1.5 {
 		t.Fatalf("expected injected infra cost to sum into total, got %+v", doc)

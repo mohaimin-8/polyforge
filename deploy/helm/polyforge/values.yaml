@@ -46,3 +46,30 @@ autoscaling:
     minReplicas: 1
     maxReplicas: 10
     targetCPUUtilization: 60
+
+# AI gateway leg of the three-knob live plane (PREREG_WAVE4_LIVE_PLANE.md).
+# Off by default; the eval harness enables it for live-AI cells. With it on,
+# AI traffic gets a real semantic cache (per-tenant budget = the operator's
+# cacheSizeMB knob) and real tier routing (modelTier knob -> tierBackends).
+gateway:
+  enabled: false
+  image:
+    repository: polyforge/ai-gateway
+    tag: dev
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  # JSON map tier -> backend, e.g.
+  # {"small": {"kind": "openai", "base_url": "http://host:9101/v1", "model": "qwen2.5-0.5b-instruct"},
+  #  "mid":   {"kind": "openai", "base_url": "http://host:9102/v1", "model": "qwen2.5-3b-instruct"}}
+  tierBackends: ""
+  # Fallback single backend for requests with no tier pin (unset tiers).
+  llmBaseURL: ""
+  embedDims: 256
+  service:
+    port: 80
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi

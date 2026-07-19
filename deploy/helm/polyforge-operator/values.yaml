@@ -74,6 +74,13 @@ planner:
     limits:
       memory: 256Mi
 
+# Three-knob live plane (PREREG_WAVE4_LIVE_PLANE.md): with adminURL set,
+# the operator pushes each Policy's cache/tier knobs to the AI gateway's
+# admin endpoint and the Applied condition covers all three knobs, not just
+# replicas. The admin key is features.adminKeySecret (the platform key).
+gateway:
+  adminURL: ""         # e.g. http://polyforge-ai-gateway.polyforge.svc:80
+
 # The planner speaks plain unauthenticated HTTP (ADR 0014) and its
 # /v1/state endpoints export/overwrite per-tenant demand history, so its
 # only defense is the network layer. This NetworkPolicy restricts planner

@@ -36,6 +36,14 @@ type SemanticCache struct {
 	policyMu          sync.Mutex
 	policies          map[string]eviction.Policy
 
+	// Live cache knob (PREREG_WAVE4_LIVE_PLANE.md §Substrate 3): per-tenant
+	// byte budgets set at runtime by the operator's Policy. Presence in
+	// budgets makes the partition bounded; 0 disables admission entirely.
+	// All three maps are guarded by policyMu.
+	budgets    map[string]int64
+	usedBytes  map[string]int64
+	entrySizes map[string]map[string]int64
+
 	// shared collapses every tenant into one cache partition — the
 	// deliberately INSECURE posture, off by default. It exists only so the
 	// cross-tenant timing side channel this design prevents can be measured
@@ -70,10 +78,13 @@ func NewSemanticCache(embedder embed.Embedder, threshold float64) *SemanticCache
 		threshold = DefaultCacheThreshold
 	}
 	return &SemanticCache{
-		embedder:  embedder,
-		index:     vector.NewIndex(embedder.Dimensions()),
-		threshold: threshold,
-		policies:  map[string]eviction.Policy{},
+		embedder:   embedder,
+		index:      vector.NewIndex(embedder.Dimensions()),
+		threshold:  threshold,
+		policies:   map[string]eviction.Policy{},
+		budgets:    map[string]int64{},
+		usedBytes:  map[string]int64{},
+		entrySizes: map[string]map[string]int64{},
 	}
 }
 
@@ -123,11 +134,11 @@ func (c *SemanticCache) Lookup(ctx context.Context, tenantID string, messages []
 		return "", 0, false
 	}
 	c.hits.Add(1)
-	if c.capacityPerTenant > 0 {
-		c.policyMu.Lock()
-		c.policyFor(part).OnHit(matches[0].Doc.ID, time.Now())
-		c.policyMu.Unlock()
-	}
+	// Policy metadata is maintained unconditionally so a byte budget set
+	// *after* entries were stored can still evict them in preference order.
+	c.policyMu.Lock()
+	c.policyFor(part).OnHit(matches[0].Doc.ID, time.Now())
+	c.policyMu.Unlock()
 	return matches[0].Doc.Meta["completion"], matches[0].Score, true
 }
 
@@ -144,6 +155,15 @@ func (c *SemanticCache) Store(ctx context.Context, tenantID string, messages []M
 // StoreWithCost records a completed exchange with the caller's true
 // recompute cost, which the W28 eviction policy weighs directly.
 func (c *SemanticCache) StoreWithCost(ctx context.Context, tenantID string, messages []Message, completion string, costUSD float64) {
+	part := c.partition(tenantID)
+	c.policyMu.Lock()
+	if budget, ok := c.budgets[part]; ok && budget == 0 {
+		// A zero budget disables the tenant's cache: no admission at all,
+		// so the miss path stays honest (nothing warms invisibly).
+		c.policyMu.Unlock()
+		return
+	}
+	c.policyMu.Unlock()
 	text := cacheKeyText(messages)
 	vecs, err := c.embedder.Embed(ctx, []string{text})
 	if err != nil {
@@ -151,12 +171,9 @@ func (c *SemanticCache) StoreWithCost(ctx context.Context, tenantID string, mess
 	}
 	// Semantic density: similarity to the nearest already-cached prompt.
 	// Measured before the insert so the entry never counts itself.
-	part := c.partition(tenantID)
 	density := 0.0
-	if c.capacityPerTenant > 0 {
-		if nearest := c.index.Search(part, vecs[0], 1); len(nearest) > 0 && nearest[0].Score > 0 {
-			density = nearest[0].Score
-		}
+	if nearest := c.index.Search(part, vecs[0], 1); len(nearest) > 0 && nearest[0].Score > 0 {
+		density = nearest[0].Score
 	}
 	sum := sha256.Sum256([]byte(text))
 	id := hex.EncodeToString(sum[:16])
@@ -167,9 +184,6 @@ func (c *SemanticCache) StoreWithCost(ctx context.Context, tenantID string, mess
 		Vector:   vecs[0],
 		Meta:     map[string]string{"completion": completion},
 	}); err != nil {
-		return
-	}
-	if c.capacityPerTenant <= 0 {
 		return
 	}
 	now := time.Now()
@@ -183,14 +197,80 @@ func (c *SemanticCache) StoreWithCost(ctx context.Context, tenantID string, mess
 		EmbeddingDensity: density,
 		StoredAt:         now,
 	}, now)
-	for c.index.Count(part) > c.capacityPerTenant {
+	c.accountStoreLocked(part, id, int64(len(completion)))
+	c.evictWhileOverLocked(part, now)
+}
+
+// accountStoreLocked updates the byte accounting for one admission,
+// handling the Upsert-replaces-by-ID case. policyMu must be held.
+func (c *SemanticCache) accountStoreLocked(part, id string, size int64) {
+	sizes, ok := c.entrySizes[part]
+	if !ok {
+		sizes = map[string]int64{}
+		c.entrySizes[part] = sizes
+	}
+	if old, ok := sizes[id]; ok {
+		c.usedBytes[part] -= old
+	}
+	sizes[id] = size
+	c.usedBytes[part] += size
+}
+
+func (c *SemanticCache) removeAccountingLocked(part, id string) {
+	if sizes, ok := c.entrySizes[part]; ok {
+		if size, ok := sizes[id]; ok {
+			c.usedBytes[part] -= size
+			delete(sizes, id)
+		}
+	}
+}
+
+// overBoundLocked reports whether the partition exceeds either bound: the
+// process-wide entry capacity (W28) or the partition's byte budget (the
+// live cache knob). policyMu must be held.
+func (c *SemanticCache) overBoundLocked(part string) bool {
+	if c.capacityPerTenant > 0 && c.index.Count(part) > c.capacityPerTenant {
+		return true
+	}
+	if budget, ok := c.budgets[part]; ok && c.usedBytes[part] > budget {
+		return true
+	}
+	return false
+}
+
+func (c *SemanticCache) evictWhileOverLocked(part string, now time.Time) {
+	policy := c.policyFor(part)
+	for c.overBoundLocked(part) {
 		victim, ok := policy.Victim(now)
 		if !ok {
 			break
 		}
 		c.index.Delete(part, victim)
 		policy.OnRemove(victim)
+		c.removeAccountingLocked(part, victim)
 	}
+}
+
+// SetTenantBudgetBytes sets (or resets) the tenant's cache byte budget and
+// evicts down to it immediately. A negative budget removes the bound.
+func (c *SemanticCache) SetTenantBudgetBytes(tenantID string, budget int64) {
+	part := c.partition(tenantID)
+	c.policyMu.Lock()
+	defer c.policyMu.Unlock()
+	if budget < 0 {
+		delete(c.budgets, part)
+		return
+	}
+	c.budgets[part] = budget
+	c.evictWhileOverLocked(part, time.Now())
+}
+
+// UsedBytes reports the tenant's current cache footprint (completion bytes).
+func (c *SemanticCache) UsedBytes(tenantID string) int64 {
+	part := c.partition(tenantID)
+	c.policyMu.Lock()
+	defer c.policyMu.Unlock()
+	return c.usedBytes[part]
 }
 
 // Stats reports lifetime hit/miss counters for metrics.

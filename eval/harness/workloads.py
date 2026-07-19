@@ -103,6 +103,27 @@ WORKLOAD_CLASSES = {
         shape="slowwave",
         crud_base_ms=40.0,
     ),
+    # --- Wave 4 live-plane cells (PREREG_WAVE4_LIVE_PLANE.md §Cells) -----
+    # Additive definitions for the two frozen cell names that had no class
+    # yet; committed with the harness prep, before any live number exists.
+    # `tier_mixed` is tier-load-bearing: agent traffic is the kind whose
+    # latency the tier table orders mid < large < small (a small model
+    # tool-loops), so tier choice moves both latency and $-cost materially.
+    "tier_mixed": WorkloadClass(
+        name="tier_mixed",
+        base_rps={"chat": 3.0, "agent": 1.5, "crud_read": 5.0},
+        shape="wave",
+        crud_base_ms=60.0,
+    ),
+    # `joint_stress` is the all-three-knobs cell: bursty, cacheable (96-
+    # prompt reuse pool in the live harness), tier-mixed demand that must be
+    # co-scheduled — the cell the joint claim most needs.
+    "joint_stress": WorkloadClass(
+        name="joint_stress",
+        base_rps={"chat": 5.0, "embed": 2.0, "agent": 1.0, "crud_read": 8.0},
+        shape="bursty",
+        crud_base_ms=50.0,
+    ),
 }
 
 

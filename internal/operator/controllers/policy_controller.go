@@ -42,6 +42,12 @@ const (
 // contributions; Status.AppliedReplicas remains each tenant's own share.
 type PolicyReconciler struct {
 	client.Client
+	// GatewayKnobs, when set, pushes the Policy's cache/tier levers to the
+	// live data plane (the AI gateway's admin endpoint). A failed push keeps
+	// Applied false: the actuation gate must cover every knob the plan
+	// claims to have applied, or a run could score an inert-knob plan as
+	// actuated (PREREG_WAVE4_LIVE_PLANE.md §Substrate).
+	GatewayKnobs GatewayKnobsPusher
 }
 
 func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -90,6 +96,17 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := r.ensureTenantConfig(ctx, ns, &policy); err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		return ctrl.Result{}, err
+	}
+
+	if r.GatewayKnobs != nil {
+		if err := r.GatewayKnobs.Push(ctx, policy.Spec.TenantRef,
+			string(policy.Spec.ModelTier), policy.Spec.CacheSizeMB); err != nil {
+			r.setApplied(&policy, metav1.ConditionFalse, "GatewayKnobsFailed", err.Error())
+			if serr := r.Status().Update(ctx, &policy); serr != nil {
+				return ctrl.Result{}, serr
+			}
+			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+		}
 	}
 
 	policy.Status.AppliedReplicas = replicas

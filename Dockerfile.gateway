@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1
+# AI gateway image for the three-knob live plane (PREREG_WAVE4_LIVE_PLANE.md
+# §Substrate 2-3): same multi-stage/distroless pattern as the control-plane
+# image. CGO off; the SQLite driver is pure Go, so the binary is static.
+#
+# NOT VERIFIED LOCALLY: Docker is not installed on the development machine.
+# The build is exercised by the live harness (kind load) on a Docker host.
+
+FROM golang:1.25 AS build
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+    -o /out/ai-gateway ./cmd/ai-gateway
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/ai-gateway /ai-gateway
+USER nonroot:nonroot
+EXPOSE 8081
+ENTRYPOINT ["/ai-gateway"]

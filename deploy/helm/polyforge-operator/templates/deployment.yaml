@@ -54,6 +54,17 @@ spec:
               value: {{ .Values.planner.limits.replicas | quote }}
             - name: POLYFORGE_PLAN_LIMIT_CACHE_MB
               value: {{ .Values.planner.limits.cacheMB | quote }}
+            {{- if .Values.gateway.adminURL }}
+            - name: POLYFORGE_GATEWAY_ADMIN_URL
+              value: {{ .Values.gateway.adminURL | quote }}
+            {{- if .Values.features.adminKeySecret.name }}
+            - name: POLYFORGE_GATEWAY_ADMIN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.features.adminKeySecret.name }}
+                  key: {{ .Values.features.adminKeySecret.key }}
+            {{- end }}
+            {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
