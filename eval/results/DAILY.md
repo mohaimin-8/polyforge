@@ -837,3 +837,9 @@ Appended by the runner every progress tick.
 | 2026-07-19 10:42 | matrix_concurrency | 850/900 | 0 | 2492 runs/h |
 | 2026-07-19 10:42 | matrix_concurrency | 875/900 | 0 | 2564 runs/h |
 | 2026-07-19 10:42 | matrix_concurrency | 900/900 | 0 | 2636 runs/h |
+| 2026-07-19 10:50 | matrix_scale32 | 25/80 | 0 | 214 runs/h |
+| 2026-07-19 10:50 | matrix_scale32 | 50/80 | 0 | 422 runs/h |
+| 2026-07-19 10:51 | matrix_scale32 | 75/80 | 0 | 625 runs/h |
+| 2026-07-19 10:51 | matrix_scale32 | 80/80 | 0 | 611 runs/h |
+| 2026-07-19 11:00 | matrix_scale64 | 25/40 | 0 | 166 runs/h |
+| 2026-07-19 11:03 | matrix_scale64 | 40/40 | 0 | 211 runs/h |
