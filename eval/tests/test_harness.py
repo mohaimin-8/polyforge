@@ -84,7 +84,10 @@ class TestWorkloads:
             for mix in workloads.TENANT_MIXES:
                 for size in workloads.CLUSTER_SIZES:
                     ids, buckets, configs, limits = workloads.build(wl, mix, size, 1, 5)
-                    assert len(ids) == 8 and len(buckets) == 6
+                    # Tenant count is the mix's slot count (8 for the matrix
+                    # mixes; 32/64 for the PREREG_TENANT_SCALE slices).
+                    assert len(ids) == len(workloads.TENANT_MIXES[mix])
+                    assert len(buckets) == 6
                     assert set(configs) == set(ids)
                     assert limits.replicas > 0
 

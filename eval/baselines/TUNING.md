@@ -27,7 +27,15 @@ it automatically.
 | gptcache | target_rho ∈ {0.3…0.8} | **0.3** | 7.362 | 7.58 (0.4-edge of first sweep) |
 | firm | lr × ε × w_slo (27 combos) | **lr=0.1, ε=0.1, w_slo=4** | 0.619 | 0.632 (lr=.3, ε=.1, w_slo=2) |
 | vtc_replica | target_rho ∈ {0.3…0.8} (session 15, `--only` merge; frozen rows untouched) | **0.3** | 0.555 | 0.628 (0.8) |
+| concurrency | target_concurrency {0.5…4.0} × stable_intervals {1,3,6} (session 27, PREREG_CONCURRENCY, `--only` merge) | **c_t=0.5, stable=6** | 0.543 | — (no universal c_t; Knative's 60 s stable window = the winning stable=6) |
 | static | — (no knob: over-provisioned to `replica_max` by definition) | — | — | — |
+
+Note (session 27): the tuned concurrency arm's slice J (0.543) is the
+**strongest reactive baseline measured** — better than tuned HPA (0.555)
+and KEDA (0.573) — so the 2026-stack arm enters the matrix as a
+non-strawman by construction. Its grid shows the same monotone
+SLO-generous pattern as the utilization grids (J rises with c_t), and the
+stable window helps at every c_t: flap suppression is real.
 
 ## Why the utilization grids are bounded below at 0.3
 
