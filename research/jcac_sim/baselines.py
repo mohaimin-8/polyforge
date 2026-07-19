@@ -24,6 +24,7 @@ from model import (
     TenantConfig,
     TenantState,
     apply_action,
+    congestion,
     evaluate_step,
     hit_rate,
 )
@@ -312,6 +313,69 @@ class GPTCacheLRUController:
         return current
 
 
+class ConcurrencyController:
+    """Concurrency/queue-depth autoscaler — the 2026 serving-stack shape.
+
+    The production LLM-serving stack (Knative KPA's concurrency target;
+    AIBrix/llm-d-class pod autoscalers; the K8s Gateway API Inference
+    Extension's queue-depth signals) scales decode pools on **in-flight
+    requests**, not CPU utilization. DEFENSE_QA #22 asked whether the
+    joint controller's win survives against that shape; this arm makes it
+    a measured baseline instead of an argument.
+
+    Signal: in-system work by Little's law under the model's own
+    congestion curve — L_total = λ·W ∝ ρ·g(ρ)·replicas — so the signal
+    grows superlinearly as the pool saturates (queues blow up), unlike
+    HPA's linear ρ. The KPA rule: desired = ceil(L_total / c_target).
+
+    Two vendor-shaped behaviors, both tuned in the W34 grid:
+    - `target_concurrency` c_t: per-replica in-flight work target (the
+      container-concurrency analog; c_t = ρ·g(ρ) at the steady operating
+      point, so c_t 0.5..4.0 spans ρ* 0.33..0.80 under the published
+      a = 1 congestion form).
+    - `stable_intervals`: scale-down stabilization — shrink only after
+      this many consecutive below-target readings (KPA's stable window;
+      scale-UP is immediate, the panic behavior).
+
+    Cache and tier stay fixed: like every reactive baseline, this is a
+    replica autoscaler with no concept of a semantic cache or model tier.
+    """
+
+    name = "concurrency"
+
+    def __init__(self, configs: dict[str, TenantConfig],
+                 target_concurrency: float = 1.5, stable_intervals: int = 3):
+        self.configs = configs
+        self.c_t = target_concurrency
+        self.stable_intervals = max(1, int(stable_intervals))
+        self._below = {tid: 0 for tid in configs}
+
+    def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
+        out = {}
+        for tid, state in states.items():
+            config = self.configs[tid]
+            demand = demands.get(tid, Demand())
+            lam = demand.work_units(state.cache_mb, state.tier)
+            rho = lam / max(1, state.replicas * REPLICA_CAPACITY_WU)
+            in_flight = rho * congestion(lam, state.replicas) * state.replicas
+            desired = (math.ceil(in_flight / self.c_t) if in_flight > 0
+                       else config.replica_min)
+            desired = max(config.replica_min, desired)
+
+            if desired < state.replicas:
+                # Stable window: a transient drain must persist before the
+                # pool shrinks; burst valleys do not flap the deployment.
+                self._below[tid] = self._below.get(tid, 0) + 1
+                if self._below[tid] < self.stable_intervals:
+                    desired = state.replicas
+            else:
+                self._below[tid] = 0
+
+            delta = max(-2, min(2, desired - state.replicas))
+            out[tid] = apply_action(config, state, delta, state.cache_mb, state.tier)
+        return out
+
+
 class VTCReplicaController:
     """Re-implementation of VTC's fair scheduler (Sheng et al., OSDI '24)
     restricted to the replica knob — hence "VTC-replica", the same
@@ -393,6 +457,7 @@ BASELINES = (
     FIRMReplicaController,
     GPTCacheLRUController,
     VTCReplicaController,
+    ConcurrencyController,
 )
 
 

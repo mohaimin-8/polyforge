@@ -70,6 +70,15 @@ GRIDS: dict[str, dict[str, list]] = {
     # knob is the per-tenant need target; the fair-division rule itself
     # has no parameter (that is VTC's point).
     "vtc_replica": {"target_rho": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8]},
+    # Concurrency autoscaler (session 27, PREREG_CONCURRENCY): c_t is the
+    # per-replica in-flight-work target; under the published a=1 congestion
+    # form c_t = rho*g(rho) at steady state, so 0.5..4.0 spans the same
+    # vendor-sane rho* envelope (0.33..0.80) as the utilization grids.
+    # stable_intervals is the KPA stable-window analog at 10 s/interval.
+    "concurrency": {
+        "target_concurrency": [0.5, 1.0, 1.5, 2.5, 4.0],
+        "stable_intervals": [1, 3, 6],
+    },
     # `static` is deliberately absent: over-provisioned-to-peak has no
     # tunable knob; its parameter *is* the replica_max ceiling.
 }

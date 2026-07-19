@@ -196,6 +196,41 @@ class BaselineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             baselines.make_baseline("nope", configs)
 
+    def test_concurrency_scales_up_immediately_on_queue_growth(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = baselines.ConcurrencyController(configs, target_concurrency=1.5)
+        out = ctl.plan({"a": TenantState(replicas=2)}, {"a": demand({"crud_read": 300.0})})
+        self.assertGreater(out["a"].replicas, 2)          # panic scale-up, no window
+        self.assertEqual(out["a"].cache_mb, 128)          # replica-only controller
+        self.assertEqual(out["a"].tier, "small")
+
+    def test_concurrency_superlinear_near_saturation_vs_hpa(self):
+        # At the same operating point (c_t=1.5 <=> rho_t=0.6 under a=1),
+        # the in-flight signal must demand at least as many replicas as
+        # utilization once queues grow — that superlinearity is the point
+        # of the 2026-stack shape.
+        configs = {"a": TenantConfig(tenant_id="a", replica_max=16)}
+        near_saturation = {"a": demand({"crud_read": 750.0})}  # rho ~0.94 at 8
+        kpa = baselines.ConcurrencyController(configs, target_concurrency=1.5)
+        hpa = baselines.HPAController(configs, target_rho=0.6)
+        state = {"a": TenantState(replicas=8)}
+        kpa_out = kpa.plan(state, near_saturation)
+        hpa_out = hpa.plan(state, near_saturation)
+        self.assertGreaterEqual(kpa_out["a"].replicas, hpa_out["a"].replicas)
+
+    def test_concurrency_stable_window_delays_scale_down(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = baselines.ConcurrencyController(
+            configs, target_concurrency=1.5, stable_intervals=3)
+        states = {"a": TenantState(replicas=6)}
+        idle = {"a": demand({"crud_read": 30.0})}
+        first = ctl.plan(states, idle)
+        second = ctl.plan(first, idle)
+        self.assertEqual(first["a"].replicas, 6)   # below-target reading 1: hold
+        self.assertEqual(second["a"].replicas, 6)  # reading 2: still holding
+        third = ctl.plan(second, idle)
+        self.assertLess(third["a"].replicas, 6)    # reading 3: window met, shrink
+
 
 class ForecastMethodTests(unittest.TestCase):
     def _observe_series(self, method: str, series: list[float]) -> Forecast:

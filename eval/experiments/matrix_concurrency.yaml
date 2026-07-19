@@ -1,0 +1,16 @@
+# PREREG_CONCURRENCY.md (session 27): the 2026 serving-stack reactive arm.
+# jcac_anchored (the quotable controller, RESULTS_MOVE_CLAMP) vs the tuned
+# concurrency/queue-depth autoscaler (Knative-KPA / AIBrix shape), with hpa
+# riding along for the CQ-D1 descriptive sanity reading only. Cells mirror
+# the v1 headline matrix exactly.
+name: matrix_concurrency
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac_anchored, concurrency, hpa]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_concurrency.duckdb
+retries: 2
+timeseries_reps: 0

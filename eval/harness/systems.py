@@ -135,6 +135,12 @@ SYSTEMS: dict[str, SystemSpec] = {
         "vtc_replica", lru_eviction=True,
         description="VTC-replica: least-weighted-service-first fair pool division (OSDI '24 re-impl.)",
     ),
+    "concurrency": SystemSpec(
+        "concurrency", lru_eviction=True,
+        description="Concurrency/queue-depth autoscaler (Knative-KPA / AIBrix-shaped, "
+                    "PREREG_CONCURRENCY): in-flight-work signal, stable-window "
+                    "scale-down; cache and tier fixed",
+    ),
     "static": SystemSpec(
         "static", params={"overprovisioned": True}, lru_eviction=True,
         description="Static over-provisioned to peak: never violates, always pays",
