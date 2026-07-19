@@ -83,6 +83,38 @@ Not verified: NetworkPolicy enforcement itself (needs an enforcing-CNI
 cluster; kind/kindnet cannot test it) and PVC mount/ownership on a real
 cluster — both ride along with the next live sitting.
 
+### Second pass — "any other major gaps?" — one found: the toolchain was stale
+
+A deeper sweep over the surfaces earlier sessions had not audited came back
+clean on everything but one item. Cleared with evidence: both Go servers set
+the full timeout quartet + graceful shutdown; `MaxBytesReader`/`LimitReader`
+on every request body and outbound response; admin key and JWT issuer compared
+with `subtle.ConstantTimeCompare`; the hand-rolled JWT verify pins `alg` to
+RS256 (no algorithm-confusion path) and keys by `kid`; operator RBAC is
+narrow with no secrets access; no binaries or datasets tracked in git; CI
+already runs gitleaks over full history, SBOM, golangci-lint, `-race`, and
+lints+renders both Helm charts. The limiter's fail-open on Redis loss is a
+documented deliberate choice (availability, logged), not a gap.
+
+The finding: **the module built on go1.25.5, and govulncheck reported 17
+reachable standard-library vulnerabilities** (crypto/tls including
+GO-2026-5856, crypto/x509, net/http, net/url, html/template, mime,
+net/textproto), all with fix versions ≤ go1.25.12 — reachable through real
+call paths (TLS handshakes in NATS/Redis/OIDC clients, the HTTP servers,
+stream scanning). A supply-chain posture that signs images and ships SBOMs
+was undermined by the toolchain itself.
+
+Fix: `toolchain go1.25.12` pinned in go.mod (comment records why). With
+GOTOOLCHAIN=auto this propagates everywhere without further changes: local
+builds, CI's setup-go, and the `golang:1.25` builder image all auto-switch
+to 1.25.12. Verified: build downloaded and used go1.25.12; gofmt clean;
+`go vet` pass; full `go test ./... -count=1` green (Postgres suite skips
+locally as always — CI proves it); govulncheck rerun = **0 reachable
+vulnerabilities, 0 in imported packages**. The one remaining module-level
+advisory is GO-2026-5932 (`golang.org/x/crypto/openpgp` unmaintained-by-
+design): transitive only, never imported here, and `Fixed in: N/A` — there
+is no version to bump to; recorded as a known non-item.
+
 ### Immediate next tasks
 
 1. On the next kind/Codespace sitting: `helm install` the 0.2.0 chart and

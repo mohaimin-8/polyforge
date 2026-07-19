@@ -2,6 +2,11 @@ module polyforge
 
 go 1.25.0
 
+// Patch-pinned so every build (local, CI, Docker) runs a toolchain with
+// current stdlib security fixes; govulncheck found 17 reachable stdlib
+// vulns on 1.25.5, all fixed by 1.25.12. GOTOOLCHAIN=auto downloads it.
+toolchain go1.25.12
+
 require (
 	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/jackc/pgx/v5 v5.10.0
