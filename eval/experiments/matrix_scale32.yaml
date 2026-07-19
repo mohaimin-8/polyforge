@@ -1,0 +1,14 @@
+# PREREG_TENANT_SCALE.md (session 27): end-to-end 32-tenant slice.
+# Per-tenant world identical to the 8-tenant matrix; cluster caps scaled
+# linearly (medium4x); per-tenant replica_max unchanged.
+name: matrix_scale32
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac_anchored, hpa, keda, concurrency]
+workloads: [crud_bursty, ai_cacheable]
+tenant_mixes: [uniform32, whale32]
+cluster_sizes: [medium4x]
+output: eval/results/raw_sim_scale32.duckdb
+retries: 2
+timeseries_reps: 0

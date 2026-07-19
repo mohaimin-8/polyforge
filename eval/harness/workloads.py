@@ -154,6 +154,19 @@ TENANT_MIXES = {
         + [TenantSlot("standard", 5.0, 1.0)] * 3
         + [TenantSlot("best-effort", 2.0, 0.6)] * 4
     ),
+    # --- Tenant-scale slice (PREREG_TENANT_SCALE.md, session 27) ---------
+    # DEFENSE_QA #13's end-to-end residual: the population-size factor.
+    # Per-tenant demand, budgets, and SLO classes are the 8-tenant mixes'
+    # exactly; only the count grows (whale32 replicates the whale
+    # composition x4, preserving its 1:3:4 ratio). Paired with the *4x/*8x
+    # cluster sizes below so the per-tenant capacity regime is unchanged.
+    "uniform32": [TenantSlot("standard", 5.0, 1.0)] * 32,
+    "whale32": (
+        [TenantSlot("standard", 12.0, 4.0)] * 4
+        + [TenantSlot("standard", 5.0, 1.0)] * 12
+        + [TenantSlot("best-effort", 2.0, 0.6)] * 16
+    ),
+    "uniform64": [TenantSlot("standard", 5.0, 1.0)] * 64,
 }
 
 
@@ -169,6 +182,12 @@ CLUSTER_SIZES = {
     "small": ClusterSize("small", 2048, 24, 6),
     "medium": ClusterSize("medium", 4096, 48, 10),
     "large": ClusterSize("large", 8192, 96, 16),
+    # Tenant-scale slice (PREREG_TENANT_SCALE.md): medium scaled linearly
+    # with the 4x/8x tenant populations — cluster caps grow with the
+    # portfolio, the per-tenant ceiling (replica_max) does not, so the
+    # per-tenant regime is the matrix's and only the packing width grows.
+    "medium4x": ClusterSize("medium4x", 16384, 192, 10),
+    "medium8x": ClusterSize("medium8x", 32768, 384, 10),
 }
 
 
