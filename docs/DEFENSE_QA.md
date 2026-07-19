@@ -181,6 +181,20 @@ stream, and pooling streams destroys forecastability — which is direct
 external support for per-tenant forecasting and for scoping seasonal
 claims to measured periodicity, exactly as v3 H2' bounded them.
 
+**The replay half now generalizes too (session 27,
+`PREREG_TRACE_AZURE.md` → `RESULTS_TRACE_AZURE.md`):** the *headline
+ranking* was replayed on the Azure trace itself — 72 non-overlapping 3 h
+windows tiling all 216 h, 360 runs, round-robin pseudo-tenantization
+disclosed (within-stream pseudo-tenants are near-perfectly correlated:
+the harder packing regime). **HT-AZ PASS with disclosure**: jcac beats
+tuned HPA/KEDA/FIRM on paired J at p ≤ 5.3e-22 with d_z −1.64…−1.85 and
+cost −42% per window, carrying the same disclosed attainment-for-cost
+trade as BurstGPT (violation +0.019 vs HPA/KEDA, p=1.8e-05). The Holt
+secondary replicates (`jcac_v2` − `jcac` J −0.013, p=0.0039), and the
+margin is larger on code-dominant windows. Two independent real traces
+now show the same ranking with the same disclosed trade; per ground
+rules the samples are never pooled.
+
 ## 13. "Eight tenants is not multi-tenancy at scale."
 
 Eight tenants per cluster is the factor under study (composition, not
@@ -212,6 +226,20 @@ that decorrelates cell membership from index recovers it — worst ΔJain
 −0.0053 through 1024 (PF-H1 PASS).** The engineering lesson (hash cells,
 not index round-robin) is itself measured. Contiguous-by-budget
 assignment remains the adversarial worst case, named as future work.
+
+**The end-to-end residual is now measured too (session 27,
+`PREREG_TENANT_SCALE.md` → `RESULTS_TENANT_SCALE.md`):** the full matrix
+J at 32 and 64 tenants, per-tenant world byte-identical to the 8-tenant
+mixes, cluster caps scaled linearly. **TS-H1a PASS at 32 tenants** —
+jcac_anchored beats tuned hpa/keda/concurrency on J, |d_z| 1.02–1.22,
+p ≤ 2.2e-4. At 64 tenants hpa and concurrency PASS (d_z ≈ −1.3); keda
+misses the frozen p<0.01 conjunction bar at p=0.0102 with d_z=−1.02, so
+**TS-H1b is an honest FAIL, reported as direction-consistent** (the
+prereg's declared underpowered case; nulls ledger). The descriptive
+trend is the answer to this question: the J margin *grows* with
+portfolio width (vs HPA: d_z −0.96 at 8 → −1.19 at 32 → −1.32 at 64) —
+the advantage is not an 8-tenant artifact — and portfolio fairness holds
+(jcac Jain 0.994 / 0.9999 at 32/64).
 
 ## 14. "Your live ordinal check disagreed with the simulator."
 
@@ -439,6 +467,21 @@ portfolio-level decision still adds value.
 
 **Do not say:** "−70% versus the state of the art." It is −70% versus
 tuned-but-reactive autoscalers, full stop.
+
+**The reactive half of this question is now measured, not argued
+(session 27, `PREREG_CONCURRENCY.md` → `RESULTS_CONCURRENCY.md`):** the
+matrix gained a Knative-KPA / AIBrix-shaped **concurrency/queue-depth
+autoscaler** — the 2026 stack's reactive *signal* (in-flight work,
+superlinear near saturation, stable-window scale-down), grid-tuned on
+the paper's own J per the W34 protocol. Tuned, it is the **strongest
+reactive baseline in the project** (tuning-slice J 0.543 vs HPA 0.555,
+KEDA 0.573; in-matrix it beats tuned HPA on J at p=5.7e-07 and on
+violation at d_z=−0.52). Against it, jcac_anchored wins the composite J
+at **d_z=−0.96 (p=1.3e-44) with violation parity** (diff −0.0005,
+p=0.88 — no attainment trade needed) at −37% cost (**CQ-H1/H2 PASS**).
+The engine-level half of the answer (composability with llm-d-class
+actuation) stands unchanged above; what this closes is "would a
+modern-signal *reactive scaler* have closed the gap" — measured: no.
 
 ## 23. "Your defence is 'partition the cache per tenant.' That is almost tautologically secure — where is the research contribution?"
 

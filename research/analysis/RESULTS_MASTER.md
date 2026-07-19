@@ -8,9 +8,11 @@ The per-campaign files it consolidates (`RESULTS.md`, `RESULTS_V2.md`, `RESULTS_
 `PHASE7_ORDINAL.md`, and the Wave 1–2 robustness records `BREAKEVEN_TIER.md`,
 `OBJECTIVE_FORM.md`, `RESULTS_TIER_RATIO.md`, `RESULTS_HK_ADOPTION.md`,
 `RESULTS_CHAOS_SIM.md`, `PSEUDO_TENANT.md`, the Wave 4 scaling records
-`PLANNER_CELLS.md`, `PLANNER_CELLS_DEALIAS.md`, and the Wave 5 structural-form and
+`PLANNER_CELLS.md`, `PLANNER_CELLS_DEALIAS.md`, the Wave 5 structural-form and
 solver-audit records `RESULTS_LM_ADOPTION.md`, `RESULTS_MIXTURE_P95.md`,
-`RESULTS_TIER_WU.md`, `COORD_GAP.md`, `COORD_GAP_ANCHORED.md`, `RESULTS_MOVE_CLAMP.md`) are
+`RESULTS_TIER_WU.md`, `COORD_GAP.md`, `COORD_GAP_ANCHORED.md`, `RESULTS_MOVE_CLAMP.md`,
+and the session-27 records `RESULTS_LIVE_CHAOS_P99.md`, `RESULTS_TRACE_AZURE.md`,
+`RESULTS_CONCURRENCY.md`, `RESULTS_TENANT_SCALE.md`) are
 **machine-generated measurement records**: each is written by its analysis script from
 the raw run databases and is immutable once its campaign closes (pre-registration ground
 rules). They stay exactly as they are — this file summarizes and reconciles them but
@@ -27,7 +29,7 @@ context, not results.
 
 | segment | verdict | the citable claim | evidence |
 |---|---|---|---|
-| **Cost** | **WON — confirmatory, synthetic + real** | Beats every tuned baseline on cost in the 1,800-run matrix (d_z 0.66–1.12); on real BurstGPT demand: **−70% cost vs tuned HPA/KEDA/FIRM, p ≤ 4.3e-06, n=96** | `RESULTS.md`, `RESULTS_TRACE2.md` |
+| **Cost** | **WON — confirmatory, synthetic + two real traces** | Beats every tuned baseline on cost in the 1,800-run matrix (d_z 0.66–1.12); on real BurstGPT demand: **−70% cost vs tuned HPA/KEDA/FIRM, p ≤ 4.3e-06, n=96**; reproduced on the second real trace (Azure LLM 2024): **−42%/window, d_z −1.64…−1.85, p ≤ 5.3e-22, n=72**, same disclosed attainment trade | `RESULTS.md`, `RESULTS_TRACE2.md`, `RESULTS_TRACE_AZURE.md` |
 | **SLO** | **Closed honestly — iso-attainment framing** | Violation parity with tuned HPA/KEDA at −43…−48% cost (v2, H1 FAIL); beats FIRM (p=2e-19). Overload regime: reactive scalers buy attainment at 3.2–3.4× spend (v3, H1′ FAIL); forecast mechanism confirmed (H2′ PASS, p=6e-4); spike-class exploratory win (p=5e-5, d_z=0.57, −46% cost). Stopping rule: no further confirmatory attempts | `RESULTS_V2.md`, `RESULTS_V3.md` |
 | **Fairness** | **WON — two dedicated baselines beaten** | Beats FIRM on Jain (d_z=1.0, p=4.5e-47); beats the tuned VTC-replica **on Jain itself** (0.9705 vs 0.9599, p=1.5e-6) at −35% cost and −36% worst-tenant p95 (HV1+HV2 PASS). Own γ-term honestly nulled under injected interference | `VTC_FAIRNESS.md`, `FAIRNESS_V2.md` |
 | **Forecasting** | **WON — on real data** | On the real 10.63M-request BurstGPT trace, damped Holt (jcac_v2's forecaster) cuts one-step RMSE −26.9% vs the trend default (segment 1); the synthetic stand-in's −44.8% seasonal prediction **does not transfer** and is published as such; seasonal's mechanism is confirmed only where real periodicity exists (v3 H2′). **Second real trace (Azure LLM 2024, 44.1M requests): the mechanism boundary reproduces** — seasonal wins −15.6% RMSE exactly on the stream with a genuine daily cycle (code, autocorr 0.57 @ lag 24), loses +48.5% on the weakly-periodic conv stream (persistence wins there), and pooling the streams destroys forecastability (seasonal +104%) — per-stream forecasting, which is what PolyForge does per tenant, is the supported design. Across three real streams no single forecaster dominates; the winner tracks measured periodicity | `FORECAST_TRACE_REAL.md`, `FORECAST_TRACE.md`, `RESULTS_V3.md`, `FORECAST_AZURE.md` |
@@ -37,8 +39,10 @@ context, not results.
 Composite objective J (cost + 2·violation + 0.5·(1−Jain), the objective every baseline
 was tuned on): PolyForge wins against **every** baseline in **every** campaign that
 tested it — v1 (p ≤ 4.6e-25), v2 (p ≤ 6.7e-25), v3 overload (p ≤ 1.3e-11), VTC slice
-(p = 3.3e-19), real-demand replay (p ≤ 5.5e-05) — and is the only Pareto-undominated
-system in the matrix.
+(p = 3.3e-19), real-demand replay (p ≤ 5.5e-05), Azure replay (p ≤ 5.3e-22), the
+2026-stack concurrency arm (p = 1.3e-44 at violation parity), and the 32-tenant slice
+(p ≤ 2.2e-4; 64T: 2/3 arms at p < 0.01, keda at p = 0.0102 direction-consistent) —
+and is the only Pareto-undominated system in the matrix.
 
 ---
 
@@ -280,6 +284,54 @@ the deployed planner (`FORECAST_MR.md` — engineering validation, explicitly no
 thesis claim). The exploratory all-forms arm (`matrix_structreal`, declared in
 PREREG_MIXTURE_P95) informs future-work text only.
 
+### 14. Wave 3 write-up closure — live chaos + p99 formal record (session 27)
+
+The committed session-23 live data (`live_chaos_p99_runs.csv`) scored against the
+frozen readings by `live_chaos_p99.py` → `RESULTS_LIVE_CHAOS_P99.md`. **LC-H1 PASS
+(strongest form):** zero violation through both live faults (planner crash at T=8 min,
+60 s APF throttle at T=14 min) under burst load — no excursion existed to recover
+from. **P99-H1 recorded:** first real live p99 numbers; the SLO verdict is unchanged
+read at p99 (largest tail spread: bursty CRUD p99/p95 ≈ 2.68, live-only per ground
+rule 5). Disclosures: jcac arm only, one execution per cell, shared-PG data plane.
+
+### 15. Azure LLM 2024 replay — the second real demand trace (session 27)
+
+`PREREG_TRACE_AZURE.md` (pushed before any run): 72 non-overlapping 3 h windows
+tiling the 216 h / 44.1M-request trace exactly, 360 runs, 5 tuned systems,
+round-robin pseudo-tenantization disclosed (within-stream pseudo-tenants near-
+perfectly correlated — the harder packing regime). **HT-AZ PASS with disclosure:**
+jcac beats tuned HPA/KEDA/FIRM on paired J at p ≤ 5.3e-22, d_z −1.64…−1.85, cost
+−42%/window (−$25 of ~$60), with the same disclosed attainment trade as BurstGPT
+(violation +0.019 vs HPA/KEDA, p=1.8e-05). ET-AZ1: Holt (`jcac_v2`) beats trend
+(`jcac`) on J (−0.013, p=0.0039) — the v2 configuration replicates on the second
+trace. Margin larger on code-dominant windows. The tiling exhausts the trace: no
+second Azure sample exists. → `RESULTS_TRACE_AZURE.md`
+
+### 16. Concurrency baseline — the 2026-stack reactive arm (session 27)
+
+`PREREG_CONCURRENCY.md` (pushed before the tuning sweep): a Knative-KPA /
+AIBrix-shaped queue-depth autoscaler (in-flight-work signal ρ·g(ρ)·replicas,
+immediate scale-up, stable-window scale-down), grid-tuned per the W34 protocol —
+the winner (c_t=0.5, stable=6, slice J 0.543) is the **strongest reactive baseline
+in the project** (tuned HPA 0.555, KEDA 0.573), non-strawman by construction.
+900-run matrix vs `jcac_anchored` (+hpa descriptive): **CQ-H1 PASS** — J −0.149,
+p=1.3e-44, d_z=−0.96 at **violation parity** (diff −0.0005, p=0.88; no disclosure
+needed) — and **CQ-H2 PASS** (cost −37%, p=7.7e-31). CQ-D1: the modern arm beats
+tuned HPA on J (p=5.7e-07) and violation (d_z=−0.52), and still loses decisively.
+DEFENSE_QA #22's reactive half is measured. → `RESULTS_CONCURRENCY.md`
+
+### 17. Tenant-scale slice — end-to-end J at 32 and 64 tenants (session 27)
+
+`PREREG_TENANT_SCALE.md` (pushed before any run): per-tenant world byte-identical
+to the 8-tenant mixes, cluster caps scaled linearly, 120 runs over
+{jcac_anchored, hpa, keda, concurrency}. **TS-H1a PASS (32T):** beats all three
+arms, |d_z| 1.02–1.22, p ≤ 2.2e-4. **TS-H1b FAIL (64T, honest):** hpa and
+concurrency PASS at d_z ≈ −1.3, but keda misses the frozen conjunction bar at
+p=0.0102 (d_z=−1.02, direction identical — the prereg's declared underpowered
+case; nulls ledger). TS-D1: the J margin *grows* with width (vs HPA d_z −0.96 →
+−1.19 → −1.32 across 8/32/64) — not an 8-tenant artifact. TS-D2: portfolio
+fairness holds (jcac Jain 0.994 / 0.9999). → `RESULTS_TENANT_SCALE.md`
+
 ---
 
 ## Which number to cite (disambiguation)
@@ -304,6 +356,9 @@ PREREG_MIXTURE_P95) informs future-work text only.
 | Controller spec & solver quality | **anchored controller: clamps honored, CD = exact joint optimum 120/120 at N≤3, MC 5/5-5/5-2/2 (`RESULTS_MOVE_CLAMP.md`, `COORD_GAP_ANCHORED.md`)** | the published controller's numbers as the quotable config | the published jcac exceeded its own per-interval clamps (audit-caught, disclosed); its matrices stand as the bit-reproducible record, but the anchored numbers are what the thesis quotes |
 | Per-tenant forecasting | **boundary reproduces one level down: 0 counterexamples, 3 distinct winners across 19 sub-streams (`PSEUDO_TENANT.md`)** | "validated on per-tenant SaaS series" | the decomposition is Model×Log-Type of aggregate traces; true per-tenant series remain unavailable (stated) |
 | Planner scale to 1024 | **planning cells: per-cell p95 ~195 ms flat vs 71 s monolithic (PS-H1); fairness preserved under hash assignment, ΔJain −0.0053 (PF-H1)** (`PLANNER_CELLS*.md`) | round-robin's ΔJain −0.089 as the fairness cost | that drop is a whale-period/cell-count aliasing artifact (PS-H2 FAIL, diagnosed); hash-based cell assignment is the measured fix |
+| Cost/J on the second real trace | **−42%/window, d_z −1.64…−1.85, p ≤ 5.3e-22, n=72, PASS-with-disclosure (`RESULTS_TRACE_AZURE.md`)** | any pooling with BurstGPT numbers | independent trace, different window length (3 h), pseudo-tenantized — own substrate row, never pooled (ground rule 4) |
+| vs the 2026-stack reactive scaler | **J d_z=−0.96 (p=1.3e-44) at violation parity, cost −37% vs the tuned KPA/AIBrix-shaped arm (`RESULTS_CONCURRENCY.md`)** | "beats Knative/AIBrix" | the arm is the *signal shape* (in-flight work + stable window) at sim scale, tuned on our J; engine-level serving efficiency is a different layer (DEFENSE_QA #22) |
+| End-to-end multi-tenancy at width | **TS-H1a PASS at 32T (all arms, \|d_z\| ≥ 1.02); margin grows with width, d_z −0.96 → −1.32 across 8/32/64 (`RESULTS_TENANT_SCALE.md`)** | any unqualified 64T claim | TS-H1b is an honest FAIL (keda p=0.0102 at n=10, direction-consistent); quote 32T as confirmatory, 64T as large-effect + trend |
 
 ## Honest-nulls ledger
 
@@ -312,16 +367,19 @@ of the contribution, not failures to hide: **v2 H1** (SLO vs HPA/KEDA), **v3 H1�
 (overload SLO vs HPA/KEDA), **first-sample HT** (underpowered), **γ-term** (no
 significant fairness contribution under injection), **seasonal non-transfer** (synthetic
 prediction failed on real data), **v1/v2 raw per-metric gate** (structurally impossible
-against by-construction winners; framing documented in `RESULTS.md`), **cache hit quality** (a majority of τ=0.85 hits fail the ρ=0.70 response-agreement proxy — published with its stochasticity-ceiling calibration rather than hidden behind the hit-rate headline), **live ordinal check** (J-winner DISAGREE in both cells — live parity between the arms at the replica-only projection; frozen protocol, published as measured in `PHASE7_ORDINAL.md`).
+against by-construction winners; framing documented in `RESULTS.md`), **cache hit quality** (a majority of τ=0.85 hits fail the ρ=0.70 response-agreement proxy — published with its stochasticity-ceiling calibration rather than hidden behind the hit-rate headline), **live ordinal check** (J-winner DISAGREE in both cells — live parity between the arms at the replica-only projection; frozen protocol, published as measured in `PHASE7_ORDINAL.md`), **TS-H1b** (64-tenant conjunction gate: keda misses p<0.01 at p=0.0102, d_z=−1.02, n=10 — the prereg's declared underpowered case, reported as direction-consistent; `RESULTS_TENANT_SCALE.md`).
 
 ## Cross-campaign ground rules
 
 1. Every campaign's protocol was committed and pushed **before** its first run
-   (13 pre-registrations: PREREG_V2, PREREG_V3, PREREG_TRACE, PREREG_TRACE2, PREREG_VTC,
+   (16 pre-registrations: PREREG_V2, PREREG_V3, PREREG_TRACE, PREREG_TRACE2, PREREG_VTC,
    PREREG_TIER_RATIO, PREREG_HK_ADOPTION, PREREG_CHAOS_SIM, PREREG_PSEUDO_TENANT,
-   PREREG_PLANNER_CELLS, PREREG_PLANNER_CELLS_DEALIAS — plus the two deferred live
-   protocols PREREG_WIRE_ATTACK and PREREG_LIVE_CHAOS_P99 pushed before any live number
-   exists — plus the v1 gate and Phase 4 acceptance frozen in the roadmap/V2_README). The
+   PREREG_PLANNER_CELLS, PREREG_PLANNER_CELLS_DEALIAS, and the session-27 trio
+   PREREG_TRACE_AZURE, PREREG_CONCURRENCY, PREREG_TENANT_SCALE — plus the two deferred
+   live protocols PREREG_WIRE_ATTACK and PREREG_LIVE_CHAOS_P99 pushed before any live
+   number existed, and PREREG_WAVE4_LIVE_PLANE whose harness is desk-complete and whose
+   run remains GPU-gated — plus the v1 gate and Phase 4 acceptance frozen in the
+   roadmap/V2_README). The
    PREREG_PLANNER_CELLS_DEALIAS follow-up is itself the disciplined response to a confound
    found in the frozen PLANNER_CELLS run — a new pre-registration, not a silent re-run.
    From Wave 2 on, each is additionally mirrored to OSF prospectively
@@ -341,7 +399,8 @@ against by-construction winners; framing documented in `RESULTS.md`), **cache hi
    (`research/jcac_sim/model.py`), not live-cluster absolutes.
 
 Regeneration: each campaign file names its own script (`run_analysis.py`,
-`trace_matrix.py --analyze`, `trace_matrix2.py --analyze`, `analysis_vtc.py`,
-`fairness_v2.py`, `forecast_trace_real.py`, `semantic_cache_eval.py`, `advanced.py`).
-This master file is hand-maintained; update it when — and only when — a campaign file
-changes.
+`trace_matrix.py --analyze`, `trace_matrix2.py --analyze`, `trace_matrix_azure.py
+--analyze`, `analysis_vtc.py`, `analysis_concurrency.py`, `analysis_tenant_scale.py`,
+`fairness_v2.py`, `forecast_trace_real.py`, `semantic_cache_eval.py`, `advanced.py`,
+`live_chaos_p99.py`). This master file is hand-maintained; update it when — and only
+when — a campaign file changes.

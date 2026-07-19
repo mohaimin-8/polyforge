@@ -1,6 +1,6 @@
 # Remaining work — the honest ledger of what is left and who owns it
 
-Last updated 2026-07-19 (session 24). This is the single place that answers
+Last updated 2026-07-19 (session 27). This is the single place that answers
 "what is left and who does it." It reconciles `docs/RELEASE_CHECKLIST.md`
 (human-action items), the deferred live campaigns, and the thesis fill-ins into
 one owner-split view. When it disagrees with a campaign file, the campaign file
@@ -22,9 +22,23 @@ exceeding its per-interval actuation clamps*, adjudicated by a pre-registered
 clamp-fixed rerun (all PASS, slightly stronger — `anchor_moves` is now the
 quotable controller); plus live-path engineering (churn-safe/thread-safe
 planner, selectable forecasters, multi-resolution `seasonal_mr` for day-scale
-periodicity). DEFENSE_QA #24–25 carry the new record. What remains is **not
-new measurement** — it is one gated confirmatory experiment, plus submission
-mechanics and thesis polish.
+periodicity). DEFENSE_QA #24–25 carry the new record. **Session 27 closed four more
+fronts in one sitting, every campaign pre-registered and pushed before its
+run:** (1) the B2/B3 formal write-up (`RESULTS_LIVE_CHAOS_P99.md` — LC-H1
+PASS, first live p99 on record); (2) the **B1 harness prep is
+desk-complete and WL-H2-verified** (tier routing + cache byte budgets on
+the production gateway, operator knob push under the Applied gate, live-AI
+harness mode, preflight gate PASS against the real binary — B1 now needs
+only the GPU host); (3) the **second real demand trace replayed**
+(`RESULTS_TRACE_AZURE.md` — HT-AZ PASS-with-disclosure, d_z −1.64…−1.85,
+n=72); (4) the **2026-stack concurrency baseline** added, tuned into the
+strongest reactive arm, and beaten at violation parity
+(`RESULTS_CONCURRENCY.md` — CQ-H1/H2 PASS, d_z=−0.96); plus (5) the
+**end-to-end 32/64-tenant slice** (`RESULTS_TENANT_SCALE.md` — TS-H1a
+PASS, TS-H1b honest FAIL direction-consistent, margin grows with width).
+DEFENSE_QA #12/#13/#22 carry the new records. What remains is **not new
+desk measurement** — it is one gated confirmatory experiment (B1), plus
+submission mechanics and thesis polish.
 
 The three buckets below are ordered by owner, not by priority. The single
 highest-*value* remaining item is in bucket B: the three-knob live plane, which
@@ -55,7 +69,7 @@ the joint controller.
 
 | Item | Status | Gate | Spec |
 |---|---|---|---|
-| **B1. Three-knob live plane** (joint controller, all knobs live) | prereg written this session; harness prep is a Bucket-A task | GPU-capable host (paid GPU or GPU Codespace) | `PREREG_WAVE4_LIVE_PLANE.md` |
+| **B1. Three-knob live plane** (joint controller, all knobs live) | **harness prep DONE + desk-verified (session 27):** tier/cache knobs live on the gateway, operator push under the Applied gate, live-AI harness mode, WL-H2 preflight gate PASS at the desk; run is push-button once a host exists | GPU-capable host (paid GPU or GPU Codespace) | `PREREG_WAVE4_LIVE_PLANE.md` §Status update |
 | **B2. Live chaos campaign** (planner crash + apiserver throttle) | **EXECUTED** (session 23, Codespace, shared-PG data plane): both faults injected live under load, run valid, violations 0 through both — data in `eval/results/live_chaos_p99_runs.csv` (commit 7bdbd4f). Remaining: the formal RESULTS write-up against the prereg's frozen readings | done (write-up = Bucket A) | `PREREG_LIVE_CHAOS_P99.md`, `eval/results/live_chaos_p99_runs.csv` |
 | **B3. Live p99 number** | **EXECUTED** (same sitting): first real live p99 — ai 20.043 ms / crud 1.191 ms (ai_cacheable), crud 8.01 ms (crud_bursty) — same CSV; write-up rides with B2's | done (write-up = Bucket A) | `PREREG_LIVE_CHAOS_P99.md` Part B |
 
