@@ -925,3 +925,69 @@ class GracefulDegradationTests(unittest.TestCase):
             {"a": TenantState()}, {"a": demand({"chat": 500.0})})["a"].state
         self.assertEqual(default.tier, "none")
         self.assertEqual(graceful.tier, "none")
+
+
+class RiskAwareForecastTests(unittest.TestCase):
+    """PREREG_RISK_MPC: plan against a demand quantile instead of the point
+    forecast. The default path must stay bit-identical."""
+
+    def _noisy(self, f: Forecast, n: int = 40, base: float = 10.0):
+        """Feed an alternating-noise series so forecast errors are non-zero."""
+        for i in range(n):
+            f.observe(demand({"chat": base + (5.0 if i % 2 else -5.0)}))
+            f.horizon()  # records the one-step prediction each cycle
+
+    def test_residuals_are_recorded_from_forecast_error(self):
+        f = Forecast(method="trend")
+        self._noisy(f)
+        self.assertIn("chat", f.residuals)
+        self.assertTrue(any(r != 0.0 for r in f.residuals["chat"]))
+        self.assertLessEqual(len(f.residuals["chat"]), Forecast.RESIDUAL_KEEP)
+
+    def test_default_horizon_is_unchanged_by_the_risk_machinery(self):
+        a, b = Forecast(method="trend"), Forecast(method="trend")
+        self._noisy(a)
+        self._noisy(b)
+        # None and 0 both mean "published point-forecast path".
+        self.assertEqual([d.rps for d in a.horizon()],
+                         [d.rps for d in b.horizon(None)])
+        self.assertEqual([d.rps for d in a.horizon()],
+                         [d.rps for d in b.horizon(0)])
+
+    def test_risk_quantile_only_adds_headroom_and_is_monotone(self):
+        f = Forecast(method="trend")
+        self._noisy(f)
+        base = f.horizon()[0].rps["chat"]
+        q80 = f.horizon(0.8)[0].rps["chat"]
+        q95 = f.horizon(0.95)[0].rps["chat"]
+        self.assertGreaterEqual(q80, base)   # never plans below the forecast
+        self.assertGreaterEqual(q95, q80)    # higher quantile = more headroom
+
+    def test_cold_start_does_not_inflate(self):
+        # Below RESIDUAL_MIN samples the quantile is noise: no headroom.
+        f = Forecast(method="trend")
+        for i in range(3):
+            f.observe(demand({"chat": 10.0 + i}))
+            f.horizon()
+        self.assertEqual(f.horizon(0.95)[0].rps["chat"], f.horizon()[0].rps["chat"])
+
+    def test_residuals_survive_a_snapshot_round_trip(self):
+        f = Forecast(method="trend")
+        self._noisy(f)
+        restored = Forecast.from_snapshot(f.snapshot())
+        self.assertEqual(restored.residuals, f.residuals)
+        self.assertEqual([d.rps for d in restored.horizon(0.9)],
+                         [d.rps for d in f.horizon(0.9)])
+
+    def test_risk_controller_provisions_at_least_as_much(self):
+        # Under noisy demand the risk-aware controller must never buy *less*
+        # capacity than the point-forecast controller from the same state.
+        cfg = {"a": TenantConfig(tenant_id="a", replica_max=20)}
+        plain = JCACController(cfg, anchor_moves=True)
+        risky = JCACController(cfg, anchor_moves=True, risk_quantile=0.9)
+        sp = sr = {"a": TenantState()}
+        for i in range(40):
+            d = {"a": demand({"crud_read": 120.0 + (60.0 if i % 2 else -60.0)})}
+            sp = {"a": plain.plan(sp, d)["a"].state}
+            sr = {"a": risky.plan(sr, d)["a"].state}
+        self.assertGreaterEqual(sr["a"].replicas, sp["a"].replicas)

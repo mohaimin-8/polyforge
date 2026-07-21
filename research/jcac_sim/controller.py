@@ -107,11 +107,21 @@ class Forecast:
     coarse: list = field(default_factory=list)  # list[dict kind -> mean rps]
     _accum: dict = field(default_factory=dict)  # kind -> running sum
     _accum_n: int = 0
+    # Risk-aware planning state (PREREG_RISK_MPC): the controller's own
+    # one-step forecast errors, kept per request kind. `_last_pred` is the
+    # prediction the previous horizon() made for the bucket that observe() is
+    # now being handed, so residual = actual - predicted. Recorded always
+    # (cheap, side-effect only); *used* only when a risk quantile is asked
+    # for, so the default planning path stays bit-identical.
+    residuals: dict = field(default_factory=dict)  # kind -> list[float]
+    _last_pred: dict = field(default_factory=dict)  # kind -> float
 
     _KEEP = {"persistence": 1, "trend": 3, "holt": 48, "seasonal": 96,
              "seasonal_mr": 96}
     COARSE_AGG = 60  # observations per coarse bucket (10 min at 10 s)
     COARSE_KEEP = 432  # coarse buckets kept (3 days at 10 min)
+    RESIDUAL_KEEP = 48  # rolling window of forecast errors (8 min at 10 s)
+    RESIDUAL_MIN = 8  # below this the quantile is noise: no inflation
 
     def snapshot(self) -> dict:
         """JSON-serializable forecast state for planner failover (W31).
@@ -129,6 +139,10 @@ class Forecast:
             "coarse": [dict(c) for c in self.coarse],
             "accum": dict(self._accum),
             "accum_n": self._accum_n,
+            # Risk-aware state: a replacement replica that lost its residual
+            # window would plan at the point forecast until it re-warms.
+            "residuals": {k: list(v) for k, v in self.residuals.items()},
+            "last_pred": dict(self._last_pred),
         }
 
     @classmethod
@@ -144,9 +158,22 @@ class Forecast:
                     for bucket in data.get("coarse", [])]
         f._accum = {str(k): float(v) for k, v in data.get("accum", {}).items()}
         f._accum_n = int(data.get("accum_n", 0))
+        f.residuals = {str(k): [float(x) for x in v]
+                       for k, v in (data.get("residuals") or {}).items()}
+        f._last_pred = {str(k): float(v)
+                        for k, v in (data.get("last_pred") or {}).items()}
         return f
 
     def observe(self, demand: Demand) -> None:
+        # Score the previous horizon's one-step prediction against what
+        # actually arrived. Side-effect only: never changes what horizon()
+        # returns unless a risk quantile is requested.
+        if self._last_pred:
+            for kind, pred in self._last_pred.items():
+                r = self.residuals.setdefault(kind, [])
+                r.append(demand.rps.get(kind, 0.0) - pred)
+                if len(r) > self.RESIDUAL_KEEP:
+                    r.pop(0)
         self.history.append(demand)
         keep = max(self._KEEP.get(self.method, 3), self.window)
         if len(self.history) > keep:
@@ -162,12 +189,41 @@ class Forecast:
                 if len(self.coarse) > self.COARSE_KEEP:
                     self.coarse.pop(0)
 
-    def horizon(self) -> list[Demand]:
+    def _residual_quantile(self, kind: str, q: float) -> float:
+        """Empirical q-quantile of this kind's forecast errors, floored at 0.
+
+        Deliberately distribution-free — no normality assumption, just the
+        controller's own realized errors. Floored at zero because the risk
+        knob may only *add* headroom: planning below the point forecast
+        because errors happened to skew negative would be reckless.
+        """
+        r = self.residuals.get(kind)
+        if not r or len(r) < self.RESIDUAL_MIN:
+            return 0.0
+        s = sorted(r)
+        idx = min(len(s) - 1, int(q * (len(s) - 1) + 0.5))
+        return max(0.0, s[idx])
+
+    def horizon(self, risk_quantile: float | None = None) -> list[Demand]:
+        """Per-step demand forecast. With `risk_quantile` in (0.5, 1), each
+        kind is inflated by the empirical quantile of its own recent forecast
+        errors — plan for the demand you'd exceed only (1-q) of the time
+        instead of for the mean (PREREG_RISK_MPC). None/0 = the published
+        point-forecast path, arithmetically unchanged."""
         if not self.history:
             return [Demand()] * HORIZON_STEPS
         last = self.history[-1]
         if self.method == "persistence" or len(self.history) < 2:
-            return [last] * HORIZON_STEPS
+            self._last_pred = dict(last.rps)
+            if not risk_quantile:
+                return [last] * HORIZON_STEPS
+            pad = {k: self._residual_quantile(k, risk_quantile) for k in last.rps}
+            return [
+                Demand(
+                    rps={k: max(0.0, v + pad.get(k, 0.0)) for k, v in last.rps.items()},
+                    crud_base_ms=last.crud_base_ms,
+                )
+            ] * HORIZON_STEPS
 
         kinds = sorted(set().union(*(d.rps.keys() for d in self.history)))
         series = {k: [d.rps.get(k, 0.0) for d in self.history] for k in kinds}
@@ -180,9 +236,15 @@ class Forecast:
         else:
             per_kind = {k: self._trend(series[k]) for k in kinds}
 
+        # Residuals score the *base* forecaster, so record the un-inflated
+        # one-step prediction; otherwise the padding would feed itself.
+        self._last_pred = {k: per_kind[k][0] for k in kinds}
+        pad = ({k: self._residual_quantile(k, risk_quantile) for k in kinds}
+               if risk_quantile else {})
+
         return [
             Demand(
-                rps={k: max(0.0, per_kind[k][step]) for k in kinds},
+                rps={k: max(0.0, per_kind[k][step] + pad.get(k, 0.0)) for k in kinds},
                 crud_base_ms=last.crud_base_ms,
             )
             for step in range(HORIZON_STEPS)
@@ -294,8 +356,20 @@ class JCACController:
         adaptive_capacity: bool = False,
         anchor_moves: bool = False,
         degrade_gracefully: bool = False,
+        risk_quantile: float | None = None,
     ):
         self.configs = configs
+        # PREREG_RISK_MPC: plan against a demand *quantile* instead of the
+        # point forecast. The published controller optimizes cost at the
+        # expected demand, so demand lands above plan roughly half the time —
+        # the mechanism behind the disclosed violation trade. `risk_quantile`
+        # inflates each kind by the empirical quantile of the controller's own
+        # forecast errors, making SLO-tolerance an explicit, tunable knob
+        # rather than an implicit consequence of planning at the mean.
+        # Orthogonal to `adaptive_capacity`, which corrects model optimism
+        # (realized-vs-projected capacity), not demand variance.
+        # None = the published behavior, bit-identical.
+        self.risk_quantile = risk_quantile
         self.weights = weights or Weights()
         self.limits = limits or ClusterLimits()
         self.forecasts = {tid: Forecast(method=forecast_method) for tid in configs}
@@ -394,7 +468,8 @@ class JCACController:
         self._interference = interference or {}
         for tid, demand in demands.items():
             self.forecasts[tid].observe(demand)
-        horizons = {tid: self.forecasts[tid].horizon() for tid in self.configs}
+        horizons = {tid: self.forecasts[tid].horizon(self.risk_quantile)
+                    for tid in self.configs}
 
         chosen = dict(states)
         # Two sweeps of coordinate descent: tenant order is fixed, each

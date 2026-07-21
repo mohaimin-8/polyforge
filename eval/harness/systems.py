@@ -118,6 +118,28 @@ SYSTEMS: dict[str, SystemSpec] = {
                     "fix — the published jcac could move ±4 replicas / two "
                     "cache levels per interval via its second sweep)",
     ),
+    # --- Risk-aware MPC frontier (PREREG_RISK_MPC) -----------------------
+    # Same controller as jcac_anchored, planning against a demand *quantile*
+    # from its own forecast residuals instead of the point forecast. Sweeping
+    # q traces a cost/violation frontier: jcac_anchored is the q=point-forecast
+    # end, jcac_q95 the conservative end. Nothing else differs.
+    "jcac_q70": SystemSpec(
+        "jcac", params={"anchor_moves": True, "risk_quantile": 0.70},
+        description="PolyForge, risk-aware MPC at demand quantile 0.70 (PREREG_RISK_MPC)",
+    ),
+    "jcac_q80": SystemSpec(
+        "jcac", params={"anchor_moves": True, "risk_quantile": 0.80},
+        description="PolyForge, risk-aware MPC at demand quantile 0.80 (PREREG_RISK_MPC)",
+    ),
+    "jcac_q90": SystemSpec(
+        "jcac", params={"anchor_moves": True, "risk_quantile": 0.90},
+        description="PolyForge, risk-aware MPC at demand quantile 0.90 (PREREG_RISK_MPC; "
+                    "the pre-declared RQ-H1 operating point)",
+    ),
+    "jcac_q95": SystemSpec(
+        "jcac", params={"anchor_moves": True, "risk_quantile": 0.95},
+        description="PolyForge, risk-aware MPC at demand quantile 0.95 (PREREG_RISK_MPC)",
+    ),
     # --- W34 baselines ---------------------------------------------------
     "hpa": SystemSpec(
         "hpa", lru_eviction=True,
