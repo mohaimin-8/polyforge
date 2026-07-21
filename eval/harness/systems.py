@@ -141,6 +141,27 @@ SYSTEMS: dict[str, SystemSpec] = {
                     "PREREG_CONCURRENCY): in-flight-work signal, stable-window "
                     "scale-down; cache and tier fixed",
     ),
+    # Learned joint controller (PREREG_LEARNED_CONTROL): the learned analog of
+    # PolyForge's MPC and the joint-knob generalization of FIRM-replica.
+    # `learned_trained` is the primary confirmatory arm — a shared policy
+    # trained offline by baselines/train_learned.py and deployed frozen-greedy
+    # from the committed Q-table (train=False, ε=0). `learned_online` is the
+    # data-efficiency ablation: FIRM-style per-tenant online learning within
+    # the run, which is data-starved over the joint space by design.
+    "learned_trained": SystemSpec(
+        "learned", lru_eviction=True, seeded=True,
+        params={"train": False, "epsilon": 0.0, "shared": True,
+                "qtable_path": str(REPO_ROOT / "research" / "results" / "learned_qtable.json")},
+        description="Learned joint controller, offline-trained shared policy deployed "
+                    "frozen-greedy (PREREG_LEARNED_CONTROL) — the learned analog of "
+                    "PolyForge's MPC",
+    ),
+    "learned_online": SystemSpec(
+        "learned", lru_eviction=True, seeded=True,
+        params={"train": True, "shared": False, "epsilon": 0.1},
+        description="Learned joint controller, FIRM-style per-tenant online learning "
+                    "within the run (PREREG_LEARNED_CONTROL data-efficiency ablation)",
+    ),
     "static": SystemSpec(
         "static", params={"overprovisioned": True}, lru_eviction=True,
         description="Static over-provisioned to peak: never violates, always pays",

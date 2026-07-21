@@ -1,0 +1,19 @@
+# PREREG_LEARNED_CONTROL.md: the learned joint controller, the RL analog of
+# PolyForge's MPC. jcac_anchored (the quotable controller, RESULTS_MOVE_CLAMP)
+# vs learned_trained (offline-trained shared Q-table deployed frozen-greedy)
+# vs learned_online (FIRM-style per-tenant online-learning ablation), with hpa
+# riding along for the LR-D1 descriptive sanity reading only. Cells mirror the
+# v1 headline matrix exactly. NOTE: learned_trained requires the committed
+# artifact research/results/learned_qtable.json — run baselines/train_learned.py
+# (after the prereg is pushed) before this matrix.
+name: matrix_learned
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac_anchored, learned_trained, learned_online, hpa]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_learned.duckdb
+retries: 2
+timeseries_reps: 0

@@ -80,7 +80,11 @@ GRIDS: dict[str, dict[str, list]] = {
         "stable_intervals": [1, 3, 6],
     },
     # `static` is deliberately absent: over-provisioned-to-peak has no
-    # tunable knob; its parameter *is* the replica_max ceiling.
+    # tunable knob; its parameter *is* the replica_max ceiling. `learned`
+    # (PREREG_LEARNED_CONTROL) is also absent here on purpose: it is trained
+    # offline and deployed frozen, so its hyperparameter selection is a
+    # train/val/test protocol owned by baselines/train_learned.py, not this
+    # online-tuning sweep.
 }
 
 

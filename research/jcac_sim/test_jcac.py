@@ -231,6 +231,85 @@ class BaselineTests(unittest.TestCase):
         third = ctl.plan(second, idle)
         self.assertLess(third["a"].replicas, 6)    # reading 3: window met, shrink
 
+    # --- Learned joint controller (PREREG_LEARNED_CONTROL) -----------------
+    def test_learned_respects_all_knob_bounds_and_cache_thrash_rule(self):
+        configs = {"a": TenantConfig(tenant_id="a", replica_min=1, replica_max=6)}
+        ctl = baselines.LearnedJointController(configs, seed=4, epsilon=0.5)  # explore hard
+        states = {"a": TenantState()}
+        prev_ci = model.CACHE_LEVELS_MB.index(states["a"].cache_mb)
+        for _ in range(200):
+            states = ctl.plan(states, {"a": demand({"chat": 8.0, "crud_read": 50.0})})
+            s = states["a"]
+            self.assertGreaterEqual(s.replicas, 1)
+            self.assertLessEqual(s.replicas, 6)
+            self.assertIn(s.cache_mb, model.CACHE_LEVELS_MB)
+            self.assertIn(s.tier, ("small", "mid", "large"))  # never sheds to an outage
+            ci = model.CACHE_LEVELS_MB.index(s.cache_mb)
+            self.assertLessEqual(abs(ci - prev_ci), 1)  # <= one cache level per interval
+            prev_ci = ci
+
+    def test_learned_is_deterministic_under_a_seed(self):
+        def run_once():
+            configs = {"a": TenantConfig(tenant_id="a"),
+                       "b": TenantConfig(tenant_id="b", slo_class="premium")}
+            ctl = baselines.LearnedJointController(configs, seed=3, epsilon=0.2)
+            states = {"a": TenantState(), "b": TenantState()}
+            for i in range(30):
+                states = ctl.plan(states, {"a": demand({"crud_read": float(20 * i)}),
+                                           "b": demand({"chat": 5.0})})
+            return states
+
+        self.assertEqual(run_once(), run_once())
+
+    def test_learned_untrained_default_is_hold(self):
+        # index-0 action is (0,0,0), so an all-zero Q row keeps the config:
+        # an untrained state holds rather than exploring into an outage.
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = baselines.LearnedJointController(configs, seed=0, epsilon=0.0)
+        s0 = {"a": TenantState(replicas=3, cache_mb=128, tier="small")}
+        out = ctl.plan(s0, {"a": demand({"chat": 5.0})})
+        self.assertEqual(out["a"], s0["a"])
+
+    def test_learned_exercises_all_three_knobs(self):
+        # Distinguishes the joint learner from replica-only RL (FIRM): over a
+        # run it moves cache and tier, not just replicas.
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = baselines.LearnedJointController(configs, seed=1, epsilon=0.3)
+        states, caches, tiers = {"a": TenantState()}, set(), set()
+        for _ in range(80):
+            states = ctl.plan(states, {"a": demand({"chat": 6.0})})
+            caches.add(states["a"].cache_mb)
+            tiers.add(states["a"].tier)
+        self.assertGreater(len(caches), 1)
+        self.assertGreater(len(tiers), 1)
+
+    def test_learned_shared_table_learns_and_round_trips(self):
+        import os
+        import tempfile
+
+        configs = {"a": TenantConfig(tenant_id="a", slo_class="premium")}
+        ctl = baselines.LearnedJointController(configs, seed=2, epsilon=0.3, shared=True)
+        states = {"a": TenantState(replicas=1)}
+        for _ in range(60):
+            states = ctl.plan(states, {"a": demand({"crud_read": 300.0})})
+        self.assertTrue([r for r in ctl._shared_q.values() if max(r) != min(r)])  # learned
+
+        path = os.path.join(tempfile.gettempdir(), "pf_learned_test_q.json")
+        try:
+            ctl.save_q(path)
+            loaded = baselines.LearnedJointController(configs, seed=9, epsilon=0.0,
+                                                      qtable_path=path)
+            self.assertEqual(loaded._shared_q, ctl._shared_q)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_make_baseline_creates_learned(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = baselines.make_baseline("learned", configs, epsilon=0.05, replay_batch=0)
+        self.assertEqual(ctl.epsilon, 0.05)
+        self.assertEqual(ctl.replay_batch, 0)
+
 
 class ForecastMethodTests(unittest.TestCase):
     def _observe_series(self, method: str, series: list[float]) -> Forecast:

@@ -10,6 +10,7 @@ transition (`apply_action`), so no baseline can cheat the guardrails.
 
 from __future__ import annotations
 
+import json
 import math
 import random
 
@@ -449,6 +450,232 @@ class VTCReplicaController:
         return out
 
 
+# The learned joint controller optimizes the same cost/violation surface the
+# MPC does; these are controller.COST_SCALE_USD (the shared cost normalizer)
+# and the serving tiers a learner is allowed to route to ("none" is a
+# designed AI outage the MPC only reaches as an infeasibility fallback, so
+# the learned arm is not given it — an exclusion that favors the baseline).
+_COST_SCALE_USD = 0.01
+_SERVING_TIERS = ("small", "mid", "large")
+_SLO_CLASSES = ("premium", "standard", "best-effort")  # matches SLO_CLASS_CYCLE
+
+# Joint action lattice for the learned controller, ordered so index 0 is the
+# no-op (hold) — the default an untrained state falls back to. Δreplicas is
+# the ±2/interval clamp every controller obeys; Δcache/Δtier move one level.
+_LEARNED_DR = (0, -1, 1, -2, 2)
+_LEARNED_DC = (0, -1, 1)
+_LEARNED_DT = (0, -1, 1)
+_LEARNED_ACTIONS = tuple(
+    (dr, dc, dt) for dr in _LEARNED_DR for dc in _LEARNED_DC for dt in _LEARNED_DT
+)
+
+
+class LearnedJointController:
+    """Model-free RL over the FULL joint action space — the learned analog of
+    PolyForge's MPC, and the direct joint-knob generalization of
+    `FIRMReplicaController`.
+
+    FIRM-replica (above) showed that tabular Q-learning can drive **one**
+    knob (replicas). PolyForge's thesis is that the interesting problem is
+    *joint* cross-layer coordination — replicas, semantic cache, and model
+    tier moved together against one objective — which it solves by MPC
+    (`controller.py`). The obvious 2026 reviewer question is whether the
+    hand-designed optimizer is necessary at all: could a **learned** policy
+    discover the joint coordination on its own? This controller is that
+    question made measurable. It uses exactly FIRM's machinery — per-tenant
+    tabular Q-learning, ε-greedy, seeded, learning online during the run —
+    but over the same ≤60-candidate joint lattice the MPC enumerates:
+
+        action u = (Δreplicas ∈ {-2,-1,0,+1,+2},
+                    Δcache_level ∈ {-1,0,+1}   (one level per interval),
+                    Δtier ∈ {-1,0,+1}          over small/mid/large)
+
+    ordered so index 0 is *hold* — an untrained state defaults to holding
+    its configuration rather than exploring into an outage, a fair prior.
+
+    Reward mirrors the objective the MPC minimizes and every baseline is
+    tuned on — cost and SLO overshoot on the same scales
+    (`_COST_SCALE_USD`, `log1p(excess)` exactly as `JCACController._project`
+    uses) — so the learner is optimizing the paper's surface, not a proxy:
+
+        r = -(reward_alpha · cost_norm + reward_beta · log1p(excess))
+
+    The fairness (γ·(1−Jain)) term is cross-tenant and, like FIRM, is not in
+    the per-tenant reward; the resulting Jain is measured, not assumed.
+
+    To make this a *strong* learned arm rather than a straw man, it gets
+    experience replay (the standard sample-efficiency tool for model-free
+    RL): each step replays `replay_batch` past transitions from a bounded
+    buffer, so a short deployment episode yields many more Q-updates than
+    online SARSA alone. Its exploration/learning knobs are swept in the same
+    W34 grid as every other baseline. What the experiment then measures is
+    whether that machinery, given the joint action space, recovers the
+    cross-layer coordination the MPC computes with **zero** learning — the
+    scientific point is the comparison, whichever way it falls.
+
+    Cache/tier bounds and the ±1-cache-level thrash rule are enforced by
+    construction; replica bounds by the shared `apply_action`. Like every
+    reactive baseline it evicts LRU (no W28 cost-aware eviction) and, like
+    the FIRM/HPA/KEDA family, does not itself honor cluster caps (the
+    v3-disclosed asymmetry that is strict against PolyForge). Seeded, so the
+    harness's per-rep seed makes runs reproducible.
+
+    Two deployment shapes (PREREG_LEARNED_CONTROL):
+    - `shared=True` (default): one **tenant-agnostic** Q-table keyed by the
+      discretized state — which *includes the SLO class* — so every tenant's
+      transitions pool into one policy that transfers across episodes and
+      tenant counts. This is the table an offline trainer fills and freezes;
+      `save_q`/`load_q` persist it as a committed artifact (the RL analog of
+      `cmd/classifier-train`'s model). Deploy it with `epsilon=0` for a
+      frozen greedy policy.
+    - `shared=False`: FIRM-style per-tenant tables learned online within the
+      run — the pure-online ablation, which is data-starved over the joint
+      space by design (that contrast is part of what the campaign measures).
+    """
+
+    name = "learned"
+    _actions = _LEARNED_ACTIONS  # index 0 == (0,0,0) == hold
+
+    def __init__(
+        self,
+        configs: dict[str, TenantConfig],
+        learning_rate: float = 0.3,
+        discount: float = 0.7,
+        epsilon: float = 0.1,
+        reward_alpha: float = 1.0,
+        reward_beta: float = 2.0,
+        replay_batch: int = 8,
+        replay_size: int = 2000,
+        shared: bool = True,
+        train: bool = True,
+        qtable_path: str | None = None,
+        seed: int = 0,
+    ):
+        self.configs = configs
+        self.lr = learning_rate
+        self.discount = discount
+        self.epsilon = epsilon
+        self.reward_alpha = reward_alpha
+        self.reward_beta = reward_beta
+        self.replay_batch = max(0, int(replay_batch))
+        self.replay_size = max(1, int(replay_size))
+        self.shared = shared
+        # train=False is the frozen deployment: pure greedy inference from the
+        # loaded table, no online updates — the committed artifact fully
+        # determines behavior (and the run is reproducible from it alone).
+        self.train = train
+        self.rng = random.Random(seed)
+        # Shared: one state-keyed table for all tenants. Per-tenant: q[tid].
+        self._shared_q: dict[tuple, list[float]] = {}
+        self._tenant_q: dict[str, dict[tuple, list[float]]] = {tid: {} for tid in configs}
+        self._last: dict[str, tuple[tuple, int]] = {}
+        self._buffer: list[tuple[str, tuple, int, float, tuple]] = []
+        if qtable_path:
+            self.load_q(qtable_path)
+
+    def _table(self, tid: str) -> dict[tuple, list[float]]:
+        return self._shared_q if self.shared else self._tenant_q[tid]
+
+    def _row(self, tid: str, s: tuple) -> list[float]:
+        return self._table(tid).setdefault(s, [0.0] * len(self._actions))
+
+    def save_q(self, path: str) -> None:
+        """Persist the shared policy as JSON: a list of [state_list, q_row]
+        pairs (tuple keys are not JSON-native). Only the shared table is a
+        deployable artifact; per-tenant tables are run-local."""
+        rows = [[list(s), row] for s, row in sorted(self._shared_q.items())]
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"actions": len(self._actions), "q": rows}, f)
+
+    def load_q(self, path: str) -> None:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if int(data.get("actions", len(self._actions))) != len(self._actions):
+            raise ValueError("qtable action count does not match this controller")
+        self._shared_q = {tuple(s): [float(v) for v in row] for s, row in data["q"]}
+
+    def _observe(self, config: TenantConfig, state: TenantState, demand: Demand):
+        """Discretized joint state + the immediate reward of the transition
+        that produced `state`. The state carries what each knob needs:
+        the SLO class (so a shared policy conditions on the target),
+        utilization (replicas), AI tail pressure (tier), cacheable intensity
+        (cache), plus the current cache/tier index because moves are
+        relative."""
+        slo_b = _SLO_CLASSES.index(config.slo_class) if config.slo_class in _SLO_CLASSES else 1
+        lam = demand.work_units(state.cache_mb, state.tier)
+        rho = lam / max(1, state.replicas * REPLICA_CAPACITY_WU)
+        rho_b = min(9, int(rho * 5.0))  # 0..9 in ρ steps of 0.2 (FIRM's bucketing)
+        m = evaluate_step(config, state, demand)
+        viol_b = 0 if m.violation <= 0.0 else (1 if m.violation < 0.5 else 2)
+
+        ai_rps = sum(demand.rps.get(k, 0.0) for k in AI_KINDS)
+        if ai_rps > 0.0:
+            target = SLO_BASE_MS["ai"] * SLO_CLASS_FACTOR[config.slo_class]
+            ratio = m.ai_p95_ms / target if target > 0 else 0.0
+            ai_b = 0 if ratio < 0.5 else (1 if ratio <= 1.0 else 2)
+        else:
+            ai_b = 0
+        cacheable = sum(demand.rps.get(k, 0.0) * CACHEABLE_FRACTION[k] for k in AI_KINDS)
+        cache_load_b = 0 if cacheable < 0.05 else (1 if cacheable < 2.0 else 2)
+
+        cache_idx = CACHE_LEVELS_MB.index(state.cache_mb) if state.cache_mb in CACHE_LEVELS_MB else 0
+        tier_idx = _SERVING_TIERS.index(state.tier) if state.tier in _SERVING_TIERS else 0
+
+        s = (slo_b, rho_b, viol_b, ai_b, cache_load_b, cache_idx, tier_idx)
+        reward = -(self.reward_alpha * m.cost_usd / _COST_SCALE_USD
+                   + self.reward_beta * math.log1p(m.excess))
+        return s, reward
+
+    def _learn(self, tid: str, prev_s: tuple, prev_a: int, reward: float, s: tuple) -> None:
+        table = self._table(tid)
+        prev_row = table.setdefault(prev_s, [0.0] * len(self._actions))
+        row = table.setdefault(s, [0.0] * len(self._actions))
+        prev_row[prev_a] += self.lr * (reward + self.discount * max(row) - prev_row[prev_a])
+
+    def _replay(self) -> None:
+        if self.replay_batch == 0 or not self._buffer:
+            return
+        for _ in range(self.replay_batch):
+            tid, prev_s, prev_a, reward, s = self._buffer[self.rng.randrange(len(self._buffer))]
+            self._learn(tid, prev_s, prev_a, reward, s)
+
+    def _apply(self, config: TenantConfig, state: TenantState, action: tuple) -> TenantState:
+        dr, dc, dt = action
+        ci = CACHE_LEVELS_MB.index(state.cache_mb) if state.cache_mb in CACHE_LEVELS_MB else 0
+        ci = max(0, min(len(CACHE_LEVELS_MB) - 1, ci + dc))
+        ti = _SERVING_TIERS.index(state.tier) if state.tier in _SERVING_TIERS else 0
+        ti = max(0, min(len(_SERVING_TIERS) - 1, ti + dt))
+        return apply_action(config, state, dr, CACHE_LEVELS_MB[ci], _SERVING_TIERS[ti])
+
+    def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
+        out = {}
+        for tid, state in states.items():
+            config = self.configs[tid]
+            demand = demands.get(tid, Demand())
+            s, reward = self._observe(config, state, demand)
+            row = self._row(tid, s)
+
+            if self.train:
+                # Learn from the previous transition (Q-learning bootstrap on
+                # the greedy value), then remember it for replay.
+                if tid in self._last:
+                    prev_s, prev_a = self._last[tid]
+                    self._learn(tid, prev_s, prev_a, reward, s)
+                    self._buffer.append((tid, prev_s, prev_a, reward, s))
+                    if len(self._buffer) > self.replay_size:
+                        self._buffer.pop(0)
+
+            if self.train and self.rng.random() < self.epsilon:
+                a = self.rng.randrange(len(self._actions))
+            else:
+                a = row.index(max(row))  # ties → index 0 == hold
+            self._last[tid] = (s, a)
+            out[tid] = self._apply(config, state, self._actions[a])
+        if self.train:
+            self._replay()
+        return out
+
+
 BASELINES = (
     StaticController,
     HPAController,
@@ -458,6 +685,7 @@ BASELINES = (
     GPTCacheLRUController,
     VTCReplicaController,
     ConcurrencyController,
+    LearnedJointController,
 )
 
 
