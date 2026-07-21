@@ -357,8 +357,20 @@ class JCACController:
         anchor_moves: bool = False,
         degrade_gracefully: bool = False,
         risk_quantile: float | None = None,
+        risk_cost_at_point: bool = False,
     ):
         self.configs = configs
+        # PREREG_RISK_BUDGET: the one changed factor the RESULTS_RISK null
+        # identified. Inflating demand for the SLO term also inflated
+        # *projected spend* (tier cost scales with demand), so candidates
+        # failed the per-tenant budget filter and the controller shed to
+        # tier="none" — cheap, and a total SLO miss. The correction: size
+        # capacity against the risk-inflated demand, but project cost and
+        # check the budget against the POINT forecast, because you are billed
+        # for the demand that *arrives*, not the demand you provisioned
+        # against. False = the published (null) behavior, kept so
+        # matrix_risk replays bit-identically.
+        self.risk_cost_at_point = risk_cost_at_point
         # PREREG_RISK_MPC: plan against a demand *quantile* instead of the
         # point forecast. The published controller optimizes cost at the
         # expected demand, so demand lands above plan roughly half the time —
@@ -470,6 +482,12 @@ class JCACController:
             self.forecasts[tid].observe(demand)
         horizons = {tid: self.forecasts[tid].horizon(self.risk_quantile)
                     for tid in self.configs}
+        # Split projection: SLO is judged on the risk-inflated demand, money on
+        # the point forecast. None keeps the single-horizon path exactly.
+        cost_horizons = None
+        if self.risk_quantile and self.risk_cost_at_point:
+            cost_horizons = {tid: self.forecasts[tid].horizon()
+                             for tid in self.configs}
 
         chosen = dict(states)
         # Two sweeps of coordinate descent: tenant order is fixed, each
@@ -480,11 +498,15 @@ class JCACController:
         origin = dict(states) if self.anchor_moves else None
         for _ in range(2):
             for tid in sorted(self.configs):
-                chosen[tid] = self._best_for_tenant(tid, chosen, horizons, origin)
+                chosen[tid] = self._best_for_tenant(tid, chosen, horizons, origin,
+                                                    cost_horizons)
 
         plans = {}
         for tid, state in chosen.items():
             cost, violation, _ = self._project(tid, state, horizons[tid])
+            if cost_horizons is not None:
+                # Report the spend you will actually be billed for.
+                cost = self._project(tid, state, cost_horizons[tid])[0]
             self._projected[tid] = violation  # feedback baseline (adaptive)
             plans[tid] = PlanEntry(state=state, projected_cost_usd=cost, projected_violation=violation)
         return plans
@@ -511,6 +533,7 @@ class JCACController:
         chosen: dict[str, TenantState],
         horizons: dict[str, list[Demand]],
         origin: dict[str, TenantState] | None = None,
+        cost_horizons: dict[str, list[Demand]] | None = None,
     ) -> TenantState:
         config = self.configs[tid]
         current = chosen[tid]
@@ -528,6 +551,8 @@ class JCACController:
             if oid == tid:
                 continue
             cost, viol, obj = self._project(oid, ostate, horizons[oid])
+            if cost_horizons is not None:
+                cost = self._project(oid, ostate, cost_horizons[oid])[0]
             other_cost += cost
             other_obj += obj
             other_satisfaction.append(1.0 - viol)
@@ -544,6 +569,11 @@ class JCACController:
                     if others_replicas + candidate.replicas > self.limits.replicas:
                         continue
                     cost, viol, obj = self._project(tid, candidate, horizons[tid])
+                    if cost_horizons is not None:
+                        # Budget is a *money* guardrail: test it against the
+                        # spend the arriving demand will bill, not against the
+                        # headroom we provisioned for.
+                        cost = self._project(tid, candidate, cost_horizons[tid])[0]
                     if cost > budget_per_step:
                         continue
                     switches = (

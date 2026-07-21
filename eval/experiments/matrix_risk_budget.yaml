@@ -1,0 +1,17 @@
+# PREREG_RISK_BUDGET.md: the budget-corrected risk frontier — the disciplined
+# follow-up to the RESULTS_RISK null (one changed factor: cost projected and
+# budget checked at the POINT forecast while capacity is sized at the risk
+# quantile). jcac_anchored is the point-forecast end; hpa/keda/concurrency are
+# the tuned reactive arms the RB-H3 strict-domination gate is scored against.
+# Cells mirror the v1 headline matrix exactly.
+name: matrix_risk_budget
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac_anchored, jcac_q70c, jcac_q80c, jcac_q90c, jcac_q95c, hpa, keda, concurrency]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_risk_budget.duckdb
+retries: 2
+timeseries_reps: 0

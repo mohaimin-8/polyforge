@@ -140,6 +140,33 @@ SYSTEMS: dict[str, SystemSpec] = {
         "jcac", params={"anchor_moves": True, "risk_quantile": 0.95},
         description="PolyForge, risk-aware MPC at demand quantile 0.95 (PREREG_RISK_MPC)",
     ),
+    # --- Budget-corrected risk frontier (PREREG_RISK_BUDGET) --------------
+    # The one changed factor after the RESULTS_RISK null: capacity is sized
+    # at the risk quantile, but cost is projected and the budget checked at
+    # the POINT forecast — you are billed for the demand that arrives, not
+    # the demand you provisioned against. Everything else identical to the
+    # jcac_q* arms above (which stay untouched as the published null).
+    "jcac_q70c": SystemSpec(
+        "jcac", params={"anchor_moves": True, "risk_quantile": 0.70,
+                        "risk_cost_at_point": True},
+        description="PolyForge, budget-corrected risk MPC at q=0.70 (PREREG_RISK_BUDGET)",
+    ),
+    "jcac_q80c": SystemSpec(
+        "jcac", params={"anchor_moves": True, "risk_quantile": 0.80,
+                        "risk_cost_at_point": True},
+        description="PolyForge, budget-corrected risk MPC at q=0.80 (PREREG_RISK_BUDGET)",
+    ),
+    "jcac_q90c": SystemSpec(
+        "jcac", params={"anchor_moves": True, "risk_quantile": 0.90,
+                        "risk_cost_at_point": True},
+        description="PolyForge, budget-corrected risk MPC at q=0.90 (PREREG_RISK_BUDGET; "
+                    "the pre-declared RB operating point)",
+    ),
+    "jcac_q95c": SystemSpec(
+        "jcac", params={"anchor_moves": True, "risk_quantile": 0.95,
+                        "risk_cost_at_point": True},
+        description="PolyForge, budget-corrected risk MPC at q=0.95 (PREREG_RISK_BUDGET)",
+    ),
     # --- W34 baselines ---------------------------------------------------
     "hpa": SystemSpec(
         "hpa", lru_eviction=True,

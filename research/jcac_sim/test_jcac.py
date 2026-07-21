@@ -991,3 +991,58 @@ class RiskAwareForecastTests(unittest.TestCase):
             sp = {"a": plain.plan(sp, d)["a"].state}
             sr = {"a": risky.plan(sr, d)["a"].state}
         self.assertGreaterEqual(sr["a"].replicas, sp["a"].replicas)
+
+
+class RiskBudgetCorrectionTests(unittest.TestCase):
+    """PREREG_RISK_BUDGET: the one changed factor after the RESULTS_RISK null —
+    size capacity at the risk quantile, but project cost and check the budget
+    at the point forecast (you are billed for the demand that arrives, not the
+    demand you provisioned against)."""
+
+    def _run(self, params, steps=60, rate=120.0, jitter=60.0):
+        cfg = {"a": TenantConfig(tenant_id="a", replica_max=20)}
+        ctl = JCACController(cfg, anchor_moves=True, **params)
+        s = {"a": TenantState()}
+        sheds = 0
+        for i in range(steps):
+            d = {"a": demand({"chat": rate / 20.0 + (jitter / 20.0 if i % 2 else 0.0)})}
+            s = {"a": ctl.plan(s, d)["a"].state}
+            sheds += 1 if s["a"].tier == "none" else 0
+        return s, sheds
+
+    def test_default_flag_off_is_the_published_null_path(self):
+        # risk_cost_at_point defaults False so matrix_risk replays exactly.
+        cfg = {"a": TenantConfig(tenant_id="a")}
+        ctl = JCACController(cfg, risk_quantile=0.9)
+        self.assertFalse(ctl.risk_cost_at_point)
+
+    def test_correction_never_sheds_more_than_the_point_forecast(self):
+        # The null's failure mode: inflated projected tier spend tripped the
+        # budget filter into tier="none" *more often* than at the point
+        # forecast (RESULTS_RISK probe: 0 vs 2/4 sheds). With the budget
+        # checked at the point forecast, affordability is identical by
+        # construction, so the corrected controller can never shed more.
+        _, sheds_point = self._run({})
+        _, sheds_uncorr = self._run({"risk_quantile": 0.95})
+        _, sheds_corr = self._run({"risk_quantile": 0.95, "risk_cost_at_point": True})
+        self.assertLessEqual(sheds_corr, sheds_point)
+        self.assertGreaterEqual(sheds_uncorr, sheds_corr)
+
+    def test_corrected_controller_provisions_at_least_as_much(self):
+        s_point, _ = self._run({})
+        s_corr, _ = self._run({"risk_quantile": 0.9, "risk_cost_at_point": True})
+        self.assertGreaterEqual(s_corr["a"].replicas, s_point["a"].replicas)
+
+    def test_flag_without_quantile_is_inert(self):
+        # risk_cost_at_point only means anything alongside a quantile; alone
+        # it must leave the published single-horizon path untouched.
+        cfg = {"a": TenantConfig(tenant_id="a")}
+        base = JCACController(cfg)
+        flagged = JCACController(cfg, risk_cost_at_point=True)
+        s = {"a": TenantState()}
+        d = {"a": demand({"chat": 5.0, "crud_read": 40.0})}
+        for _ in range(10):
+            sb = base.plan(s, d)["a"].state
+            sf = flagged.plan(s, d)["a"].state
+            self.assertEqual(sb, sf)
+            s = {"a": sb}
