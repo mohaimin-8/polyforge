@@ -367,6 +367,38 @@ combos; winner lr 0.3 / replay 16 / β 3.0). 1,200 runs, all valid.
 - Sanity: MPC vs tuned HPA reproduces the standing result (d_z=−1.01,
   p=1.7e-47). → `RESULTS_LEARNED.md`
 
+### 19. Risk-aware (quantile) MPC — published null with a diagnosis (session 29)
+
+`PREREG_RISK_MPC.md` (pushed at b2900b2 before any run). The base controller
+plans at the *expected* demand, so realized demand lands above plan roughly half
+the time — the structural mechanism behind the disclosed attainment-for-spend
+trade. The campaign replaced the point forecast with a **quantile of the
+controller's own realized forecast errors** (distribution-free, floored at zero),
+sweeping q ∈ {0.70, 0.80, 0.90, 0.95} against the point-forecast arm and the three
+tuned reactive arms. 2,400 runs, all valid. `risk_quantile=None` was verified
+**bit-identical (drift 0.00e+00)** before the anchor push, so no closed campaign
+is affected.
+
+- **RQ-H1 FAIL / RQ-H2 FAIL — and the failure is *perfectly monotone in the
+  reverse direction* (ρ = +1 / −1).** Raising the quantile made the controller
+  spend **less** (2.357 → 2.001 USD) and violate **more** (0.0687 → 0.0929).
+- **Diagnosed (post-run, prose only — the PLANNER_CELLS precedent).** The knob was
+  applied to the whole projection, so inflating demand also inflated *projected
+  tier spend*; candidates then failed the per-tenant budget filter and the
+  controller took its designed shed fallback (`tier="none"`, an AI outage) — cheap,
+  and a total SLO miss. Evidence: the CRUD classes, which carry no tier spend, show
+  **no effect** (p = 0.27, 0.92) while all three AI classes move sharply; a targeted
+  probe counts `tier="none"` **0 / 2 / 4** times at point / q=0.90 / q=0.95 while
+  mean replicas *rise* 2.64 → 2.93 — the capacity half worked; the budget
+  interaction defeated it. **The knob was fighting the Budget CRD, not the demand.**
+- Descriptive, unaffected by the null: every PolyForge arm remains far cheaper than
+  every tuned reactive arm (cost −44%…−50% vs hpa/keda/concurrency, p ≤ 3.5e-34),
+  and tuned HPA and Concurrency are Pareto-dominated by frontier arms.
+- The one changed factor for a disciplined follow-up is identified and stated —
+  size capacity at the risk quantile, but project cost and check the budget at the
+  point forecast — and requires its **own** pre-registration; this campaign's
+  stopping rule forbids re-running it. → `RESULTS_RISK.md`, fig18
+
 ---
 
 ## Which number to cite (disambiguation)
@@ -403,7 +435,7 @@ of the contribution, not failures to hide: **v2 H1** (SLO vs HPA/KEDA), **v3 H1�
 (overload SLO vs HPA/KEDA), **first-sample HT** (underpowered), **γ-term** (no
 significant fairness contribution under injection), **seasonal non-transfer** (synthetic
 prediction failed on real data), **v1/v2 raw per-metric gate** (structurally impossible
-against by-construction winners; framing documented in `RESULTS.md`), **cache hit quality** (a majority of τ=0.85 hits fail the ρ=0.70 response-agreement proxy — published with its stochasticity-ceiling calibration rather than hidden behind the hit-rate headline), **live ordinal check** (J-winner DISAGREE in both cells — live parity between the arms at the replica-only projection; frozen protocol, published as measured in `PHASE7_ORDINAL.md`), **TS-H1b** (64-tenant conjunction gate: keda misses p<0.01 at p=0.0102, d_z=−1.02, n=10 — the prereg's declared underpowered case, reported as direction-consistent; `RESULTS_TENANT_SCALE.md`).
+against by-construction winners; framing documented in `RESULTS.md`), **cache hit quality** (a majority of τ=0.85 hits fail the ρ=0.70 response-agreement proxy — published with its stochasticity-ceiling calibration rather than hidden behind the hit-rate headline), **live ordinal check** (J-winner DISAGREE in both cells — live parity between the arms at the replica-only projection; frozen protocol, published as measured in `PHASE7_ORDINAL.md`), **TS-H1b** (64-tenant conjunction gate: keda misses p<0.01 at p=0.0102, d_z=−1.02, n=10 — the prereg's declared underpowered case, reported as direction-consistent; `RESULTS_TENANT_SCALE.md`), **RQ-H1/RQ-H2** (risk-aware quantile MPC: the knob steered the controller *backwards* — monotonically cheaper and more violating — because inflating demand also inflated projected tier spend and tripped the budget guardrail into its shed fallback; published with the diagnosis and the one changed factor a follow-up prereg would test, `RESULTS_RISK.md`).
 
 ## Cross-campaign ground rules
 
@@ -419,7 +451,8 @@ against by-construction winners; framing documented in `RESULTS.md`), **cache hi
    PREREG_PLANNER_CELLS_DEALIAS follow-up is itself the disciplined response to a confound
    found in the frozen PLANNER_CELLS run — a new pre-registration, not a silent re-run.
    Session 29 adds PREREG_LEARNED_CONTROL (pushed 896c896 before its training run, tuning
-   sweep, and matrix), bringing the ledger to 17 pre-registrations. Its RESULTS file carries
+   sweep, and matrix) and PREREG_RISK_MPC (pushed b2900b2 before any run; both its gates
+   FAILED and are published with a diagnosis), bringing the ledger to 18 pre-registrations. Its RESULTS file carries
    a disclosed arithmetic erratum: the prereg text labels the matrix "1,500 runs" where the
    design it specifies is 1,200; the design executed exactly as frozen and the frozen file
    was not edited after the fact.
