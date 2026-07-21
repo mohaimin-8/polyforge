@@ -598,3 +598,54 @@ spec violation affecting every committed jcac run, found by our own
 audit, adjudicated by a pre-registered rerun whose outcome rule was
 frozen before the result was known — and the fixed controller is the one
 the thesis now quotes.
+
+## 26. "You hand-designed an MPC. It is 2026 — why not just *learn* the joint policy? Isn't the optimizer unnecessary engineering?"
+
+**Answer: we measured it, pre-registered, and the hand-designed controller
+wins — at zero training cost.** Until session 29 this was the sharpest
+open question we could only argue about: every baseline in the matrix is
+hand-designed, and the one RL arm (`firm`, OSDI '20) learns the **replica
+knob only**, so nothing tested whether a learned policy discovers the
+*joint* cross-layer coordination. `PREREG_LEARNED_CONTROL.md` (pushed
+before the training run, the tuning sweep, and the matrix) closed it.
+
+The learned arm is deliberately strong, not a straw man: tabular
+Q-learning over the **identical ≤60-candidate replicas×cache×tier
+lattice** the MPC enumerates, rewarded on the **identical objective**,
+with a shared tenant-agnostic policy (SLO class in the state) trained
+**offline** on seeds disjoint from the matrix, hyperparameters selected on
+a disjoint validation slice (val J spread 0.46–1.05 across the grid — a
+real, non-degenerate sweep), experience replay for sample efficiency, and
+deployment **frozen-greedy** so the committed Q-table alone determines
+behaviour.
+
+As measured over 300 matched cells (`RESULTS_LEARNED.md`):
+
+- The MPC **beats** it on composite J — **−0.376, 95% CI [−0.437,
+  −0.318], p=2.9e-28, d_z=−0.708** — and pays **no training episodes**,
+  where the learned arm needed a full offline budget.
+- **The mechanism is the interesting part.** The learner is *not* worse
+  everywhere: it attains **lower violation** (0.0559 vs 0.0683,
+  p=3.1e-4) — but buys that with **2.61× the spend** ($6.17 vs $2.37).
+  That is the *same attainment-for-spend trade the tuned reactive
+  scalers make*. A well-trained learner rediscovers "buy headroom"; it
+  does not find the cost-efficient joint posture. **Finding the cheap
+  configuration — not meeting the SLO — is what the joint optimizer
+  contributes.**
+- **LR-H2:** offline training is load-bearing. Learning the joint policy
+  *within* a deployment episode is not viable (J 9.02 vs 0.78,
+  d_z=−0.94): the joint action space is too large to explore online,
+  while the MPC needs no episodes at all.
+
+The gate was pre-registered as **non-inferiority** — we expected to have
+to defend parity, and froze the weaker claim before the data existed.
+The measured result exceeded it. The falsifier was pre-committed too: had
+the learned policy won, that would have headlined the limitations and
+made learned control the primary future direction.
+
+**Do not say:** "RL can't do joint control." It can, it is credible, and
+on violation alone it is slightly *better*. The defensible claim is
+narrower and stronger: **an interpretable optimizer with Props 1–2
+guarantees matches-and-beats a well-trained model-free learner on the
+objective that pays the bills, without training data** — and the learner's
+loss is economic, not a failure to control.

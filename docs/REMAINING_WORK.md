@@ -44,7 +44,16 @@ generated record and figure from the committed data (verified: 5/5 records
 byte-identical, 17/17 figures; CI proves the clean-clone tier on every
 push — `docs/REPRODUCE.md`), every campaign now has a committed run-level
 csv.gz export, and `research/paper/main.tex` is a compiling FGCS scaffold
-awaiting the user's manuscript carve.
+awaiting the user's manuscript carve. **Session 29 closed the
+learned-control front** — the sharpest remaining *mechanism* objection
+("why a hand-designed MPC and not a learned policy?"). A strong,
+offline-trained RL controller over the *identical* joint action space and
+objective was pre-registered (`PREREG_LEARNED_CONTROL.md`, pushed at
+896c896 before any run), trained, and beaten: MPC J −0.376, p=2.9e-28,
+d_z=−0.708 over 300 matched cells **at zero training cost**, with the
+learner's lower violation bought at 2.61× the spend — the same
+attainment-for-spend trade the reactive scalers make
+(`RESULTS_LEARNED.md`, DEFENSE_QA #26).
 
 The three buckets below are ordered by owner, not by priority. The single
 highest-*value* remaining item is in bucket B: the three-knob live plane, which

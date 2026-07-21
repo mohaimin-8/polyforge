@@ -40,8 +40,10 @@ Composite objective J (cost + 2·violation + 0.5·(1−Jain), the objective ever
 was tuned on): PolyForge wins against **every** baseline in **every** campaign that
 tested it — v1 (p ≤ 4.6e-25), v2 (p ≤ 6.7e-25), v3 overload (p ≤ 1.3e-11), VTC slice
 (p = 3.3e-19), real-demand replay (p ≤ 5.5e-05), Azure replay (p ≤ 5.3e-22), the
-2026-stack concurrency arm (p = 1.3e-44 at violation parity), and the 32-tenant slice
-(p ≤ 2.2e-4; 64T: 2/3 arms at p < 0.01, keda at p = 0.0102 direction-consistent) —
+2026-stack concurrency arm (p = 1.3e-44 at violation parity), the 32-tenant slice
+(p ≤ 2.2e-4; 64T: 2/3 arms at p < 0.01, keda at p = 0.0102 direction-consistent), and the
+offline-trained **learned (RL) joint controller** over the identical action space
+(p = 2.9e-28, d_z = −0.708, at zero training cost) —
 and is the only Pareto-undominated system in the matrix.
 
 ---
@@ -332,6 +334,39 @@ case; nulls ledger). TS-D1: the J margin *grows* with width (vs HPA d_z −0.96 
 −1.19 → −1.32 across 8/32/64) — not an 8-tenant artifact. TS-D2: portfolio
 fairness holds (jcac Jain 0.994 / 0.9999). → `RESULTS_TENANT_SCALE.md`
 
+### 18. Learned joint control — the RL analog of the MPC (session 29)
+
+`PREREG_LEARNED_CONTROL.md` (pushed at 896c896 before the training run, the
+tuning sweep, or any matrix run). The sharpest remaining *mechanism* question:
+every baseline in the matrix is hand-designed, and the one RL arm
+(`firm`, OSDI '20) learns the **replica knob only** — so nothing tested whether
+a *learned* policy discovers the joint cross-layer coordination the MPC
+computes. `LearnedJointController` = tabular Q-learning over the **same
+≤60-candidate replicas×cache×tier lattice** the MPC enumerates, rewarded on the
+**same objective** (`α·cost_norm + β·log1p(excess)`), with a shared
+tenant-agnostic policy (state includes SLO class) **trained offline** on seeds
+disjoint from the matrix and **deployed frozen-greedy**; experience replay and
+a val-slice-tuned grid make it non-strawman (val J spread 0.46–1.05 over 8
+combos; winner lr 0.3 / replay 16 / β 3.0). 1,200 runs, all valid.
+
+- **LR-H1 PASS — and stronger than its own gate.** Non-inferiority held, but
+  the pre-declared two-sided reading shows the MPC **beats** the trained
+  learned policy on composite J: **−0.376 (95% CI [−0.437, −0.318]),
+  p=2.9e-28, d_z=−0.708** over 300 matched cells — *at zero training cost*.
+- **Mechanism (descriptive).** The learner is not worse everywhere: it attains
+  **lower violation** (0.0559 vs 0.0683, p=3.1e-4) but buys it with **2.61×
+  the spend** ($6.17 vs $2.37, p=2.7e-30) — the *same attainment-for-spend
+  trade the tuned reactive scalers make*. The learner rediscovers "buy
+  headroom"; it does not find the cost-efficient joint posture. **Finding the
+  cheap configuration, not meeting the SLO, is what the joint optimizer
+  contributes.**
+- **LR-H2 PASS (data-efficiency).** Offline training is load-bearing: trained
+  J 0.776 vs online-ablation J 9.016 (d_z=−0.94, p=4.6e-43). Model-free
+  learning of the joint policy *within* a deployment episode is not viable —
+  the joint action space is too large — while the MPC needs no episodes at all.
+- Sanity: MPC vs tuned HPA reproduces the standing result (d_z=−1.01,
+  p=1.7e-47). → `RESULTS_LEARNED.md`
+
 ---
 
 ## Which number to cite (disambiguation)
@@ -359,6 +394,7 @@ fairness holds (jcac Jain 0.994 / 0.9999). → `RESULTS_TENANT_SCALE.md`
 | Cost/J on the second real trace | **−42%/window, d_z −1.64…−1.85, p ≤ 5.3e-22, n=72, PASS-with-disclosure (`RESULTS_TRACE_AZURE.md`)** | any pooling with BurstGPT numbers | independent trace, different window length (3 h), pseudo-tenantized — own substrate row, never pooled (ground rule 4) |
 | vs the 2026-stack reactive scaler | **J d_z=−0.96 (p=1.3e-44) at violation parity, cost −37% vs the tuned KPA/AIBrix-shaped arm (`RESULTS_CONCURRENCY.md`)** | "beats Knative/AIBrix" | the arm is the *signal shape* (in-flight work + stable window) at sim scale, tuned on our J; engine-level serving efficiency is a different layer (DEFENSE_QA #22) |
 | End-to-end multi-tenancy at width | **TS-H1a PASS at 32T (all arms, \|d_z\| ≥ 1.02); margin grows with width, d_z −0.96 → −1.32 across 8/32/64 (`RESULTS_TENANT_SCALE.md`)** | any unqualified 64T claim | TS-H1b is an honest FAIL (keda p=0.0102 at n=10, direction-consistent); quote 32T as confirmatory, 64T as large-effect + trend |
+| vs a learned (RL) joint controller | **MPC beats the offline-trained learned policy on J: −0.376, CI [−0.437, −0.318], p=2.9e-28, d_z=−0.708, at zero training cost (`RESULTS_LEARNED.md`)** | "RL cannot do joint control" | the learned arm is strong and *lower-violation* — it loses on J by spending 2.61× more; the claim is that the optimizer finds the **cheap** joint posture a well-trained learner does not, and needs no training episodes to do it |
 
 ## Honest-nulls ledger
 
@@ -382,6 +418,11 @@ against by-construction winners; framing documented in `RESULTS.md`), **cache hi
    roadmap/V2_README). The
    PREREG_PLANNER_CELLS_DEALIAS follow-up is itself the disciplined response to a confound
    found in the frozen PLANNER_CELLS run — a new pre-registration, not a silent re-run.
+   Session 29 adds PREREG_LEARNED_CONTROL (pushed 896c896 before its training run, tuning
+   sweep, and matrix), bringing the ledger to 17 pre-registrations. Its RESULTS file carries
+   a disclosed arithmetic erratum: the prereg text labels the matrix "1,500 runs" where the
+   design it specifies is 1,200; the design executed exactly as frozen and the frozen file
+   was not edited after the fact.
    From Wave 2 on, each is additionally mirrored to OSF prospectively
    (`OSF_REGISTRATION.md`; the submit step is a flagged user action).
 2. Closed campaigns are immutable: stopping rules forbid re-running, widening, or
