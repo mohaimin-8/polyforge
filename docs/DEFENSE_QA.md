@@ -649,3 +649,54 @@ narrower and stronger: **an interpretable optimizer with Props 1–2
 guarantees matches-and-beats a well-trained model-free learner on the
 objective that pays the bills, without training data** — and the learner's
 loss is economic, not a failure to control.
+
+## 27. "You bolted a risk knob on to fix your SLO weakness, ran it twice, and still can't say you beat HPA on attainment. Isn't that the same null with extra steps?"
+
+**Answer: no — the two campaigns measured different things, and the second
+one is why we now understand the first.** `PREREG_RISK_MPC` (campaign 19)
+planned against a quantile of the controller's own forecast residuals. Both
+its gates failed, and failed *perfectly monotonically in the reverse
+direction* (ρ = +1 / −1) — raising the quantile made the controller cheaper
+and more violating. That is not noise, so we diagnosed it rather than
+shrugging: inflating demand also inflated *projected tier spend*, candidates
+failed the per-tenant budget filter, and the controller took its designed
+shed fallback (`tier="none"` — an AI outage). **The knob was fighting the
+Budget CRD, not the demand.**
+
+`PREREG_RISK_BUDGET` (campaign 20, pushed at 701d29b before any run) tested
+exactly **one changed factor**: size capacity at the risk quantile, but
+project cost and check the budget at the *point* forecast — you are billed
+for demand that arrives, not demand you provisioned against. As measured over
+300 matched cells (`RESULTS_RISK_BUDGET.md`):
+
+- **RB-H1 PASS.** The precise reading the null failed with the sign reversed
+  now lands as designed: **−0.00232 violation, 95% CI [−0.00402, −0.00064],
+  p=0.0073.** One changed factor flipped the mechanism's sign, which is the
+  strongest possible confirmation that the published diagnosis was correct
+  rather than a post-hoc story.
+- **RB-H2 and RB-H3 FAIL, and are reported as failures.** Violation is
+  non-monotone in the quantile — an *interior optimum* at q=0.90 that turns
+  back up at q=0.95 — so no frontier claim is made. Strict Pareto domination
+  of the reactive stack failed on all three violation conjuncts; only cost
+  separates (−33…−39%). **Partial dominance is reported as partial.**
+- **We then argued against our own knob.** Under the published objective
+  weights the corrected arm is net *worse* on composite J (ΔJ = +0.0079,
+  p=1.9e-07). So the point-forecast controller stays the quotable
+  configuration, and campaign 20 is evidence **for** our default, not for the
+  new feature.
+
+The contribution is not "we finally beat HPA on SLO" — we did not, and the
+standing claim is unchanged: **parity on violation at roughly a third the
+spend.** The contribution is that a named limitation ("the win is conditional
+on operator SLO-tolerance") is now an **explicit dial with a measured price
+curve**, plus a mechanism-level bound on where the dial stops working: a
+24-cell probe shows the knob buys attainment **only where a capacity lever
+still has headroom with a real return** — `ai_cacheable` converts it (51→59%
+of the cluster replica ceiling), while `agentic` and `ai_uncacheable`, pinned
+at ~99% of that ceiling, convert it into spend instead of service.
+
+**Do not say:** "the risk-aware controller is better" or quote the corrected
+arm as the system's configuration. **Do say:** two pre-registered campaigns,
+one changed factor between them, a diagnosis that predicted its own fix, and a
+mechanism we measured and then declined to adopt because our own objective
+says it is not worth its price.

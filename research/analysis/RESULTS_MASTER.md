@@ -399,6 +399,55 @@ is affected.
   point forecast — and requires its **own** pre-registration; this campaign's
   stopping rule forbids re-running it. → `RESULTS_RISK.md`, fig18
 
+### 20. Budget-corrected risk MPC — the null's follow-up, one changed factor (session 30)
+
+`PREREG_RISK_BUDGET.md` (pushed at 701d29b before any run). The disciplined
+follow-up the campaign-19 diagnosis identified, in the
+`PREREG_PLANNER_CELLS_DEALIAS` tradition — a **new pre-registration with
+exactly one changed factor**: capacity is still sized against the
+risk-inflated demand, but cost is projected and the budget checked against
+the **point** forecast, because a tenant is billed for the demand that
+*arrives*, not the demand it was provisioned against. Same grid, same
+operating point, same baselines, same matrix shape; nothing re-tuned and the
+null never re-run. 2,400 runs, all valid, 300 matched cells per arm;
+`risk_cost_at_point=False` is the default so campaign 19 and every earlier
+campaign replay bit-identically (spot-check drift **0.00e+00**).
+
+- **RB-H1 PASS — the diagnosis was right.** The exact reading the uncorrected
+  mechanism failed *with the sign reversed* now lands as designed: at the
+  pre-declared q=0.90 violation is **−0.00232 (95% CI [−0.00402, −0.00064]),
+  p=0.0073** against the arm's own point-forecast configuration, at +$0.121
+  spend. One changed factor flipped the mechanism's sign.
+- **RB-H2 FAIL — an interior optimum, not a frontier.** Cost is perfectly
+  monotone in the quantile (ρ = +1) but violation is not (ρ = −0.70 against a
+  required ≤ −0.90): it falls through q=0.90 (0.0659) and **turns back up at
+  q=0.95** (0.0672). Per the pre-committed falsifier, **no frontier claim is
+  made**.
+- **RB-H3 FAIL — 3 of 6 conjuncts; reported as partial, never rounded up.**
+  All three *cost* conjuncts pass overwhelmingly (−33% vs hpa p=1.8e-24, −39%
+  vs keda p=3.4e-39, −34% vs concurrency p=2.1e-26); all three *violation*
+  conjuncts fail (hpa −0.0075 p=0.026, keda −0.0019 p=0.59, concurrency
+  −0.0028 p=0.38). The standing result is unchanged: **violation parity at
+  roughly a third less spend**, not strict Pareto domination.
+- **Diagnosed (post-run, prose only — the PLANNER_CELLS precedent).** A 24-cell
+  timeseries probe explains both failures with one mechanism: **the knob buys
+  attainment only where a capacity lever still has headroom with a real
+  return.** `ai_cacheable` has replica headroom (51→59% of the 48-replica
+  cluster ceiling) and converts risk headroom into capacity; `agentic` and
+  `ai_uncacheable` sit pinned at ~99% of that ceiling, so the inflated target
+  is chased through tier upgrades (which cost money and re-trip the budget
+  filter — shed rises 0.31%→2.08% from q90c to q95c) or through cache on a
+  class only ~29% cacheable and past half-saturation. The `crud_bursty`
+  control sheds 0.00% at every arm, confirming the channel is tier spend.
+- **Not a new default, and not claimed as one.** Under the published objective
+  weights the corrected arm is net *worse* on composite J (ΔJ **+0.0079**,
+  p=1.9e-07): the attainment costs more than the weights say it is worth. The
+  point-forecast controller remains the quotable configuration — this campaign
+  is evidence *for* that default. What it contributes is the conversion of the
+  standing "conditional on operator SLO-tolerance" caveat into an explicit
+  dial with a measured price curve, and a bound on where that dial stops
+  working. → `RESULTS_RISK_BUDGET.md`, fig19
+
 ---
 
 ## Which number to cite (disambiguation)
@@ -426,6 +475,7 @@ is affected.
 | Cost/J on the second real trace | **−42%/window, d_z −1.64…−1.85, p ≤ 5.3e-22, n=72, PASS-with-disclosure (`RESULTS_TRACE_AZURE.md`)** | any pooling with BurstGPT numbers | independent trace, different window length (3 h), pseudo-tenantized — own substrate row, never pooled (ground rule 4) |
 | vs the 2026-stack reactive scaler | **J d_z=−0.96 (p=1.3e-44) at violation parity, cost −37% vs the tuned KPA/AIBrix-shaped arm (`RESULTS_CONCURRENCY.md`)** | "beats Knative/AIBrix" | the arm is the *signal shape* (in-flight work + stable window) at sim scale, tuned on our J; engine-level serving efficiency is a different layer (DEFENSE_QA #22) |
 | End-to-end multi-tenancy at width | **TS-H1a PASS at 32T (all arms, \|d_z\| ≥ 1.02); margin grows with width, d_z −0.96 → −1.32 across 8/32/64 (`RESULTS_TENANT_SCALE.md`)** | any unqualified 64T claim | TS-H1b is an honest FAIL (keda p=0.0102 at n=10, direction-consistent); quote 32T as confirmatory, 64T as large-effect + trend |
+| Risk-aware / quantile planning | **the corrected mechanism works but is not the default: RB-H1 PASS (−0.00232 violation, p=0.0073) while ΔJ is +0.0079 (p=1.9e-07) against the point forecast (`RESULTS_RISK_BUDGET.md`)** | the uncorrected null's numbers (`RESULTS_RISK.md`) as the mechanism's verdict, or any "risk-aware MPC beats the reactive stack on SLO" claim | two campaigns, one changed factor: the null measured a *defect* (the knob fighting the Budget CRD), the follow-up measured the *mechanism* and found it real but net-negative under our weights. RB-H2/RB-H3 both FAILED — no frontier claim, no strict domination; violation vs the reactive stack stays parity-at-lower-cost |
 | vs a learned (RL) joint controller | **MPC beats the offline-trained learned policy on J: −0.376, CI [−0.437, −0.318], p=2.9e-28, d_z=−0.708, at zero training cost (`RESULTS_LEARNED.md`)** | "RL cannot do joint control" | the learned arm is strong and *lower-violation* — it loses on J by spending 2.61× more; the claim is that the optimizer finds the **cheap** joint posture a well-trained learner does not, and needs no training episodes to do it |
 
 ## Honest-nulls ledger
@@ -435,24 +485,29 @@ of the contribution, not failures to hide: **v2 H1** (SLO vs HPA/KEDA), **v3 H1�
 (overload SLO vs HPA/KEDA), **first-sample HT** (underpowered), **γ-term** (no
 significant fairness contribution under injection), **seasonal non-transfer** (synthetic
 prediction failed on real data), **v1/v2 raw per-metric gate** (structurally impossible
-against by-construction winners; framing documented in `RESULTS.md`), **cache hit quality** (a majority of τ=0.85 hits fail the ρ=0.70 response-agreement proxy — published with its stochasticity-ceiling calibration rather than hidden behind the hit-rate headline), **live ordinal check** (J-winner DISAGREE in both cells — live parity between the arms at the replica-only projection; frozen protocol, published as measured in `PHASE7_ORDINAL.md`), **TS-H1b** (64-tenant conjunction gate: keda misses p<0.01 at p=0.0102, d_z=−1.02, n=10 — the prereg's declared underpowered case, reported as direction-consistent; `RESULTS_TENANT_SCALE.md`), **RQ-H1/RQ-H2** (risk-aware quantile MPC: the knob steered the controller *backwards* — monotonically cheaper and more violating — because inflating demand also inflated projected tier spend and tripped the budget guardrail into its shed fallback; published with the diagnosis and the one changed factor a follow-up prereg would test, `RESULTS_RISK.md`).
+against by-construction winners; framing documented in `RESULTS.md`), **cache hit quality** (a majority of τ=0.85 hits fail the ρ=0.70 response-agreement proxy — published with its stochasticity-ceiling calibration rather than hidden behind the hit-rate headline), **live ordinal check** (J-winner DISAGREE in both cells — live parity between the arms at the replica-only projection; frozen protocol, published as measured in `PHASE7_ORDINAL.md`), **TS-H1b** (64-tenant conjunction gate: keda misses p<0.01 at p=0.0102, d_z=−1.02, n=10 — the prereg's declared underpowered case, reported as direction-consistent; `RESULTS_TENANT_SCALE.md`), **RQ-H1/RQ-H2** (risk-aware quantile MPC: the knob steered the controller *backwards* — monotonically cheaper and more violating — because inflating demand also inflated projected tier spend and tripped the budget guardrail into its shed fallback; published with the diagnosis and the one changed factor a follow-up prereg would test, `RESULTS_RISK.md`), **RB-H2/RB-H3** (the corrected follow-up: the knob's *direction* was repaired and RB-H1 passed, but violation is non-monotone in the quantile — an interior optimum at q=0.90, ρ=−0.70 — and strict Pareto domination of the reactive stack failed on all three violation conjuncts; 3 of 6 conjuncts reported as partial dominance, and the corrected arm is net worse on J under the published weights, `RESULTS_RISK_BUDGET.md`).
 
 ## Cross-campaign ground rules
 
-1. Every campaign's protocol was committed and pushed **before** its first run
-   (16 pre-registrations: PREREG_V2, PREREG_V3, PREREG_TRACE, PREREG_TRACE2, PREREG_VTC,
-   PREREG_TIER_RATIO, PREREG_HK_ADOPTION, PREREG_CHAOS_SIM, PREREG_PSEUDO_TENANT,
-   PREREG_PLANNER_CELLS, PREREG_PLANNER_CELLS_DEALIAS, and the session-27 trio
-   PREREG_TRACE_AZURE, PREREG_CONCURRENCY, PREREG_TENANT_SCALE — plus the two deferred
-   live protocols PREREG_WIRE_ATTACK and PREREG_LIVE_CHAOS_P99 pushed before any live
-   number existed, and PREREG_WAVE4_LIVE_PLANE whose harness is desk-complete and whose
-   run remains GPU-gated — plus the v1 gate and Phase 4 acceptance frozen in the
-   roadmap/V2_README). The
-   PREREG_PLANNER_CELLS_DEALIAS follow-up is itself the disciplined response to a confound
-   found in the frozen PLANNER_CELLS run — a new pre-registration, not a silent re-run.
-   Session 29 adds PREREG_LEARNED_CONTROL (pushed 896c896 before its training run, tuning
-   sweep, and matrix) and PREREG_RISK_MPC (pushed b2900b2 before any run; both its gates
-   FAILED and are published with a diagnosis), bringing the ledger to 18 pre-registrations. Its RESULTS file carries
+1. Every campaign's protocol was committed and pushed **before** its first run.
+   **26 pre-registration protocols** live in `research/analysis/PREREG_*.md`, and
+   `OSF_REGISTRATION.md` carries a row per protocol with its verified anchor commit
+   and authored timestamp (`git log --diff-filter=A`), so the count is auditable
+   rather than asserted: **21 pushed under the prospective-OSF commitment** and **5
+   prior-campaign protocols** (PREREG_V2, V3, VTC, TRACE, TRACE2) that predate that
+   commitment and remain git-anchored only — disclosed in DEFENSE_QA #17. One of the
+   21 is **deferred, not done** — PREREG_WAVE4_LIVE_PLANE (GPU-gated; harness
+   desk-complete, WL-H2 preflight PASS) — while the two live protocols
+   PREREG_WIRE_ATTACK and PREREG_LIVE_CHAOS_P99 were pushed before any live number
+   existed and have since been executed. The v1 gate and Phase 4 acceptance are
+   frozen separately in the roadmap/V2_README.
+   **Two of the 26 are follow-ups in the same discipline** — a new pre-registration
+   testing exactly *one changed factor* identified by a published null's own
+   diagnosis, never a silent re-run of the null: PREREG_PLANNER_CELLS_DEALIAS
+   (the whale/cell-count aliasing confound in PLANNER_CELLS) and PREREG_RISK_BUDGET
+   (the budget interaction diagnosed in RESULTS_RISK; pushed 701d29b, and its RB-H1
+   PASS is what confirms that diagnosis was mechanism rather than story).
+   The learned-control RESULTS file carries
    a disclosed arithmetic erratum: the prereg text labels the matrix "1,500 runs" where the
    design it specifies is 1,200; the design executed exactly as frozen and the frozen file
    was not edited after the fact.

@@ -52,6 +52,17 @@ RECORDS = [
     ("RESULTS_V3.md", "raw_sim_v3.duckdb"),
 ]
 
+# Figures produced by a standalone campaign script rather than by
+# run_analysis.py. Each needs its own campaign database, so a reproduction run
+# names the script and the file instead of leaving an unexplained gap in the
+# figure count.
+CAMPAIGN_FIGURES = {
+    "fig18_risk_frontier": (
+        "research/analysis/analysis_risk.py", "raw_sim_risk.duckdb"),
+    "fig19_risk_budget_frontier": (
+        "research/analysis/analysis_risk_budget.py", "raw_sim_risk_budget.duckdb"),
+}
+
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
                 "metrics_forecasters.csv.gz", "metrics_realism.csv.gz"]
 DEPS = ["duckdb", "pandas", "scipy", "statsmodels", "matplotlib"]
@@ -146,9 +157,14 @@ def main() -> int:
     print(f"  figures            {len(rebuilt_figs)}/{len(committed_figs)} "
           f"rebuilt as vector PDF + 600-DPI PNG")
     for f in missing:
-        print(f"    not rebuilt: {f} (needs archive timeseries)"
-              if tier == "git" or f == "fig09_adaptation_trace"
-              else f"    not rebuilt: {f}")
+        if f in CAMPAIGN_FIGURES:
+            script, db = CAMPAIGN_FIGURES[f]
+            print(f"    not rebuilt: {f} — campaign figure; rebuild with "
+                  f"`python {script}` (needs eval/results/{db})")
+        elif tier == "git" or f == "fig09_adaptation_trace":
+            print(f"    not rebuilt: {f} (needs archive timeseries)")
+        else:
+            print(f"    not rebuilt: {f}")
     print("committed records and figures were not modified.")
     return 0
 

@@ -45,6 +45,14 @@ listed for the user exactly as the Zenodo/GHCR/video items are in
 | `PREREG_MOVE_CLAMP.md` | DEFENSE_QA #25 (actuation-clamp violation) | `cfab691` | 2026-07-19T00:11:08+06:00 | session 24 | _pending_ |
 | `PREREG_PLANNER_CELLS.md` | DEFENSE_QA #13 (scale) | `264356a` | 2026-07-16 (session 21) | yes (session 21, PLANNER_CELLS.md) | _pending_ |
 | `PREREG_PLANNER_CELLS_DEALIAS.md` | DEFENSE_QA #13 (scale, confound follow-up) | `0a61c6a` | 2026-07-16 (session 21) | yes (session 21, PLANNER_CELLS_DEALIAS.md) | _pending_ |
+| `PREREG_DEGRADE.md` | gap 4.4 (graceful-degradation policy) | `3e66253` | 2026-07-19T03:27:44+06:00 | yes (session 25, DEGRADE_PROBE.md) | _pending_ |
+| `PREREG_WAVE4_LIVE_PLANE.md` | DEFENSE_QA #21 (three-knob live plane) | `821274d` | 2026-07-17T21:40:46+06:00 | deferred (GPU host; harness desk-complete, WL-H2 preflight PASS) | _pending_ |
+| `PREREG_TRACE_AZURE.md` | DEFENSE_QA #12 (second real trace) | `527a1b0` | 2026-07-19T16:11:38+06:00 | yes (session 27, RESULTS_TRACE_AZURE.md) | _pending_ |
+| `PREREG_CONCURRENCY.md` | DEFENSE_QA #22 (2026-stack reactive arm) | `ff84846` | 2026-07-19T16:19:52+06:00 | yes (session 27, RESULTS_CONCURRENCY.md) | _pending_ |
+| `PREREG_TENANT_SCALE.md` | DEFENSE_QA #13 (end-to-end width) | `37d36ae` | 2026-07-19T16:24:11+06:00 | yes (session 27, RESULTS_TENANT_SCALE.md) | _pending_ |
+| `PREREG_LEARNED_CONTROL.md` | DEFENSE_QA #26 (why not RL?) | `896c896` | 2026-07-22T00:19:46+06:00 | yes (session 29, RESULTS_LEARNED.md) | _pending_ |
+| `PREREG_RISK_MPC.md` | DEFENSE_QA #27 (SLO-tolerance dial) | `b2900b2` | 2026-07-22T00:53:16+06:00 | yes (session 29, RESULTS_RISK.md — both gates FAIL, published null) | _pending_ |
+| `PREREG_RISK_BUDGET.md` | DEFENSE_QA #27 (one-changed-factor follow-up) | `701d29b` | 2026-07-22T02:28:18+06:00 | yes (session 30, RESULTS_RISK_BUDGET.md — RB-H1 PASS, RB-H2/H3 FAIL) | _pending_ |
 
 Prior-campaign preregs (PREREG_V2/V3/VTC/TRACE/TRACE2) predate this OSF
 commitment and remain git-anchored only, as disclosed in DEFENSE_QA #17;

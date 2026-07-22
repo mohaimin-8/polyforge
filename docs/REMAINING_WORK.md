@@ -1,6 +1,6 @@
 # Remaining work — the honest ledger of what is left and who owns it
 
-Last updated 2026-07-19 (session 28). This is the single place that answers
+Last updated 2026-07-23 (session 30). This is the single place that answers
 "what is left and who does it." It reconciles `docs/RELEASE_CHECKLIST.md`
 (human-action items), the deferred live campaigns, and the thesis fill-ins into
 one owner-split view. When it disagrees with a campaign file, the campaign file
@@ -53,7 +53,19 @@ objective was pre-registered (`PREREG_LEARNED_CONTROL.md`, pushed at
 d_z=−0.708 over 300 matched cells **at zero training cost**, with the
 learner's lower violation bought at 2.61× the spend — the same
 attainment-for-spend trade the reactive scalers make
-(`RESULTS_LEARNED.md`, DEFENSE_QA #26).
+(`RESULTS_LEARNED.md`, DEFENSE_QA #26). **Session 30 closed the risk-control
+line** with the disciplined follow-up its own published null called for
+(`PREREG_RISK_BUDGET.md`, pushed 701d29b before any run; one changed factor,
+the null never re-run): **RB-H1 PASS** — the reading the null failed *with
+the sign reversed* now lands as designed (−0.00232 violation, p=0.0073),
+confirming the published diagnosis was mechanism and not story — while
+**RB-H2 and RB-H3 FAIL honestly** (an interior optimum at q=0.90 rather than
+a monotone frontier; 3 of 6 domination conjuncts, cost only, reported as
+partial). A 24-cell probe bounds the mechanism: the knob buys attainment only
+where a capacity lever still has headroom with a real return. Under the
+published weights the corrected arm is net worse on J, so the point-forecast
+controller **remains** the quotable configuration and the campaign stands as
+evidence for that default (`RESULTS_RISK_BUDGET.md`, DEFENSE_QA #27).
 
 The three buckets below are ordered by owner, not by priority. The single
 highest-*value* remaining item is in bucket B: the three-knob live plane, which

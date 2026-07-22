@@ -7,6 +7,100 @@ and what to study next. This file is that record. Newest entry first.
 
 ---
 
+## 2026-07-23 (session 30) — the risk-control line closed: RB-H1 PASS, RB-H2/H3 FAIL, and a mechanism bound
+
+Milestone status: no new matrix was run. `matrix_risk_budget` (2,400 runs)
+had been **executed** at the end of session 29 but never scored — the
+analysis script existed uncommitted and `RESULTS_RISK_BUDGET.md` did not
+exist. This session performed the frozen protocol's single permitted
+analysis pass and reconciled the ledgers. `PREREG_RISK_BUDGET.md` §4 allows
+one matrix execution and one analysis pass; both are now spent, and the
+risk-quantile line is closed.
+
+What changed:
+
+- **Verified before scoring:** `validate_results.py` all green (2,400/2,400
+  valid, 0 failed, 0 duplicate/orphan/null); `spot_check.py --n 8` replayed at
+  worst drift **0.00e+00**; python suite 150/150.
+- **The frozen readings, as scored.** **RB-H1 PASS** — at the pre-declared
+  q=0.90 violation is −0.00232 (95% CI [−0.00402, −0.00064], p=0.0073)
+  against the arm's own point forecast. That is the exact reading the
+  published null failed *with the sign reversed*, so the one changed factor
+  (budget checked at the point forecast) was the defect, and the null's
+  diagnosis was mechanism rather than story. **RB-H2 FAIL** — cost is
+  monotone in the quantile (ρ=+1) but violation is not (ρ=−0.70 vs a required
+  ≤−0.90): an *interior optimum* at q=0.90 that turns back up at q=0.95, so no
+  frontier claim is made. **RB-H3 FAIL** — 3 of 6 conjuncts; all three cost
+  conjuncts pass overwhelmingly (−33…−39%, p ≤ 1.8e-24), all three violation
+  conjuncts fail. Partial dominance reported as partial.
+- **Post-run diagnosis, measured not guessed** (the PLANNER_CELLS precedent;
+  written into the generating script, not hand-edited into the record). A
+  24-cell timeseries probe explains both failures with one mechanism: **the
+  knob buys attainment only where a capacity lever still has headroom with a
+  real return.** `ai_cacheable` has replica headroom (51→59% of the
+  48-replica cluster ceiling) and converts risk headroom into capacity;
+  `agentic` and `ai_uncacheable` sit at ~99% of that ceiling and convert it
+  into spend instead — via tier upgrades that re-trip the budget filter (shed
+  0.31%→2.08% from q90c to q95c) or via cache on a class only ~29% cacheable
+  and past half-saturation. `crud_bursty` (no tier spend) sheds 0.00% at every
+  arm, confirming the channel.
+- **We argued against our own feature.** Under the published objective weights
+  the corrected arm is net *worse* on composite J (ΔJ +0.0079, p=1.9e-07), so
+  the point-forecast controller **remains** the quotable configuration and the
+  campaign is recorded as evidence *for* that default.
+- **Three presentation defects fixed in `analysis_risk_budget.py`** (no
+  threshold, metric, or verdict touched): the RB-H3 table rendered NaN columns
+  because each row carried a differently-named baseline column; the
+  pre-written figure caption would have printed "did not deliver its
+  pre-registered readings" on an outcome where RB-H1 *passed* (the session-29
+  fig18 hazard in reverse); and the RB-D1 mean-based dominance line read as
+  contradicting the RB-H3 FAIL directly above it, so it now says so explicitly.
+- **fig19 redesigned** as two panels. The single panel crammed all five
+  frontier arms into a $2.37–2.53 band on an axis spanning to $4.10, with five
+  overlapping labels — illegible exactly where the result lives. Panel (a) is
+  the landscape; panel (b) plots the **paired** violation delta against each
+  campaign's own point-forecast arm with 95% bootstrap CIs. That change is
+  substantive, not cosmetic: the panel-(a) error bars are *unpaired* spreads
+  across heterogeneous cells and are an order of magnitude larger than the
+  paired effect, so a reader of the old figure would have concluded the arms
+  were indistinguishable when the gates say otherwise.
+- Ledgers reconciled: `RESULTS_MASTER.md` campaign 20 + a which-number-to-cite
+  row + the honest-nulls ledger (RB-H2/RB-H3) + prereg count 18→19;
+  `DEFENSE_QA.md` #27; `REMAINING_WORK.md`; run-level export
+  `metrics_matrix_risk_budget.csv.gz` (2,400 rows).
+- `OSF_REGISTRATION.md` gained the **six rows it was missing** — the session-27
+  trio (TRACE_AZURE, CONCURRENCY, TENANT_SCALE) and session-29/30's
+  LEARNED_CONTROL, RISK_MPC, RISK_BUDGET — each with its verified anchor commit
+  and authored timestamp from `git log --diff-filter=A`. The mirror index is
+  the evidence behind the prereg-discipline claim (DEFENSE_QA #17), so gaps in
+  it are not cosmetic.
+
+Verified by: validation + spot-check + full python suite before scoring;
+`analysis_risk_budget.py` re-run end-to-end after every edit; both figure
+revisions rendered and visually inspected for label collisions.
+
+- `scripts/reproduce.py` now names the two campaign figures it cannot rebuild
+  (fig18, fig19) with the script and database each needs, instead of printing a
+  bare "not rebuilt" — this session widened that gap from one figure to two, and
+  an unexplained hole in the figure count is exactly what an artifact reviewer
+  reads as a broken claim.
+- **A caption-loss defect found and fixed for fig19.** `figures.save()` appends
+  captions to an in-memory `CAPTIONS` list that only `run_analysis.py` flushes to
+  `FIGURES.md`; standalone campaign scripts never flush it, so their captions were
+  written and then discarded. `analysis_risk_budget.py` now returns the caption and
+  writes it into `RESULTS_RISK_BUDGET.md` beneath the figure, where the
+  outcome-aware wording is actually readable.
+
+Known gap (found, deliberately not fixed): **fig18's caption is lost the same
+way.** Recovering it means re-running `analysis_risk.py`, which would rewrite a
+closed campaign's record — ground rule 2 says closed campaigns are immutable, and
+a caption is not worth breaking that for. It is recorded here instead.
+
+Known ledger gap (stated, not fixed): **session 29 has no SESSION_LOG entry.**
+Its two campaigns are fully recorded in `RESULTS_MASTER.md` §18–19,
+`DEFENSE_QA.md` #26, and their RESULTS files; a retroactive entry is not
+written here because it would be reconstructed rather than observed.
+
 ## 2026-07-19 (session 28) — artifact-evaluation readiness: one-command reproduction, every campaign's data committed, manuscript scaffold
 
 Milestone status: no measurement changed; the submission mechanics advanced.
