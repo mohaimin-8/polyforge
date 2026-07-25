@@ -83,16 +83,43 @@ to ±4 left all six passing. Limits are now literals (the frozen spec), with
 fails 4 tests; reintroducing the audited defect itself (`origin = None`)
 fails exactly the two clamp tests.
 
-## Phase 2 — B1 live three-knob plane `[GATE:user opens GPU host, $20–60]`
+## Phase 2 — B1 live three-knob plane `[GATE:user, $0 route available]`
 **Runs BEFORE Phase 3** (Phase 3 modifies the code path B1's preflight
 verified).
 
+**The money gate is gone.** `docs/WAVE4_FREE_ROUTE.md` runs B1 at $0 by
+splitting it: GPU tiers on a free Kaggle kernel (30 GPU-h/week; ran the tier
+bench twice), cluster on a free Codespace (120 core-h/month; ran Phase 7 and
+the live chaos sitting), joined by a free cloudflared tunnel. No code change
+was needed — `POLYFORGE_EVAL_TIER_BACKENDS` already takes a URL. Prefer a
+single GPU VM on GCP's $300 trial / Azure-for-Students $100 **if GPU quota is
+granted** (avoids the round-trip entirely); otherwise the split route.
+
+### T4a — free-route preflight (do this FIRST; protects GPU quota)
+DO: start `research/calibration/kaggle_tier_server.py` on Kaggle (GPU +
+internet on); it prints the public URL and the exact
+`POLYFORGE_EVAL_TIER_BACKENDS` export line. Then, **before** standing up any
+cluster: `python eval/scripts/tunnel_preflight.py`.
+VERIFY: exit 0. Read `slo_headroom_ms` — **the binding constraint is the
+premium AI SLO (2500 ms), not WL-H2.** The tier gap survives ~1.3 s of
+round-trip, but ~600 ms already puts the mid tier (1883 ms) over target,
+after which premium tenants violate regardless of the controller and the SLO
+term goes flat. The probe warns; heed it.
+DONE-WHEN: exit 0 **and** the slowest tier is inside the premium SLO. Exit 1
+or an over-target warning → do not start the run; reduce round-trip or use a
+credit-funded single host.
+
 ### T4 — execute B1
 DO: follow `research/analysis/PREREG_WAVE4_LIVE_PLANE.md` §Substrate +
-§Status update exactly; apply R5 + R6. Run the **WL-H2 preflight
-knob-liveness gate first** — if any knob is inert live, STOP (an inert-knob
-run VOIDS WL-H1; do not fake it, report). VRAM short → drop the 7B tier
-(prereg's amendment rule). Run the frozen matrix once (stopping rule).
+§Status update exactly; apply R5 + R6 (on the free route, `docs/
+WAVE4_FREE_ROUTE.md` §3 lists both). Run the **WL-H2 preflight
+knob-liveness gate first** (`eval/scripts/knob_preflight.py` — the real gate;
+T4a only predicts it) — if any knob is inert live, STOP (an inert-knob run
+VOIDS WL-H1; do not fake it, report). VRAM short → drop the 7B tier
+(prereg's amendment rule; the free route is a two-tier run by construction).
+On the free route, carry `WAVE4_FREE_ROUTE.md` §4 verbatim into the RESULTS
+file — tunnel round-trip changes absolute latency, so live absolutes are
+never quotable as tier latencies. Run the frozen matrix once (stopping rule).
 Publish outcome **as measured, PASS or FAIL**, via a new analysis script →
 new RESULTS file; reconcile `RESULTS_MASTER.md`, `DEFENSE_QA.md`,
 `REMAINING_WORK.md`. Never edit the prereg (R1).
@@ -155,7 +182,9 @@ R5 + R6 mandatory.
 **Done:** T0–T3 (Phase 0 security + Phase 1 artifact integrity), pushed
 through 3fc418c.
 
-**Next:** T4 (B1) the moment the GPU gate opens — it preempts everything,
+**Next:** T4 (B1). The $20-60 gate is gone -- `docs/WAVE4_FREE_ROUTE.md`
+runs it at $0 on Kaggle + Codespaces, and T4a checks the path is good enough
+before any GPU hour is spent. Run it the moment the user has an hour free — it preempts everything,
 because T5 modifies the operator→planner path B1's frozen WL-H2 preflight
 was verified against. If the gate stays shut, T5–T7 can proceed first, but
 then re-run the WL-H2 preflight before T4.
