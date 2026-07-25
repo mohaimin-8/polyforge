@@ -32,48 +32,56 @@ task, report, do not improvise.**
   never mix substrates or pool samples.
 - **R8** Thesis/manuscript prose is user-owned. Agents do engineering only.
 
-## T0 — commit session-31 security work `[GATE:user approval]`
+## T0 — commit session-31 security work ✅ DONE (acec891, pushed)
 
-DO: `git add -A`, commit ("Security hardening: planner bearer auth,
-x/text CVE fix, govulncheck CI gate; Q1 roadmap"), push.
-DONE-WHEN: `git status` clean, CI green.
+## Phase 1 — artifact integrity ✅ DONE (session 32)
 
-## Phase 1 — artifact integrity (desk, no gate, do now)
+### T1 — CSV fallback loaders ✅ DONE (654a765)
+Delivered wider than specified. Findings that changed the plan:
 
-### T1 — CSV fallback loaders (7 analysis scripts)
-Scripts whose `load()` is duckdb-only: `analysis_chaos.py`,
-`analysis_concurrency.py`, `analysis_econ.py`, `analysis_learned.py`,
-`analysis_risk.py`, `analysis_tenant_scale.py`, plus
-`analysis_risk_budget.py` (its main DB is duckdb-only too). All in
-`research/analysis/`.
-DO: in each, when the `.duckdb` is absent, load the committed export
-instead — mirror the existing fallback pattern in `scripts/reproduce.py`
-(`load_runs` → `eval/results/metrics_*.csv.gz`). File map: chaos→
-`metrics_chaos_sim`, concurrency→`metrics_matrix_concurrency`, econ→
-`metrics_matrix_gpu_econ`, learned→`metrics_matrix_learned`, risk→
-`metrics_matrix_risk`, risk_budget→`metrics_matrix_risk_budget`,
-tenant_scale→`metrics_matrix_scale32`+`scale64`.
-VERIFY: per script — temporarily rename its `.duckdb` away, run with
-`POLYFORGE_ANALYSIS_OUT=<scratch>`, diff regenerated record vs committed:
-**byte-identical required**. If float-precision digits differ: stop,
-report (R1 forbids rewriting the committed record). Restore the `.duckdb`.
-DONE-WHEN: 7/7 byte-identical from CSV; R3 green.
+* **The map said 7 scripts; the real split was different.** Five share one
+  run-level query (`stats.load_campaign_runs`); `analysis_econ` already used
+  `stats.load_runs` and only needed its DBs registered in `CSV_EXPORTS`;
+  `analysis_chaos` and `analysis_econ.tier_posture` read the **timeseries**
+  table, which no run-level export covers.
+* **Timeseries solved by committed aggregates.** Each such consumer uses a
+  *grouped* result, so `eval/scripts/export_timeseries_agg.py` commits an
+  aggregate of exactly the query that consumer runs (~35 KB total): chaos
+  violation traces, per-(system, tier) posture, fairness worst-tenant, and
+  the two runs fig09 plots. Scope stated in `docs/REPRODUCE.md`; a slice
+  outside the committed one raises rather than silently returning nothing.
+* **Row order is part of the contract.** Bootstrap CIs resample positionally
+  under a fixed seed, so the exports' `ORDER BY` shifted published CI digits
+  when rebuilt from CSV. Exporter now writes the DuckDB's own row order;
+  `load_runs` (whose SQL *has* an `ORDER BY`) re-sorts in its CSV branch.
+  Six exports rewritten in place — verified same rows, reordered only.
+* **Four `.exists()` guards** (v2, v3, fairness_v2, iso-cost) asked whether
+  the DuckDB was present when the question is whether the data is loadable;
+  now `runs_available()`.
 
-### T2 — reproduce.py covers everything
-DO: add the T1 campaigns' records and `fig18_risk_frontier` +
-`fig19_risk_budget_frontier` to `scripts/reproduce.py`'s rebuild set.
-VERIFY: `python scripts/reproduce.py` on a tree without any `.duckdb`
-reports **20/20 records MATCH, 19/19 figures**; CI `reproduce` job green.
+### T2 — reproduce.py covers everything ✅ DONE (654a765)
+**16/16 records byte-identical, 19/19 figures, on a tree with zero DuckDBs**
+(the map's "20/20" counted campaigns, not records; 16 is the true corpus).
+Two defects found while verifying:
 
-### T3 — controller invariant property tests (tests ONLY, no behavior change)
-DO: new `research/jcac_sim/test_invariants.py`. Over a seeded grid of
-states/demands, for `JCACController` with `anchor_moves` True AND False,
-assert every emitted plan: (a) per-interval move clamps honored **relative
-to the prior config** (|Δreplicas| ≤ clamp, ≤1 cache level — the class of
-defect the Wave-5 audit caught post-publication); (b) bounds:
-`replica_min ≤ r ≤ replica_max`, cache within limits, tier ∈ `TIERS`;
-(c) determinism: same seed twice → identical plans.
-VERIFY: pytest green; R3 green (proves zero behavior change).
+* reproduce.py never cleared its output dir, so anything that failed to
+  rebuild was still counted from the previous run's leftovers — it reported
+  19/19 figures on a tree where fig09 had not rebuilt at all. Now clears its
+  own artifacts by pattern first.
+* Campaign scripts wrote to a hardcoded path, ignoring
+  `POLYFORGE_ANALYSIS_OUT` — running one during a reproduction would have
+  overwritten the frozen record it was meant to be diffed against. All now
+  go through `stats.record_path()`.
+
+### T3 — controller invariant property tests ✅ DONE (3fc418c)
+`research/jcac_sim/test_invariants.py`, 9 tests, 192 total pass.
+**Lesson worth carrying:** the first draft derived `MAX_REPLICA_STEP` from
+`DELTA_REPLICAS`, which made the tests tautological — mutating the lattice
+to ±4 left all six passing. Limits are now literals (the frozen spec), with
+`ActuationContractTests` pinning the lattice against them.
+**Always mutation-test a property test.** Verified: widening the lattice
+fails 4 tests; reintroducing the audited defect itself (`origin = None`)
+fails exactly the two clamp tests.
 
 ## Phase 2 — B1 live three-knob plane `[GATE:user opens GPU host, $20–60]`
 **Runs BEFORE Phase 3** (Phase 3 modifies the code path B1's preflight
@@ -144,7 +152,14 @@ R5 + R6 mandatory.
 
 ## Order summary
 
-Now: T0 → T1 → T2 → T3. The moment the GPU gate opens: T4 (preempts
-everything). Then T5–T7. Then T8–T10 if maximum probability is wanted.
-T11–T16 run on the user's clock in parallel. Submission-ready =
-T0–T7 + T11–T16 done; maximum-probability = add T8–T10.
+**Done:** T0–T3 (Phase 0 security + Phase 1 artifact integrity), pushed
+through 3fc418c.
+
+**Next:** T4 (B1) the moment the GPU gate opens — it preempts everything,
+because T5 modifies the operator→planner path B1's frozen WL-H2 preflight
+was verified against. If the gate stays shut, T5–T7 can proceed first, but
+then re-run the WL-H2 preflight before T4.
+
+Then T8–T10 if maximum acceptance probability is wanted (Track B).
+T11–T16 run on the user's clock in parallel and none of them block T4–T10.
+Submission-ready = T0–T7 + T11–T16; maximum-probability = add T8–T10.
