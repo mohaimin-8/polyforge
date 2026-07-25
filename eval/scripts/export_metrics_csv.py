@@ -33,6 +33,14 @@ def main() -> None:
     out = EVAL_DIR / "results" / f"metrics_{spec.name}.csv.gz"
 
     con = duckdb.connect(str(db_path), read_only=True)
+    # Deliberately no ORDER BY: the export must carry the DuckDB's own row
+    # order, because that is the order the analysis scripts read when they
+    # generated the committed records. Bootstrap CIs resample positionally
+    # under a fixed seed, so re-ordering the rows silently shifts published
+    # CI bounds — the export would then re-derive a record that differs from
+    # the frozen one in its last digits. Any consumer that needs a specific
+    # order must sort explicitly and say why (see
+    # research/analysis/analysis_risk_budget.py::load_null_runs).
     rows = con.execute(
         """
         SELECT r.run_id, r.system, r.workload, r.tenant_mix, r.cluster_size,
@@ -41,7 +49,6 @@ def main() -> None:
                m.crud_p95_ms, m.ai_p95_ms
         FROM metrics m JOIN runs r USING (run_id)
         WHERE r.status = 'valid'
-        ORDER BY r.system, r.workload, r.tenant_mix, r.cluster_size, r.rep
         """
     ).fetchall()
     columns = [d[0] for d in con.description]

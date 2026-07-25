@@ -133,6 +133,24 @@ def paired(df: pd.DataFrame, baseline: str, metric: str,
 
 
 def tier_posture(db_path: Path) -> pd.DataFrame:
+    """Per-(system, tier) posture counts and mean cache size.
+
+    From the DuckDB when present, else from the committed aggregate that
+    `eval/scripts/export_timeseries_agg.py` writes with this exact query —
+    the raw timeseries are Zenodo-archived, the grouped result is tiny, so
+    the aggregate is what git carries.
+    """
+    if not db_path.exists():
+        agg = (db_path.parent /
+               f"agg_tier_posture_{db_path.stem.replace('raw_sim_', '')}.csv.gz")
+        if agg.exists():
+            df = pd.read_csv(agg)
+            df["n"] = pd.to_numeric(df["n"], errors="coerce")
+            df["mean_cache_mb"] = pd.to_numeric(df["mean_cache_mb"], errors="coerce")
+            return df
+        raise FileNotFoundError(
+            f"{db_path.name} missing and its committed aggregate {agg.name} "
+            "is absent too; run the campaign or fetch the Zenodo archive")
     con = duckdb.connect(str(db_path), read_only=True)
     df = con.execute(
         """
@@ -268,7 +286,7 @@ def main() -> None:
         w(f"| {system} | " + " | ".join(shares) + f" | {cache:.0f} |")
     w("")
 
-    out = Path(__file__).resolve().parent / spec["out"]
+    out = stats.record_path(spec["out"])
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"wrote {out}")
 

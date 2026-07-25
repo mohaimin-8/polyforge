@@ -43,25 +43,35 @@ RESULTS = REPO_ROOT / "eval" / "results"
 FIGURES = RESULTS / "figures"
 
 # What run_analysis.py can produce, and the raw database each record needs
-# beyond the committed exports (None = fully rebuildable from git).
+# beyond the committed exports (None = fully rebuildable from git). All five
+# are None: every campaign here now has either a run-level csv.gz export or,
+# where the analysis needs the timeseries, a committed aggregate of exactly
+# the query it runs (eval/scripts/export_timeseries_agg.py).
 RECORDS = [
     ("RESULTS.md", None),
     ("ADVANCED.md", None),
-    ("RESULTS_V2.md", "raw_sim_v2.duckdb"),
-    ("FAIRNESS_V2.md", "fairness_v2.duckdb"),
-    ("RESULTS_V3.md", "raw_sim_v3.duckdb"),
+    ("RESULTS_V2.md", None),
+    ("FAIRNESS_V2.md", None),
+    ("RESULTS_V3.md", None),
 ]
 
-# Figures produced by a standalone campaign script rather than by
-# run_analysis.py. Each needs its own campaign database, so a reproduction run
-# names the script and the file instead of leaving an unexplained gap in the
-# figure count.
-CAMPAIGN_FIGURES = {
-    "fig18_risk_frontier": (
-        "research/analysis/analysis_risk.py", "raw_sim_risk.duckdb"),
-    "fig19_risk_budget_frontier": (
-        "research/analysis/analysis_risk_budget.py", "raw_sim_risk_budget.duckdb"),
-}
+# Campaign records produced by a standalone script rather than by
+# run_analysis.py: (script, argv, record). Each reads its campaign's committed
+# csv.gz export when the DuckDB is absent, so this whole block rebuilds on a
+# clean clone. fig18/fig19 ride along with their campaigns' scripts.
+CAMPAIGN_RECORDS = [
+    ("analysis_concurrency.py", [], "RESULTS_CONCURRENCY.md"),
+    ("analysis_learned.py", [], "RESULTS_LEARNED.md"),
+    ("analysis_risk.py", [], "RESULTS_RISK.md"),
+    ("analysis_risk_budget.py", [], "RESULTS_RISK_BUDGET.md"),
+    ("analysis_tenant_scale.py", [], "RESULTS_TENANT_SCALE.md"),
+    ("analysis_chaos.py", [], "RESULTS_CHAOS_SIM.md"),
+    ("analysis_econ.py", ["tier"], "RESULTS_TIER_RATIO.md"),
+    ("analysis_econ.py", ["hk"], "RESULTS_HK_ADOPTION.md"),
+    ("analysis_econ.py", ["lm"], "RESULTS_LM_ADOPTION.md"),
+    ("analysis_econ.py", ["mixp95"], "RESULTS_MIXTURE_P95.md"),
+    ("analysis_econ.py", ["tierwu"], "RESULTS_TIER_WU.md"),
+]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
                 "metrics_forecasters.csv.gz", "metrics_realism.csv.gz"]
@@ -138,6 +148,22 @@ def main() -> int:
     out_dir = args.out.resolve()
     fig_dir = out_dir / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
+    # Clear this script's own artifacts from a previous run before rebuilding.
+    # Without it, anything that fails to rebuild now is still counted from the
+    # last run's leftovers — which overstates exactly the claim this script
+    # exists to substantiate. (Only known artifact patterns are removed, never
+    # the directory itself: --out can point anywhere.)
+    stale = 0
+    for pattern in ("fig*.pdf", "fig*.png", "FIGURES.md"):
+        for path in fig_dir.glob(pattern):
+            path.unlink()
+            stale += 1
+    for pattern in ("*.md", "diff_*.txt"):
+        for path in out_dir.glob(pattern):
+            path.unlink()
+            stale += 1
+    if stale:
+        print(f"cleared {stale} artifact(s) from the previous run")
     env = {**os.environ,
            "POLYFORGE_ANALYSIS_OUT": str(out_dir),
            "POLYFORGE_FIG_DIR": str(fig_dir)}
@@ -148,20 +174,39 @@ def main() -> int:
         print("run_analysis.py FAILED")
         return proc.returncode
 
+    # Campaign scripts, each in its own process so one failure cannot take the
+    # rest of the report with it.
+    failed_campaigns = []
+    for script, argv, record in CAMPAIGN_RECORDS:
+        proc = subprocess.run([sys.executable, script, *argv], cwd=ANALYSIS,
+                              env=env, capture_output=True, text=True)
+        if proc.returncode != 0:
+            failed_campaigns.append((record, proc.stderr.strip().splitlines()[-1:]))
+
     print("\n=== reproduction report ===")
+    all_records = [r for r, _ in RECORDS] + [r for _, _, r in CAMPAIGN_RECORDS]
+    width = max(len(r) for r in all_records)
+    matched = 0
     for record, _ in RECORDS:
-        print(f"  {record:<18} {diff_record(record, out_dir)}")
+        status = diff_record(record, out_dir)
+        matched += status.startswith("MATCH")
+        print(f"  {record:<{width}} {status}")
+    for _, _, record in CAMPAIGN_RECORDS:
+        status = diff_record(record, out_dir)
+        matched += status.startswith("MATCH")
+        print(f"  {record:<{width}} {status}")
+    print(f"  {'records':<{width}} {matched}/{len(all_records)} byte-identical")
+    for record, err in failed_campaigns:
+        print(f"    campaign script for {record} exited nonzero: "
+              f"{' '.join(err) or 'see output above'}")
+
     rebuilt_figs = sorted(p.stem for p in fig_dir.glob("fig*.pdf"))
     committed_figs = sorted(p.stem for p in FIGURES.glob("fig*.pdf"))
     missing = [f for f in committed_figs if f not in rebuilt_figs]
-    print(f"  figures            {len(rebuilt_figs)}/{len(committed_figs)} "
+    print(f"  {'figures':<{width}} {len(rebuilt_figs)}/{len(committed_figs)} "
           f"rebuilt as vector PDF + 600-DPI PNG")
     for f in missing:
-        if f in CAMPAIGN_FIGURES:
-            script, db = CAMPAIGN_FIGURES[f]
-            print(f"    not rebuilt: {f} — campaign figure; rebuild with "
-                  f"`python {script}` (needs eval/results/{db})")
-        elif tier == "git" or f == "fig09_adaptation_trace":
+        if tier == "git" or f == "fig09_adaptation_trace":
             print(f"    not rebuilt: {f} (needs archive timeseries)")
         else:
             print(f"    not rebuilt: {f}")

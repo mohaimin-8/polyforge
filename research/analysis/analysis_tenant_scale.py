@@ -12,15 +12,28 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import duckdb
 import pandas as pd
 from scipy import stats as sps
+
+import stats
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DB32 = REPO_ROOT / "eval" / "results" / "raw_sim_scale32.duckdb"
 DB64 = REPO_ROOT / "eval" / "results" / "raw_sim_scale64.duckdb"
 DB8 = REPO_ROOT / "eval" / "results" / "raw_sim_concurrency.duckdb"
-OUT = Path(__file__).resolve().parent / "RESULTS_TENANT_SCALE.md"
+# Committed run-level exports: the DuckDBs are Zenodo-archived, so these are
+# what let a clean clone re-derive this record (stats.load_campaign_runs).
+# The 8-tenant arm is the concurrency matrix re-read at this width, so it
+# shares that campaign's export.
+CSV_FOR = {
+    DB32: REPO_ROOT / "eval" / "results" / "metrics_matrix_scale32.csv.gz",
+    DB64: REPO_ROOT / "eval" / "results" / "metrics_matrix_scale64.csv.gz",
+    DB8: REPO_ROOT / "eval" / "results" / "metrics_matrix_concurrency.csv.gz",
+}
+# Written via stats.record_path so scripts/reproduce.py can redirect the
+# rebuild into a scratch dir and diff it against the committed record
+# without ever overwriting it.
+OUT = stats.record_path("RESULTS_TENANT_SCALE.md")
 COST_SCALE = 0.01
 SCORED_STEPS = 119  # 120-step runs score 119 intervals (stats.py convention)
 CELL = ["workload", "tenant_mix", "cluster_size", "rep"]
@@ -34,14 +47,7 @@ LABELS = {"jcac_anchored": "PolyForge (anchored)", "hpa": "HPA",
 
 
 def load(db: Path) -> pd.DataFrame:
-    con = duckdb.connect(str(db), read_only=True)
-    df = con.execute(
-        "select r.system, r.workload, r.tenant_mix, r.cluster_size, r.rep, "
-        "m.total_cost_usd, m.mean_violation, m.mean_jain, m.steps "
-        "from runs r join metrics m on r.run_id = m.run_id "
-        "where r.status = 'valid'"
-    ).fetchdf()
-    con.close()
+    df = stats.load_campaign_runs(db, CSV_FOR[db])
     tenants = df.tenant_mix.map(TENANTS_BY_MIX)
     df["J"] = (df.total_cost_usd / (SCORED_STEPS * tenants) / COST_SCALE
                + 2.0 * df.mean_violation + 0.5 * (1.0 - df.mean_jain))
@@ -124,7 +130,10 @@ def main() -> None:
 
     w("## TS-D1 (descriptive) — J margin vs portfolio width")
     w("")
-    if DB8.exists():
+    # The 8-tenant reference is available from the concurrency campaign's
+    # DuckDB or, on a clean clone, from its committed export — the same
+    # either-source rule the other arms use.
+    if DB8.exists() or CSV_FOR[DB8].exists():
         df8 = load(DB8)
         rows = []
         for baseline in ("hpa", "concurrency"):

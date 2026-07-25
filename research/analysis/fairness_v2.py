@@ -35,7 +35,22 @@ CELLS = ["workload", "tenant_mix", "cluster_size", "rep"]
 def load_worst_tenant(db_path: Path) -> pd.DataFrame:
     """Per run: the worst tenant's p95 latency and mean violation —
     'no tenant is allowed to have a terrible day so another can have a
-    great one' is the γ-term's actual job, and cluster means hide it."""
+    great one' is the γ-term's actual job, and cluster means hide it.
+
+    From the DuckDB when present, else from the committed aggregate that
+    `eval/scripts/export_timeseries_agg.py` writes with this exact query —
+    the timeseries are Zenodo-archived (192k rows), the grouped result is
+    200, so the aggregate is what git carries."""
+    if not db_path.exists():
+        agg = db_path.parent / "agg_fairness_v2_worst_tenant.csv.gz"
+        if agg.exists():
+            df = pd.read_csv(agg)
+            for col in ("worst_tenant_p95_ms", "worst_tenant_violation"):
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+            return df
+        raise FileNotFoundError(
+            f"{db_path.name} missing and its committed aggregate {agg.name} "
+            "is absent too; run the campaign or fetch the Zenodo archive")
     con = duckdb.connect(str(db_path), read_only=True)
     df = con.execute(
         """

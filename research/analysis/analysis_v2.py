@@ -226,7 +226,7 @@ def main() -> None:
         "are always shown side by side.")
 
     df_iso = None
-    if ISOCOST_DB.exists():
+    if stats.runs_available(ISOCOST_DB):
         try:
             df_iso = stats.load_runs(ISOCOST_DB)
         except Exception:

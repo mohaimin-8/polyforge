@@ -12,16 +12,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import duckdb
 import numpy as np
 import pandas as pd
 from scipy import stats as sps
+
+import stats
 
 import figures as F  # shared 600-DPI / colour-blind-safe conventions
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DB = REPO_ROOT / "eval" / "results" / "raw_sim_risk.duckdb"
-OUT = Path(__file__).resolve().parent / "RESULTS_RISK.md"
+# Committed run-level export: the DuckDB is Zenodo-archived, so this is what
+# lets a clean clone re-derive this record (stats.load_campaign_runs).
+CSV = REPO_ROOT / "eval" / "results" / "metrics_matrix_risk.csv.gz"
+# Written via stats.record_path so scripts/reproduce.py can redirect the
+# rebuild into a scratch dir and diff it against the committed record
+# without ever overwriting it.
+OUT = stats.record_path("RESULTS_RISK.md")
 TENANTS = 8
 COST_SCALE = 0.01
 CELL = ["workload", "tenant_mix", "cluster_size", "rep"]
@@ -48,14 +55,7 @@ FRONTIER_COLOR = F.SYSTEM_COLORS["jcac"]
 
 
 def load() -> pd.DataFrame:
-    con = duckdb.connect(str(DB), read_only=True)
-    df = con.execute(
-        "select r.system, r.workload, r.tenant_mix, r.cluster_size, r.rep, "
-        "m.total_cost_usd, m.mean_violation, m.mean_jain, m.steps "
-        "from runs r join metrics m on r.run_id = m.run_id "
-        "where r.status = 'valid'"
-    ).fetchdf()
-    con.close()
+    df = stats.load_campaign_runs(DB, CSV)
     df["J"] = (df.total_cost_usd / (119 * TENANTS) / COST_SCALE
                + 2.0 * df.mean_violation + 0.5 * (1.0 - df.mean_jain))
     return df

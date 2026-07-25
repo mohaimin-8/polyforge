@@ -16,17 +16,24 @@ import csv
 import gzip
 from pathlib import Path
 
-import duckdb
 import numpy as np
 import pandas as pd
 from scipy import stats as sps
+
+import stats
 
 import figures as F
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DB = REPO_ROOT / "eval" / "results" / "raw_sim_risk_budget.duckdb"
+# Committed run-level export: the DuckDB is Zenodo-archived, so this is what
+# lets a clean clone re-derive this record (stats.load_campaign_runs).
+CSV = REPO_ROOT / "eval" / "results" / "metrics_matrix_risk_budget.csv.gz"
 NULL_CSV = REPO_ROOT / "eval" / "results" / "metrics_matrix_risk.csv.gz"
-OUT = Path(__file__).resolve().parent / "RESULTS_RISK_BUDGET.md"
+# Written via stats.record_path so scripts/reproduce.py can redirect the
+# rebuild into a scratch dir and diff it against the committed record
+# without ever overwriting it.
+OUT = stats.record_path("RESULTS_RISK_BUDGET.md")
 TENANTS = 8
 COST_SCALE = 0.01
 CELL = ["workload", "tenant_mix", "cluster_size", "rep"]
@@ -53,14 +60,7 @@ NULL_GREY = "#b9b7ae"
 
 
 def load() -> pd.DataFrame:
-    con = duckdb.connect(str(DB), read_only=True)
-    df = con.execute(
-        "select r.system, r.workload, r.tenant_mix, r.cluster_size, r.rep, "
-        "m.total_cost_usd, m.mean_violation, m.mean_jain, m.steps "
-        "from runs r join metrics m on r.run_id = m.run_id "
-        "where r.status = 'valid'"
-    ).fetchdf()
-    con.close()
+    df = stats.load_campaign_runs(DB, CSV)
     df["J"] = (df.total_cost_usd / (119 * TENANTS) / COST_SCALE
                + 2.0 * df.mean_violation + 0.5 * (1.0 - df.mean_jain))
     return df
@@ -87,7 +87,17 @@ def load_null_runs() -> pd.DataFrame:
                              "rep": int(r["rep"]),
                              "total_cost_usd": float(r["total_cost_usd"]),
                              "mean_violation": float(r["mean_violation"])})
-    return pd.DataFrame(rows)
+    # Pin the row order rather than inheriting the file's. fig19's grey
+    # error bars are bootstrap CIs over *paired* differences, and resampling
+    # with a fixed seed reads the rows positionally — so the order here is
+    # part of the published figure. This sort is the order the export
+    # carried when fig19 was generated; stating it explicitly keeps the
+    # figure reproducible even though the export is now written in the
+    # DuckDB's own row order (which is what the main load() needs to match
+    # its record). Keys are unique per row, so the sort is total.
+    return pd.DataFrame(rows).sort_values(
+        ["system", "workload", "tenant_mix", "cluster_size", "rep"],
+        kind="mergesort").reset_index(drop=True)
 
 
 def paired(df: pd.DataFrame, a: str, b: str, metric: str) -> dict:

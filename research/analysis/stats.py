@@ -39,7 +39,32 @@ CSV_EXPORTS = {
     ABLATIONS_DB: _RESULTS_DIR / "metrics_ablations.csv.gz",
     FORECASTERS_DB: _RESULTS_DIR / "metrics_forecasters.csv.gz",
     REALISM_DB: _RESULTS_DIR / "metrics_realism.csv.gz",
+    # Every other campaign whose analysis reads run-level metrics. Same rule
+    # as above: the DuckDBs are Zenodo-archived, these committed exports are
+    # what a clean clone re-derives the records from. (The two live Phase 7
+    # databases have no export — their records are live measurements, not
+    # re-derivable at the desk.)
+    _RESULTS_DIR / "raw_sim_v2.duckdb": _RESULTS_DIR / "metrics_matrix_v2.csv.gz",
+    _RESULTS_DIR / "raw_sim_v3.duckdb": _RESULTS_DIR / "metrics_matrix_v3_overload.csv.gz",
+    _RESULTS_DIR / "vtc_fairness.duckdb": _RESULTS_DIR / "metrics_vtc_fairness.csv.gz",
+    _RESULTS_DIR / "fairness_v2.duckdb": _RESULTS_DIR / "metrics_fairness_v2.csv.gz",
+    _RESULTS_DIR / "isocost.duckdb": _RESULTS_DIR / "metrics_isocost.csv.gz",
+    _RESULTS_DIR / "chaos_sim.duckdb": _RESULTS_DIR / "metrics_chaos_sim.csv.gz",
+    _RESULTS_DIR / "raw_sim_clamp.duckdb": _RESULTS_DIR / "metrics_matrix_clamp.csv.gz",
+    # Wave 2 economy + Wave 5 structural-form reruns (analysis_econ.py).
+    _RESULTS_DIR / "raw_sim_gpu_econ.duckdb": _RESULTS_DIR / "metrics_matrix_gpu_econ.csv.gz",
+    _RESULTS_DIR / "raw_sim_hk.duckdb": _RESULTS_DIR / "metrics_matrix_hk.csv.gz",
+    _RESULTS_DIR / "raw_sim_lm.duckdb": _RESULTS_DIR / "metrics_matrix_lm.csv.gz",
+    _RESULTS_DIR / "raw_sim_mixp95.duckdb": _RESULTS_DIR / "metrics_matrix_mixp95.csv.gz",
+    _RESULTS_DIR / "raw_sim_tierwu.duckdb": _RESULTS_DIR / "metrics_matrix_tierwu.csv.gz",
 }
+
+# The order `load_runs`'s SQL imposes. The CSV branch re-applies it because
+# exports are written in the DuckDB's own row order (see
+# eval/scripts/export_metrics_csv.py), which is not this one; sorting here
+# keeps the two branches identical row-for-row. Keys are unique per run, so
+# the sort is total.
+_RUN_ORDER = ["system", "workload", "tenant_mix", "cluster_size", "rep"]
 
 RUN_COLUMNS = [
     "system", "workload", "tenant_mix", "cluster_size", "rep",
@@ -92,7 +117,8 @@ def load_runs(db_path: Path = FULL_DB) -> pd.DataFrame:
             df = pd.read_csv(export)[RUN_COLUMNS]
             for col in RUN_COLUMNS[5:]:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
-            return df
+            return (df.sort_values(_RUN_ORDER, kind="mergesort")
+                      .reset_index(drop=True))
         raise FileNotFoundError(
             f"{db_path} missing and no committed csv.gz export covers it; "
             "run the experiment or fetch the Zenodo archive")
@@ -111,8 +137,81 @@ def load_runs(db_path: Path = FULL_DB) -> pd.DataFrame:
     return df
 
 
+# The run-level projection every post-v3 matrix campaign scores on
+# (concurrency, learned, risk, risk_budget, tenant_scale). `steps` is read
+# from the metrics table in the DuckDB path and from the runs table in the
+# export; they are the same value (verified equal on every valid row).
+CAMPAIGN_RUN_COLUMNS = [
+    "system", "workload", "tenant_mix", "cluster_size", "rep",
+    "total_cost_usd", "mean_violation", "mean_jain", "steps",
+]
+
+
+def load_campaign_runs(db_path: Path, csv_path: Path) -> pd.DataFrame:
+    """Run-level rows for one campaign matrix: from its DuckDB when that is
+    present, else from its committed csv.gz export.
+
+    The DuckDB files carry the timeseries and are Zenodo-archived rather than
+    committed, so without this fallback a clean clone could not re-derive
+    these campaigns' records at all. Both paths return the same columns for
+    the same `status = 'valid'` rows; callers compute their own J on top.
+
+    Row *order* is part of the contract, not an incidental detail: several
+    of these campaigns report bootstrap CIs, and resampling under a fixed
+    seed reads the rows positionally, so a different order shifts the
+    published CI bounds. `eval/scripts/export_metrics_csv.py` therefore
+    writes the export in the DuckDB's own row order and neither path sorts,
+    which is what makes the two byte-identical.
+    """
+    if db_path.exists():
+        con = duckdb.connect(str(db_path), read_only=True)
+        df = con.execute(
+            "select r.system, r.workload, r.tenant_mix, r.cluster_size, r.rep, "
+            "m.total_cost_usd, m.mean_violation, m.mean_jain, m.steps "
+            "from runs r join metrics m on r.run_id = m.run_id "
+            "where r.status = 'valid'"
+        ).fetchdf()
+        con.close()
+        return df
+    if csv_path.exists():
+        # Exports carry only valid rows, so there is no status filter here.
+        df = pd.read_csv(csv_path)[CAMPAIGN_RUN_COLUMNS]
+        for col in ("total_cost_usd", "mean_violation", "mean_jain", "steps"):
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df
+    raise FileNotFoundError(
+        f"{db_path.name} missing and its committed export {csv_path.name} is "
+        "absent too; run the campaign or fetch the Zenodo archive")
+
+
+# Columns load_timeseries returns, in order.
+_TS_COLUMNS = ["system", "workload", "tenant_mix", "step", "tenant",
+               "replicas", "cache_mb", "tier", "cost_usd", "violation"]
+# The one timeseries slice committed to git: the two runs fig09 plots.
+# Full timeseries stay in the Zenodo archives — this is a named exception,
+# not a general fallback, so anything outside it still fails loudly.
+_TS_SLICE_CSV = _RESULTS_DIR / "agg_fig09_timeseries_slices.csv.gz"
+
+
 def load_timeseries(db_path: Path, **filters) -> pd.DataFrame:
     if not db_path.exists():
+        if db_path == FULL_DB and _TS_SLICE_CSV.exists():
+            df = pd.read_csv(_TS_SLICE_CSV)
+            for key, value in filters.items():
+                if key not in df.columns:
+                    df = df.iloc[0:0]
+                    break
+                df = df[df[key].astype(str) == str(value)]
+            if not df.empty:
+                for col in ("step", "tenant", "replicas", "cache_mb",
+                            "cost_usd", "violation"):
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+                return (df.sort_values(["step", "tenant"], kind="mergesort")
+                          [_TS_COLUMNS].reset_index(drop=True))
+            raise FileNotFoundError(
+                f"{db_path.name}: timeseries for {filters} are not in the "
+                f"committed slice ({_TS_SLICE_CSV.name} covers only the runs "
+                "fig09 plots); fetch the Zenodo archive")
         raise FileNotFoundError(
             f"{db_path.name}: timeseries exist only in the DuckDB archives "
             "(Zenodo deposit), not in the committed csv.gz exports")

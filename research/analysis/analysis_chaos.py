@@ -17,7 +17,13 @@ import stats
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DB = REPO_ROOT / "eval" / "results" / "chaos_sim.duckdb"
-OUT = Path(__file__).resolve().parent / "RESULTS_CHAOS_SIM.md"
+# Committed aggregate of the timeseries view this script needs
+# (eval/scripts/export_timeseries_agg.py); the DuckDB is Zenodo-archived.
+TRACES_CSV = REPO_ROOT / "eval" / "results" / "agg_chaos_violation_traces.csv.gz"
+# Written via stats.record_path so scripts/reproduce.py can redirect the
+# rebuild into a scratch dir and diff it against the committed record
+# without ever overwriting it.
+OUT = stats.record_path("RESULTS_CHAOS_SIM.md")
 ALPHA = 0.01
 KEYS = ["workload", "rep"]  # single mix and size by design
 
@@ -52,6 +58,23 @@ def paired(df: pd.DataFrame, a: str, b: str, metric: str = "J") -> dict:
 
 
 def violation_traces() -> pd.DataFrame:
+    """Mean violation per (system, workload, step).
+
+    From the DuckDB when it is present, else from the committed aggregate
+    that `eval/scripts/export_timeseries_agg.py` writes with this exact
+    query — the raw timeseries are Zenodo-archived (518k rows here), so the
+    grouped result is what git carries.
+    """
+    if not DB.exists():
+        if TRACES_CSV.exists():
+            df = pd.read_csv(TRACES_CSV)
+            df["step"] = pd.to_numeric(df["step"], errors="coerce")
+            df["violation"] = pd.to_numeric(df["violation"], errors="coerce")
+            return df
+        raise FileNotFoundError(
+            f"{DB.name} missing and its committed aggregate "
+            f"{TRACES_CSV.name} is absent too; run the campaign or fetch the "
+            "Zenodo archive")
     con = duckdb.connect(str(DB), read_only=True)
     df = con.execute(
         """

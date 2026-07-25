@@ -212,7 +212,7 @@ def main() -> None:
     # v2 pre-registered analysis (PREREG_V2.md) once the v2 matrix exists.
     import analysis_v2
 
-    if analysis_v2.V2_DB.exists():
+    if stats.runs_available(analysis_v2.V2_DB):
         analysis_v2.main()
     else:
         print("analysis_v2.py skipped: run experiments/matrix_v2.yaml first")
@@ -220,7 +220,7 @@ def main() -> None:
     # v2 Phase 4 fairness γ-ablation under interference injection.
     import fairness_v2
 
-    if fairness_v2.DB.exists():
+    if stats.runs_available(fairness_v2.DB):
         fairness_v2.main()
     else:
         print("fairness_v2.py skipped: run experiments/fairness_v2.yaml first")
@@ -228,7 +228,7 @@ def main() -> None:
     # v3 pre-registered overload-matrix analysis (PREREG_V3.md).
     import analysis_v3
 
-    if analysis_v3.V3_DB.exists():
+    if stats.runs_available(analysis_v3.V3_DB):
         analysis_v3.main()
     else:
         print("analysis_v3.py skipped: run experiments/matrix_v3_overload.yaml first")
