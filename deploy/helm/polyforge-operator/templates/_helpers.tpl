@@ -25,3 +25,17 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- define "polyforge-operator.plannerImage" -}}
 {{- printf "%s:%s" .Values.planner.image.repository (default .Chart.AppVersion .Values.planner.image.tag) -}}
 {{- end -}}
+
+{{/* Name and key of the Secret holding the planner's shared bearer token —
+     either the user's existingSecret or the chart-managed one. */}}
+{{- define "polyforge-operator.plannerAuthSecretName" -}}
+{{- if .Values.planner.auth.existingSecret -}}
+{{- .Values.planner.auth.existingSecret -}}
+{{- else -}}
+{{- printf "%s-planner-auth" (include "polyforge-operator.fullname" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "polyforge-operator.plannerAuthSecretKey" -}}
+{{- default "token" .Values.planner.auth.existingSecretKey -}}
+{{- end -}}

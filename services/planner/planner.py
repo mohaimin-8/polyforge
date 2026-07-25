@@ -34,7 +34,9 @@ planner, is the source of truth for applied configuration.
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
+import os
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -297,7 +299,26 @@ class PlannerCore:
         }
 
 
-def make_handler(core: PlannerCore):
+def resolve_auth_token(cli_token_file: str | None = None) -> str | None:
+    """Resolve the shared bearer token guarding /v1/*, or None if unset.
+
+    Precedence: --auth-token-file (a mounted k8s Secret) over
+    POLYFORGE_PLANNER_TOKEN (env). Returns None when neither is configured,
+    which leaves the service open — the historical posture the frozen eval
+    harness and every closed campaign run against, so enabling auth can
+    never retroactively change a published number. The Helm chart sets the
+    token by default, so the *deployed* posture is authenticated while the
+    research path is untouched (ADR 0014 defence-in-depth follow-up).
+    """
+    if cli_token_file:
+        token = Path(cli_token_file).read_text(encoding="utf-8").strip()
+        if not token:
+            raise ValueError(f"auth token file {cli_token_file} is empty")
+        return token
+    return os.environ.get("POLYFORGE_PLANNER_TOKEN") or None
+
+
+def make_handler(core: PlannerCore, auth_token: str | None = None):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # quiet: the operator logs calls
             pass
@@ -309,10 +330,50 @@ def make_handler(core: PlannerCore):
             self.end_headers()
             self.wfile.write(body)
 
+        def _authorized(self) -> bool:
+            """Constant-time bearer check. /healthz stays open for probes;
+            every /v1/* route is guarded because GET /v1/state exports and
+            POST /v1/state overwrites per-tenant demand history, and
+            POST /v1/plan steers capacity for every tenant at once."""
+            if auth_token is None:
+                return True
+            header = self.headers.get("Authorization", "")
+            scheme, _, presented = header.partition(" ")
+            if scheme.lower() != "bearer":
+                return False
+            return hmac.compare_digest(presented.strip(), auth_token)
+
+        def _deny(self) -> None:
+            # Drain the request body before replying. Rejecting a POST without
+            # consuming what the peer already sent makes the OS reset the
+            # connection (WinError 10053) instead of delivering our 401, so an
+            # unauthorized client would see a transport error rather than the
+            # status. Cap the drain so an unauthenticated peer cannot make us
+            # read an unbounded body.
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                length = 0
+            if length > 0:
+                self.rfile.read(min(length, 1 << 20))
+            body = json.dumps({"error": "unauthorized"}).encode()
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("WWW-Authenticate", "Bearer")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(body)
+            self.close_connection = True
+
         def do_GET(self):
             if self.path == "/healthz":
                 self._send(200, b"ok", "text/plain")
-            elif self.path == "/v1/state":
+                return
+            if not self._authorized():
+                self._deny()
+                return
+            if self.path == "/v1/state":
                 # Export the forecast snapshot for hand-off/backup.
                 body = json.dumps(core.snapshot()).encode()
                 self._send(200, body, "application/json")
@@ -320,6 +381,9 @@ def make_handler(core: PlannerCore):
                 self._send(404, b"not found", "text/plain")
 
         def do_POST(self):
+            if not self._authorized():
+                self._deny()
+                return
             if self.path == "/v1/plan":
                 self._handle(core.plan)
             elif self.path == "/v1/state":
@@ -362,14 +426,27 @@ def main() -> None:
                          "boot and atomically rewritten after each plan, so a "
                          "restart or a PVC-backed replacement pod resumes "
                          "demand history instead of cold-starting")
+    ap.add_argument("--auth-token-file", default=None,
+                    help="path to a file holding the shared bearer token that "
+                         "guards /v1/plan and /v1/state; overrides the "
+                         "POLYFORGE_PLANNER_TOKEN env var. When neither is set "
+                         "the service is unauthenticated (the research-harness "
+                         "posture) and says so loudly at boot")
     args = ap.parse_args()
+    auth_token = resolve_auth_token(args.auth_token_file)
     core = PlannerCore(
         default_weights={"alpha": args.alpha, "beta": args.beta, "gamma": args.gamma},
         forecast_method=args.forecast,
         state_file=args.state_file,
     )
-    server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(core))
+    server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(core, auth_token))
     print(f"jcac planner ({SOLVER_NAME}) listening on :{args.port}")
+    if auth_token is None:
+        print("WARNING: planner is UNAUTHENTICATED — /v1/state exports and "
+              "overwrites per-tenant demand history and /v1/plan steers every "
+              "tenant's capacity. Set --auth-token-file or "
+              "POLYFORGE_PLANNER_TOKEN, and do not rely on NetworkPolicy "
+              "alone (it is inert on non-enforcing CNIs).", file=sys.stderr)
     server.serve_forever()
 
 

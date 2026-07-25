@@ -47,6 +47,17 @@ spec:
             - --gamma={{ .Values.planner.gamma }}
             - --forecast={{ .Values.planner.forecast }}
             - --state-file=/var/lib/polyforge/planner-state.json
+          {{- if .Values.planner.auth.enabled }}
+          # Defence in depth for /v1/plan and /v1/state, which steer every
+          # tenant's capacity and export/overwrite demand history. The
+          # NetworkPolicy below is inert on non-enforcing CNIs; this is not.
+          env:
+            - name: POLYFORGE_PLANNER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "polyforge-operator.plannerAuthSecretName" . }}
+                  key: {{ include "polyforge-operator.plannerAuthSecretKey" . }}
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.planner.port }}

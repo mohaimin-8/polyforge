@@ -48,6 +48,41 @@ in the manifest header. Requires an enforcing CNI (Calico on kind).
 - **Secrets hygiene**: gitleaks scans full git history on every push.
 - **Build**: distroless final image; Go module sums pinned by `go.sum`.
 
+## Internal control-plane surface: the JCAC planner
+
+The OWASP walk above covers the tenant-facing APIs. The planner
+(`services/planner`, ADR 0014) is an *internal* service and was initially
+scoped out of that table — recorded here because "internal" is a network
+claim, not an authorization one.
+
+Its routes are not read-only conveniences. `POST /v1/plan` chooses
+replicas, cache budget and model tier for **every tenant at once**;
+`GET /v1/state` exports every tenant's demand history; `POST /v1/state`
+overwrites the forecast state the controller plans on. An attacker who
+reaches the port can therefore read cross-tenant demand telemetry and
+steer capacity for the whole cluster — an integrity and confidentiality
+break, not merely a nuisance.
+
+Until this was fixed the **only** control was the NetworkPolicy in
+`deploy/helm/polyforge-operator/templates/networkpolicy.yaml`, which is
+inert on CNIs that do not enforce NetworkPolicy (kind's default kindnet
+among them). That is a control that **fails open silently** — the manifest
+applies cleanly and enforces nothing.
+
+**Enforcement now:** a shared bearer token guards every `/v1/*` route and
+verb, compared in constant time (`hmac.compare_digest`); `/healthz` stays
+open for kubelet probes. The Helm chart generates the token once, pins it
+across upgrades via `lookup` so an upgrade cannot desynchronize the two
+pods, and injects the same Secret into the planner and the operator
+(`planner.auth.*`); `planner.auth.existingSecret` hands token management
+to the operator of the cluster. The token is configured by
+`--auth-token-file` (a mounted Secret) or `POLYFORGE_PLANNER_TOKEN`, and
+an empty token file is a hard boot error rather than a silent downgrade to
+open. Unset means unauthenticated — the historical posture the frozen eval
+harness reproduces against — and the service says so loudly on stderr at
+boot. Defence in depth: the NetworkPolicy is unchanged and still on by
+default.
+
 ## Penetration test status
 
 `scripts/zap-baseline.sh` runs the OWASP ZAP baseline scan against a
@@ -69,3 +104,15 @@ fixed or triaged.
 3. No per-process egress allowlist (API7) — containment is network-level.
 4. Trufflehog as a second scanner (roadmap mentions both) is not wired;
    gitleaks covers the gate.
+5. Planner transport is plain HTTP inside the mesh: the bearer token
+   authenticates the caller but does not encrypt the hop. Linkerd mTLS
+   (W22) covers confidentiality where the mesh is deployed; on a bare
+   cluster without it the token is observable to an on-path attacker.
+   A single shared token also means no per-caller attribution — the
+   operator is the only intended client, so this is scoped, not solved.
+6. `govulncheck` is not yet a CI gate. It was run manually against this
+   tree (clean as of 2026-07-25, after `golang.org/x/text` v0.38.0 →
+   v0.39.0 cleared GO-2026-5970, an infinite-loop DoS reachable from the
+   OIDC token exchange and the Postgres migration path). Wiring it into
+   `ci.yml` is the standing fix so the next reachable CVE fails a build
+   instead of waiting for an audit.

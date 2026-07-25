@@ -50,6 +50,21 @@ planner:
   # persistence | trend | holt | seasonal | seasonal_mr (multi-resolution,
   # can see day-scale cycles live — Wave 5).
   forecast: holt
+  # Shared bearer token guarding /v1/plan and /v1/state. On by default: those
+  # routes steer every tenant's capacity and export/overwrite per-tenant demand
+  # history, and the NetworkPolicy below is inert on CNIs that do not enforce
+  # NetworkPolicy — a control that fails open silently. With auth on, the chart
+  # generates the token once and pins it across upgrades (`lookup`), wiring the
+  # same Secret into the planner and the operator.
+  #
+  # Set enabled: false only for the research/eval harness, which drives the
+  # planner directly and reproduces the published campaigns against the
+  # historical unauthenticated posture.
+  auth:
+    enabled: true
+    # Manage the token yourself instead: name a Secret holding it.
+    existingSecret: ""
+    existingSecretKey: token
   # Durable forecast state (`--state-file`, Wave 5): the planner atomically
   # rewrites this file after every plan, so a restart resumes every
   # tenant's demand history instead of cold-starting it. Always on: with

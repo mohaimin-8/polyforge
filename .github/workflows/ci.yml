@@ -60,6 +60,16 @@ jobs:
           awk -v t="$total" 'BEGIN { exit !(t >= 60.0) }' || { echo "FAIL: coverage ${total}% is below the 60% gate"; exit 1; }
       - name: Lint OpenAPI
         run: npx --yes @redocly/cli lint api/openapi.yaml
+      # Reachability-aware CVE gate. govulncheck fails only on
+      # vulnerabilities our code actually *calls*, so it does not turn
+      # every advisory in the module graph into a red build. Added after a
+      # manual audit found GO-2026-5970 (infinite-loop DoS in
+      # golang.org/x/text, reachable from the OIDC token exchange) sitting
+      # in the tree with nothing to catch it — see docs/SECURITY.md.
+      - name: Vulnerability scan (reachable symbols)
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./...
 
   # W23: no secrets in the repo or its history. gitleaks scans every push
   # over the full history (fetch-depth: 0 is what makes that true).

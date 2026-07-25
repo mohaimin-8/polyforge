@@ -96,6 +96,11 @@ var validTiers = map[string]bool{"none": true, "small": true, "mid": true, "larg
 type HTTPClient struct {
 	BaseURL string
 	HTTP    *http.Client
+	// AuthToken is the shared bearer token the planner requires on /v1/*
+	// (services/planner: --auth-token-file / POLYFORGE_PLANNER_TOKEN).
+	// Empty means the planner is running in its unauthenticated research
+	// posture; the Helm chart sets it on both sides by default.
+	AuthToken string
 }
 
 func NewHTTPClient(baseURL string, timeout time.Duration) *HTTPClient {
@@ -103,6 +108,12 @@ func NewHTTPClient(baseURL string, timeout time.Duration) *HTTPClient {
 		timeout = 3 * time.Second
 	}
 	return &HTTPClient{BaseURL: baseURL, HTTP: &http.Client{Timeout: timeout}}
+}
+
+// WithAuthToken sets the bearer token sent on every planner call.
+func (c *HTTPClient) WithAuthToken(token string) *HTTPClient {
+	c.AuthToken = token
+	return c
 }
 
 func (c *HTTPClient) Plan(ctx context.Context, req Request) (Response, error) {
@@ -115,6 +126,9 @@ func (c *HTTPClient) Plan(ctx context.Context, req Request) (Response, error) {
 		return Response{}, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	if c.AuthToken != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+c.AuthToken)
+	}
 
 	resp, err := c.HTTP.Do(httpReq)
 	if err != nil {

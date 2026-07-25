@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import threading
 import unittest
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
 
-from planner import PlannerCore, make_handler
+from planner import PlannerCore, make_handler, resolve_auth_token
 
 
 def tenant(tid: str, **overrides) -> dict:
@@ -117,6 +119,106 @@ class PlannerHTTPTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             urllib.request.urlopen(req, timeout=5)
         self.assertEqual(ctx.exception.code, 400)
+
+
+class PlannerAuthTests(unittest.TestCase):
+    """The planner's /v1/* routes steer capacity for every tenant and
+    export/overwrite per-tenant demand history. NetworkPolicy is inert on
+    non-enforcing CNIs, so the bearer token is the defence-in-depth layer:
+    when configured it must be enforced on every /v1/ route and verb, and
+    /healthz must stay open for kubelet probes."""
+
+    TOKEN = "s3cret-planner-token"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.server = ThreadingHTTPServer(
+            ("127.0.0.1", 0), make_handler(PlannerCore(), cls.TOKEN))
+        cls.port = cls.server.server_address[1]
+        threading.Thread(target=cls.server.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+
+    def _request(self, path: str, token: str | None, method: str = "POST"):
+        headers = {"Content-Type": "application/json"}
+        if token is not None:
+            headers["Authorization"] = f"Bearer {token}"
+        data = json.dumps({"tenants": [tenant("acme")]}).encode() if method == "POST" else None
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}{path}", data=data,
+            headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                return resp.status
+        except urllib.error.HTTPError as err:
+            return err.code
+
+    def test_healthz_stays_open_for_probes(self):
+        with urllib.request.urlopen(f"http://127.0.0.1:{self.port}/healthz", timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+
+    def test_plan_rejects_missing_token(self):
+        self.assertEqual(self._request("/v1/plan", None), 401)
+
+    def test_plan_rejects_wrong_token(self):
+        self.assertEqual(self._request("/v1/plan", "wrong-token"), 401)
+
+    def test_plan_accepts_correct_token(self):
+        self.assertEqual(self._request("/v1/plan", self.TOKEN), 200)
+
+    def test_state_export_is_guarded(self):
+        # GET /v1/state discloses every tenant's demand history.
+        self.assertEqual(self._request("/v1/state", None, method="GET"), 401)
+        self.assertEqual(self._request("/v1/state", self.TOKEN, method="GET"), 200)
+
+    def test_state_import_is_guarded(self):
+        # POST /v1/state overwrites the forecast state the controller plans on.
+        self.assertEqual(self._request("/v1/state", None), 401)
+
+    def test_unknown_route_does_not_leak_existence_before_auth(self):
+        # An unauthenticated caller gets 401, not a 404 route oracle.
+        self.assertEqual(self._request("/v1/secret-admin", None), 401)
+
+
+class ResolveAuthTokenTests(unittest.TestCase):
+    def setUp(self):
+        self._saved = os.environ.pop("POLYFORGE_PLANNER_TOKEN", None)
+
+    def tearDown(self):
+        os.environ.pop("POLYFORGE_PLANNER_TOKEN", None)
+        if self._saved is not None:
+            os.environ["POLYFORGE_PLANNER_TOKEN"] = self._saved
+
+    def test_none_when_unconfigured(self):
+        # The historical posture the frozen eval harness runs against.
+        self.assertIsNone(resolve_auth_token())
+
+    def test_reads_env(self):
+        os.environ["POLYFORGE_PLANNER_TOKEN"] = "from-env"
+        self.assertEqual(resolve_auth_token(), "from-env")
+
+    def test_file_overrides_env(self):
+        os.environ["POLYFORGE_PLANNER_TOKEN"] = "from-env"
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+            fh.write("  from-file\n")
+            path = fh.name
+        try:
+            self.assertEqual(resolve_auth_token(path), "from-file")
+        finally:
+            os.unlink(path)
+
+    def test_empty_file_fails_loudly(self):
+        # Never silently fall back to "open" because a Secret mounted empty.
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+            fh.write("   \n")
+            path = fh.name
+        try:
+            with self.assertRaises(ValueError):
+                resolve_auth_token(path)
+        finally:
+            os.unlink(path)
 
 
 class PlannerLifecycleTests(unittest.TestCase):

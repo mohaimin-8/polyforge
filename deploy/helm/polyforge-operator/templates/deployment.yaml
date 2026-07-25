@@ -33,6 +33,14 @@ spec:
             {{- if .Values.planner.enabled }}
             - name: POLYFORGE_PLANNER_URL
               value: "http://{{ include "polyforge-operator.fullname" . }}-planner.{{ .Release.Namespace }}:{{ .Values.planner.port }}"
+            {{- if .Values.planner.auth.enabled }}
+            # Must match the planner pod's token; both read the same Secret.
+            - name: POLYFORGE_PLANNER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "polyforge-operator.plannerAuthSecretName" . }}
+                  key: {{ include "polyforge-operator.plannerAuthSecretKey" . }}
+            {{- end }}
             {{- else }}
             - name: POLYFORGE_PLANNER_URL
               value: ""

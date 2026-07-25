@@ -57,6 +57,41 @@ func TestHTTPClientRoundTrip(t *testing.T) {
 	}
 }
 
+// The planner guards /v1/* with a shared bearer token because its routes
+// steer every tenant's capacity and export/overwrite demand history, and the
+// NetworkPolicy that used to be the only defence is inert on non-enforcing
+// CNIs. The operator must present the token when configured — and must not
+// send an empty Authorization header when it is not (the research posture).
+func TestHTTPClientSendsBearerToken(t *testing.T) {
+	var got string
+	var present bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("Authorization")
+		_, present = r.Header["Authorization"]
+		_ = json.NewEncoder(w).Encode(Response{
+			Solver: "jcac-lattice-v1",
+			Plans:  map[string]Plan{"acme": {Replicas: 1, CacheMB: 0, Tier: "none"}},
+		})
+	}))
+	defer server.Close()
+
+	client := NewHTTPClient(server.URL, time.Second).WithAuthToken("s3cret")
+	if _, err := client.Plan(context.Background(), planRequest()); err != nil {
+		t.Fatal(err)
+	}
+	if got != "Bearer s3cret" {
+		t.Errorf("Authorization = %q, want %q", got, "Bearer s3cret")
+	}
+
+	client = NewHTTPClient(server.URL, time.Second)
+	if _, err := client.Plan(context.Background(), planRequest()); err != nil {
+		t.Fatal(err)
+	}
+	if present {
+		t.Errorf("unauthenticated posture sent an Authorization header: %q", got)
+	}
+}
+
 func TestHTTPClientRejectsMalformedPlans(t *testing.T) {
 	cases := map[string]Response{
 		"unknown tier":       {Plans: map[string]Plan{"acme": {Replicas: 1, Tier: "colossal"}}},

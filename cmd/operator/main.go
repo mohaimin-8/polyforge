@@ -140,8 +140,14 @@ func main() {
 		// a tenant-scoped bearer token cannot (Phase 7 jcac live arm).
 		demands.AdminKey = os.Getenv("POLYFORGE_FEATURES_ADMIN_KEY")
 		runner := &controllers.PlanRunner{
-			Client:  mgr.GetClient(),
-			Planner: planner.NewHTTPClient(plannerURL, 3*time.Second),
+			Client: mgr.GetClient(),
+			// The planner's /v1/* routes steer every tenant's capacity and
+			// export/overwrite demand history, so they carry a shared bearer
+			// token in addition to the NetworkPolicy (which is inert on
+			// non-enforcing CNIs). Empty = the planner's unauthenticated
+			// research posture.
+			Planner: planner.NewHTTPClient(plannerURL, 3*time.Second).
+				WithAuthToken(os.Getenv("POLYFORGE_PLANNER_TOKEN")),
 			Demands: demands,
 			Log:     log,
 			Weights: planner.Weights{Alpha: 1, Beta: 2, Gamma: 0.5},
