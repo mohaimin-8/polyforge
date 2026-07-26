@@ -89,6 +89,12 @@ type PlanRunner struct {
 	Interval     time.Duration
 	Weights      planner.Weights
 	Limits       planner.Limits
+	// CellSize caps how many tenants go into one planner call. 0 (the
+	// default) plans the whole portfolio in a single call, exactly as before
+	// cells existed. Set it — CellSize is the measured value — when the
+	// portfolio is large enough that the joint solve approaches the
+	// operator's timeout; see planning_cells.go for what it costs.
+	CellSize int
 }
 
 // Start satisfies manager.Runnable; the manager cancels ctx on shutdown.
@@ -127,17 +133,35 @@ func (p *PlanRunner) RunOnce(ctx context.Context) error {
 	}
 	span.SetAttributes(attribute.Int("tenants", len(inputs)))
 
-	planCtx, cancel := context.WithTimeout(ctx, planCallTimeout)
-	resp, err := p.Planner.Plan(planCtx, planner.Request{
-		Weights: p.Weights,
-		Limits:  p.Limits,
-		Tenants: inputs,
-	})
-	cancel()
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		p.fallback(ctx, inputs, policies, err)
-		return nil // fallback is the designed behavior, not a cycle error
+	// One planner call per planning cell. With CellSize unset this is a
+	// single cell holding every tenant — the pre-cells behaviour, unchanged.
+	cells := planningCells(inputs, p.CellSize)
+	limits := cellLimits(p.Limits, cells)
+	span.SetAttributes(attribute.Int("cells", len(cells)))
+
+	resp := planner.Response{Plans: make(map[string]planner.Plan, len(inputs))}
+	for i, cell := range cells {
+		planCtx, cancel := context.WithTimeout(ctx, planCallTimeout)
+		cellResp, err := p.Planner.Plan(planCtx, planner.Request{
+			Weights: p.Weights,
+			Limits:  limits[i],
+			Tenants: cell,
+		})
+		cancel()
+		if err != nil {
+			// A cell failing is a cycle failing: applying the cells that did
+			// succeed would actuate a partial plan whose fairness term was
+			// solved over a portfolio the cluster is not actually in. The
+			// designed fallback — hold the last good plan — is the honest
+			// response for every tenant, not just the unplanned ones.
+			span.SetStatus(codes.Error, err.Error())
+			p.fallback(ctx, inputs, policies, err)
+			return nil // fallback is the designed behavior, not a cycle error
+		}
+		resp.Solver = cellResp.Solver
+		for id, plan := range cellResp.Plans {
+			resp.Plans[id] = plan
+		}
 	}
 
 	satisfactions := make([]float64, 0, len(inputs))

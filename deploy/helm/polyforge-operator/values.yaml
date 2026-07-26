@@ -82,6 +82,21 @@ planner:
   limits:
     replicas: 60
     cacheMB: 4096
+  # Planning cells: tenants per planner call. 0 (default) plans the whole
+  # portfolio in one call — what the operator did before cells existed.
+  #
+  # The joint solve is super-linear in tenants; its p95 first crosses the
+  # operator's 3 s timeout at 128 tenants, while per-cell latency stays flat
+  # at ~195 ms through 1024 (research/analysis/PLANNER_CELLS.md, PS-H1). Set
+  # this to 32 — the size every published per-cell latency was measured at —
+  # for portfolios approaching that width.
+  #
+  # The trade is explicit: cells scope the fairness term to each cell instead
+  # of the whole portfolio. Under the hash assignment the operator implements,
+  # the measured worst-case global-Jain cost is -0.0053 across N in [8, 1024]
+  # (PLANNER_CELLS_DEALIAS.md, PF-H1) — small, but not nothing, which is why
+  # this is opt-in rather than on by default.
+  cellSize: 0
   resources:
     requests:
       cpu: 100m

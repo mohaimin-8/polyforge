@@ -62,6 +62,13 @@ spec:
               value: {{ .Values.planner.limits.replicas | quote }}
             - name: POLYFORGE_PLAN_LIMIT_CACHE_MB
               value: {{ .Values.planner.limits.cacheMB | quote }}
+            {{- if gt (int .Values.planner.cellSize) 0 }}
+            # Omitted entirely when 0: the operator rejects a non-positive
+            # value so a typo cannot silently become a default, which means
+            # "disabled" has to be an absent variable, not a zero.
+            - name: POLYFORGE_PLAN_CELL_SIZE
+              value: {{ .Values.planner.cellSize | quote }}
+            {{- end }}
             {{- if .Values.gateway.adminURL }}
             - name: POLYFORGE_GATEWAY_ADMIN_URL
               value: {{ .Values.gateway.adminURL | quote }}

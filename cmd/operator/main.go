@@ -159,6 +159,14 @@ func main() {
 				CacheMB:  envInt32(log, "POLYFORGE_PLAN_LIMIT_CACHE_MB", 4096),
 				Replicas: envInt32(log, "POLYFORGE_PLAN_LIMIT_REPLICAS", 60),
 			},
+			// Planning cells. 0 (default) = one call for the whole
+			// portfolio, the behaviour before cells existed. The joint
+			// solve is super-linear in tenants and its p95 crosses the 3 s
+			// timeout at 128 (PLANNER_CELLS.md); past roughly that width,
+			// set this to controllers.CellSize (32) to keep per-cell solve
+			// time flat. It scopes the fairness term to each cell — a
+			// measured global-Jain cost of −0.0053 — so it is opt-in.
+			CellSize: int(envInt32(log, "POLYFORGE_PLAN_CELL_SIZE", 0)),
 		}
 		if natsURL := os.Getenv("POLYFORGE_NATS_URL"); natsURL != "" {
 			backbone, err := events.Connect(context.Background(), natsURL, events.BackboneConfig{})

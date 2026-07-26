@@ -1,0 +1,102 @@
+[
+  {
+    "tenants": 8,
+    "cell_size": 0,
+    "cells": 1,
+    "per_cell_p95_ms": 100.012,
+    "per_cell_median_ms": 100.012,
+    "cycle_total_ms": 100.012,
+    "plans_returned": 8,
+    "within_10s_control_period": true
+  },
+  {
+    "tenants": 8,
+    "cell_size": 32,
+    "cells": 1,
+    "per_cell_p95_ms": 93.054,
+    "per_cell_median_ms": 93.054,
+    "cycle_total_ms": 93.054,
+    "plans_returned": 8,
+    "within_10s_control_period": true
+  },
+  {
+    "tenants": 32,
+    "cell_size": 0,
+    "cells": 1,
+    "per_cell_p95_ms": 297.889,
+    "per_cell_median_ms": 297.889,
+    "cycle_total_ms": 297.889,
+    "plans_returned": 32,
+    "within_10s_control_period": true
+  },
+  {
+    "tenants": 32,
+    "cell_size": 32,
+    "cells": 1,
+    "per_cell_p95_ms": 385.077,
+    "per_cell_median_ms": 385.077,
+    "cycle_total_ms": 385.582,
+    "plans_returned": 32,
+    "within_10s_control_period": true
+  },
+  {
+    "tenants": 64,
+    "cell_size": 0,
+    "cells": 1,
+    "per_cell_p95_ms": 833.078,
+    "per_cell_median_ms": 833.078,
+    "cycle_total_ms": 833.078,
+    "plans_returned": 64,
+    "within_10s_control_period": true
+  },
+  {
+    "tenants": 64,
+    "cell_size": 32,
+    "cells": 2,
+    "per_cell_p95_ms": 272.455,
+    "per_cell_median_ms": 272.455,
+    "cycle_total_ms": 592.463,
+    "plans_returned": 64,
+    "within_10s_control_period": true
+  },
+  {
+    "tenants": 128,
+    "cell_size": 0,
+    "cells": 1,
+    "per_cell_p95_ms": 3179.766,
+    "per_cell_median_ms": 3179.766,
+    "cycle_total_ms": 3179.766,
+    "plans_returned": 128,
+    "within_10s_control_period": true
+  },
+  {
+    "tenants": 128,
+    "cell_size": 32,
+    "cells": 4,
+    "per_cell_p95_ms": 309.442,
+    "per_cell_median_ms": 264.04,
+    "cycle_total_ms": 1138.03,
+    "plans_returned": 128,
+    "within_10s_control_period": true
+  },
+  {
+    "tenants": 256,
+    "cell_size": 0,
+    "cells": 1,
+    "per_cell_p95_ms": 10171.217,
+    "per_cell_median_ms": 10171.217,
+    "cycle_total_ms": 10171.217,
+    "plans_returned": 256,
+    "within_10s_control_period": false
+  },
+  {
+    "tenants": 256,
+    "cell_size": 32,
+    "cells": 8,
+    "per_cell_p95_ms": 377.915,
+    "per_cell_median_ms": 308.274,
+    "cycle_total_ms": 2588.909,
+    "plans_returned": 256,
+    "within_10s_control_period": true
+  }
+]
