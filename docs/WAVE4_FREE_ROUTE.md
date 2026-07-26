@@ -78,6 +78,42 @@ Read three numbers:
 Exit 0 → proceed. Exit 1 → **do not start the run.** Reduce round-trip (a
 Codespace region nearer the Kaggle pool), or use a rented/credit GPU host.
 
+### 2b. Verified on the real host (session 33)
+
+The wiring above was exercised end-to-end on the actual Codespace
+(`fantastic-waffle`, 4-core standardLinux32gb) with the tier server in
+`--mock` mode, before any GPU hour was spent:
+
+```
+ small: mean 1241.3 ms   mid: mean 1881.3 ms
+  gap 640.0 ms vs threshold 310.3 ms -> MATERIAL
+  tolerates ~1319 ms more round-trip before WL-H2's tier probe would fail
+  slowest tier 1881 ms vs premium AI SLO 2500 ms -> 619 ms of headroom
+verdict: TUNNEL OK
+```
+
+So on this host the budget is **~619 ms of tunnel round-trip** before the
+premium SLO saturates (amendment clause 3 voids the run past that), against
+~1319 ms before WL-H2's tier probe would fail. The SLO binds first, by
+roughly 2x — measured, not estimated. A cloudflared quick tunnel typically
+adds 50–300 ms, so the route has real margin, but it is not unlimited and
+step 2 is what checks it on the day.
+
+Codespace gotchas met this session, on top of the session-19 list:
+
+* **Use a login shell.** `gh codespace ssh -- 'bash -lc "…"'`; a plain
+  non-login shell has no `GITHUB_TOKEN`, and `gh` is not installed inside.
+* **A dormant Codespace's git credential expires.** `git pull` fails with
+  "Invalid username or token". Rather than push a token in, copy a delta
+  bundle: `git bundle create delta.bundle <remote-sha>..main`, then
+  `gh codespace cp -c <name> delta.bundle remote:/tmp/`, then
+  `git fetch /tmp/delta.bundle main:refs/remotes/origin/main --force`.
+  (3.2 MB for ~40 commits.)
+* **`gh codespace cp` works from Windows** on gh 2.96 — the session-19
+  base64-over-ssh workaround is no longer needed for file transfer, though
+  base64 is still the reliable way to ship a multi-line *script* through the
+  nested quoting.
+
 ## 3. Start the cluster half (Codespace) and run
 
 Follow `PREREG_WAVE4_LIVE_PLANE.md` §Substrate and the existing
@@ -109,11 +145,21 @@ the real gateway.
 
 ---
 
-## 4. Substrate deviations — the text the RESULTS file must carry
+## 4. Substrate deviations — **already declared in the prereg**
 
-The pre-registration is frozen (ground rule 2). These are deviations of the
-*host*, declared here and to be restated in the RESULTS file, not edits to
-the protocol.
+Correction to an earlier draft of this file, which said these deviations
+belong in the runbook and the RESULTS file. They belong in the
+**pre-registration**, pushed before any comparison number: its §Outcome
+handling requires that "any substrate change forced by the provisioned host
+... is declared as a pushed pre-run amendment in this file", following
+`PREREG_WIRE_ATTACK.md` §Amendment. Putting them only here would have
+invalidated the run.
+
+That amendment is **already written and pushed** —
+`PREREG_WAVE4_LIVE_PLANE.md` §Amendment (session 33, commit 791f96a). Nothing
+further is needed before the run; the summary below is orientation, and the
+amendment is authoritative wherever the two differ. Restate it in the RESULTS
+file too, but the prereg push is what makes the run valid.
 
 ### 4.1 Two tiers, not three
 
@@ -152,6 +198,11 @@ exactly as frozen. The run is scored once. A WL-H2 failure voids WL-H1 and is
 reported as an inadequate substrate — that guard is what makes attempting a
 free route safe: the worst outcome is a declared void, never a quiet result
 from a bad substrate.
+
+The amendment adds one guard on top: **clause 3**, an over-target slowest
+tier voids the comparison on the same terms as an inert knob. A saturated
+SLO term is the failure that would otherwise pass WL-H2 and quietly produce
+a meaningless WL-H1.
 
 ---
 
