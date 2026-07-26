@@ -125,7 +125,26 @@ new RESULTS file; reconcile `RESULTS_MASTER.md`, `DEFENSE_QA.md`,
 `REMAINING_WORK.md`. Never edit the prereg (R1).
 DONE-WHEN: RESULTS committed + ledgers reconciled.
 
-## Phase 3 — ship planning cells (desk; AFTER T4, or user says go early)
+## Phase 3 — ship planning cells ✅ DONE (session 33, 99a2d5e)
+
+Done ahead of T4 (user opened the gate). **T5/T6/T7 all complete.** Findings:
+
+* **The map's partition rule was wrong.** It specified `md5(tenant_id) % K`
+  (fixed cell *count*); the measured rule is fixed cell *size* — order by
+  md5 and chunk into 32 (`planner_cells_dealias.hash_cells`,
+  `planner_cells.CELL_SIZE`). Different memberships. Shipped the measured one;
+  a mutation test now fails if modulo is reintroduced.
+* **The wall reproduces on the shipped path at the same width.** Monolithic
+  p95 3180 ms at 128 tenants (first over the 3 s timeout) and 10171 ms at 256
+  — past the whole 10 s control period. Per-cell p95 flat at 272–378 ms.
+  `research/analysis/CELLS_SHIPPED.md`, engineering note, no prereg (nothing
+  thesis-scored changed).
+* **Off by default**, and the chart omits the env var rather than setting 0,
+  because `envInt32` exits on non-positive so "disabled" must be absence.
+* Ceilings apportioned by largest remainder so per-cell limits sum to exactly
+  the cluster ceiling (over-sum would let cells jointly overcommit).
+
+### Superseded plan (kept for context)
 
 ### T5 — operator-side cell fan-out (smallest honest implementation)
 DO: in `internal/operator/controllers` PlanRunner: new env
