@@ -171,3 +171,73 @@ desk substrate** (mock backends stand in for the GPU host's model servers;
 the live run must re-run the gate on the provisioned host). Gate 1 — the
 GPU-capable host — remains the only blocker, and no comparison number
 exists.
+
+## Amendment (declared pre-run, session 33 — substrate: two tiers, split host)
+
+The frozen §Substrate assumes the model tiers are "served on the GPU host",
+implicitly the same host as the cluster, with VRAM possibly sufficient for a
+7B `large` tier. The substrate actually available is a **free** one, and it
+differs in two ways. Per §Outcome handling ("any substrate change forced by
+the provisioned host ... is declared as a pushed pre-run amendment in this
+file *before* any comparison number is collected"), this amendment is
+committed and pushed before any comparison number exists. Arms, cells,
+hypotheses, the iso-fairness margin (0.01), and the stopping rule are
+untouched.
+
+1. **Two tiers, not three — `small` and `mid` only.** `small` =
+   Qwen2.5-0.5B-Instruct, `mid` = Qwen2.5-3B-Instruct: the tier-bench pair
+   this file names as its frozen default. The `large` (7B) tier is dropped
+   under the rule §Substrate already states — `TIER_BENCH.md` measured 7B fp16
+   (~15.4 GB) spilling to CPU on a 16 GB card in two independent sessions, and
+   a CPU-offloaded tier measures the offload, not the tier. This run is
+   therefore **a two-tier run, declared as such**. Note this constraint is not
+   specific to the free host: any single-16 GB GPU forces it.
+
+2. **Split host: the tiers are served on a separate machine, reached over a
+   public tunnel.** The cluster half (kind, operator, planner, gateway) runs
+   on one free host; the GPU half (`research/calibration/kaggle_tier_server.py`,
+   both tiers behind one OpenAI-compatible endpoint) runs on a free GPU kernel
+   and is reached at a `trycloudflare.com` URL supplied through
+   `POLYFORGE_EVAL_TIER_BACKENDS`. No code path changes — the harness already
+   takes tier backends as URLs — but every AI request now crosses the public
+   internet, which the frozen substrate did not contemplate. What that does,
+   stated before the numbers exist so it cannot be chosen afterwards:
+
+   - **The tier separation is preserved.** Round-trip is added to both tiers
+     alike, so the small/mid *gap* — the quantity WL-H2 tests and the tier
+     knob actuates on — is unchanged; only WL-H2's relative threshold grows,
+     at 0.25x the added round-trip.
+   - **$-cost is unaffected.** Cost is metered from the tier a request
+     actually hit, not from its latency, so WL-H1's cost term is untouched.
+   - **Absolute latency is inflated**, and with it the SLO term and the Jain
+     index computed over SLO satisfaction. Live absolutes from this substrate
+     are **not** comparable to `TIER_BENCH.md`'s in-host tier latencies and
+     are never quoted as tier latencies (ground rule 3 applies with full
+     force here).
+   - **The SLO term can saturate.** The premium AI target is 2500 ms
+     (`model.py` `SLO_BASE_MS["ai"]` x `SLO_CLASS_FACTOR["premium"]`) and the
+     `mid` tier benched at 1883 ms, so roughly 600 ms of added round-trip puts
+     that tier over target, after which premium tenants violate irrespective
+     of the controller's choices and the SLO dimension the arms are separated
+     on goes flat. **This binds well before WL-H2 does** (which tolerates
+     ~1.3 s), and it is the failure mode this amendment most needs on record.
+
+3. **Pre-run substrate gate, in addition to WL-H2.** Before the matrix is
+   run, `eval/scripts/tunnel_preflight.py` must exit 0 **and** report the
+   slowest tier inside the premium AI SLO. Its JSON report
+   (`eval/results/tunnel_preflight.json`: per-tier means, measured gap,
+   threshold, round-trip headroom, SLO headroom) is committed with the run
+   and quoted in `RESULTS_WAVE4_LIVE_PLANE.md`. If the slowest tier is over
+   target, the substrate is declared inadequate on the same terms as a WL-H2
+   failure and **no comparison number is collected** — WL-H1 is not scored
+   from a saturated substrate.
+
+4. **Scope.** Clauses 2 and 3 apply only if the split-host route is taken. If
+   a single GPU host is provisioned instead (cloud credit, rented, or a GPU
+   Codespace), only clause 1 applies and clauses 2-3 are void — the run is
+   then exactly the frozen protocol at two tiers.
+
+Neither clause weakens a hypothesis or its falsifier. WL-H1 still fails
+loudly if the joint arm does not beat the best single-knob arm on cost at
+iso-fairness, and a WL-H2 or clause-3 failure still voids the comparison
+rather than producing a softened claim.
