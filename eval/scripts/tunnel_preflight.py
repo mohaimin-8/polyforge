@@ -64,12 +64,18 @@ def _prompt(tag: str, i: int) -> str:
     return f"Reply with the word ok. Nonce {digest}."
 
 
-def chat(base_url: str, model: str, prompt: str, timeout: float) -> tuple[float, str]:
+def chat(base_url: str, model: str, prompt: str, timeout: float,
+         api_key: str = "") -> tuple[float, str]:
     body = json.dumps({"model": model, "stream": False,
                        "messages": [{"role": "user", "content": prompt}]}).encode()
+    headers = {"Content-Type": "application/json"}
+    # Same header the gateway sends from a tier spec's api_key
+    # (internal/ai/gateway/openai.go), so this probe exercises the
+    # authenticated path the real run will use rather than a laxer one.
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     req = urllib.request.Request(base_url.rstrip("/") + "/chat/completions",
-                                 data=body, method="POST",
-                                 headers={"Content-Type": "application/json"})
+                                 data=body, method="POST", headers=headers)
     started = time.perf_counter()
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         payload = json.loads(resp.read())
@@ -80,20 +86,40 @@ def chat(base_url: str, model: str, prompt: str, timeout: float) -> tuple[float,
     return elapsed_ms, served
 
 
-def measure(name: str, spec: dict, n: int, timeout: float) -> dict:
-    base_url, model = spec["base_url"], spec["model"]
-    samples, served_models = [], set()
-    for i in range(n + 1):  # first call absorbs connection + model warm-up
-        ms, served = chat(base_url, model, _prompt(name, i), timeout)
-        if i:
-            samples.append(ms)
-            served_models.add(served)
-    return {"tier": name, "model": model, "base_url": base_url,
-            "n": len(samples), "mean_ms": statistics.mean(samples),
-            "min_ms": min(samples), "max_ms": max(samples),
-            "stdev_ms": statistics.pstdev(samples) if len(samples) > 1 else 0.0,
-            "served_models": sorted(served_models),
-            "echoes_requested_model": served_models == {model}}
+def measure_interleaved(specs: dict[str, dict], n: int, warmups: int,
+                        timeout: float) -> dict[str, dict]:
+    """Sample both tiers round-robin, after warming each.
+
+    Measured the naive way — warm one tier, time it, then the next — the first
+    tier absorbs every cold cost the process has (CUDA context, kernel
+    autotune, allocator growth) and the second runs warm. On a real P100 that
+    made the 3B tier appear *faster* than the 0.5B one: 598 ms vs 424 ms, the
+    wrong way round, with the small tier's SD at 486 ms. Interleaving after a
+    proper warm-up put the ordering back where physics says it belongs
+    (1452 ms vs 2114 ms, a 662 ms gap against the tier bench's 641 ms).
+    """
+    samples: dict[str, list[float]] = {name: [] for name in specs}
+    served: dict[str, set] = {name: set() for name in specs}
+    for i in range(warmups + n):
+        for name, spec in specs.items():
+            ms, model = chat(spec["base_url"], spec["model"], _prompt(name, i),
+                             timeout, spec.get("api_key", ""))
+            if i >= warmups:
+                samples[name].append(ms)
+                served[name].add(model)
+    out = {}
+    for name, spec in specs.items():
+        vals = samples[name]
+        out[name] = {
+            "tier": name, "model": spec["model"], "base_url": spec["base_url"],
+            "n": len(vals), "mean_ms": statistics.mean(vals),
+            "median_ms": statistics.median(vals),
+            "min_ms": min(vals), "max_ms": max(vals),
+            "stdev_ms": statistics.pstdev(vals) if len(vals) > 1 else 0.0,
+            "served_models": sorted(served[name]),
+            "echoes_requested_model": served[name] == {spec["model"]},
+        }
+    return out
 
 
 def main() -> int:
@@ -103,6 +129,10 @@ def main() -> int:
     ap.add_argument("--tiers", default="small,mid",
                     help="the two tiers to contrast (default: small,mid)")
     ap.add_argument("--probes", type=int, default=8)
+    ap.add_argument("--warmups", type=int, default=2,
+                    help="discarded calls per tier before timing; one is not "
+                         "enough on a cold GPU and the shortfall lands "
+                         "entirely on whichever tier is sampled first")
     ap.add_argument("--timeout", type=float, default=180.0)
     ap.add_argument("--report", type=Path, default=DEFAULT_REPORT)
     args = ap.parse_args()
@@ -128,8 +158,10 @@ def main() -> int:
     report: dict = {"tiers": [tier_a, tier_b], "probes": args.probes,
                     "rel_margin": REL_MARGIN, "abs_margin_ms": ABS_MARGIN_MS}
     try:
-        a = measure(tier_a, backends[tier_a], args.probes, args.timeout)
-        b = measure(tier_b, backends[tier_b], args.probes, args.timeout)
+        measured = measure_interleaved(
+            {tier_a: backends[tier_a], tier_b: backends[tier_b]},
+            args.probes, args.warmups, args.timeout)
+        a, b = measured[tier_a], measured[tier_b]
     except (urllib.error.URLError, TimeoutError, RuntimeError, KeyError) as err:
         report["verdict"] = f"UNREACHABLE ({type(err).__name__}: {err})"
         args.report.parent.mkdir(parents=True, exist_ok=True)
@@ -141,6 +173,14 @@ def main() -> int:
     slower = min(a["mean_ms"], b["mean_ms"])
     threshold = max(ABS_MARGIN_MS, REL_MARGIN * slower)
     material = delta_ms >= threshold
+    # Magnitude is not enough: the gap has to point the right way. `--tiers`
+    # is given in ascending capability, so the later tier runs the bigger
+    # model and must be the slower one. An inverted gap is not a working tier
+    # knob -- it means the tiers are mismeasured or misrouted -- yet an
+    # abs() materiality test scores it exactly like a healthy one. That is not
+    # hypothetical: the first run of this probe against a real P100 reported
+    # the 3B tier 174 ms *faster* than the 0.5B tier and returned PASS.
+    ordered = b["mean_ms"] > a["mean_ms"]
     # How much *more* constant round-trip the gate would still tolerate:
     # raising both means by r raises the threshold by rel_margin * r, so the
     # slack is (delta - threshold) / rel_margin. Reported in the probe's own
@@ -154,12 +194,13 @@ def main() -> int:
     report.update({tier_a: a, tier_b: b, "delta_ms": delta_ms,
                    "threshold_ms": threshold, "latency_moved": material,
                    "models_echoed": routed,
+                   "ordering_correct": ordered,
                    "extra_rtt_tolerance_ms": headroom_ms,
                    "ai_slo_premium_ms": AI_SLO_PREMIUM_MS,
                    "slowest_tier_mean_ms": slowest,
                    "slo_headroom_ms": slo_headroom_ms,
                    "slowest_tier_within_premium_slo": slo_headroom_ms > 0.0})
-    ok = material and routed
+    ok = material and routed and ordered
     report["verdict"] = ("TUNNEL OK (tier gap survives the round-trip)" if ok else
                          "SUBSTRATE INADEQUATE (do not start the run)")
 
@@ -173,6 +214,11 @@ def main() -> int:
     print(f"  gap {delta_ms:.1f} ms vs threshold {threshold:.1f} ms -> "
           f"{'MATERIAL' if material else 'BLURRED'}")
     print(f"  models echoed correctly: {routed}")
+    if not ordered:
+        print(f"  ORDERING INVERTED: {b['tier']} ({b['mean_ms']:.0f} ms) is not "
+              f"slower than {a['tier']} ({a['mean_ms']:.0f} ms) -- the bigger "
+              "model must cost more. Suspect cold-start contamination or "
+              "misrouted tiers; do not score a run from this.", file=sys.stderr)
     if ok:
         print(f"  tolerates ~{headroom_ms:.0f} ms more round-trip before "
               "WL-H2's tier probe would fail")

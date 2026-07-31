@@ -38,11 +38,13 @@ committed tier table instead of varying with sampled output length.
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import os
 import subprocess
 import sys
 import threading
+import urllib.request
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -120,7 +122,20 @@ class TierModels:
         with self.locks[tier]:
             inputs = tok([text], return_tensors="pt").to(model.device)
             with torch.no_grad():
-                out = model.generate(**inputs, max_new_tokens=MAX_NEW_TOKENS,
+                # min == max: every request decodes exactly MAX_NEW_TOKENS,
+                # ignoring EOS. TIER_BENCH.md timed "a fixed 48-token
+                # completion", and matching that is what makes per-tier
+                # latency comparable to the committed table.
+                #
+                # It also stops the *prompt* from setting the measurement.
+                # Left free to stop early, a prompt like "reply with the word
+                # ok" ends after ~3 tokens on both tiers, and the small/mid
+                # gap collapses from ~660 ms to ~18 ms — which reads exactly
+                # like an inert tier knob and would fail WL-H2 for a reason
+                # that is an artifact of the prompt, not the substrate.
+                out = model.generate(**inputs,
+                                     max_new_tokens=MAX_NEW_TOKENS,
+                                     min_new_tokens=MAX_NEW_TOKENS,
                                      do_sample=False,
                                      pad_token_id=tok.eos_token_id)
             prompt_tokens = int(inputs.input_ids.shape[1])
@@ -129,12 +144,43 @@ class TierModels:
         return reply, prompt_tokens, int(new_tokens.shape[0])
 
 
-def make_handler(models: TierModels):
+def make_handler(models: TierModels, auth_token: str | None = None):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
         def log_message(self, fmt, *args):
             pass
+
+        def _authorized(self) -> bool:
+            """A quick tunnel puts this server on the public internet behind
+            nothing but a random subdomain. That is obscurity, not access
+            control, and the thing behind it spends someone's GPU. When a
+            token is configured every /v1/* route requires it; /healthz stays
+            open so the tunnel and the orchestrator can probe liveness."""
+            if auth_token is None:
+                return True
+            scheme, _, presented = self.headers.get("Authorization", "").partition(" ")
+            return (scheme.lower() == "bearer"
+                    and hmac.compare_digest(presented.strip(), auth_token))
+
+        def _deny(self) -> None:
+            # Drain first: replying to a POST without consuming its body makes
+            # the peer see a connection reset instead of the 401.
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                length = 0
+            if length > 0:
+                self.rfile.read(min(length, 1 << 20))
+            body = json.dumps({"error": "unauthorized"}).encode()
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("WWW-Authenticate", "Bearer")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(body)
+            self.close_connection = True
 
         def _send(self, status: int, payload: dict) -> None:
             body = json.dumps(payload).encode()
@@ -152,6 +198,9 @@ def make_handler(models: TierModels):
                 self._send(404, {"error": "not found"})
 
         def do_POST(self):
+            if not self._authorized():
+                self._deny()
+                return
             if not self.path.rstrip("/").endswith("/chat/completions"):
                 self._drain()
                 self._send(404, {"error": "not found"})
@@ -224,6 +273,36 @@ def start_tunnel(port: int) -> str | None:
     return None
 
 
+def announce(endpoint: str, payload: dict, attempts: int = 5) -> bool:
+    """Publish the tunnel URL outward, because it cannot be read inward.
+
+    Kaggle script kernels are batch: the API returns no output at all while a
+    kernel runs, and the full log only after it exits — by which time a server
+    kernel is gone. Verified, not assumed (a probe kernel printed a line at
+    t=1.3 s and it was invisible until COMPLETE). So the kernel announces
+    itself to a rendezvous the orchestrator is already watching, inverting the
+    direction of discovery.
+
+    Failure here is not fatal: the URL is still printed to the log for a human
+    reading the notebook, which is the manual path.
+    """
+    body = json.dumps(payload).encode()
+    for attempt in range(attempts):
+        try:
+            req = urllib.request.Request(
+                endpoint, data=body, method="POST",
+                headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                if 200 <= resp.status < 300:
+                    print(f"announced to {endpoint}", flush=True)
+                    return True
+        except Exception as err:  # any transport problem is retryable
+            print(f"announce attempt {attempt + 1} failed: {err}", flush=True)
+        time.sleep(3 * (attempt + 1))
+    print("could not announce; the URL above is the manual path", flush=True)
+    return False
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--port", type=int, default=9109)
@@ -234,10 +313,20 @@ def main() -> None:
     ap.add_argument("--hours", type=float, default=8.0,
                     help="serve for this long, then exit cleanly (Kaggle "
                          "kernels are time-boxed; leaving early frees quota)")
+    ap.add_argument("--auth-token", default=os.environ.get("TIER_SERVER_TOKEN", ""),
+                    help="bearer token required on /v1/*; strongly recommended "
+                         "whenever a tunnel is open, since the tunnel makes this "
+                         "server publicly reachable")
+    ap.add_argument("--announce-url", default=os.environ.get("TIER_SERVER_ANNOUNCE", ""),
+                    help="POST the tunnel URL here once it is up, so an "
+                         "orchestrator can discover a kernel whose log it "
+                         "cannot read while it runs")
     args = ap.parse_args()
 
+    auth_token = args.auth_token.strip() or None
     models = TierModels(mock=args.mock)
-    server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(models))
+    server = ThreadingHTTPServer(("0.0.0.0", args.port),
+                                 make_handler(models, auth_token))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     print(f"tier server listening on :{args.port}", flush=True)
 
@@ -254,6 +343,14 @@ def main() -> None:
               flush=True)
         print("python eval/scripts/tunnel_preflight.py", flush=True)
         print("=" * 68 + "\n", flush=True)
+        if args.announce_url:
+            announce(args.announce_url, {
+                "public_url": public,
+                "backends": backends,
+                "authenticated": auth_token is not None,
+                "mock": args.mock,
+                "serving_hours": args.hours,
+            })
 
     deadline = time.time() + args.hours * 3600
     try:

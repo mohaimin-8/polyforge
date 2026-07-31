@@ -125,6 +125,16 @@ def probe_tier(gw: Gateway, tier_a: str, tier_b: str, n: int,
     routed = seen_a == {tier_a} and seen_b == {tier_b}
     delta_ms = abs(mean_b - mean_a)
     material = delta_ms >= max(abs_margin_ms, rel_margin * min(mean_a, mean_b))
+    # Direction matters as much as size. Tiers are named in ascending
+    # capability, so tier_b runs the larger model and must be the slower one;
+    # an inverted gap means the tiers are misrouted or the measurement is
+    # cold-start contaminated, not that the knob works. Testing |delta| alone
+    # scores that case identically to a healthy substrate — which is not
+    # hypothetical: measured naively against a real P100, the 3B tier came out
+    # 174 ms *faster* than the 0.5B tier and the abs() rule returned PASS.
+    # Added before any WL-H1 comparison number existed; it makes the gate
+    # strictly harder to pass, never easier.
+    ordered = mean_b > mean_a
     return {
         "tier_a": tier_a, "mean_ms_a": mean_a, "tiers_seen_a": sorted(seen_a),
         "tier_b": tier_b, "mean_ms_b": mean_b, "tiers_seen_b": sorted(seen_b),
@@ -132,7 +142,8 @@ def probe_tier(gw: Gateway, tier_a: str, tier_b: str, n: int,
         "rel_margin": rel_margin, "abs_margin_ms": abs_margin_ms,
         "routing_moved": routed,
         "latency_moved": material,
-        "live": routed and material,
+        "ordering_correct": ordered,
+        "live": routed and material and ordered,
     }
 
 

@@ -196,3 +196,33 @@ def test_slo_headroom_positive_when_within_target(monkeypatch, tmp_path, stub):
     assert report["slowest_tier_within_premium_slo"] is True
     assert report["slo_headroom_ms"] == pytest.approx(
         tp.AI_SLO_PREMIUM_MS - report["slowest_tier_mean_ms"], abs=1.0)
+
+
+def test_inverted_ordering_is_rejected(monkeypatch, tmp_path, stub, capsys):
+    """A gap of the right size but the wrong sign is not a working tier knob.
+    Measured naively against a real P100 the 3B tier came out faster than the
+    0.5B one and an abs()-only rule returned PASS; the run would have been
+    scored on a substrate whose tiers were mismeasured."""
+    # mid FASTER than small: |gap| is material, direction is impossible.
+    base = stub({"small-model": 400.0, "mid-model": 120.0})
+    code, report = run(monkeypatch, tmp_path, base)
+    assert code == 1
+    assert report["latency_moved"], "the magnitude test alone would have passed"
+    assert report["ordering_correct"] is False
+    assert "INADEQUATE" in report["verdict"]
+    assert "ORDERING INVERTED" in capsys.readouterr().err
+
+
+def test_correct_ordering_is_accepted(monkeypatch, tmp_path, stub):
+    base = stub({"small-model": 120.0, "mid-model": 400.0})
+    code, report = run(monkeypatch, tmp_path, base)
+    assert code == 0 and report["ordering_correct"] is True
+
+
+def test_ordering_check_matches_the_real_gate():
+    """knob_preflight is the gate this probe predicts, so the ordering rule
+    has to exist there too or the two disagree on a real substrate."""
+    gate = Path(__file__).resolve().parents[1] / "scripts" / "knob_preflight.py"
+    text = gate.read_text(encoding="utf-8")
+    assert "ordering_correct" in text, "the real gate lacks the ordering check"
+    assert "material and ordered" in text, "the gate's verdict ignores ordering"
