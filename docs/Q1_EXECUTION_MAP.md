@@ -109,7 +109,33 @@ DONE-WHEN: exit 0 **and** the slowest tier is inside the premium SLO. Exit 1
 or an over-target warning → do not start the run; reduce round-trip or use a
 credit-funded single host.
 
-### T4 — execute B1
+### T4-BLOCKED — B1 cannot run as frozen yet (found session 33)
+
+**Stop. The ledger's "B1 now needs only the GPU host" is wrong**, and this was
+found by trying to run it, not by reading. The GPU half is solved and T4a
+passes on real hardware; the *cluster* half cannot express the protocol:
+
+* `eval/harness/cluster_backend.py`: `OPERATOR_SYSTEMS = {"jcac"}`, with the
+  comment "the jcac_* ablations remain sim-only". Only the full jcac arm has
+  live wiring.
+* The prereg's arms are **jcac, replica-only, cache-only, tier-only**, and it
+  calls the two-knob ablations "the sharpest test of the central claim".
+  WL-H1 is scored against them, so without them WL-H1 is not evaluable.
+* Freezing a knob is not configuration: the Policy CRD has `replicaMin` /
+  `replicaMax` but **no bounds for `cacheSizeMB` or `modelTier`**, so
+  cache-only and tier-only need planner- or operator-side support for pinned
+  knobs.
+* No B1 experiment spec exists (`eval/experiments/` has no wave4 file); the
+  four frozen cell classes *do* exist in `workloads.py`.
+
+**T4 prerequisite (new task, desk-doable, no GPU):** implement the three
+missing live arms faithfully to the prereg's definitions, add the wave4
+experiment spec mirroring the frozen arms/cells, and dry-run the whole
+integration non-scored. Only then spend the single scored shot. Do NOT
+improvise substitute arms — arms are frozen by the prereg push and "may not
+change after it".
+
+### T4 — execute B1 (after the prerequisite above)
 DO: follow `research/analysis/PREREG_WAVE4_LIVE_PLANE.md` §Substrate +
 §Status update exactly; apply R5 + R6 (on the free route, `docs/
 WAVE4_FREE_ROUTE.md` §3 lists both). Run the **WL-H2 preflight
