@@ -251,11 +251,37 @@ So the derived 49% and the measured −44…−50% are **consistent in sign and
 magnitude but not yet a validated correspondence**, and must not be written up
 as one.
 
-- **NEXT SLICE:** enumerate the non-convex interior of the reactive frontier
-  (the λ sweep cannot reach it), then redo the parity read on `spike_agentic`.
-- **STILL OWED:** the `DEFENSE_QA` entry, after the replay resolves. Theorem
-  prose stays user-owned (R8) — the numbers and the verified model are the
-  agent's deliverable.
+**RESOLVED 2026-08-06 (9081a63).** The reactive frontier is now enumerated
+exactly rather than swept: with reach relaxed the observation classes are
+independent, so the achievable set is a Minkowski sum and pruning dominated
+partial sums is lossless. On `spike` that recovers **62 frontier points where
+the sweep found 3**, and the reactive side reaches within 0.029 of the target
+instead of 0.14. Correctness is pinned against brute force on an orbit small
+enough to enumerate every reactive policy directly.
+
+**Derived vs measured**, both sides read at hpa's own violation so they honour
+one constraint:
+
+| class | derived | measured | comparable? |
+|---|---|---|---|
+| `spike_agentic` | **+67.0%** | **+50.5%** | **yes** — 0.2239 vs 0.2236 |
+| `flash_ai` | +49.5% | +80.9% | no — 0.2716 vs 0.1719 |
+| `flash_crud` | **−19.5%** | **−55.5%** | no — 0.1118 vs 0.1324 |
+
+`spike_agentic` is the only class at genuine violation parity, and there the
+derived and measured separations agree in sign and magnitude. The other two are
+not parity comparisons so their magnitudes are not comparable — but **the signs
+agree in all three, including `flash_crud`, where jcac is measurably *more*
+expensive and the derived model independently says so.** Predicting that one
+uncomfortable direction correctly is the part worth trusting.
+
+**Standing caveat for the write-up:** the derived model is *single-tenant* and
+omits the cluster caps, fairness coupling and 8-tenant packing the campaigns
+contain. This is structural corroboration at one operating point, not a
+validated numerical correspondence — cite it as such.
+
+- **STILL OWED:** the `DEFENSE_QA` entry. Theorem prose stays user-owned (R8) —
+  the numbers and the verified model are the agent's deliverable.
 
 ### M4 / T18 — energy/carbon + admission control  *(NEW — optional, survey-blessed)*
 
