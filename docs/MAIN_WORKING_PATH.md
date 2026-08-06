@@ -299,8 +299,15 @@ model.
 theorem describes. This is *suggestive structural corroboration*, materially
 weaker than a validated correspondence, and must be cited that way.
 
-- **STILL OWED:** the `DEFENSE_QA` entry. Theorem prose stays user-owned (R8) —
-  the numbers and the verified model are the agent's deliverable.
+**M3 CLOSED 2026-08-06** — `DEFENSE_QA` #28 records the vacuity finding, the
+replacement theorem, the retracted sign agreement and the coupling gap, with an
+explicit do-not-say list. Theorem prose stays user-owned (R8); the numbers and
+the verified model were the agent's deliverable and are committed.
+
+**Open item carried forward (not part of M3):** the multi-tenant extension.
+Cluster caps couple tenants and destroy the independence that makes the
+frontier enumeration *exact*, so this trades a provable result for an
+approximate one — worth doing only if a reviewer presses on it.
 
 ### M4 / T18 — energy/carbon + admission control  *(NEW — optional, survey-blessed)*
 
