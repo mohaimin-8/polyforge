@@ -247,5 +247,132 @@ class MutationTests(unittest.TestCase):
         self.assertFalse(guarantee.terminal_set(broke, orbit, threshold=0.0))
 
 
+class PriceOfReactionTests(unittest.TestCase):
+    """The separation that survives the vacuity finding.
+
+    The claim is not "reactive controllers violate" -- they need not, they can
+    over-provision -- but "reactive controllers pay". These tests establish
+    that the gap exists where the actuation clamp binds, nearly vanishes on the
+    control cell, and is *caused* by observational aliasing rather than by one
+    search simply outrunning another.
+    """
+
+    def test_aliased_positions_pool_their_successors(self):
+        # Two troughs, one followed by a burst and one by another trough: a
+        # controller seeing only the trough cannot tell them apart, so both
+        # successors must be in the set it has to survive.
+        orbit = [crud_demand(0.5), crud_demand(6.0), crud_demand(0.5), crud_demand(0.5)]
+        succ = guarantee.successor_demand_indices(orbit)
+        # positions 0, 2 and 3 all observe 0.5x; their successors are 1, 3, 0.
+        self.assertEqual(succ[0], (0, 1, 3))
+        self.assertEqual(succ[0], succ[2])
+        self.assertEqual(succ[0], succ[3])
+        # position 1 observes 6.0x uniquely, so its successor is a singleton.
+        self.assertEqual(succ[1], (2,))
+
+    def test_reaction_costs_money_on_a_burst_onset(self):
+        config = standard_config()
+        result = guarantee.price_of_reaction(config, flash_orbit())
+        self.assertTrue(result["reactive_can_hold_slo"])
+        self.assertGreater(result["gap"], 0.0)
+        # The floor must exceed a realised predictive cycle by a wide margin,
+        # not by float noise: this is the regime the clamp binds in.
+        self.assertGreater(result["gap"] / result["reactive_cost_floor"], 0.25)
+
+    def test_control_cell_pays_almost_nothing_for_reacting(self):
+        # ramp_gentle shares flash_crud's 0.5x-6.0x envelope but is reached at
+        # a slope actuation can follow, so foresight buys little. This is the
+        # specificity check: without it, a large gap on flash could just mean
+        # the world is generically kind to whoever plans ahead.
+        config = standard_config()
+        burst = guarantee.price_of_reaction(config, flash_orbit())
+        gentle = guarantee.price_of_reaction(config, gentle_orbit(period=20))
+        burst_share = burst["gap"] / burst["reactive_cost_floor"]
+        gentle_share = gentle["gap"] / gentle["reactive_cost_floor"]
+        self.assertGreater(burst_share, 5.0 * gentle_share)
+
+    def test_the_predictive_cycle_is_really_realisable(self):
+        # The upper bound is only honest if the trajectory exists. Rebuild one
+        # of that cost by DP and check every step: SLO met, budget respected,
+        # each move inside the reach clamp, and the cycle closed.
+        config = standard_config()
+        orbit = flash_orbit()
+        claimed = guarantee.predictive_cycle_cost(config, orbit)
+        self.assertIsNotNone(claimed)
+
+        trajectory = _rebuild_cycle(config, orbit, claimed)
+        self.assertIsNotNone(trajectory, "no trajectory attains the claimed cost")
+        total = 0.0
+        for k, state in enumerate(trajectory):
+            metrics = model.evaluate_step(config, state, orbit[k])
+            self.assertLessEqual(metrics.violation, 0.0)
+            self.assertLessEqual(metrics.cost_usd, guarantee.budget_per_step(config))
+            nxt = trajectory[(k + 1) % len(trajectory)]
+            self.assertIn(nxt, guarantee.reach(config, state),
+                          f"step {k} -> {k+1} leaves the reach clamp")
+            total += metrics.cost_usd
+        self.assertAlmostEqual(total, claimed, places=9)
+
+    def test_removing_the_aliasing_removes_the_gap(self):
+        # The mechanism test. Give every orbit position a distinct observation
+        # and a reactive controller's successor set becomes a singleton -- it
+        # is as informed as a predictive one, so its floor can no longer exceed
+        # a realised predictive cycle. If the gap survived this, it would not
+        # be caused by the information asymmetry the theorem claims.
+        config = standard_config()
+        distinct = [crud_demand(0.5 + 0.35 * k) for k in range(12)]
+        self.assertEqual(len({guarantee.observation_key(d) for d in distinct}),
+                         len(distinct))
+        for succ in guarantee.successor_demand_indices(distinct):
+            self.assertEqual(len(succ), 1)
+        result = guarantee.price_of_reaction(config, distinct)
+        self.assertLessEqual(result["gap"], 0.0)
+
+    def test_reactive_cannot_hold_slo_when_no_state_clears_the_alias_set(self):
+        # The stronger verdict: cap replicas below what the aliased peak needs
+        # and no single configuration survives the uncertainty, so no reactive
+        # policy holds zero violation at all.
+        orbit = flash_orbit()
+        need = max(guarantee.replica_floor(standard_config(), d) for d in orbit)
+        tight = standard_config(replica_max=need - 1)
+        self.assertIsNone(guarantee.reactive_cost_floor(tight, orbit))
+        self.assertFalse(
+            guarantee.price_of_reaction(tight, orbit)["reactive_can_hold_slo"])
+
+
+def _rebuild_cycle(config, orbit, target):
+    """Recover a zero-violation cycle whose cost equals `target`, by the same
+    DP the bound uses but retaining predecessors. Written independently of
+    `predictive_cycle_cost` so it checks that function rather than echoing it.
+    """
+    states = guarantee.admissible_states(config)
+    layers = []
+    for k, d in enumerate(orbit):
+        ok = []
+        for x in states:
+            m = model.evaluate_step(config, x, d)
+            if m.violation <= 0.0 and m.cost_usd <= guarantee.budget_per_step(config):
+                ok.append(x)
+        layers.append(ok)
+    for start in layers[0]:
+        paths = {start: [start]}
+        costs = {start: model.evaluate_step(config, start, orbit[0]).cost_usd}
+        for k in range(1, len(orbit)):
+            nxt_c, nxt_p = {}, {}
+            allowed = set(layers[k])
+            for x, spent in costs.items():
+                for y in set(guarantee.reach(config, x)) & allowed:
+                    total = spent + model.evaluate_step(config, y, orbit[k]).cost_usd
+                    if y not in nxt_c or total < nxt_c[y]:
+                        nxt_c[y], nxt_p[y] = total, paths[x] + [y]
+            costs, paths = nxt_c, nxt_p
+            if not costs:
+                break
+        for x, spent in costs.items():
+            if start in guarantee.reach(config, x) and abs(spent - target) < 1e-12:
+                return paths[x]
+    return None
+
+
 if __name__ == "__main__":
     unittest.main()

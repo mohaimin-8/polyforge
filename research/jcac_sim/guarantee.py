@@ -281,6 +281,179 @@ def attainable_peak(
     return candidates[hi]
 
 
+# --- the price of reaction -------------------------------------------------
+#
+# The separation that survives the vacuity finding. A reactive controller can
+# always avoid onset violation by over-provisioning permanently -- that is what
+# made the invariant-set argument empty -- so the honest theorem is about COST,
+# not about violation.
+#
+# A controller choosing the configuration for interval k+1 at the end of
+# interval k has not yet seen d_{k+1}. If its observation is d_k, then every
+# orbit position carrying the same observation is indistinguishable to it, so
+# to hold zero violation it must pick a configuration that clears *every*
+# demand that can follow that observation. On an orbit where a trough can be
+# followed by either another trough or a burst, that forces peak provisioning
+# through the troughs. A predictive controller provisions for d_{k+1} alone.
+#
+# SOUNDNESS -- the two sides are deliberately asymmetric, and the asymmetry is
+# what makes a positive gap a proof rather than an artefact:
+#
+#   * the reactive side is a LOWER bound. Constraints are *relaxed* (the reach
+#     clamp and affordability are both dropped), which can only shrink the
+#     minimum, so any real reactive controller pays at least this.
+#   * the predictive side is an ACHIEVABLE trajectory. Constraints are all
+#     *enforced* (reach, budget, knob bounds) and the trajectory is closed into
+#     a cycle, so a controller really can realise it.
+#
+# Comparing two lower bounds would prove nothing. Comparing a floor on one
+# class against a realised trajectory of the other proves the gap.
+
+
+def observation_key(demand: Demand) -> tuple:
+    """Hashable identity of a demand, for deciding which orbit positions a
+    reactive controller cannot tell apart."""
+    return (tuple(sorted(demand.rps.items())), demand.crud_base_ms)
+
+
+def successor_demand_indices(demands: list[Demand]) -> list[tuple[int, ...]]:
+    """For each k, the demands that can follow what was observed at k.
+
+    Orbit positions sharing an observation are aliased, so their successors
+    pool: a controller that has seen only `demands[k]` cannot know which of
+    them is coming.
+    """
+    n = len(demands)
+    groups: dict[tuple, list[int]] = {}
+    for k, d in enumerate(demands):
+        groups.setdefault(observation_key(d), []).append(k)
+    return [
+        tuple(sorted({(peer + 1) % n for peer in groups[observation_key(demands[k])]}))
+        for k in range(n)
+    ]
+
+
+def reactive_cost_floor(config: TenantConfig, demands: list[Demand]) -> float | None:
+    """LOWER bound on one period's cost for a reactive zero-violation policy.
+
+    At each step the configuration must clear every demand that can follow the
+    observation, and is then billed against the demand that actually arrives.
+    The reach clamp and the budget filter are both relaxed -- a real controller
+    has strictly fewer options and so pays at least this. Returns None when no
+    configuration clears an aliased successor set, which is the stronger
+    verdict: no reactive policy can hold zero violation at all.
+    """
+    n = len(demands)
+    states = admissible_states(config)
+    succ = successor_demand_indices(demands)
+    total = 0.0
+    for k in range(n):
+        billed = demands[(k + 1) % n]
+        best = None
+        for x in states:
+            if all(violation_of(config, x, demands[j]) <= 0.0 for j in succ[k]):
+                cost = model.evaluate_step(config, x, billed).cost_usd
+                if best is None or cost < best:
+                    best = cost
+        if best is None:
+            return None
+        total += best
+    return total
+
+
+def predictive_cycle_cost(
+    config: TenantConfig,
+    demands: list[Demand],
+    act: Actuation = Actuation(),
+    max_starts: int = 16,
+) -> float | None:
+    """Cost of one period of a *realisable* zero-violation predictive cycle.
+
+    An upper bound, and an honest one: the returned number is the cost of a
+    specific trajectory that respects the reach clamp, the budget filter and
+    the knob bounds, and closes back on its own starting configuration.
+
+    Search is seeded from the `max_starts` cheapest layer-0 configurations
+    rather than all of them -- missing a cheaper cycle only loosens an upper
+    bound, so that stays sound. If none of those seeds closes a cycle the
+    search widens to every layer-0 configuration before giving up: the cheap
+    seeds are systematically the ones that *cannot* close, because they sit at
+    the replica floor while the configuration a peak leaves behind is often out
+    of their reach. Without the widening this reports None on orbits that do
+    admit a cycle. Returns None only when no admissible cycle exists.
+    """
+    n = len(demands)
+    if n == 0:
+        return None
+    states = admissible_states(config)
+    cost_at = {}
+    feasible: list[list[TenantState]] = []
+    for k, d in enumerate(demands):
+        layer = []
+        for x in states:
+            metrics = model.evaluate_step(config, x, d)
+            cost_at[(k, x)] = metrics.cost_usd
+            if metrics.violation <= 0.0 and metrics.cost_usd <= budget_per_step(config):
+                layer.append(x)
+        feasible.append(layer)
+    if any(not layer for layer in feasible):
+        return None
+
+    reach_cache = {x: set(reach(config, x, act)) for x in states}
+    layer_sets = [set(layer) for layer in feasible]
+    ordered = sorted(feasible[0], key=lambda x: cost_at[(0, x)])
+
+    def best_from(seeds) -> float | None:
+        best = None
+        for start in seeds:
+            dp = {start: cost_at[(0, start)]}
+            for k in range(1, n):
+                nxt: dict[TenantState, float] = {}
+                allowed = layer_sets[k]
+                for x, spent in dp.items():
+                    for y in reach_cache[x] & allowed:
+                        total = spent + cost_at[(k, y)]
+                        if y not in nxt or total < nxt[y]:
+                            nxt[y] = total
+                dp = nxt
+                if not dp:
+                    break
+            for x, spent in dp.items():
+                if start in reach_cache[x] and (best is None or spent < best):
+                    best = spent
+        return best
+
+    best_cycle = best_from(ordered[:max_starts])
+    if best_cycle is None and len(ordered) > max_starts:
+        best_cycle = best_from(ordered[max_starts:])
+    return best_cycle
+
+
+def price_of_reaction(
+    config: TenantConfig,
+    demands: list[Demand],
+    act: Actuation = Actuation(),
+) -> dict:
+    """The separation, as a dict of the two bounds and their gap.
+
+    `gap` is positive only when a *floor* on reactive cost exceeds a *realised*
+    predictive cycle, so a positive value is a proof that seeing one interval
+    ahead is worth money on this demand -- not merely that one search found a
+    better answer than another.
+    """
+    floor = reactive_cost_floor(config, demands)
+    cycle = predictive_cycle_cost(config, demands, act)
+    gap = None
+    if floor is not None and cycle is not None:
+        gap = floor - cycle
+    return {
+        "reactive_cost_floor": floor,
+        "predictive_cycle_cost": cycle,
+        "gap": gap,
+        "reactive_can_hold_slo": floor is not None,
+    }
+
+
 def replica_floor(config: TenantConfig, demand: Demand, cap: int | None = None) -> int | None:
     """Fewest replicas that meet the SLO for `demand`, cache and tier chosen
     freely. Reported for diagnosis -- the climb between consecutive floors is
