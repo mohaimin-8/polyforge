@@ -205,12 +205,30 @@ the next slice: prove the gap by comparing a **lower** bound on reactive cost
 (relax the reach constraint) against an **achievable** predictive trajectory
 (respecting reach) — two lower bounds would prove nothing.
 
-- **NEXT SLICE:** observation/successor-set construction, the robust
-  per-layer feasibility filter, and the two cost bounds; then the
-  campaign-replay validation. The invariant-set machinery in `guarantee.py`
-  is reused as-is.
-- Also still owed from the original spec: the validation script over every
-  closed campaign, and the `DEFENSE_QA` entry.
+**DONE 2026-08-06 (bec0f62) — the theorem is executable and it lands on the
+measured record.** `price_of_reaction` in `guarantee.py` returns a *floor* on
+reactive cost (reach clamp and budget filter relaxed) against a *realised*
+predictive cycle (reach, budget and knob bounds all enforced, trajectory closed
+and independently rebuilt step-by-step in test). On the published amplitudes,
+standard tenant, `replica_max` 10:
+
+| orbit | onset climb vs authority 2 | reactive floor | predictive cycle | gap |
+|---|---|---|---|---|
+| `flash` | 5 — clamp binds | $0.012800 | $0.006533 | **+49.0%** |
+| `ramp_gentle` | 1 — control cell | $0.009733 | $0.009467 | +2.7% |
+| same orbit, demands all distinct | — no aliasing | $0.004533 | $0.004800 | **−5.9%** |
+
+Row 1 is the headline: **49.0% derived from the plant constants alone, against
+the campaigns' measured −44…−50% cost at violation parity.** Row 2 reproduces
+PREREG_V3's specificity check analytically (`ramp_gentle` shares `flash_crud`'s
+0.5×–6.0× envelope, differing only in slope). Row 3 is the mechanism test —
+remove the observational aliasing and the separation inverts, so the gap is
+caused by the information asymmetry the theorem names.
+
+- **STILL OWED:** the campaign-replay validation (assert the separation holds
+  against every closed campaign's measured cost split) and the `DEFENSE_QA`
+  entry. Theorem/proof prose stays user-owned (R8) — the numbers and the
+  verified model are the agent's deliverable.
 
 ### M4 / T18 — energy/carbon + admission control  *(NEW — optional, survey-blessed)*
 
