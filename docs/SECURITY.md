@@ -110,9 +110,24 @@ fixed or triaged.
    cluster without it the token is observable to an on-path attacker.
    A single shared token also means no per-caller attribution — the
    operator is the only intended client, so this is scoped, not solved.
-6. `govulncheck` is not yet a CI gate. It was run manually against this
-   tree (clean as of 2026-07-25, after `golang.org/x/text` v0.38.0 →
-   v0.39.0 cleared GO-2026-5970, an infinite-loop DoS reachable from the
-   OIDC token exchange and the Postgres migration path). Wiring it into
-   `ci.yml` is the standing fix so the next reachable CVE fails a build
-   instead of waiting for an audit.
+6. ~~`govulncheck` is not yet a CI gate.~~ **Closed.** It is a gate in
+   `ci.yml` ("Vulnerability scan (reachable symbols)"), reachability-aware
+   so it fails only on advisories our code actually *calls* rather than
+   reddening the build for every entry in the module graph. It was wired in
+   after a manual audit found GO-2026-5970 (infinite-loop DoS in
+   `golang.org/x/text`, reachable from the OIDC token exchange and the
+   Postgres migration path) sitting in the tree with nothing to catch it.
+
+   Last manual sweep 2026-08-06: **0 reachable**, after
+   `google.golang.org/grpc` v1.81.1 → v1.82.1 cleared GO-2026-6061 (xDS
+   RBAC / HTTP-2 transport), which *was* reachable via
+   `analytics.Batcher.Close`. Two unreachable advisories were cleared in
+   the same pass as defence in depth — `golang.org/x/net` v0.55.0 → v0.56.0
+   (GO-2026-5942) and `github.com/klauspost/compress` v1.18.6 → v1.18.7
+   (GO-2026-5841). One known non-item remains and is expected to:
+   GO-2026-5932, the unmaintained `golang.org/x/crypto/openpgp`, transitive
+   only, never imported, with no fixed version published.
+
+   The gate catches reachable regressions on every push; the periodic manual
+   sweep exists to pick up newly *published* advisories against pinned
+   versions, which is exactly what surfaced GO-2026-6061 here.
