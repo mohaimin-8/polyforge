@@ -700,3 +700,72 @@ arm as the system's configuration. **Do say:** two pre-registered campaigns,
 one changed factor between them, a diagnosis that predicted its own fix, and a
 mechanism we measured and then declined to adopt because our own objective
 says it is not worth its price.
+
+## 28. "You set out to prove a formal SLO guarantee for your controller. You ended up proving your own theorem was empty. What is actually left?"
+
+**Say this plainly, because the honest version is stronger than the one we
+planned.** The programme was a terminal invariant set plus a
+recursive-feasibility argument over the MPC's clamped actuation lattice —
+the standard MPC device. We built the exact construction (finite state space,
+deterministic periodic demand, greatest fixed point) and it showed the theorem
+would be **true and empty**:
+
+- the plant is **memoryless** — violation depends on the configuration held and
+  the demand that arrives, never on a backlog carried forward — so no state is
+  a trap and none has to be avoided to stay recoverable;
+- the controller may **hold still**, so any configuration clearing the SLO
+  across the orbit is trivially control-invariant;
+- **replicas are cheap.** At the `flash` peak six clear the SLO and ten cost
+  $0.00134 per interval against a $0.01389 budget.
+
+So "is there a terminal set?" collapses into "is the peak servable at all?" —
+a static capacity question the ±2 clamp plays no part in. We reported that
+instead of shipping the vacuous version.
+
+**What replaced it is an indistinguishability argument about cost, not
+attainment.** A controller choosing the configuration for interval *k+1* has
+not seen `d_{k+1}`. If its observation is `d_k`, every orbit position sharing
+that observation is aliased to it, so to hold zero violation it must clear
+*every* demand that can follow — which on an orbit where a trough may precede
+either another trough or a burst forces peak provisioning through the troughs.
+A predictive controller provisions for `d_{k+1}` alone. The gap is the **price
+of reaction**, computed as a *floor* on reactive cost (reach clamp and budget
+relaxed) against a *realised* predictive cycle (both enforced, trajectory
+closed and rebuilt step-by-step in test). On `flash` that is **+49.0% derived
+from the plant constants alone**, against **+2.7%** on the `ramp_gentle`
+control cell and **−5.9%** once the observational aliasing is removed — the
+mechanism check, since removing the information asymmetry must remove the gap.
+
+**Now the part to volunteer before the examiner finds it.** Checking this
+against the campaigns is *suggestive, not validated*, and an earlier version of
+our own table overstated it. Comparing derived numbers from one cell against
+measured numbers averaged over twelve produced an apparent sign agreement
+across all three burst classes; redone per cell at matched violation, one class
+flips. The current standing:
+
+| matched cell (`uniform` mix) | derived | measured |
+|---|---|---|
+| medium / `spike_agentic` vs hpa | +43.4% | +53.1% |
+| large / `flash_ai` vs firm | +42.5% | +79.1% |
+| small / `flash_crud` vs firm | not computable | +11.5% |
+
+Two agree in sign within ~1.2–1.9×; one is not computable under either
+coupling model; the two `ramp_gentle` pairs fall outside what the theorem
+describes. **The multi-tenant coupling is load-bearing, not a footnote:**
+ignoring cluster caps makes `flash_crud` come out −19.5%, the opposite sign to
+measurement, while charging each tenant an equal share makes the cell
+infeasible — and neither is right, because the per-tenant phases are drawn
+independently, so bursts do not coincide and a tenant can borrow capacity while
+its neighbours sit in a trough. Separately, our derived "reactive" class is an
+*idealised* policy keyed on the exact demand, whereas real HPA and KEDA merely
+lag; the measured deltas therefore also contain plain reactive lag, which this
+theorem does not model.
+
+**Do not say:** "we have a formal guarantee", "the bound is validated against
+the campaigns", or quote 49% and −44…−50% as the same quantity. **Do say:** the
+guarantee we set out to prove does not exist on this plant and we established
+that rather than assuming it; what exists instead is a computable,
+brute-force-verified cost separation whose mechanism we tested by removing it;
+and its correspondence to the measured record is one-operating-point structural
+corroboration in a single-tenant model, with the multi-tenant extension named
+as the open item.

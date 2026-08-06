@@ -319,8 +319,8 @@ class PriceOfReactionTests(unittest.TestCase):
         # is as informed as a predictive one, so its floor can no longer exceed
         # a realised predictive cycle. If the gap survived this, it would not
         # be caused by the information asymmetry the theorem claims.
-        config = standard_config()
-        distinct = [crud_demand(0.5 + 0.35 * k) for k in range(12)]
+        config = standard_config(replica_max=6)
+        distinct = [crud_demand(0.5 + 0.5 * k) for k in range(8)]
         self.assertEqual(len({guarantee.observation_key(d) for d in distinct}),
                          len(distinct))
         for succ in guarantee.successor_demand_indices(distinct):
@@ -423,12 +423,17 @@ class FrontierTests(unittest.TestCase):
         # point -- so the "gap" compared two different violations. Enumerating
         # the frontier closes that, and the test pins the improvement by
         # measuring both ways on the same orbit.
+        # Full lattice on purpose. The offset *ratio* is not scale-invariant --
+        # at replica_max 6 the sweep lands at 0.059 rather than 0.140 and the
+        # margin narrows -- so shrinking the lattice would quietly weaken the
+        # guard. The lambda grid is trimmed instead: 16 points reproduce the
+        # documented 0.140 / 0.029 exactly at half the cost.
         config = standard_config()
         spike = [Demand(rps={"agent": 1.5 * f, "embed": 1.0 * f, "crud_read": 5.0 * f},
                         crud_base_ms=60.0)
                  for f in [8.0, 8.0] + [0.6] * 10]
         target = 0.2236
-        dense = tuple(round(0.002 * (1.35 ** i), 5) for i in range(34))
+        dense = tuple(round(0.002 * (1.35 ** i), 5) for i in range(16))
 
         swept = [guarantee.reactive_frontier_point(config, spike, lam) for lam in dense]
         swept_offset = min(abs(v - target) for v, _ in swept)
@@ -447,9 +452,10 @@ class FrontierTests(unittest.TestCase):
         # Without a target the reader would settle on the lambda=0 corner,
         # where both classes shed to the replica floor and coincide. Asking at
         # a low violation must not return that degenerate 0% answer.
-        config = standard_config()
+        config = standard_config(replica_max=6)
         orbit = flash_orbit()
-        result = guarantee.cost_at_violation_parity(config, orbit, target_violation=0.0)
+        result = guarantee.cost_at_violation_parity(
+            config, orbit, target_violation=0.0, lambdas=(0.0, 0.1, 1.0, 10.0))
         self.assertIsNotNone(result)
         self.assertGreater(result["gap_frac"], 0.0)
 

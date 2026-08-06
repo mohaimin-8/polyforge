@@ -259,26 +259,45 @@ the sweep found 3**, and the reactive side reaches within 0.029 of the target
 instead of 0.14. Correctness is pinned against brute force on an orbit small
 enough to enumerate every reactive policy directly.
 
-**Derived vs measured**, both sides read at hpa's own violation so they honour
-one constraint:
+**Derived vs measured — CORRECTED 2026-08-06.** An earlier version of this
+table compared derived numbers from *one* cell against measured numbers
+averaged over *twelve* (4 tenant mixes × 3 cluster sizes) and reported that all
+three classes agreed in sign. **That agreement was an artefact of the
+mismatch.** Redone per cell, restricted to the `uniform` mix — 8 identical
+tenants, so a per-tenant cost ratio is directly comparable — and scanning all
+three reactive arms, which yields **5 violation-parity pairs instead of 1**:
 
-| class | derived | measured | comparable? |
+| matched cell (uniform mix) | derived | measured | note |
 |---|---|---|---|
-| `spike_agentic` | **+67.0%** | **+50.5%** | **yes** — 0.2239 vs 0.2236 |
-| `flash_ai` | +49.5% | +80.9% | no — 0.2716 vs 0.1719 |
-| `flash_crud` | **−19.5%** | **−55.5%** | no — 0.1118 vs 0.1324 |
+| medium / `spike_agentic` vs hpa | **+43.4%** | **+53.1%** | agrees, within 1.2× |
+| large / `flash_ai` vs firm | **+42.5%** | **+79.1%** | agrees in sign, 1.9× apart |
+| small / `flash_crud` vs firm | **not computable** | +11.5% | see below |
+| large / `ramp_gentle` vs hpa | ~0 by construction | +18.9% | smooth orbit, no aliasing |
+| large / `ramp_gentle` vs keda | ~0 by construction | +53.1% | smooth orbit, no aliasing |
 
-`spike_agentic` is the only class at genuine violation parity, and there the
-derived and measured separations agree in sign and magnitude. The other two are
-not parity comparisons so their magnitudes are not comparable — but **the signs
-agree in all three, including `flash_crud`, where jcac is measurably *more*
-expensive and the derived model independently says so.** Predicting that one
-uncomfortable direction correctly is the part worth trusting.
+Derived values use a **symmetric per-tenant share** of the cluster caps
+(`replicas//8`, `cache_mb//8`), which the `uniform` mix justifies by symmetry.
 
-**Standing caveat for the write-up:** the derived model is *single-tenant* and
-omits the cluster caps, fairness coupling and 8-tenant packing the campaigns
-contain. This is structural corroboration at one operating point, not a
-validated numerical correspondence — cite it as such.
+**The multi-tenant coupling is load-bearing, not an optional refinement.**
+Ignoring the caps entirely makes `flash_crud` come out −19.5% — the *opposite*
+sign to the measured +11.5%. Applying the equal share instead makes the cell
+*infeasible* (a 3-replica share cannot serve a peak needing 6), yet the real
+runs reach that violation. Both bracket the truth without capturing it: the
+per-tenant phases are drawn independently, so bursts do not coincide and a
+tenant can borrow capacity while its neighbours sit in a trough. Neither bound
+models that.
+
+Also note `ramp_gentle`: the theory predicts ~0 separation on a smooth orbit
+(every position uniquely identifiable, so reaction is as informed as
+prediction), yet jcac is measurably cheaper. The derived class is an *idealised*
+reactive policy keyed on the exact demand; real HPA/KEDA merely lag. So the
+measured deltas also contain plain reactive lag, which this theorem does not
+model.
+
+**Honest status:** 2 matched comparisons agree in sign and within ~1.2–1.9×;
+1 is not computable under either coupling model; 2 fall outside what the
+theorem describes. This is *suggestive structural corroboration*, materially
+weaker than a validated correspondence, and must be cited that way.
 
 - **STILL OWED:** the `DEFENSE_QA` entry. Theorem prose stays user-owned (R8) —
   the numbers and the verified model are the agent's deliverable.
