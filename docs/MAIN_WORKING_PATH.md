@@ -311,6 +311,29 @@ approximate one — worth doing only if a reviewer presses on it.
 
 ### M4 / T18 — energy/carbon + admission control  *(NEW — optional, survey-blessed)*
 
+**Status 2026-08-06 (51d2f65) — energy/carbon DONE; admission control NOT done,
+deliberately.** Per-step energy and carbon are reported on every `StepMetrics`,
+never priced into `cost_usd`, and the controller has an optional
+`carbon_weight` (guarded, default off — R4 re-verified 16/16 byte-identical
+after touching both `model.py` and `controller.py`).
+
+**Scope it honestly when citing it.** The intended divergence from dollars
+(tier price 1:10:100 vs tier energy ~1:4:16) does **not** materialise under a
+constant grid: 240 configurations give **2 discordant (cost, carbon) pairs out
+of ~57,000 comparisons**, both near-ties where one side already violates. Every
+knob moves cost and carbon the same way, so at fixed intensity minimising spend
+already minimises grams — as a static per-step term it would be decorative.
+The dimension is real only because **grid intensity varies over time and price
+does not follow it**: with carbon unpriced the settled plan is identical at 50
+and 900 g/kWh; with it priced the plan moves (7 replicas → 6 → shed). The knob
+is sharp — low weights move nothing, high weights shed AI traffic outright.
+
+**Admission control is left open on purpose.** It needs the sim loop to scale
+admitted demand plus a research decision on whether a rejected request counts
+as an SLO violation, and its own prereg if scored (R2). T18 offers it as an
+"and/or" alternative, so the milestone's letter is met; bolting it in
+unexamined would be worse than leaving it named.
+
 Add a carbon-intensity or energy term (and/or an admission-control arm for
 bursty load) as an **additional constraint/dimension**, off by default (R4).
 Directly citable against the IEEE survey's stated open list. Low priority —
