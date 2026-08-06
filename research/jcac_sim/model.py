@@ -60,6 +60,81 @@ NO_TIER_LATENCY_MS = 30000.0  # AI request with tier=none: effectively an outage
 REPLICA_COST_USD_HR = 0.048
 MEM_COST_USD_GB_HR = 0.005
 
+# --- energy and carbon (M4 / T18) ------------------------------------------
+# Reported on every step, never priced into `cost_usd`, and entering the
+# controller's objective only when `carbon_weight` is set (default off, so
+# every committed campaign replays bit-for-bit).
+#
+# WHERE THIS DIMENSION IS REAL, AND WHERE IT IS NOT — measured, not assumed.
+# The design intent was that carbon would diverge from dollars because tier
+# *price* rises 1 : 10 : 100 across small/mid/large while tier *energy* rises
+# about 1 : 4 : 16. Enumerating the lattice shows that intent is NOT met under
+# a constant grid: over 240 configurations there are 2 discordant (cost,
+# carbon) pairs out of ~57,000 comparisons, and both are near-ties where one
+# side is already violating outright. Every knob moves cost and carbon the same
+# way — more replicas, heavier tiers and fewer cache hits all cost more and
+# emit more — so with a fixed intensity, minimising spend already minimises
+# grams and pricing carbon changes essentially nothing. Said plainly: as a
+# static per-step term this would be decorative.
+#
+# What makes it a genuine dimension is the grid, not the lattice.
+# `CARBON_INTENSITY_G_PER_KWH` varies over time in the real world and price
+# does not follow it, so the same plan is clean at 03:00 and dirty at 18:00
+# while costing the identical amount. A carbon-pricing controller therefore
+# reacts to something a cost-only controller cannot represent at all, which
+# `test_grid_intensity_moves_the_plan_only_when_carbon_is_priced` asserts
+# directly. The knob is sharp: at low weights nothing moves, and at high
+# weights the controller will shed AI traffic outright to stop emitting.
+#
+# The figures are order-of-magnitude public estimates for commodity serving
+# hardware and an average grid mix. They are NOT measurements of this system,
+# and no energy or carbon number produced here is quotable as measured.
+REPLICA_POWER_W = 45.0
+MEM_POWER_W_PER_GB = 0.4
+TIER_ENERGY_WH_PER_REQ = {"none": 0.0, "small": 0.15, "mid": 0.6, "large": 2.4}
+CARBON_INTENSITY_G_PER_KWH = 400.0
+
+_DEFAULT_REPLICA_POWER_W = REPLICA_POWER_W
+_DEFAULT_MEM_POWER_W_PER_GB = MEM_POWER_W_PER_GB
+_DEFAULT_TIER_ENERGY_WH_PER_REQ = dict(TIER_ENERGY_WH_PER_REQ)
+_DEFAULT_CARBON_INTENSITY = CARBON_INTENSITY_G_PER_KWH
+
+
+def set_energy(
+    replica_power_w: float | None = None,
+    mem_power_w_per_gb: float | None = None,
+    tier_energy_wh_per_req: dict | None = None,
+    carbon_intensity_g_per_kwh: float | None = None,
+) -> None:
+    """Reset the energy model to its defaults, then apply overrides.
+
+    Same contract as `set_economy` and `set_model_form`: always resets first so
+    a pooled worker process is stateless across runs, and the tier table is
+    mutated in place so `from model import` aliases keep seeing the active
+    model. Carbon intensity is the natural knob for a grid-mix study — it moves
+    carbon without touching price at all.
+    """
+    global REPLICA_POWER_W, MEM_POWER_W_PER_GB, CARBON_INTENSITY_G_PER_KWH
+    REPLICA_POWER_W = (
+        _DEFAULT_REPLICA_POWER_W if replica_power_w is None else float(replica_power_w))
+    MEM_POWER_W_PER_GB = (
+        _DEFAULT_MEM_POWER_W_PER_GB if mem_power_w_per_gb is None
+        else float(mem_power_w_per_gb))
+    CARBON_INTENSITY_G_PER_KWH = (
+        _DEFAULT_CARBON_INTENSITY if carbon_intensity_g_per_kwh is None
+        else float(carbon_intensity_g_per_kwh))
+    TIER_ENERGY_WH_PER_REQ.clear()
+    TIER_ENERGY_WH_PER_REQ.update(_DEFAULT_TIER_ENERGY_WH_PER_REQ)
+    if tier_energy_wh_per_req:
+        unknown = set(tier_energy_wh_per_req) - set(TIERS)
+        if unknown:
+            raise ValueError(f"unknown tiers in energy override: {sorted(unknown)}")
+        if any(v < 0.0 for v in tier_energy_wh_per_req.values()):
+            raise ValueError("tier energies must be non-negative")
+        TIER_ENERGY_WH_PER_REQ.update(tier_energy_wh_per_req)
+    if REPLICA_POWER_W < 0.0 or MEM_POWER_W_PER_GB < 0.0 or CARBON_INTENSITY_G_PER_KWH < 0.0:
+        raise ValueError("energy model constants must be non-negative")
+
 CACHE_LEVELS_MB = (0, 64, 128, 256, 512, 1024)
 
 # The constants above are the *published* economy: every committed campaign
@@ -322,6 +397,10 @@ class StepMetrics:
     # *which* requests miss, so it moves inference spend, not infra spend.
     cost_infra_usd: float = 0.0
     cost_tier_usd: float = 0.0
+    # Energy and its carbon (M4 / T18). Always reported, never priced into
+    # `cost_usd`, so nothing that reads cost can be perturbed by them.
+    energy_kwh: float = 0.0
+    carbon_g: float = 0.0
 
 
 def _mixture_p95_ms(branches: list[tuple[float, float, bool]], tail: float) -> float:
@@ -443,6 +522,14 @@ def evaluate_step(config: TenantConfig, state: TenantState, demand: Demand) -> S
     cost_infra += (state.cache_mb / 1024.0) * MEM_COST_USD_GB_HR * interval_hr
     cost_tier = miss_rps * CONTROL_INTERVAL_S * TIER_COST_USD_PER_REQ[state.tier]
 
+    # Energy on the same footing as cost: replicas and memory draw power for
+    # the interval, and every request that *misses* the cache pays the tier's
+    # inference energy — the identical miss_rps the tier bill uses, so a cache
+    # hit avoids the joules exactly as it avoids the dollars.
+    energy_kwh = state.replicas * REPLICA_POWER_W / 1000.0 * interval_hr
+    energy_kwh += (state.cache_mb / 1024.0) * MEM_POWER_W_PER_GB / 1000.0 * interval_hr
+    energy_kwh += miss_rps * CONTROL_INTERVAL_S * TIER_ENERGY_WH_PER_REQ[state.tier] / 1000.0
+
     return StepMetrics(
         cost_usd=cost_infra + cost_tier,
         violation=violation,
@@ -452,6 +539,8 @@ def evaluate_step(config: TenantConfig, state: TenantState, demand: Demand) -> S
         cache_hit_rate=hit,
         cost_infra_usd=cost_infra,
         cost_tier_usd=cost_tier,
+        energy_kwh=energy_kwh,
+        carbon_g=energy_kwh * CARBON_INTENSITY_G_PER_KWH,
     )
 
 

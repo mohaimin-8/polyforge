@@ -48,6 +48,11 @@ from model import (
 # Normalizer that puts cost on a comparable scale with violation (0..1):
 # the per-interval cost of a deliberately over-provisioned tenant.
 COST_SCALE_USD = 0.01
+# Normaliser for the optional carbon term (M4 / T18), chosen so a typical
+# tenant-step's grams land in the same 0.1-1 band COST_SCALE_USD puts dollars
+# in — that way `carbon_weight` is on a comparable footing to `alpha` instead
+# of needing a hidden order-of-magnitude correction.
+CARBON_SCALE_G = 10.0
 
 SWITCH_PENALTY = 0.05  # objective units per changed knob (hysteresis)
 DELTA_REPLICAS = (-2, -1, 0, 1, 2)
@@ -358,8 +363,20 @@ class JCACController:
         degrade_gracefully: bool = False,
         risk_quantile: float | None = None,
         risk_cost_at_point: bool = False,
+        carbon_weight: float = 0.0,
     ):
         self.configs = configs
+        # M4 / T18: price the plan's carbon alongside its dollars. 0.0 (the
+        # default) leaves the objective untouched — the term is guarded, not
+        # multiplied by zero, so the published campaigns replay bit-for-bit.
+        # Scope it honestly (see model.py's energy block for the measurement):
+        # under a CONSTANT grid intensity carbon is near-collinear with cost on
+        # these constants, so this knob buys almost nothing there. It becomes a
+        # real dimension when the grid's intensity varies over time, because
+        # price does not follow the grid — the same plan is clean at 03:00 and
+        # dirty at 18:00 for identical money. Expect a sharp response: low
+        # weights move nothing, high weights shed AI traffic outright.
+        self.carbon_weight = carbon_weight
         # PREREG_RISK_BUDGET: the one changed factor the RESULTS_RISK null
         # identified. Inflating demand for the SLO term also inflated
         # *projected spend* (tier cost scales with demand), so candidates
@@ -527,6 +544,16 @@ class JCACController:
         n = max(1, len(horizon))
         return cost / n, violation / n, obj / n
 
+    def _project_carbon(self, tid: str, state: TenantState, horizon: list[Demand]) -> float:
+        """Horizon-mean carbon in grams. Kept separate from `_project` so the
+        default path's arithmetic and return shape are untouched; only called
+        when `carbon_weight` is set (M4 / T18)."""
+        total = 0.0
+        for demand in horizon:
+            total += evaluate_step(
+                self.configs[tid], state, self._planning_demand(tid, demand)).carbon_g
+        return total / max(1, len(horizon))
+
     def _best_for_tenant(
         self,
         tid: str,
@@ -544,13 +571,15 @@ class JCACController:
         budget_per_step = config.hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
 
         # Others' contributions are fixed during this tenant's move.
-        other_cost = other_obj = 0.0
+        other_cost = other_obj = other_carbon = 0.0
         other_satisfaction = []
         others_cache = others_replicas = 0
         for oid, ostate in chosen.items():
             if oid == tid:
                 continue
             cost, viol, obj = self._project(oid, ostate, horizons[oid])
+            if self.carbon_weight:
+                other_carbon += self._project_carbon(oid, ostate, horizons[oid])
             if cost_horizons is not None:
                 cost = self._project(oid, ostate, cost_horizons[oid])[0]
             other_cost += cost
@@ -608,6 +637,13 @@ class JCACController:
                         + self.weights.gamma * noise * resource_share
                         + SWITCH_PENALTY * switches
                     )
+                    # M4 / T18: guarded rather than multiplied by zero, so with
+                    # the knob off the score is the published expression to the
+                    # last bit.
+                    if self.carbon_weight:
+                        score += self.carbon_weight * (
+                            other_carbon + self._project_carbon(tid, candidate, horizons[tid])
+                        ) / CARBON_SCALE_G
                     if score < best_score:
                         best_score, best_state = score, candidate
         # An entirely infeasible lattice (tight budget + tight cluster)

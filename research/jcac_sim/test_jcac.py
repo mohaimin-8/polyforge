@@ -1105,3 +1105,118 @@ class RiskBudgetCorrectionTests(unittest.TestCase):
             sf = flagged.plan(s, d)["a"].state
             self.assertEqual(sb, sf)
             s = {"a": sb}
+
+
+class EnergyCarbonTests(unittest.TestCase):
+    """Energy accounting and the optional carbon term (M4 / T18).
+
+    These tests pin an uncomfortable property as firmly as a useful one. Under
+    a *constant* grid intensity, carbon is very nearly collinear with dollar
+    cost on the published constants, so pricing it changes almost nothing --
+    minimising spend already minimises grams. The term earns its place only
+    when the grid's intensity varies over time, because price cannot express
+    that at all. Both facts are asserted below so neither can be quietly
+    overstated later.
+    """
+
+    def tearDown(self):
+        model.set_energy()  # never leak an override into another test
+
+    def _lattice(self, config, demand):
+        return [
+            model.evaluate_step(config, TenantState(replicas=r, cache_mb=c, tier=t), demand)
+            for r in range(1, 11)
+            for c in model.CACHE_LEVELS_MB
+            for t in model.TIERS
+        ]
+
+    def test_energy_tracks_the_three_knobs(self):
+        config = TenantConfig(tenant_id="a")
+        d = demand({"chat": 20.0, "crud_read": 5.0})
+        base = TenantState(replicas=2, cache_mb=128, tier="small")
+        e = lambda s: evaluate_step(config, s, d).energy_kwh  # noqa: E731
+
+        # more replicas draw more power
+        self.assertGreater(e(replace_state(base, replicas=6)), e(base))
+        # a heavier tier burns more per miss
+        self.assertGreater(e(replace_state(base, tier="large")), e(base))
+        # and cache *saves* energy, because a hit never reaches the model
+        self.assertLess(e(replace_state(base, cache_mb=1024)), e(base))
+
+    def test_carbon_scales_with_grid_intensity_only(self):
+        config = TenantConfig(tenant_id="a")
+        d = demand({"chat": 20.0})
+        state = TenantState(replicas=3, cache_mb=128, tier="small")
+        clean = evaluate_step(config, state, d)
+        model.set_energy(carbon_intensity_g_per_kwh=800.0)
+        dirty = evaluate_step(config, state, d)
+        # twice the intensity, twice the carbon, identical energy AND identical
+        # money -- which is exactly why price cannot stand in for carbon.
+        self.assertAlmostEqual(dirty.carbon_g, 2.0 * clean.carbon_g, places=9)
+        self.assertAlmostEqual(dirty.energy_kwh, clean.energy_kwh, places=12)
+        self.assertAlmostEqual(dirty.cost_usd, clean.cost_usd, places=12)
+
+    def test_carbon_is_nearly_collinear_with_cost_at_constant_intensity(self):
+        # The honest limitation. A pair is discordant when one state is cheaper
+        # but dirtier than another; if there were many, pricing carbon would be
+        # a real lever under a fixed grid. There are almost none.
+        config = TenantConfig(tenant_id="a", slo_class="premium", hourly_budget_usd=100.0)
+        rows = self._lattice(config, demand({"chat": 25.0, "crud_read": 5.0}))
+        discordant = sum(
+            1 for a in rows for b in rows
+            if a.cost_usd < b.cost_usd and a.carbon_g > b.carbon_g
+        )
+        self.assertLess(discordant / (len(rows) ** 2), 0.001,
+                        "carbon and cost disagree often enough that the constant-"
+                        "intensity term is a real lever -- update the docs if so")
+
+    def test_carbon_weight_is_off_by_default_and_inert(self):
+        configs = {"a": TenantConfig(tenant_id="a", slo_class="premium",
+                                     hourly_budget_usd=100.0)}
+        d = {"a": demand({"chat": 25.0, "crud_read": 5.0})}
+        self.assertEqual(JCACController(configs).carbon_weight, 0.0)
+        base, priced = JCACController(configs), JCACController(configs, carbon_weight=0.0)
+        s1 = s2 = {"a": TenantState()}
+        for _ in range(8):
+            s1 = {"a": base.plan(s1, d)["a"].state}
+            s2 = {"a": priced.plan(s2, d)["a"].state}
+            self.assertEqual(s1, s2)
+
+    def test_grid_intensity_moves_the_plan_only_when_carbon_is_priced(self):
+        # The dimension test. Same demand, same prices, different grid: a
+        # cost-only controller cannot react (money is intensity-invariant),
+        # a carbon-pricing one must. If this failed, the term would be
+        # reproducible by simply reweighting cost.
+        configs = {"a": TenantConfig(tenant_id="a", slo_class="premium",
+                                     hourly_budget_usd=100.0)}
+        d = {"a": demand({"chat": 25.0, "crud_read": 5.0})}
+
+        def settle(intensity: float, weight: float) -> TenantState:
+            model.set_energy(carbon_intensity_g_per_kwh=intensity)
+            ctl = JCACController(configs, carbon_weight=weight)
+            state = {"a": TenantState()}
+            for _ in range(8):
+                state = {"a": ctl.plan(state, d)["a"].state}
+            return state["a"]
+
+        self.assertEqual(settle(50.0, 0.0), settle(900.0, 0.0),
+                         "an unpriced controller must ignore the grid entirely")
+        self.assertNotEqual(settle(50.0, 2.0), settle(900.0, 2.0),
+                            "a carbon-pricing controller must react to the grid")
+
+    def test_set_energy_resets_before_applying(self):
+        model.set_energy(replica_power_w=999.0, carbon_intensity_g_per_kwh=1.0)
+        model.set_energy(carbon_intensity_g_per_kwh=123.0)
+        self.assertEqual(model.REPLICA_POWER_W, 45.0)  # reset, not carried over
+        self.assertEqual(model.CARBON_INTENSITY_G_PER_KWH, 123.0)
+        model.set_energy()
+        self.assertEqual(model.CARBON_INTENSITY_G_PER_KWH, 400.0)
+        with self.assertRaises(ValueError):
+            model.set_energy(tier_energy_wh_per_req={"enormous": 1.0})
+        with self.assertRaises(ValueError):
+            model.set_energy(replica_power_w=-1.0)
+
+
+def replace_state(state: TenantState, **kw) -> TenantState:
+    from dataclasses import replace
+    return replace(state, **kw)
