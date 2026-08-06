@@ -333,15 +333,23 @@ def successor_demand_indices(demands: list[Demand]) -> list[tuple[int, ...]]:
     ]
 
 
-def reactive_cost_floor(config: TenantConfig, demands: list[Demand]) -> float | None:
-    """LOWER bound on one period's cost for a reactive zero-violation policy.
+def reactive_cost_floor(
+    config: TenantConfig, demands: list[Demand], threshold: float = 0.0
+) -> float | None:
+    """LOWER bound on one period's cost for a reactive policy holding
+    `violation <= threshold`.
 
     At each step the configuration must clear every demand that can follow the
     observation, and is then billed against the demand that actually arrives.
     The reach clamp and the budget filter are both relaxed -- a real controller
     has strictly fewer options and so pays at least this. Returns None when no
     configuration clears an aliased successor set, which is the stronger
-    verdict: no reactive policy can hold zero violation at all.
+    verdict: no reactive policy can hold the constraint at all.
+
+    `threshold` exists because the deployed arms do not run at zero violation:
+    every v3 campaign sits around 0.11-0.27. Comparing a zero-violation bound
+    against runs at 0.22 would be comparing different regimes, so the operating
+    point has to be an argument.
     """
     n = len(demands)
     states = admissible_states(config)
@@ -351,7 +359,7 @@ def reactive_cost_floor(config: TenantConfig, demands: list[Demand]) -> float | 
         billed = demands[(k + 1) % n]
         best = None
         for x in states:
-            if all(violation_of(config, x, demands[j]) <= 0.0 for j in succ[k]):
+            if all(violation_of(config, x, demands[j]) <= threshold for j in succ[k]):
                 cost = model.evaluate_step(config, x, billed).cost_usd
                 if best is None or cost < best:
                     best = cost
@@ -366,8 +374,10 @@ def predictive_cycle_cost(
     demands: list[Demand],
     act: Actuation = Actuation(),
     max_starts: int = 16,
+    threshold: float = 0.0,
 ) -> float | None:
-    """Cost of one period of a *realisable* zero-violation predictive cycle.
+    """Cost of one period of a *realisable* predictive cycle holding
+    `violation <= threshold`.
 
     An upper bound, and an honest one: the returned number is the cost of a
     specific trajectory that respects the reach clamp, the budget filter and
@@ -393,7 +403,7 @@ def predictive_cycle_cost(
         for x in states:
             metrics = model.evaluate_step(config, x, d)
             cost_at[(k, x)] = metrics.cost_usd
-            if metrics.violation <= 0.0 and metrics.cost_usd <= budget_per_step(config):
+            if metrics.violation <= threshold and metrics.cost_usd <= budget_per_step(config):
                 layer.append(x)
         feasible.append(layer)
     if any(not layer for layer in feasible):
@@ -433,16 +443,18 @@ def price_of_reaction(
     config: TenantConfig,
     demands: list[Demand],
     act: Actuation = Actuation(),
+    threshold: float = 0.0,
 ) -> dict:
     """The separation, as a dict of the two bounds and their gap.
 
     `gap` is positive only when a *floor* on reactive cost exceeds a *realised*
     predictive cycle, so a positive value is a proof that seeing one interval
     ahead is worth money on this demand -- not merely that one search found a
-    better answer than another.
+    better answer than another. Both sides are evaluated at the same
+    `threshold`, so the comparison is always within one operating regime.
     """
-    floor = reactive_cost_floor(config, demands)
-    cycle = predictive_cycle_cost(config, demands, act)
+    floor = reactive_cost_floor(config, demands, threshold)
+    cycle = predictive_cycle_cost(config, demands, act, threshold=threshold)
     gap = None
     if floor is not None and cycle is not None:
         gap = floor - cycle
@@ -451,6 +463,180 @@ def price_of_reaction(
         "predictive_cycle_cost": cycle,
         "gap": gap,
         "reactive_can_hold_slo": floor is not None,
+    }
+
+
+# --- cost/violation frontiers, for comparison at violation parity ----------
+#
+# The zero-violation separation above cannot be checked against the campaigns
+# directly, for a reason worth stating: it constrains violation at *every*
+# step, while the campaigns report the *mean* over the run. An arm with mean
+# violation 0.13 may be missing the SLO completely through a burst and clearing
+# it everywhere else -- a regime the per-step bound simply does not describe.
+#
+# So each policy class is traced as a cost/violation frontier instead, by
+# pricing violation at lambda and minimising cost + lambda * violation. Sweeping
+# lambda walks each class along its own frontier, and the two can then be read
+# off at *equal mean violation* -- which is exactly the comparison the campaigns
+# headline ("cost at violation parity").
+#
+# The same asymmetry as above is preserved, and for the same reason: the
+# reactive side relaxes the reach clamp and the budget filter (a floor), the
+# predictive side enforces both and closes a cycle (achievable).
+
+
+def reactive_frontier_point(
+    config: TenantConfig, demands: list[Demand], lam: float
+) -> tuple[float, float]:
+    """(mean violation, mean cost) of the relaxed reactive optimum at price `lam`.
+
+    A reactive policy is a map from observation to configuration, so the choice
+    is made once per observation class and then billed at every aliased
+    position. With the reach clamp relaxed the classes are independent, so each
+    is minimised separately -- which is what makes this a computable floor
+    rather than a policy-synthesis search.
+    """
+    n = len(demands)
+    groups: dict[tuple, list[int]] = {}
+    for k, d in enumerate(demands):
+        groups.setdefault(observation_key(d), []).append(k)
+    states = admissible_states(config)
+
+    total_cost = total_viol = 0.0
+    for positions in groups.values():
+        billed = [(k + 1) % n for k in positions]
+        best = None
+        for x in states:
+            cost = viol = 0.0
+            for j in billed:
+                m = model.evaluate_step(config, x, demands[j])
+                cost += m.cost_usd
+                viol += m.violation
+            score = cost + lam * viol
+            if best is None or score < best[0]:
+                best = (score, cost, viol)
+        total_cost += best[1]
+        total_viol += best[2]
+    return total_viol / n, total_cost / n
+
+
+def predictive_frontier_point(
+    config: TenantConfig,
+    demands: list[Demand],
+    lam: float,
+    act: Actuation = Actuation(),
+    max_starts: int = 16,
+) -> tuple[float, float] | None:
+    """(mean violation, mean cost) of a *realisable* predictive cycle at `lam`.
+
+    Same DP as `predictive_cycle_cost`, with edges priced at
+    cost + lam * violation and only the budget filter constraining membership,
+    so the returned pair belongs to an actual closed trajectory.
+    """
+    n = len(demands)
+    if n == 0:
+        return None
+    states = admissible_states(config)
+    cap = budget_per_step(config)
+    metrics: dict[tuple[int, TenantState], tuple[float, float]] = {}
+    layers: list[list[TenantState]] = []
+    for k, d in enumerate(demands):
+        layer = []
+        for x in states:
+            m = model.evaluate_step(config, x, d)
+            metrics[(k, x)] = (m.cost_usd, m.violation)
+            if m.cost_usd <= cap:
+                layer.append(x)
+        layers.append(layer)
+    if any(not layer for layer in layers):
+        return None
+
+    reach_cache = {x: set(reach(config, x, act)) for x in states}
+    layer_sets = [set(layer) for layer in layers]
+
+    def weight(k, x):
+        cost, viol = metrics[(k, x)]
+        return cost + lam * viol
+
+    def search(seeds):
+        best = None
+        for start in seeds:
+            c0, v0 = metrics[(0, start)]
+            dp = {start: (weight(0, start), c0, v0)}
+            for k in range(1, n):
+                nxt = {}
+                allowed = layer_sets[k]
+                for x, (w, c, v) in dp.items():
+                    for y in reach_cache[x] & allowed:
+                        cy, vy = metrics[(k, y)]
+                        cand = (w + weight(k, y), c + cy, v + vy)
+                        if y not in nxt or cand[0] < nxt[y][0]:
+                            nxt[y] = cand
+                dp = nxt
+                if not dp:
+                    break
+            for x, entry in dp.items():
+                if start in reach_cache[x] and (best is None or entry[0] < best[0]):
+                    best = entry
+        return best
+
+    ordered = sorted(layers[0], key=lambda x: weight(0, x))
+    found = search(ordered[:max_starts])
+    if found is None and len(ordered) > max_starts:
+        found = search(ordered[max_starts:])
+    if found is None:
+        return None
+    _, cost, viol = found
+    return viol / n, cost / n
+
+
+def cost_at_violation_parity(
+    config: TenantConfig,
+    demands: list[Demand],
+    target_violation: float,
+    act: Actuation = Actuation(),
+    lambdas: tuple[float, ...] = (0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0),
+) -> dict | None:
+    """Read both frontiers at `target_violation` and return the cost gap.
+
+    The operating point must be supplied rather than discovered. Asking instead
+    for "the closest matched pair anywhere" finds the lambda=0 corner, where
+    both classes simply shed to the replica floor and eat the violation: their
+    costs coincide there and the gap reads 0.0% on demand orbits that plainly
+    do separate. A comparison at violation parity only means something at a
+    stated violation.
+
+    `reactive_offset` / `predictive_offset` report how far each frontier's
+    nearest point sits from the target. **Check them before reading the gap.**
+    A lambda sweep recovers only the lower convex hull of a frontier, and the
+    reactive frontier is genuinely sparse -- a reactive policy makes one choice
+    per *observation class*, and an orbit like `spike` has only two, so its
+    frontier holds a handful of points and may have no operating point near a
+    given target at all. When that happens the two sides are read at different
+    violations and the ratio is not a parity comparison. Recovering the
+    non-convex interior needs enumeration rather than a sweep; until then a
+    large offset means "no comparison available here", not "no gap".
+    """
+    reactive = [reactive_frontier_point(config, demands, lam) for lam in lambdas]
+    predictive = []
+    for lam in lambdas:
+        point = predictive_frontier_point(config, demands, lam, act)
+        if point is not None:
+            predictive.append(point)
+    if not predictive:
+        return None
+
+    rv, rc = min(reactive, key=lambda p: abs(p[0] - target_violation))
+    pv, pc = min(predictive, key=lambda p: abs(p[0] - target_violation))
+    return {
+        "target_violation": target_violation,
+        "reactive": {"violation": rv, "cost": rc},
+        "predictive": {"violation": pv, "cost": pc},
+        "reactive_offset": abs(rv - target_violation),
+        "predictive_offset": abs(pv - target_violation),
+        "gap_frac": (rc - pc) / rc if rc > 0 else None,
+        "reactive_frontier": reactive,
+        "predictive_frontier": predictive,
     }
 
 

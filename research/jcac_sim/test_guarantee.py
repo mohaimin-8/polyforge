@@ -340,6 +340,58 @@ class PriceOfReactionTests(unittest.TestCase):
             guarantee.price_of_reaction(tight, orbit)["reactive_can_hold_slo"])
 
 
+class FrontierTests(unittest.TestCase):
+    """Cost/violation frontiers, for comparing the two classes at equal mean
+    violation instead of at a per-step bound the campaigns never operate under.
+    """
+
+    def test_pricing_violation_trades_cost_for_attainment(self):
+        # The frontier must actually be a frontier: paying more for violation
+        # must buy less of it, and cost more.
+        config = standard_config()
+        orbit = flash_orbit()
+        cheap_v, cheap_c = guarantee.reactive_frontier_point(config, orbit, 0.0)
+        dear_v, dear_c = guarantee.reactive_frontier_point(config, orbit, 100.0)
+        self.assertGreater(cheap_v, dear_v)
+        self.assertLess(cheap_c, dear_c)
+
+    def test_predictive_frontier_point_stays_inside_budget(self):
+        config = standard_config()
+        point = guarantee.predictive_frontier_point(config, flash_orbit(), 1.0)
+        self.assertIsNotNone(point)
+        violation, cost = point
+        self.assertGreaterEqual(violation, 0.0)
+        self.assertLessEqual(cost, guarantee.budget_per_step(config))
+
+    def test_parity_reader_flags_a_frontier_that_misses_the_target(self):
+        # The guard that matters. A reactive policy chooses once per
+        # observation class, and `spike` has only two, so its frontier is
+        # sparse and may hold nothing near a given violation. The reader must
+        # surface that as a large offset rather than silently comparing two
+        # different operating points and calling it parity.
+        config = standard_config()
+        spike = [Demand(rps={"agent": 1.5 * f, "embed": 1.0 * f, "crud_read": 5.0 * f},
+                        crud_base_ms=60.0)
+                 for f in [8.0, 8.0] + [0.6] * 10]
+        dense = tuple(round(0.002 * (1.35 ** i), 5) for i in range(34))
+        result = guarantee.cost_at_violation_parity(
+            config, spike, target_violation=0.2237, lambdas=dense)
+        self.assertIsNotNone(result)
+        # The predictive side reaches the target; the reactive side does not.
+        self.assertLess(result["predictive_offset"], 0.01)
+        self.assertGreater(result["reactive_offset"], 0.1)
+
+    def test_parity_reader_needs_a_stated_target(self):
+        # Without a target the reader would settle on the lambda=0 corner,
+        # where both classes shed to the replica floor and coincide. Asking at
+        # a low violation must not return that degenerate 0% answer.
+        config = standard_config()
+        orbit = flash_orbit()
+        result = guarantee.cost_at_violation_parity(config, orbit, target_violation=0.0)
+        self.assertIsNotNone(result)
+        self.assertGreater(result["gap_frac"], 0.0)
+
+
 def _rebuild_cycle(config, orbit, target):
     """Recover a zero-violation cycle whose cost equals `target`, by the same
     DP the bound uses but retaining predecessors. Written independently of
