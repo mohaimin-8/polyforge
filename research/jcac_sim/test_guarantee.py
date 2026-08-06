@@ -363,23 +363,85 @@ class FrontierTests(unittest.TestCase):
         self.assertGreaterEqual(violation, 0.0)
         self.assertLessEqual(cost, guarantee.budget_per_step(config))
 
-    def test_parity_reader_flags_a_frontier_that_misses_the_target(self):
-        # The guard that matters. A reactive policy chooses once per
-        # observation class, and `spike` has only two, so its frontier is
-        # sparse and may hold nothing near a given violation. The reader must
-        # surface that as a large offset rather than silently comparing two
-        # different operating points and calling it parity.
+    def test_exact_frontier_matches_brute_force(self):
+        # The enumeration's correctness claim, checked the only way that
+        # settles it: on an orbit small enough to enumerate every reactive
+        # policy directly (two observation classes, 96 states each = 9216
+        # combinations) the Minkowski-sum-with-pruning result must equal the
+        # brute-force Pareto frontier exactly.
+        config = standard_config(replica_max=4)
+        orbit = [crud_demand(f) for f in [6.0, 6.0] + [0.5] * 6]
+        n = len(orbit)
+        states = guarantee.admissible_states(config)
+
+        groups: dict[tuple, list[int]] = {}
+        for k, d in enumerate(orbit):
+            groups.setdefault(guarantee.observation_key(d), []).append(k)
+        self.assertEqual(len(groups), 2)
+        per_class = []
+        for positions in groups.values():
+            billed = [(k + 1) % n for k in positions]
+            per_class.append([
+                (sum(model.evaluate_step(config, x, orbit[j]).violation for j in billed),
+                 sum(model.evaluate_step(config, x, orbit[j]).cost_usd for j in billed))
+                for x in states
+            ])
+        brute = [(a[0] + b[0], a[1] + b[1]) for a in per_class[0] for b in per_class[1]]
+        expected = [(v / n, c / n) for v, c in guarantee._pareto(brute)]
+
+        self.assertEqual(guarantee.reactive_frontier(config, orbit), expected)
+
+    def test_enumeration_recovers_what_the_sweep_cannot(self):
+        # The reason this exists: a lambda sweep sees only the lower convex
+        # hull. On the sparse `spike` frontier that is a handful of points;
+        # enumeration must find substantially more, or the fix did nothing.
         config = standard_config()
         spike = [Demand(rps={"agent": 1.5 * f, "embed": 1.0 * f, "crud_read": 5.0 * f},
                         crud_base_ms=60.0)
                  for f in [8.0, 8.0] + [0.6] * 10]
+        exact = guarantee.reactive_frontier(config, spike)
+        swept = {guarantee.reactive_frontier_point(config, spike, lam)
+                 for lam in (0.0, 0.01, 0.1, 1.0, 10.0, 100.0)}
+        self.assertGreater(len(exact), 4 * len(swept))
+        # and it must be a genuine staircase: violation up, cost strictly down
+        for (v1, c1), (v2, c2) in zip(exact, exact[1:]):
+            self.assertLess(v1, v2)
+            self.assertLess(c2, c1)
+
+    def test_floor_at_a_violation_is_monotone(self):
+        # Allowing more violation can never cost more.
+        config = standard_config()
+        orbit = flash_orbit()
+        strict = guarantee.reactive_cost_floor_at(config, orbit, 0.05)
+        loose = guarantee.reactive_cost_floor_at(config, orbit, 0.40)
+        self.assertIsNotNone(strict)
+        self.assertLessEqual(loose, strict)
+
+    def test_enumeration_brings_the_reactive_side_within_reach_of_the_target(self):
+        # Regression guard on the fix. Reading the reactive side off a lambda
+        # sweep left its nearest point 0.14 away from the measured operating
+        # point -- so the "gap" compared two different violations. Enumerating
+        # the frontier closes that, and the test pins the improvement by
+        # measuring both ways on the same orbit.
+        config = standard_config()
+        spike = [Demand(rps={"agent": 1.5 * f, "embed": 1.0 * f, "crud_read": 5.0 * f},
+                        crud_base_ms=60.0)
+                 for f in [8.0, 8.0] + [0.6] * 10]
+        target = 0.2236
         dense = tuple(round(0.002 * (1.35 ** i), 5) for i in range(34))
+
+        swept = [guarantee.reactive_frontier_point(config, spike, lam) for lam in dense]
+        swept_offset = min(abs(v - target) for v, _ in swept)
+
         result = guarantee.cost_at_violation_parity(
-            config, spike, target_violation=0.2237, lambdas=dense)
-        self.assertIsNotNone(result)
-        # The predictive side reaches the target; the reactive side does not.
-        self.assertLess(result["predictive_offset"], 0.01)
-        self.assertGreater(result["reactive_offset"], 0.1)
+            config, spike, target_violation=target, lambdas=dense)
+        self.assertTrue(result["reachable"])
+        self.assertLess(result["reactive_offset"], swept_offset / 4.0)
+        # Both sides must honour the SAME constraint for the ratio to mean
+        # anything -- that is what makes it a parity comparison.
+        self.assertLessEqual(result["reactive"]["violation"], target + 1e-12)
+        self.assertLessEqual(result["predictive"]["violation"], target + 1e-12)
+        self.assertGreater(result["gap_frac"], 0.0)
 
     def test_parity_reader_needs_a_stated_target(self):
         # Without a target the reader would settle on the lambda=0 corner,

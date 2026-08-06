@@ -520,6 +520,87 @@ def reactive_frontier_point(
     return total_viol / n, total_cost / n
 
 
+def _pareto(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Non-dominated (violation, cost) pairs, ascending in violation.
+
+    Lower is better on both axes, so after sorting by violation a point
+    survives only if it is strictly cheaper than everything admitting less
+    violation -- the usual staircase.
+    """
+    out: list[tuple[float, float]] = []
+    best = float("inf")
+    for violation, cost in sorted(set(points)):
+        if cost < best - 1e-15:
+            out.append((violation, cost))
+            best = cost
+    return out
+
+
+def reactive_frontier(
+    config: TenantConfig, demands: list[Demand], max_points: int = 20000
+) -> list[tuple[float, float]]:
+    """EXACT Pareto frontier of the reactive policy class, as (mean violation,
+    mean cost) pairs.
+
+    A lambda sweep recovers only the lower convex hull, which on a sparse
+    frontier can miss the operating point entirely (see
+    `cost_at_violation_parity`). This enumerates instead, and can do so exactly
+    because with the reach clamp relaxed the observation classes are
+    independent: the achievable set is the Minkowski sum of the per-class sets.
+    Pruning dominated partial sums along the way is lossless -- if one partial
+    sum dominates another, it still dominates after any common addition -- so
+    the result is the true frontier, convex or not.
+
+    COST SCALES WITH THE NUMBER OF OBSERVATION CLASSES, and that is benign for
+    a reason worth noticing: the classes are the *distinct* demands in the
+    orbit, so a burst shape has two or three and enumerates in seconds, while a
+    smooth shape has one per step and the sum does not collapse. But a smooth
+    orbit is exactly the case where every position is uniquely identifiable, so
+    a reactive controller is as informed as a predictive one and the separation
+    is zero by construction (`test_removing_the_aliasing_removes_the_gap`).
+    Enumeration is cheap precisely where it is needed and expensive only where
+    the answer is already known, so `max_points` raises rather than grinding.
+    """
+    n = len(demands)
+    groups: dict[tuple, list[int]] = {}
+    for k, d in enumerate(demands):
+        groups.setdefault(observation_key(d), []).append(k)
+    states = admissible_states(config)
+
+    total: list[tuple[float, float]] = [(0.0, 0.0)]
+    for positions in groups.values():
+        billed = [(k + 1) % n for k in positions]
+        options = []
+        for x in states:
+            cost = viol = 0.0
+            for j in billed:
+                m = model.evaluate_step(config, x, demands[j])
+                cost += m.cost_usd
+                viol += m.violation
+            options.append((viol, cost))
+        options = _pareto(options)
+        total = _pareto([(v1 + v2, c1 + c2) for v1, c1 in total for v2, c2 in options])
+        if len(total) > max_points:
+            raise ValueError(
+                f"reactive frontier exceeded {max_points} points; the orbit has "
+                f"{len(groups)} observation classes and the Minkowski sum is not "
+                f"collapsing. Raise max_points deliberately or reduce the orbit."
+            )
+    return [(v / n, c / n) for v, c in total]
+
+
+def reactive_cost_floor_at(
+    config: TenantConfig, demands: list[Demand], max_violation: float
+) -> float | None:
+    """Cheapest reactive policy holding mean violation <= `max_violation`.
+
+    A floor: the reach clamp and the budget filter are relaxed, so any real
+    reactive controller operating at that violation pays at least this.
+    """
+    admissible = [c for v, c in reactive_frontier(config, demands) if v <= max_violation + 1e-12]
+    return min(admissible) if admissible else None
+
+
 def predictive_frontier_point(
     config: TenantConfig,
     demands: list[Demand],
@@ -617,26 +698,40 @@ def cost_at_violation_parity(
     non-convex interior needs enumeration rather than a sweep; until then a
     large offset means "no comparison available here", not "no gap".
     """
-    reactive = [reactive_frontier_point(config, demands, lam) for lam in lambdas]
+    reactive = reactive_frontier(config, demands)
     predictive = []
     for lam in lambdas:
         point = predictive_frontier_point(config, demands, lam, act)
         if point is not None:
             predictive.append(point)
-    if not predictive:
-        return None
 
-    rv, rc = min(reactive, key=lambda p: abs(p[0] - target_violation))
-    pv, pc = min(predictive, key=lambda p: abs(p[0] - target_violation))
+    # Both sides are read at "no worse than the target", never above it, so the
+    # comparison can only understate the gap: the reactive side is the cheapest
+    # policy that still holds the target (a floor), and the predictive side is
+    # a realised cycle that also holds it (an upper bound). A predictive point
+    # cheaper than the floor at the same violation is then a proof.
+    admissible_r = [(v, c) for v, c in reactive if v <= target_violation + 1e-12]
+    admissible_p = [(v, c) for v, c in predictive if v <= target_violation + 1e-12]
+    if not admissible_r or not admissible_p:
+        return {
+            "target_violation": target_violation,
+            "reachable": False,
+            "reactive_frontier": reactive,
+            "predictive_frontier": _pareto(predictive),
+        }
+
+    rv, rc = min(admissible_r, key=lambda p: p[1])
+    pv, pc = min(admissible_p, key=lambda p: p[1])
     return {
         "target_violation": target_violation,
+        "reachable": True,
         "reactive": {"violation": rv, "cost": rc},
         "predictive": {"violation": pv, "cost": pc},
         "reactive_offset": abs(rv - target_violation),
         "predictive_offset": abs(pv - target_violation),
         "gap_frac": (rc - pc) / rc if rc > 0 else None,
         "reactive_frontier": reactive,
-        "predictive_frontier": predictive,
+        "predictive_frontier": _pareto(predictive),
     }
 
 
