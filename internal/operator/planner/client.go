@@ -35,6 +35,18 @@ type TenantInput struct {
 	ReplicaMin      int32   `json:"replica_min"`
 	ReplicaMax      int32   `json:"replica_max"`
 	FairnessWeight  float64 `json:"fairness_weight"`
+	// Cache/tier knob bounds mirror the Policy CRD guardrails so the planner
+	// optimizes over the same envelope the operator will enforce. All are
+	// omitempty: an absent bound means the planner's full-envelope default
+	// (no floor / no ceiling / any tier), so a Policy that sets no bound
+	// produces a request byte-identical to the pre-bounds one. Setting a
+	// knob's min==max pins it — the cache-only / tier-only ablation freeze
+	// (PREREG_WAVE4_LIVE_PLANE.md §Arms). CacheMax is a pointer so "no
+	// ceiling" (nil) is distinct from a real ceiling of 0.
+	CacheMin int32  `json:"cache_min,omitempty"`
+	CacheMax *int32 `json:"cache_max,omitempty"`
+	TierMin  string `json:"tier_min,omitempty"`
+	TierMax  string `json:"tier_max,omitempty"`
 	// Interference is the W32 noisy-neighbor score, 0 = clean.
 	Interference float64 `json:"interference,omitempty"`
 	State        State   `json:"state"`

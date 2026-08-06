@@ -342,6 +342,89 @@ class TestClusterBackend:
         assert docs.count("hourlyCapMilliUSD: 5000") == 8
         assert docs.count("sloClass: standard") == 8
 
+    def test_wave4_ablation_arms_pin_the_right_knobs(self):
+        # cache-only: replicas + tier pinned (min==max), cache free.
+        cache_only = cluster_backend.operator_crs(
+            expand(tiny_spec(systems=["cache-only"]))[0])
+        assert cache_only.count("replicaMin: 2") == 8
+        assert cache_only.count("replicaMax: 2") == 8      # replicas pinned
+        assert cache_only.count("modelTierMin: small") == 8
+        assert cache_only.count("modelTierMax: small") == 8  # tier pinned
+        assert cache_only.count("cacheSizeMBMax: 0") == 8    # cache free (no ceiling)
+
+        # tier-only: replicas + cache pinned, tier free.
+        tier_only = cluster_backend.operator_crs(
+            expand(tiny_spec(systems=["tier-only"]))[0])
+        assert tier_only.count("replicaMin: 2") == 8
+        assert tier_only.count("replicaMax: 2") == 8
+        assert tier_only.count("cacheSizeMBMin: 128") == 8
+        assert tier_only.count("cacheSizeMBMax: 128") == 8   # cache pinned
+        assert tier_only.count("modelTierMin: none") == 8
+        assert tier_only.count("modelTierMax: large") == 8   # tier free
+
+        # jcac still spans the full envelope (replicaMax is the cluster ceiling).
+        jcac = cluster_backend.operator_crs(expand(tiny_spec(systems=["jcac"]))[0])
+        assert jcac.count("replicaMax: 6") == 8
+        assert jcac.count("modelTierMax: large") == 8
+
+    def test_wave4_arms_registered_and_operator_wiring(self):
+        for arm in ("replica-only", "cache-only", "tier-only"):
+            assert arm in SYSTEMS
+        # The two-knob ablations run the operator; replica-only is reactive HPA.
+        assert {"cache-only", "tier-only"} <= cluster_backend.OPERATOR_SYSTEMS
+        assert "replica-only" not in cluster_backend.OPERATOR_SYSTEMS
+
+    def test_wave4_crs_are_admissible_against_the_real_crds(self):
+        """Every field the harness emits must be a property the CRD declares,
+        inside its declared bounds. This is the guard the ablation arms most
+        need: the API server *prunes* fields a structural schema does not
+        declare rather than rejecting them, so a bound field that is mistyped
+        or missing from the CRD would apply cleanly, silently leave the knob
+        free, and turn a `cache-only` run into a second `jcac` run — voiding
+        WL-H1 with nothing to flag it. Checked against the committed CRDs, so
+        it also fails if the CRDs stop being regenerated from the Go types."""
+        import yaml
+
+        crd_dir = EVAL_DIR.parent / "deploy" / "operator" / "crds"
+        schemas = {}
+        for path in sorted(crd_dir.glob("polyforge.io_*.yaml")):
+            crd = yaml.safe_load(path.read_text(encoding="utf-8"))
+            schema = crd["spec"]["versions"][0]["schema"]["openAPIV3Schema"]
+            schemas[crd["spec"]["names"]["kind"]] = schema["properties"]["spec"]["properties"]
+
+        checked = 0
+        for arm in sorted(cluster_backend.OPERATOR_SYSTEMS):
+            run = expand(tiny_spec(systems=[arm]))[0]
+            for doc in yaml.safe_load_all(cluster_backend.operator_crs(run)):
+                props = schemas[doc["kind"]]
+                for key, value in doc.get("spec", {}).items():
+                    assert key in props, (
+                        f"{arm}: {doc['kind']}.spec.{key} is not declared by the "
+                        f"CRD — the API server would prune it and the knob would "
+                        f"silently stay free")
+                    field = props[key]
+                    if "enum" in field:
+                        assert value in field["enum"], \
+                            f"{arm}: {key}={value!r} not in {field['enum']}"
+                    if isinstance(value, int):
+                        assert value >= field.get("minimum", value), \
+                            f"{arm}: {key}={value} below minimum {field['minimum']}"
+                        assert value <= field.get("maximum", value), \
+                            f"{arm}: {key}={value} above maximum {field['maximum']}"
+                    checked += 1
+        # Guard the guard: the loop must actually have inspected the pins.
+        assert checked >= len(cluster_backend.OPERATOR_SYSTEMS) * 8
+
+    def test_sim_freeze_knobs_pins_only_named_knobs(self):
+        from model import TenantConfig
+
+        configs = {"a": TenantConfig(tenant_id="a")}
+        frozen = sim_backend._freeze_knobs(configs, frozenset({"replicas", "tier"}))
+        c = frozen["a"]
+        assert c.replica_min == c.replica_max == 2   # replicas pinned at init
+        assert c.tier_min == c.tier_max == "small"   # tier pinned at init
+        assert c.cache_max is None                   # cache still free
+
 
 class TestV3OverloadCells:
     """PREREG_V3 §3 structural guarantees: the overload classes are defined

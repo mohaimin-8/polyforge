@@ -563,6 +563,14 @@ class JCACController:
         for delta in DELTA_REPLICAS:
             for cache_mb in neighbor_cache_levels(base.cache_mb):
                 for tier in TIERS:
+                    # Per-tenant knob bounds: a pinned (min==max) cache or tier
+                    # removes every off-value candidate, so a cache-only /
+                    # tier-only ablation truly re-optimizes over the free knob
+                    # alone instead of planning jointly and being clamped at
+                    # actuation. Full-envelope bounds admit everything, so the
+                    # published campaigns enumerate the identical lattice (R4).
+                    if not config.knob_admits(cache_mb, tier):
+                        continue
                     candidate = apply_action(config, base, delta, cache_mb, tier)
                     if others_cache + candidate.cache_mb > self.limits.cache_mb:
                         continue

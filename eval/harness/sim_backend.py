@@ -23,6 +23,30 @@ from . import workloads
 _JITTER_SALT = 0x5F3759DF
 
 
+def _freeze_knobs(configs: dict, knobs: frozenset[str]) -> dict:
+    """Pin the named knobs at the initial world for every tenant — the sim
+    analogue of the Policy CRD min==max pin the live cache-only / tier-only
+    ablations use (PREREG_WAVE4_LIVE_PLANE.md §Arms). Replicas pin via
+    replica_min==replica_max (apply_action already clamps to that band);
+    cache and tier pin via the bounds knob_admits enforces in the candidate
+    lattice. Called only for arms that declare knob_freeze, so every other
+    arm's configs are untouched and its records replay bit-identically."""
+    from dataclasses import replace
+
+    init = model.TenantState()
+    out = {}
+    for tid, cfg in configs.items():
+        kw = {}
+        if "replicas" in knobs:
+            kw.update(replica_min=init.replicas, replica_max=init.replicas)
+        if "cache" in knobs:
+            kw.update(cache_min=init.cache_mb, cache_max=init.cache_mb)
+        if "tier" in knobs:
+            kw.update(tier_min=init.tier, tier_max=init.tier)
+        out[tid] = replace(cfg, **kw) if kw else cfg
+    return out
+
+
 def _apply_economy(economy: tuple) -> None:
     """Set the model economy for this run. Called unconditionally so a
     pooled worker process is stateless: an empty override restores the
@@ -71,6 +95,8 @@ def execute(run: RunSpec) -> dict:
     tenant_ids, buckets, configs, limits = workloads.build(
         run.workload, run.tenant_mix, run.cluster_size, run.seed, run.steps
     )
+    if spec.knob_freeze:
+        configs = _freeze_knobs(configs, spec.knob_freeze)
 
     params = dict(tuned_params().get(spec.controller, {}))
     params.update(spec.params)

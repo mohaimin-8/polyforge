@@ -208,6 +208,16 @@ func (p *PlanRunner) gather(ctx context.Context) (inputs []planner.TenantInput, 
 			ReplicaMin:      policy.Spec.ReplicaMin,
 			ReplicaMax:      policy.Spec.ReplicaMax,
 			FairnessWeight:  0.5,
+			// Forward the cache/tier knob bounds so the planner optimizes over
+			// the same envelope the operator enforces — a pinned (min==max)
+			// knob makes the planner re-optimize the free knob alone (the
+			// cache-only / tier-only ablation). A zero cache ceiling / empty
+			// tier bound is omitempty'd away, so an unbounded Policy sends the
+			// pre-bounds request unchanged.
+			CacheMin: policy.Spec.CacheSizeMBMin,
+			CacheMax: nonZeroInt32Ptr(policy.Spec.CacheSizeMBMax),
+			TierMin:  string(policy.Spec.ModelTierMin),
+			TierMax:  string(policy.Spec.ModelTierMax),
 			State: planner.State{
 				Replicas: policy.Spec.Replicas,
 				CacheMB:  policy.Spec.CacheSizeMB,
@@ -241,14 +251,25 @@ func (p *PlanRunner) apply(ctx context.Context, policy *pfv1alpha1.Policy, input
 	if replicas > policy.Spec.ReplicaMax {
 		replicas = policy.Spec.ReplicaMax
 	}
+	// Clamp cache/tier to the Policy bounds too, reusing the shared clamp
+	// helpers on a copy carrying the planned value — the single source of the
+	// bound logic. The planner already plans within them, so with a bound-free
+	// Policy this is the identity; with a pin it is the belt to the planner's
+	// braces, matching the replica guardrail above.
+	cacheSpec := policy.Spec
+	cacheSpec.CacheSizeMB = plan.CacheMB
+	cache := clampCache(&cacheSpec)
+	tierSpec := policy.Spec
+	tierSpec.ModelTier = pfv1alpha1.ModelTier(plan.Tier)
+	tier := clampTier(&tierSpec)
 
 	changed := policy.Spec.Replicas != replicas ||
-		policy.Spec.CacheSizeMB != plan.CacheMB ||
-		policy.Spec.ModelTier != pfv1alpha1.ModelTier(plan.Tier)
+		policy.Spec.CacheSizeMB != cache ||
+		policy.Spec.ModelTier != tier
 	if changed {
 		policy.Spec.Replicas = replicas
-		policy.Spec.CacheSizeMB = plan.CacheMB
-		policy.Spec.ModelTier = pfv1alpha1.ModelTier(plan.Tier)
+		policy.Spec.CacheSizeMB = cache
+		policy.Spec.ModelTier = tier
 		if err := p.Client.Update(ctx, policy); err != nil {
 			return fmt.Errorf("update policy spec: %w", err)
 		}
@@ -269,14 +290,25 @@ func (p *PlanRunner) apply(ctx context.Context, policy *pfv1alpha1.Policy, input
 		From:   input.State,
 		To: planner.State{
 			Replicas: replicas,
-			CacheMB:  plan.CacheMB,
-			Tier:     plan.Tier,
+			CacheMB:  cache,
+			Tier:     string(tier),
 		},
 		ProjectedCostUSD:   plan.ProjectedCostUSD,
 		ProjectedViolation: plan.ProjectedViolation,
 		Interference:       input.Interference,
 	})
 	return nil
+}
+
+// nonZeroInt32Ptr returns a pointer to v, or nil when v is 0 — the encoding
+// the planner request uses to mean "no cache ceiling" (omitempty drops nil),
+// so an unbounded Policy sends no cache_max and the planner applies its
+// full-envelope default.
+func nonZeroInt32Ptr(v int32) *int32 {
+	if v == 0 {
+		return nil
+	}
+	return &v
 }
 
 // fallback marks every planned tenant as running on its last good plan.

@@ -123,6 +123,65 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(second, third)
 
 
+class KnobBoundTests(unittest.TestCase):
+    """Per-tenant cache/tier bounds are the live-ablation freeze mechanism
+    (PREREG_WAVE4_LIVE_PLANE.md §Arms): a pinned (min==max) knob removes every
+    off-value candidate so the joint controller re-optimizes the free knob
+    alone. Default full-envelope bounds must be a no-op."""
+
+    def test_default_config_admits_every_candidate(self):
+        c = TenantConfig(tenant_id="t")
+        for cache in model.CACHE_LEVELS_MB:
+            for tier in model.TIERS:
+                self.assertTrue(c.knob_admits(cache, tier),
+                                f"default bounds rejected {cache}/{tier}")
+
+    def test_pin_admits_only_the_pinned_value(self):
+        cache_pin = TenantConfig(tenant_id="t", cache_min=128, cache_max=128)
+        self.assertTrue(cache_pin.knob_admits(128, "small"))
+        self.assertFalse(cache_pin.knob_admits(256, "small"))
+        self.assertFalse(cache_pin.knob_admits(0, "small"))
+        tier_pin = TenantConfig(tenant_id="t", tier_min="small", tier_max="small")
+        self.assertTrue(tier_pin.knob_admits(128, "small"))
+        self.assertFalse(tier_pin.knob_admits(128, "mid"))
+        self.assertFalse(tier_pin.knob_admits(128, "none"))
+
+    def test_pinned_cache_holds_while_unpinned_climbs(self):
+        # A cacheable premium surge with a generous budget: unpinned the
+        # controller raises the cache to absorb work; pinned it cannot, which
+        # is what makes the pin meaningful (not trivially constant).
+        def run(pin: bool) -> int:
+            kw = dict(cache_min=128, cache_max=128) if pin else {}
+            configs = {"a": TenantConfig(tenant_id="a", slo_class="premium",
+                                         hourly_budget_usd=100.0, **kw)}
+            ctl = JCACController(configs)
+            states = {"a": TenantState(cache_mb=128)}
+            for _ in range(5):
+                plans = ctl.plan(states, {"a": demand({"chat": 30.0})})
+                states = {t: p.state for t, p in plans.items()}
+            return states["a"].cache_mb
+
+        self.assertEqual(run(pin=True), 128, "pinned cache must not move")
+        self.assertGreater(run(pin=False), 128, "control: unpinned cache should climb")
+
+    def test_pinned_tier_holds_while_unpinned_upgrades(self):
+        # Agent traffic degrades on the small tier, so with headroom the
+        # unpinned controller upgrades; the tier-pinned arm stays put.
+        def run(pin: bool) -> str:
+            kw = dict(tier_min="small", tier_max="small") if pin else {}
+            configs = {"a": TenantConfig(tenant_id="a", slo_class="premium",
+                                         hourly_budget_usd=100.0, **kw)}
+            ctl = JCACController(configs)
+            states = {"a": TenantState(tier="small")}
+            for _ in range(5):
+                plans = ctl.plan(states, {"a": demand({"agent": 10.0})})
+                states = {t: p.state for t, p in plans.items()}
+            return states["a"].tier
+
+        self.assertEqual(run(pin=True), "small", "pinned tier must not move")
+        self.assertNotEqual(run(pin=False), "small", "control: unpinned tier should upgrade")
+
+
 class BaselineTests(unittest.TestCase):
     def test_static_never_moves(self):
         configs = {"a": TenantConfig(tenant_id="a")}

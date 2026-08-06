@@ -61,11 +61,13 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	replicas := clampReplicas(&policy.Spec)
+	cacheMB := clampCache(&policy.Spec)
+	tier := clampTier(&policy.Spec)
 	span.SetAttributes(
 		attribute.String("tenant", policy.Spec.TenantRef),
 		attribute.Int("replicas", int(replicas)),
-		attribute.Int("cache_mb", int(policy.Spec.CacheSizeMB)),
-		attribute.String("model_tier", string(policy.Spec.ModelTier)),
+		attribute.Int("cache_mb", int(cacheMB)),
+		attribute.String("model_tier", string(tier)),
 	)
 
 	ns, name, err := splitTarget(policy.Spec.TargetDeployment, policy.Spec.TenantRef)
@@ -93,14 +95,14 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	if err := r.ensureTenantConfig(ctx, ns, &policy); err != nil {
+	if err := r.ensureTenantConfig(ctx, ns, &policy, cacheMB, tier); err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		return ctrl.Result{}, err
 	}
 
 	if r.GatewayKnobs != nil {
 		if err := r.GatewayKnobs.Push(ctx, policy.Spec.TenantRef,
-			string(policy.Spec.ModelTier), policy.Spec.CacheSizeMB); err != nil {
+			string(tier), cacheMB); err != nil {
 			r.setApplied(&policy, metav1.ConditionFalse, "GatewayKnobsFailed", err.Error())
 			if serr := r.Status().Update(ctx, &policy); serr != nil {
 				return ctrl.Result{}, serr
@@ -110,15 +112,15 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	policy.Status.AppliedReplicas = replicas
-	policy.Status.AppliedCacheSizeMB = policy.Spec.CacheSizeMB
-	policy.Status.AppliedModelTier = policy.Spec.ModelTier
+	policy.Status.AppliedCacheSizeMB = cacheMB
+	policy.Status.AppliedModelTier = tier
 	policy.Status.ObservedGeneration = policy.Generation
 	if policy.Status.LastPlanSource == "" {
 		policy.Status.LastPlanSource = pfv1alpha1.PlanSourceManual
 	}
 	r.setApplied(&policy, metav1.ConditionTrue, "Applied",
 		fmt.Sprintf("replicas=%d (target total %d) cacheMB=%d tier=%s",
-			replicas, total, policy.Spec.CacheSizeMB, policy.Spec.ModelTier))
+			replicas, total, cacheMB, tier))
 	if err := r.Status().Update(ctx, &policy); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -136,6 +138,42 @@ func clampReplicas(spec *pfv1alpha1.PolicySpec) int32 {
 		replicas = spec.ReplicaMax
 	}
 	return replicas
+}
+
+// clampCache enforces the cache-knob bounds, symmetric with clampReplicas.
+// A CacheSizeMBMax of 0 means "no ceiling" (the pre-bounds default), so an
+// unset bound never zeroes the cache; a positive max caps it, and min==max
+// pins it (the cache-frozen ablation posture). A max below a positive min is
+// a misconfiguration resolved in favor of the floor.
+func clampCache(spec *pfv1alpha1.PolicySpec) int32 {
+	cache := spec.CacheSizeMB
+	if cache < spec.CacheSizeMBMin {
+		cache = spec.CacheSizeMBMin
+	}
+	if spec.CacheSizeMBMax > 0 && spec.CacheSizeMBMax >= spec.CacheSizeMBMin && cache > spec.CacheSizeMBMax {
+		cache = spec.CacheSizeMBMax
+	}
+	return cache
+}
+
+// clampTier enforces the tier-knob bounds on the ordinal none<small<mid<large.
+// An empty ModelTierMin/Max means "no bound" (the pre-bounds default), so an
+// unset bound never moves the tier; min==max pins it (the tier-frozen ablation
+// posture). A max below min is resolved in favor of the floor, matching the
+// replica guardrail's availability-beats-cost convention.
+func clampTier(spec *pfv1alpha1.PolicySpec) pfv1alpha1.ModelTier {
+	tier := spec.ModelTier
+	rank := pfv1alpha1.TierRank(tier)
+	if lo := pfv1alpha1.TierRank(spec.ModelTierMin); lo >= 0 && rank < lo {
+		rank = lo
+	}
+	if hi := pfv1alpha1.TierRank(spec.ModelTierMax); hi >= 0 && hi >= pfv1alpha1.TierRank(spec.ModelTierMin) && rank > hi {
+		rank = hi
+	}
+	if rank < 0 {
+		return tier // unknown tier: leave as-is, validation rejects it upstream
+	}
+	return pfv1alpha1.TierByRank(rank)
 }
 
 func splitTarget(target, tenantRef string) (ns, name string, err error) {
@@ -222,12 +260,14 @@ func (r *PolicyReconciler) scaleDeployment(ctx context.Context, ns, name string,
 
 // ensureTenantConfig writes the per-tenant knobs the gateway reads at
 // runtime: semantic-cache budget (W28 eviction bound) and model tier
-// (W19 routing table).
-func (r *PolicyReconciler) ensureTenantConfig(ctx context.Context, ns string, policy *pfv1alpha1.Policy) error {
+// (W19 routing table). The values are the clamped ones — the guardrail is
+// enforced at the single actuation point, so a pinned (min==max) knob is
+// physically frozen at the data plane regardless of the plan source.
+func (r *PolicyReconciler) ensureTenantConfig(ctx context.Context, ns string, policy *pfv1alpha1.Policy, cacheMB int32, tier pfv1alpha1.ModelTier) error {
 	name := "pf-tenant-config-" + policy.Spec.TenantRef
 	data := map[string]string{
-		"cache_size_mb": strconv.Itoa(int(policy.Spec.CacheSizeMB)),
-		"model_tier":    string(policy.Spec.ModelTier),
+		"cache_size_mb": strconv.Itoa(int(cacheMB)),
+		"model_tier":    string(tier),
 	}
 	var cm corev1.ConfigMap
 	err := r.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &cm)

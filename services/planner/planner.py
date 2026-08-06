@@ -209,6 +209,13 @@ class PlannerCore:
             tier = state.get("tier", "small")
             if tier not in TIERS:
                 raise ValueError(f"unknown tier {tier!r}")
+            # Cache/tier knob bounds (PREREG_WAVE4_LIVE_PLANE.md §Arms): a
+            # pinned (min==max) knob makes the controller re-optimize the free
+            # knob alone. Absent bounds fall back to the full envelope
+            # (cache_max=None = no ceiling, tiers none..large), so a request
+            # that omits them plans over exactly the lattice it did before
+            # these fields existed.
+            cache_max = entry.get("cache_max")
             configs[tid] = TenantConfig(
                 tenant_id=tid,
                 slo_class=entry.get("slo_class", "standard"),
@@ -216,6 +223,10 @@ class PlannerCore:
                 replica_min=int(entry.get("replica_min", 1)),
                 replica_max=int(entry.get("replica_max", 10)),
                 fairness_weight=float(entry.get("fairness_weight", 0.5)),
+                cache_min=int(entry.get("cache_min", 0)),
+                cache_max=int(cache_max) if cache_max is not None else None,
+                tier_min=str(entry.get("tier_min", "none")),
+                tier_max=str(entry.get("tier_max", "large")),
             )
             states[tid] = TenantState(
                 replicas=int(state.get("replicas", 2)),

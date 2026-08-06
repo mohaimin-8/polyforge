@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -25,6 +26,36 @@ func planRequest() Request {
 			State:           State{Replicas: 2, CacheMB: 128, Tier: "small"},
 			Demand:          Demand{RPS: map[string]float64{"chat": 2.0}, CrudBaseMs: 50},
 		}},
+	}
+}
+
+// An unbounded tenant must marshal WITHOUT any of the knob-bound keys, so a
+// Policy that sets no bound produces the exact pre-bounds request wire format
+// (the byte-identical guarantee the omitempty tags exist for). A pinned tenant
+// carries them.
+func TestTenantInputBoundsAreOmitEmpty(t *testing.T) {
+	unbounded, err := json.Marshal(planRequest().Tenants[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"cache_min", "cache_max", "tier_min", "tier_max"} {
+		if strings.Contains(string(unbounded), key) {
+			t.Errorf("unbounded tenant leaked %q into the request: %s", key, unbounded)
+		}
+	}
+
+	max := int32(128)
+	pinned := planRequest().Tenants[0]
+	pinned.CacheMin, pinned.CacheMax = 128, &max
+	pinned.TierMin, pinned.TierMax = "small", "small"
+	out, err := json.Marshal(pinned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"cache_min", "cache_max", "tier_min", "tier_max"} {
+		if !strings.Contains(string(out), key) {
+			t.Errorf("pinned tenant missing %q: %s", key, out)
+		}
 	}
 }
 

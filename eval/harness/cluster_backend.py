@@ -50,10 +50,12 @@ CONTROL_PLANE_IMAGE = "polyforge/control-plane:dev"
 OPERATOR_IMAGE = "polyforge/operator:dev"
 PLANNER_IMAGE = "polyforge/planner:dev"
 
-# Systems that deploy the operator/planner control loop live. Only the full
-# jcac arm is wired for live execution; the jcac_* ablations remain sim-only
-# (V2_README Phase 7 measures the ordinal jcac-vs-hpa slice, nothing wider).
-OPERATOR_SYSTEMS = {"jcac"}
+# Systems that deploy the operator/planner control loop live. The full jcac
+# arm and its two-knob ablations (cache-only / tier-only) all run the operator
+# — the ablations differ only in which knobs their Policy CRs pin (see
+# operator_crs / _arm_knob_bounds). The Wave 4 replica-only arm is NOT here: it
+# is reactive HPA with cache/tier held by push_default_knobs, like hpa.
+OPERATOR_SYSTEMS = {"jcac", "cache-only", "tier-only"}
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADMIN_SECRET_NAME = "polyforge-admin"  # carries ADMIN_KEY for the operator
@@ -103,6 +105,13 @@ PROMPT_POOL_BY_CLASS = {
 # baseline's name, so keep them sim-only until their toggles exist.
 HELM_VALUES_BY_SYSTEM = {
     "jcac": {"planner.enabled": "true", "classifier.enabled": "true"},
+    # Wave 4 arms: cache-only / tier-only run the same operator chart as jcac
+    # (they ARE jcac, with two knobs pinned by their Policy CRs — the chart is
+    # knob-agnostic). replica-only is reactive HPA with cache/tier held fixed
+    # by push_default_knobs, exactly like hpa.
+    "cache-only": {"planner.enabled": "true", "classifier.enabled": "true"},
+    "tier-only": {"planner.enabled": "true", "classifier.enabled": "true"},
+    "replica-only": {"planner.enabled": "false", "autoscaling.hpa.enabled": "true"},
     "hpa": {"planner.enabled": "false", "autoscaling.hpa.enabled": "true"},
     "keda": {"planner.enabled": "false", "autoscaling.keda.enabled": "true"},
     "firm": {"planner.enabled": "false", "autoscaling.firm.enabled": "true"},
@@ -275,6 +284,32 @@ HELM_EVAL_BASE_VALUES = {
 }
 
 
+def _arm_knob_bounds(system: str, initial: "TenantState", size) -> tuple:
+    """Per-arm Policy-CRD knob bounds for the Wave 4 live plane
+    (PREREG_WAVE4_LIVE_PLANE.md §Arms). Returns
+    ((replicaMin, replicaMax), (cacheMin, cacheMax), (tierMin, tierMax)).
+
+    A frozen knob is pinned min==max at the sim's initial world; a free knob
+    spans the full envelope (cacheMax 0 = no ceiling, the cluster limit still
+    binds; tiers none..large). This mirrors the sim's SystemSpec.knob_freeze so
+    the live ablations pin exactly the knobs their sim counterparts do:
+      - jcac         all three free
+      - cache-only   replicas + tier frozen, cache free
+      - tier-only    replicas + cache frozen, tier free
+    """
+    free_r = (1, size.replica_max)
+    frozen_r = (initial.replicas, initial.replicas)
+    free_c = (0, 0)
+    frozen_c = (initial.cache_mb, initial.cache_mb)
+    free_t = ("none", "large")
+    frozen_t = (initial.tier, initial.tier)
+    if system == "cache-only":
+        return frozen_r, free_c, frozen_t
+    if system == "tier-only":
+        return frozen_r, frozen_c, free_t
+    return free_r, free_c, free_t  # jcac (full joint controller)
+
+
 def operator_crs(run: RunSpec) -> str:
     """Tenant/Policy/Budget CR manifests for the jcac arm, one triple per
     eval tenant, all pointed at the shared eval Deployment (the reconciler
@@ -296,9 +331,14 @@ def operator_crs(run: RunSpec) -> str:
     )
     size = workloads.CLUSTER_SIZES[run.cluster_size]
     initial = TenantState()
+    (rmin, rmax), (cmin, cmax), (tmin, tmax) = _arm_knob_bounds(
+        run.system, initial, size)
     docs = []
     for tid in tenant_ids:
         config = configs[tid]
+        # Knob bounds encode the arm's freeze (min==max pins a knob). jcac
+        # emits the full envelope (identical to the pre-bounds CR modulo the
+        # explicit bound lines); cache-only / tier-only pin two knobs each.
         docs.append(f"""apiVersion: polyforge.io/v1alpha1
 kind: Policy
 metadata:
@@ -307,10 +347,14 @@ spec:
   tenantRef: {tid}
   targetDeployment: polyforge/polyforge-control-plane
   replicas: {initial.replicas}
-  replicaMin: 1
-  replicaMax: {size.replica_max}
+  replicaMin: {rmin}
+  replicaMax: {rmax}
   cacheSizeMB: {initial.cache_mb}
-  modelTier: {initial.tier}""")
+  cacheSizeMBMin: {cmin}
+  cacheSizeMBMax: {cmax}
+  modelTier: {initial.tier}
+  modelTierMin: {tmin}
+  modelTierMax: {tmax}""")
         docs.append(f"""apiVersion: polyforge.io/v1alpha1
 kind: Budget
 metadata:

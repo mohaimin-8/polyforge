@@ -1,10 +1,18 @@
 # Q1 execution map — terse runbook
 
+> **Read `docs/MAIN_WORKING_PATH.md` first** — it is the top-level ordered
+> route (milestones M1–M6) that this runbook's tasks slot into. When the two
+> disagree on **order**, the main path wins; this file remains authoritative on
+> each task's **steps**. Session 2026-08-05 decisions folded in below: goal
+> raised to **Transactions-level**; **T17 formal SLO guarantee** added (TPDS
+> strengthener); **T18 energy/admission** added (optional); the **leakage-budget
+> controller is spun off to a separate project** (TDSC) and is NOT a task here.
+
 Purpose: every remaining weakness, as executable steps. Written so any agent
 can follow it without re-deriving context. Rationale lives in
 `docs/Q1_ROADMAP.md` (v2); this file is the *what to do*. No submission is
 guaranteed acceptance; completing ALL tasks (incl. Phase 4) before
-submitting to FGCS/TCC/TSC (formal Q1) maximizes the probability.
+submitting to FGCS/TCC/TSC (formal Q1 / Transactions) maximizes the probability.
 
 Execute tasks in ID order. `[GATE:user]` tasks wait for the user; skip and
 continue. Each task: DO → VERIFY → DONE-WHEN. **If VERIFY fails: stop that
@@ -135,6 +143,19 @@ integration non-scored. Only then spend the single scored shot. Do NOT
 improvise substitute arms — arms are frozen by the prereg push and "may not
 change after it".
 
+**RESOLVED at the desk, session 34 (2026-08-06)** — every bullet above is
+closed: `OPERATOR_SYSTEMS = {"jcac", "cache-only", "tier-only"}` (replica-only
+is reactive HPA with cache/tier held by `push_default_knobs`); the Policy CRD
+carries `cacheSizeMBMin/Max` + `modelTierMin/Max`, min==max pinning a knob,
+clamped at the actuation point and forwarded to the planner; the sim mirrors
+the same freeze via `SystemSpec.knob_freeze`; and
+`eval/experiments/wave4_live_plane.yaml` holds the frozen 4 arms × 4 cells.
+Arms were implemented to the prereg's §Arms text, not substituted. R4 holds
+(`reproduce.py` 16/16 byte-identical), so the open-bounds default is a no-op.
+**One piece of this task is still owed:** the *live* non-scored dry-run — this
+machine has no Docker, so it moves to the front of T4's own sitting, before
+the WL-H2 gate and before the scored matrix.
+
 ### T4 — execute B1 (after the prerequisite above)
 DO: follow `research/analysis/PREREG_WAVE4_LIVE_PLANE.md` §Substrate +
 §Status update exactly; apply R5 + R6 (on the free route, `docs/
@@ -200,6 +221,40 @@ DO: one paragraph each in `values.yaml` comment + `ARCHITECTURE.md`:
 fairness under cells is **per-cell, not global** (measured cost ΔJain
 −0.0053, `PLANNER_CELLS_DEALIAS.md`). Flag for the user's manuscript text.
 
+## Phase 3.5 — Transactions strengtheners (desk, parallel; added 2026-08-05)
+
+Desk-doable, no gate. Touch a disjoint part of the tree from B1's live path, so
+they run in parallel with Phase 2. Detail + rationale in
+`docs/MAIN_WORKING_PATH.md` §3.
+
+### T17 — formal SLO guarantee (the TPDS strengthener) — main path M3
+DO: over the MPC (`research/jcac_sim/controller.py`, actuation clamps already
+pinned by `test_invariants.py`): (1) formalize the bounded per-interval demand
+disturbance from the workload model; (2) construct a terminal invariant set as
+an executable predicate; (3) prove recursive feasibility as a checkable
+condition and derive the SLO-violation bound; (4) ship an invariant/feasibility
+checker + a validation script that replays every closed campaign and asserts
+measured violation ≤ the derived bound.
+VERIFY: checker + validation green on all campaigns; **mutation-test the
+checker** (widen the disturbance bound ⇒ recursive-feasibility must fail, per
+the T3 lesson); R3/R4 green; default OFF/no-op (bit-identical).
+DONE-WHEN: bound derived, checker committed, validation green, `DEFENSE_QA`
+entry recorded. Theorem/proof PROSE is user-owned (R8).
+RISK: must be a real proof, not a heuristic — the accept-vs-major-revision
+line. If the terminal set can't be built cleanly over the actual lattice,
+report the obstruction; do not paper over it.
+
+### T18 — energy/carbon + admission control (optional strengthener) — main path M4
+DO: add a carbon/energy term and/or a bursty-load admission-control arm as an
+additional constraint/dimension, **off by default** (R4). Citable against the
+IEEE survey's stated open list. Needs its own prereg only if scored (R2).
+VERIFY: R3/R4 green, bit-identical with the feature off.
+DONE-WHEN: feature committed off-by-default with tests. Low priority.
+
+> **Out of scope here:** the leakage-budget controller (TDSC) is spun off to a
+> separate project by author decision — see `docs/MAIN_WORKING_PATH.md` §SIDE
+> TRACK and `PolyForge_Research_Gap_Analysis.docx`.
+
 ## Phase 4 — multi-node live `[GATE:user, ~€50–150]` (max-probability tier; skippable only if accepting lower odds)
 
 ### T8 — cluster up: `terraform apply` in `eval/infra/terraform` (Hetzner).
@@ -236,4 +291,8 @@ then re-run the WL-H2 preflight before T4.
 
 Then T8–T10 if maximum acceptance probability is wanted (Track B).
 T11–T16 run on the user's clock in parallel and none of them block T4–T10.
-Submission-ready = T0–T7 + T11–T16; maximum-probability = add T8–T10.
+**T17 (formal guarantee) runs in parallel with everything** — it is the primary
+Transactions/TPDS strengthener and touches only `research/jcac_sim/`. T18
+optional.
+Submission-ready = T0–T7 + T11–T16; **Transactions-strength = add T17**;
+maximum-probability = add T8–T10.

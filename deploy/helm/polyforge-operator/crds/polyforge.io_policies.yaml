@@ -66,8 +66,30 @@ spec:
               cacheSizeMB:
                 default: 128
                 description: |-
-                  CacheSizeMB is the semantic-cache budget for this tenant (ADR 0013 in
-                  W28 bounds eviction per tenant; this is the knob JCAC turns).
+                  CacheSizeMB is the semantic-cache budget for this tenant (W28
+                  bounds eviction per tenant; this is the knob JCAC turns).
+                format: int32
+                maximum: 16384
+                minimum: 0
+                type: integer
+              cacheSizeMBMax:
+                default: 0
+                description: |-
+                  CacheSizeMBMax is the ceiling the planner may never cross for the cache
+                  knob. A value of 0 (the default) means "no ceiling" so the pre-bounds
+                  behavior is unchanged; any positive value caps the cache, and min==max
+                  pins it.
+                format: int32
+                maximum: 16384
+                minimum: 0
+                type: integer
+              cacheSizeMBMin:
+                default: 0
+                description: |-
+                  CacheSizeMBMin is the floor the planner may never cross for the cache
+                  knob. Setting min==max pins the cache knob (the cache-frozen posture of
+                  the replica-only / tier-only ablations, PREREG_WAVE4_LIVE_PLANE.md
+                  §Arms). Default 0 = no floor, preserving the pre-bounds behavior.
                 format: int32
                 maximum: 16384
                 minimum: 0
@@ -76,6 +98,30 @@ spec:
                 default: small
                 description: ModelTier is the LLM class the gateway routes this tenant
                   to.
+                enum:
+                - none
+                - small
+                - mid
+                - large
+                type: string
+              modelTierMax:
+                description: |-
+                  ModelTierMax is the highest tier the planner may route this tenant to.
+                  Empty (the default) = no ceiling. Setting min==max pins the tier knob.
+                enum:
+                - none
+                - small
+                - mid
+                - large
+                type: string
+              modelTierMin:
+                description: |-
+                  ModelTierMin is the lowest tier the planner may route this tenant to
+                  (ordinal none<small<mid<large). Empty (the default) = no floor, so the
+                  pre-bounds behavior is unchanged. Setting min==max pins the tier knob
+                  (the tier-frozen posture of the replica-only / cache-only ablations).
+                  The enum comes from the ModelTier type marker; repeating it here would
+                  emit a duplicated allOf in the CRD.
                 enum:
                 - none
                 - small

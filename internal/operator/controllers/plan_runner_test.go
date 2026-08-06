@@ -144,6 +144,59 @@ func TestPlanRunnerClampsPlanToPolicyBounds(t *testing.T) {
 	}
 }
 
+// A cache-only/tier-only ablation Policy pins two knobs (min==max). The
+// runner must (a) forward those bounds to the planner so it re-optimizes the
+// free knob alone, and (b) clamp any out-of-bounds plan value at apply — the
+// belt-and-braces freeze of PREREG_WAVE4_LIVE_PLANE.md §Arms.
+func TestPlanRunnerForwardsAndClampsKnobBounds(t *testing.T) {
+	tenant := &pfv1alpha1.Tenant{
+		ObjectMeta: metav1.ObjectMeta{Name: "acme", UID: "uid-acme"},
+		Spec:       pfv1alpha1.TenantSpec{IsolationMode: pfv1alpha1.IsolationPool, SLOClass: pfv1alpha1.SLOPremium},
+	}
+	policy := &pfv1alpha1.Policy{
+		ObjectMeta: metav1.ObjectMeta{Name: "acme"},
+		Spec: pfv1alpha1.PolicySpec{
+			TenantRef:      "acme",
+			Replicas:       2,
+			ReplicaMin:     1,
+			ReplicaMax:     5,
+			CacheSizeMB:    128,
+			CacheSizeMBMin: 128, // cache pinned at 128
+			CacheSizeMBMax: 128,
+			ModelTier:      pfv1alpha1.ModelTierSmall,
+			ModelTierMin:   pfv1alpha1.ModelTierSmall, // tier pinned at small
+			ModelTierMax:   pfv1alpha1.ModelTierSmall,
+		},
+	}
+	c := newTenantClient(t, tenant, policy)
+	// The planner (or any plan source) returns values outside the pins.
+	stub := &stubPlanner{response: planner.Response{
+		Plans: map[string]planner.Plan{"acme": {Replicas: 3, CacheMB: 1024, Tier: "large"}},
+	}}
+	runner := &PlanRunner{Client: c, Planner: stub, Demands: demandFor("acme")}
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	// (a) bounds reached the planner request.
+	req := stub.requests[0].Tenants[0]
+	if req.CacheMin != 128 || req.CacheMax == nil || *req.CacheMax != 128 {
+		t.Errorf("cache bounds not forwarded: min=%d max=%v", req.CacheMin, req.CacheMax)
+	}
+	if req.TierMin != "small" || req.TierMax != "small" {
+		t.Errorf("tier bounds not forwarded: min=%q max=%q", req.TierMin, req.TierMax)
+	}
+
+	// (b) the out-of-bounds plan was clamped back to the pins at apply.
+	var got pfv1alpha1.Policy
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "acme"}, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Spec.CacheSizeMB != 128 || got.Spec.ModelTier != pfv1alpha1.ModelTierSmall {
+		t.Errorf("pinned knobs not clamped at apply: cache=%d tier=%s", got.Spec.CacheSizeMB, got.Spec.ModelTier)
+	}
+}
+
 func TestPlanRunnerFallsBackOnPlannerFailure(t *testing.T) {
 	c, _ := plannerFixtures(t)
 	stub := &stubPlanner{err: errors.New("solver exploded")}

@@ -62,6 +62,35 @@ class PlannerCoreTests(unittest.TestCase):
             noisy["plans"]["a"]["cache_mb"], clean["plans"]["a"]["cache_mb"]
         )
 
+    def test_pinned_cache_bound_holds_the_knob(self):
+        # cache_min==cache_max pins the cache knob: a cacheable surge that
+        # would otherwise raise the cache leaves it at the pin
+        # (PREREG_WAVE4_LIVE_PLANE.md cache-frozen ablation posture).
+        surge = tenant("a", cache_min=128, cache_max=128,
+                       demand={"rps": {"chat": 30.0}, "crud_base_ms": 50.0},
+                       hourly_budget_usd=100.0)
+        core = PlannerCore()
+        for _ in range(4):
+            out = core.plan({"tenants": [surge]})
+            surge["state"] = {"replicas": out["plans"]["a"]["replicas"],
+                              "cache_mb": out["plans"]["a"]["cache_mb"],
+                              "tier": out["plans"]["a"]["tier"]}
+        self.assertEqual(out["plans"]["a"]["cache_mb"], 128)
+
+    def test_pinned_tier_bound_holds_the_knob(self):
+        # tier_min==tier_max pins the tier: agent traffic that would otherwise
+        # upgrade the tier stays on the pinned tier.
+        heavy = tenant("a", tier_min="small", tier_max="small",
+                       demand={"rps": {"agent": 10.0}, "crud_base_ms": 50.0},
+                       hourly_budget_usd=100.0)
+        core = PlannerCore()
+        for _ in range(4):
+            out = core.plan({"tenants": [heavy]})
+            heavy["state"] = {"replicas": out["plans"]["a"]["replicas"],
+                              "cache_mb": out["plans"]["a"]["cache_mb"],
+                              "tier": out["plans"]["a"]["tier"]}
+        self.assertEqual(out["plans"]["a"]["tier"], "small")
+
     def test_rejects_garbage(self):
         core = PlannerCore()
         with self.assertRaises(ValueError):

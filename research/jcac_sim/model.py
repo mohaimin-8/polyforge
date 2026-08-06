@@ -191,7 +191,20 @@ SATURATION_RHO = 0.95
 
 @dataclass(frozen=True)
 class TenantConfig:
-    """Static per-tenant facts the controller may not change."""
+    """Static per-tenant facts the controller may not change.
+
+    The knob bounds mirror the operator's Policy CRD guardrails so the online
+    planner and the offline sim enforce the identical envelope. `replica_min`/
+    `replica_max` bound the replica knob (already load-bearing since W30);
+    `cache_min`/`cache_max` and `tier_min`/`tier_max` bound the cache and tier
+    knobs. Setting a knob's min==max *pins* it — the mechanism the live
+    cache-only / tier-only ablations use to freeze two of the three knobs while
+    the joint controller still optimizes the third (PREREG_WAVE4_LIVE_PLANE.md
+    §Arms). The defaults are the full envelope (cache unbounded above, every
+    tier admissible), so a config that sets no bound plans over exactly the
+    lattice it did before these fields existed — the committed campaigns replay
+    bit-for-bit (R4).
+    """
 
     tenant_id: str
     slo_class: str = "standard"
@@ -199,6 +212,26 @@ class TenantConfig:
     replica_min: int = 1
     replica_max: int = 10
     fairness_weight: float = 0.5
+    cache_min: int = 0
+    cache_max: int | None = None  # None = no ceiling (the published default)
+    tier_min: str = "none"
+    tier_max: str = "large"
+
+    def knob_admits(self, cache_mb: int, tier: str) -> bool:
+        """Whether a candidate's cache/tier fall inside this tenant's bounds.
+
+        The replica knob is bounded separately in apply_action (its clamp
+        predates these fields); this covers the two knobs the candidate loop
+        enumerates freely. With the default full-envelope bounds every
+        candidate is admitted, so the planner's search set is unchanged."""
+        if cache_mb < self.cache_min:
+            return False
+        if self.cache_max is not None and cache_mb > self.cache_max:
+            return False
+        rank = TIERS.index(tier) if tier in TIERS else -1
+        lo = TIERS.index(self.tier_min) if self.tier_min in TIERS else 0
+        hi = TIERS.index(self.tier_max) if self.tier_max in TIERS else len(TIERS) - 1
+        return lo <= rank <= hi
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,230 @@
+# Main working path — the single ordered route to a Transactions-level submission
+
+Last updated 2026-08-05. **Start here.** This is the top-level route that
+reconciles every open work item into one dependency-ordered path. It sits
+*above* two existing files and does not replace them:
+
+- `docs/Q1_EXECUTION_MAP.md` — the terse per-task runbook (T0–T18, DO / VERIFY
+  / DONE-WHEN). When this file and the map disagree on **order**, this file
+  wins; when they disagree on a task's **steps**, the map wins.
+- `docs/REMAINING_WORK.md` — the owner-split ledger (buckets A/B/C).
+- `research/analysis/PREREG_*` and `RESULTS_*` — win on any **scored
+  definition** (rules R1/R2 below). Never edited to fit a plan.
+
+## 0. What changed this session (decision log)
+
+1. **Goal raised: "formal Q1" → "Transactions-level."** Primary venues are
+   unchanged (FGCS / IEEE TCC / IEEE TSC). Two stretch venues are now in view
+   and each has a dedicated strengthener:
+   - **IEEE TPDS** ← a **formal SLO guarantee** for the controller (new work,
+     milestone **M3** below). This is the single biggest in-repo addition.
+   - **IEEE TDSC** ← the cache side-channel + a **leakage-budget controller**.
+     **Decision: this is spun off to a SEPARATE project** (author's call). It
+     is documented as a side track, **not** on PolyForge's critical path.
+2. **The journal-gap sweep confirmed the joint predictive controller lands in
+   open journal water** — the multi-knob/predictive frontier is almost entirely
+   conference/pre-print; Transactions journals hold only narrow slices
+   (`PolyForge_Research_Gap_Analysis.docx` in Downloads has the full audit +
+   competitor delta table). So the path is *finish + harden what exists*, not
+   *add a new problem*.
+3. **Survey-blessed optional strengtheners identified** (energy/carbon,
+   admission control) — milestone **M4**, low priority.
+
+## 1. Where we stand (reconciled, one paragraph)
+
+Desk research is complete and honestly reported: all six contested segments
+resolved, Waves 1–5 closed, artifact reproduction byte-identical under CI,
+26 preregs frozen. Done and pushed: **T0–T3** (security + artifact integrity)
+and **Phase 3 / T5–T7** (planner cells; monolithic wall reproduced, per-cell
+p95 flat). The B1 GPU half is solved and free — **T4a passes on a real Kaggle
+P100** (`docs/WAVE4_FREE_ROUTE.md`). **The one live-evidence gap is B1**, and
+as of 2026-08-06 it is **no longer blocked at the desk**: M1 shipped the two
+missing pieces — live `cache-only`/`tier-only` ablation arms and Policy-CRD
+`cacheSizeMB`/`modelTier` bounds that pin a knob at min==max — so the four
+frozen arms now render, validate, and clamp as the prereg defines. What M1
+could **not** do at the desk is the live actuation dry-run (no Docker on this
+machine); that check rides with M2's sitting.
+
+## 2. The main path — six milestones in dependency order
+
+```
+        DESK (agent)                         GATED / USER
+  M1 ── B1 ablation arms ───► M2 ── B1 live run ──┐
+  (unblocks live evidence)     (1 GPU sitting)     │
+                                                   ├──► M6 ── manuscript + submit
+  M3 ── formal SLO guarantee ──────────────────────┤        (user writes; long pole)
+  (TPDS strengthener; parallel to M1/M2)           │
+                                                   │
+  M4 ── energy/admission (optional) ───────────────┤
+                                                   │
+  M5 ── OSF / Zenodo / images (user, any time) ────┘
+
+  SIDE TRACK (off this path): leakage-budget controller ──► separate project ──► TDSC
+```
+
+| # | Milestone | Owner | Gate | Maps to | Exit criterion |
+|---|---|---|---|---|---|
+| **M1** | B1 live ablation arms + CRD knob bounds | agent (desk) | none | T4-prerequisite | **DESK-COMPLETE 2026-08-06** — arms wired + CRD bounds + tests green; live actuation dry-run deferred into M2 (needs a cluster) |
+| **M2** | Execute B1 three-knob live plane | user opens gate | free Kaggle+Codespace | T4a, T4 | RESULTS committed PASS/FAIL; ledgers reconciled |
+| **M3** | Formal SLO guarantee (bounded-violation proof + checker) | agent (desk) | none | **T17 (new)** | invariant checker + validation show measured violation ≤ bound on all campaigns |
+| **M4** | Energy/carbon + admission-control knobs *(optional)* | agent (desk) | none | **T18 (new)** | new constraint added off-by-default; R3/R4 bit-identical |
+| **M5** | Submission mechanics | user | accounts | T11–T14 | OSF DOIs, Zenodo DOI, GHCR images, tokens rotated |
+| **M6** | Manuscript carve + submit | **user** | M1–M5 done | T15, T16 | arXiv + venue submission with artifact/prereg DOIs |
+
+**Critical path = M1 → M2.** M1 is the only desk item that unblocks the sole
+live-evidence gap, and B1's frozen WL-H2 preflight was verified against the
+operator→planner path, so M1 must land before any later change reopens it.
+M3 runs fully in parallel (touches only `research/jcac_sim/`, not the live
+path). M6 (manuscript) is the calendar long pole and is user-owned (R8).
+
+## 3. Detailed specs for the NEW work
+
+### M1 / T4-prerequisite — B1 live ablation arms + CRD bounds (critical path)
+
+**Why:** `eval/harness/cluster_backend.py:56` has `OPERATOR_SYSTEMS = {"jcac"}`
+— only the full joint arm is wired live. `PREREG_WAVE4_LIVE_PLANE.md` scores
+WL-H1 against **four** arms (jcac, replica-only, cache-only, tier-only), so
+WL-H1 is not evaluable until the three ablations exist live. Freezing a knob
+is not configuration: the Policy CRD (`internal/operator/api/v1alpha1/
+policy_types.go`, `deploy/**/crds/polyforge.io_policies.yaml`) has
+`replicaMin/Max` but **no bounds for `cacheSizeMB` or `modelTier`**.
+
+- **DO:**
+  1. Add live wiring for `replica-only`, `cache-only`, `tier-only` in
+     `cluster_backend.py`, faithful to the prereg's arm definitions (a
+     frozen knob is pinned to its published constant, the others actuate).
+  2. Add CRD bounds `cacheSizeMB{Min,Max}` and `modelTier{Min,Max}` (or a
+     pinned-value field) to `policy_types.go` + the two CRD YAMLs; regenerate.
+     Planner/operator honor the pin (`internal/operator/controllers/
+     policy_controller.go`, `gateway_knobs.go`).
+  3. Add the wave4 experiment spec under `eval/experiments/` mirroring the
+     four frozen arms × frozen cell classes (already in `workloads.py`).
+  4. Non-scored dry-run of the whole integration (no GPU) end-to-end.
+- **VERIFY:** R3 green (`gofmt -l .` empty, `go test ./...`, `pytest`,
+  `reproduce.py` all MATCH); new Go tests for the pinned-knob CRD path green;
+  dry-run shows all four arms actuate/pin as defined. **Arms are frozen by the
+  prereg push (R1) — do NOT invent substitutes; if an arm can't be expressed
+  faithfully, STOP and report.**
+- **DONE-WHEN:** four arms run live in a non-scored dry-run; committed.
+
+**Status 2026-08-06 — DESK-COMPLETE, one check deferred (honest split).**
+Shipped: `replica-only` (reactive HPA, cache/tier held by `push_default_knobs`)
+plus `cache-only` / `tier-only` as operator arms whose Policy CRs pin two knobs
+at min==max; `cacheSizeMBMin/Max` + `modelTierMin/Max` on the CRD with the
+clamp enforced at the single actuation point (`clampCache`/`clampTier`), the
+bounds forwarded to the planner, and the same freeze mirrored in the sim
+(`SystemSpec.knob_freeze`); `eval/experiments/wave4_live_plane.yaml` holds the
+frozen 4×4 matrix. Verified at the desk: 220 pytest + full `go test ./...` +
+`gofmt`/`go vet` green; **R4 holds — `reproduce.py` re-derives 16/16 records
+byte-identical and 19/19 figures**, so the bounds are a true no-op when open;
+the spec expands to 16 runs and every rendered CR validates against the real
+committed CRDs, guarded by a mutation-tested test
+(`test_wave4_crs_are_admissible_against_the_real_crds` — unknown CR fields are
+*pruned*, not rejected, so a mistyped bound would silently unfreeze an arm).
+**Deferred, not done:** the live actuation dry-run (four arms against a real
+cluster) — this machine has no Docker, so it is folded into M2's sitting as
+its first step, *before* the scored matrix. Nothing here is scored, so R1/R2
+are untouched.
+
+### M2 / T4a + T4 — execute B1 (gated, ~1 sitting)
+
+Unchanged from `Q1_EXECUTION_MAP.md`. Order: T4a free-route preflight (protect
+GPU quota) → `knob_preflight.py` WL-H2 liveness gate (inert knob VOIDS WL-H1 —
+report, don't fake) → run the frozen matrix once → publish as measured →
+reconcile `RESULTS_MASTER.md`, `DEFENSE_QA.md`, `REMAINING_WORK.md`. Apply
+R5 (`POLYFORGE_EVAL_SHARED_PG=1`) + R6 (planner auth). Carry
+`WAVE4_FREE_ROUTE.md` §4 verbatim (tunnel round-trip → live absolutes are not
+quotable tier latencies).
+
+### M3 / T17 — formal SLO guarantee  *(NEW — the TPDS strengthener)*
+
+**Why:** the LLM-serving field is empirical; no controller in print carries a
+bounded-violation proof. PolyForge already has an MPC (`research/jcac_sim/
+controller.py`) with **per-interval actuation clamps already pinned** by
+`test_invariants.py` (`MAX_REPLICA_STEP = 2`, cache/tier lattices). That is the
+foundation a recursive-feasibility argument stands on.
+
+**Engineering deliverable (R8-clean — code, not prose):** the *theorem
+statement* is user-written; the agent delivers the verified model and the
+numbers.
+- **DO:**
+  1. Formalize the disturbance bound: the max per-interval demand change the
+     workload model admits (read it off `model.py` / the workload generator).
+  2. Construct a **terminal invariant set** — the state region where the SLO
+     constraint holds and the clamped actuation can keep the state inside it
+     under the bounded disturbance. Encode it as an executable predicate.
+  3. Prove **recursive feasibility** as a checkable condition (feasible now ⇒
+     feasible next step under any admitted disturbance), and derive the
+     **violation bound** it implies.
+  4. Ship an **invariant/feasibility checker** in `research/jcac_sim/` that
+     evaluates the terminal-set predicate and the recursive-feasibility
+     condition, plus a **validation script** that replays every closed campaign
+     and asserts measured SLO violation ≤ the derived bound.
+- **VERIFY:** checker + validation green on all campaigns; mutation-test the
+  checker (widen the disturbance bound → recursive-feasibility condition must
+  fail), per the T3 lesson. R3/R4 green; default OFF/no-op so run identities
+  stay bit-identical.
+- **DONE-WHEN:** bound derived, checker committed, validation shows
+  violation ≤ bound everywhere; a `DEFENSE_QA` entry records it. *(User then
+  writes the theorem/proof prose for the manuscript.)*
+- **RISK:** must be a real proof, not a heuristic — this is the
+  Transactions-accept vs major-revision line. If the terminal set can't be
+  constructed cleanly over the actual lattice, report the obstruction; do not
+  paper over it.
+
+### M4 / T18 — energy/carbon + admission control  *(NEW — optional, survey-blessed)*
+
+Add a carbon-intensity or energy term (and/or an admission-control arm for
+bursty load) as an **additional constraint/dimension**, off by default (R4).
+Directly citable against the IEEE survey's stated open list. Low priority —
+strengthening material, not a headline. Needs its own prereg only if scored
+(R2).
+
+### SIDE TRACK (off this path) — leakage-budget controller → TDSC
+
+Author's decision: implemented in a **separate project**, not PolyForge.
+Recorded here only so the path is complete. Shape: leakage-rate as a fourth
+hard MPC constraint + an online channel-capacity estimator + a bounded-exposure
+proof. Reuses PolyForge's wire-confirmed side channel as the attack model.
+Full detail in `PolyForge_Research_Gap_Analysis.docx` (Downloads).
+
+## 4. Timeline — the 6–8 week map
+
+| Week | Milestone(s) active | Owner | Blocks |
+|---|---|---|---|
+| 1–2 | **M1** B1 ablation arms + CRD bounds | agent (desk) | unblocks M2 |
+| 2–4 | **M3** formal guarantee (parallel to M1) | agent (desk) | feeds M6 |
+| 3 | **M2** B1 live run (1 sitting) | user gate + desk | feeds M6 |
+| 3–4 | **M5** OSF / Zenodo / images / token rotation | user | feeds M6 |
+| 4–8 | **M6** manuscript carve (~25–30 pp) + submit | **user** | terminal |
+| any | **M4** energy/admission (optional) | agent (desk) | none |
+
+**~6 weeks** if the manuscript is written in parallel with the last
+engineering weeks; **~8 weeks** sequential. The engineering critical path
+(M1→M2 + M3) is ~4 weeks of desk work; the manuscript is the long pole and is
+yours. Two hard conditions gate the verdict: **B1 must actually run** (M2 — the
+sim-only weakness is attacked independently of any new contribution) and **M3
+must be a real proof**.
+
+> Free-plan cadence: the ~4 weeks of desk engineering is several bounded
+> sessions, not one push (`[[session-scoping-preference]]`). "6–8 weeks" holds
+> only if sessions run steadily.
+
+## 5. Rules (unchanged — from `Q1_EXECUTION_MAP.md`)
+
+R1 preregs/RESULTS immutable once closed · R2 new scored measurement needs a
+pushed prereg first · R3 universal regression gate before commit · R4 sim/
+harness changes default OFF, bit-identical · R5 live runs export
+`POLYFORGE_EVAL_SHARED_PG=1` · R6 planner auth posture · R7 cite numbers per
+`RESULTS_MASTER.md` · **R8 manuscript prose is user-owned; agents do
+engineering only.**
+
+## 6. Next action
+
+~~Start M1~~ — **done at the desk 2026-08-06** (see the M1 status block in §3).
+The critical path is now **M2**, which is user-gated: B1 needs a GPU host, and
+its first step is the live actuation dry-run M1 could not run here.
+
+**Next desk action: M3** (formal SLO guarantee, the TPDS strengthener). It is
+the only remaining agent-doable item on the main path, it touches a disjoint
+part of the tree (`research/jcac_sim/`), and it does not wait on M2.

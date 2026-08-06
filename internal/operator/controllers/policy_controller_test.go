@@ -131,6 +131,96 @@ func TestPolicyClampsReplicasToBounds(t *testing.T) {
 	}
 }
 
+// The cache and tier knobs clamp to their bounds at the single actuation
+// point, exactly like replicas — so a pinned (min==max) knob is physically
+// frozen at the data plane. This is the mechanism the cache-only / tier-only
+// live ablations (PREREG_WAVE4_LIVE_PLANE.md §Arms) rely on to freeze two of
+// the three knobs while the operator arm still runs.
+func TestPolicyClampsCacheToBounds(t *testing.T) {
+	cases := []struct {
+		name            string
+		cache, min, max int32
+		want            int32
+	}{
+		{"below floor", 64, 256, 1024, 256},
+		{"above ceiling", 4096, 0, 512, 512},
+		{"pinned min==max freezes", 4096, 128, 128, 128},
+		{"zero max means no ceiling", 900, 0, 0, 900},
+		{"within bounds untouched", 512, 128, 1024, 512},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := &pfv1alpha1.PolicySpec{
+				CacheSizeMB:    tc.cache,
+				CacheSizeMBMin: tc.min,
+				CacheSizeMBMax: tc.max,
+			}
+			if got := clampCache(spec); got != tc.want {
+				t.Errorf("clampCache = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPolicyClampsTierToBounds(t *testing.T) {
+	cases := []struct {
+		name                 string
+		tier, min, max, want pfv1alpha1.ModelTier
+	}{
+		{"below floor", pfv1alpha1.ModelTierNone, pfv1alpha1.ModelTierMid, pfv1alpha1.ModelTierLarge, pfv1alpha1.ModelTierMid},
+		{"above ceiling", pfv1alpha1.ModelTierLarge, pfv1alpha1.ModelTierNone, pfv1alpha1.ModelTierSmall, pfv1alpha1.ModelTierSmall},
+		{"pinned min==max freezes", pfv1alpha1.ModelTierLarge, pfv1alpha1.ModelTierSmall, pfv1alpha1.ModelTierSmall, pfv1alpha1.ModelTierSmall},
+		{"empty bounds mean no bound", pfv1alpha1.ModelTierMid, "", "", pfv1alpha1.ModelTierMid},
+		{"within bounds untouched", pfv1alpha1.ModelTierMid, pfv1alpha1.ModelTierSmall, pfv1alpha1.ModelTierLarge, pfv1alpha1.ModelTierMid},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := &pfv1alpha1.PolicySpec{
+				ModelTier:    tc.tier,
+				ModelTierMin: tc.min,
+				ModelTierMax: tc.max,
+			}
+			if got := clampTier(spec); got != tc.want {
+				t.Errorf("clampTier = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// A pinned Policy: the operator writes the frozen cache/tier to the gateway
+// ConfigMap even though the spec's setpoints (as a planner would write them)
+// are outside the pins. This is the end-to-end cache-only/tier-only posture.
+func TestPolicyPinnedKnobsFreezeConfigMap(t *testing.T) {
+	policy := testPolicy(pfv1alpha1.PolicySpec{
+		Replicas:       5,
+		ReplicaMin:     1,
+		ReplicaMax:     10,
+		CacheSizeMB:    2048, // planner "wants" 2048...
+		CacheSizeMBMin: 128,  // ...but the cache knob is pinned at 128
+		CacheSizeMBMax: 128,
+		ModelTier:      pfv1alpha1.ModelTierLarge, // planner "wants" large...
+		ModelTierMin:   pfv1alpha1.ModelTierSmall, // ...but the tier is pinned small
+		ModelTierMax:   pfv1alpha1.ModelTierSmall,
+	})
+	c := newPolicyClient(t, policy, testDeployment(2))
+	reconcilePolicy(t, c)
+
+	var cm corev1.ConfigMap
+	if err := c.Get(context.Background(), types.NamespacedName{Namespace: SharedTenantNamespace, Name: "pf-tenant-config-acme"}, &cm); err != nil {
+		t.Fatalf("tenant configmap not created: %v", err)
+	}
+	if cm.Data["cache_size_mb"] != "128" || cm.Data["model_tier"] != "small" {
+		t.Errorf("pinned knobs leaked: configmap = %v, want cache 128 / tier small", cm.Data)
+	}
+	var got pfv1alpha1.Policy
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "acme"}, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Status.AppliedCacheSizeMB != 128 || got.Status.AppliedModelTier != pfv1alpha1.ModelTierSmall {
+		t.Errorf("status applied = cache %d tier %s, want 128/small", got.Status.AppliedCacheSizeMB, got.Status.AppliedModelTier)
+	}
+}
+
 func TestPolicyMissingDeploymentRequeuesWithCondition(t *testing.T) {
 	policy := testPolicy(pfv1alpha1.PolicySpec{
 		Replicas:    2,

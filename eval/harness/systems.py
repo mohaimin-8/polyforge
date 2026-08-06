@@ -94,6 +94,7 @@ class SystemSpec:
         lru_eviction: bool = False,
         blind_classifier: bool = False,
         seeded: bool = False,
+        knob_freeze: frozenset[str] = frozenset(),
         description: str = "",
     ):
         self.controller = controller
@@ -102,6 +103,13 @@ class SystemSpec:
         self.lru_eviction = lru_eviction
         self.blind_classifier = blind_classifier
         self.seeded = seeded  # controller takes a per-run seed (FIRM)
+        # Which knobs are pinned at the initial world, from the subset
+        # {"replicas","cache","tier"}. The live-plane cache-only / tier-only
+        # ablations (PREREG_WAVE4_LIVE_PLANE.md §Arms) freeze two knobs so the
+        # joint controller re-optimizes the third alone; the sim backend
+        # applies this to each TenantConfig, the operator does it via the
+        # Policy CRD bounds. Empty = every knob free (the published default).
+        self.knob_freeze = knob_freeze
         self.description = description
 
 
@@ -166,6 +174,29 @@ SYSTEMS: dict[str, SystemSpec] = {
         "jcac", params={"anchor_moves": True, "risk_quantile": 0.95,
                         "risk_cost_at_point": True},
         description="PolyForge, budget-corrected risk MPC at q=0.95 (PREREG_RISK_BUDGET)",
+    ),
+    # --- Wave 4 live-plane arms (PREREG_WAVE4_LIVE_PLANE.md §Arms) --------
+    # The three-knob live plane's single-knob comparators. `replica-only` is
+    # the strongest reactive replica baseline (HPA) with cache/tier held at a
+    # fixed default — the prereg's named replica arm. `cache-only`/`tier-only`
+    # are ablations of the joint controller with two knobs frozen, so the live
+    # comparison isolates *jointness*. On the sim backend the freeze is applied
+    # to each TenantConfig; live it is the Policy CRD min==max pin.
+    "replica-only": SystemSpec(
+        "hpa", lru_eviction=True,
+        description="Wave 4 replica-only: reactive HPA replica control, cache "
+                    "and tier fixed at the initial default (the prereg's "
+                    "strongest single-knob reactive baseline)",
+    ),
+    "cache-only": SystemSpec(
+        "jcac", knob_freeze=frozenset({"replicas", "tier"}),
+        description="Wave 4 cache-only ablation: the joint MPC with replicas "
+                    "and tier pinned, so only the cache knob actuates",
+    ),
+    "tier-only": SystemSpec(
+        "jcac", knob_freeze=frozenset({"replicas", "cache"}),
+        description="Wave 4 tier-only ablation: the joint MPC with replicas "
+                    "and cache pinned, so only the tier knob actuates",
     ),
     # --- W34 baselines ---------------------------------------------------
     "hpa": SystemSpec(

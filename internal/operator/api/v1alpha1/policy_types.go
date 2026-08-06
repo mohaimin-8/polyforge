@@ -16,6 +16,38 @@ const (
 	ModelTierLarge ModelTier = "large"
 )
 
+// TierRank is the ordinal position of a tier (none < small < mid < large),
+// used to clamp modelTier to [modelTierMin, modelTierMax]. An unset/unknown
+// tier ranks -1 so an empty bound reads as "no bound" (see clampTier).
+func TierRank(t ModelTier) int {
+	switch t {
+	case ModelTierNone:
+		return 0
+	case ModelTierSmall:
+		return 1
+	case ModelTierMid:
+		return 2
+	case ModelTierLarge:
+		return 3
+	default:
+		return -1
+	}
+}
+
+// TierByRank inverts TierRank for ranks 0..3.
+func TierByRank(r int) ModelTier {
+	switch r {
+	case 0:
+		return ModelTierNone
+	case 1:
+		return ModelTierSmall
+	case 2:
+		return ModelTierMid
+	default:
+		return ModelTierLarge
+	}
+}
+
 // PlanSource records who authored the currently applied plan.
 type PlanSource string
 
@@ -59,9 +91,43 @@ type PolicySpec struct {
 	// +kubebuilder:validation:Maximum=16384
 	CacheSizeMB int32 `json:"cacheSizeMB"`
 
+	// CacheSizeMBMin is the floor the planner may never cross for the cache
+	// knob. Setting min==max pins the cache knob (the cache-frozen posture of
+	// the replica-only / tier-only ablations, PREREG_WAVE4_LIVE_PLANE.md
+	// §Arms). Default 0 = no floor, preserving the pre-bounds behavior.
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=16384
+	// +optional
+	CacheSizeMBMin int32 `json:"cacheSizeMBMin,omitempty"`
+
+	// CacheSizeMBMax is the ceiling the planner may never cross for the cache
+	// knob. A value of 0 (the default) means "no ceiling" so the pre-bounds
+	// behavior is unchanged; any positive value caps the cache, and min==max
+	// pins it.
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=16384
+	// +optional
+	CacheSizeMBMax int32 `json:"cacheSizeMBMax,omitempty"`
+
 	// ModelTier is the LLM class the gateway routes this tenant to.
 	// +kubebuilder:default=small
 	ModelTier ModelTier `json:"modelTier"`
+
+	// ModelTierMin is the lowest tier the planner may route this tenant to
+	// (ordinal none<small<mid<large). Empty (the default) = no floor, so the
+	// pre-bounds behavior is unchanged. Setting min==max pins the tier knob
+	// (the tier-frozen posture of the replica-only / cache-only ablations).
+	// The enum comes from the ModelTier type marker; repeating it here would
+	// emit a duplicated allOf in the CRD.
+	// +optional
+	ModelTierMin ModelTier `json:"modelTierMin,omitempty"`
+
+	// ModelTierMax is the highest tier the planner may route this tenant to.
+	// Empty (the default) = no ceiling. Setting min==max pins the tier knob.
+	// +optional
+	ModelTierMax ModelTier `json:"modelTierMax,omitempty"`
 }
 
 // PolicyStatus is the observed state of a Policy.
