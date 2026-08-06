@@ -225,10 +225,37 @@ PREREG_V3's specificity check analytically (`ramp_gentle` shares `flash_crud`'s
 remove the observational aliasing and the separation inverts, so the gap is
 caused by the information asymmetry the theorem names.
 
-- **STILL OWED:** the campaign-replay validation (assert the separation holds
-  against every closed campaign's measured cost split) and the `DEFENSE_QA`
-  entry. Theorem/proof prose stays user-owned (R8) — the numbers and the
-  verified model are the agent's deliverable.
+**Campaign replay attempted 2026-08-06 (2bc3bf5) — DOES NOT LAND YET; open.**
+Two things block it, both now encoded in the tool rather than argued around:
+
+1. **Regime mismatch.** The separation bounds violation at *every step*; the
+   campaigns report the *mean*. An arm at mean 0.13 may be missing the SLO
+   completely through a burst and clearing it elsewhere. Addressed by tracing
+   each class as a cost/violation frontier (price violation at λ) and reading
+   both at equal mean violation — the campaigns' own comparison.
+2. **The reactive frontier is sparse, and a λ sweep only recovers its convex
+   hull.** A reactive policy chooses once per *observation class*, and `spike`
+   has two, so its frontier has no point near the measured 0.224 — the nearest
+   is 0.083. A naive read returns "+74.4%" by comparing reactive at 0.083
+   against predictive at 0.222, which is not parity.
+   `cost_at_violation_parity` now demands a stated target and returns
+   `reactive_offset`/`predictive_offset`; a large offset means *no comparison
+   available*, not *no gap*.
+
+**What the measured data actually supports.** Of the four v3 classes only
+`spike_agentic` is at genuine violation parity (jcac 0.2239 vs hpa 0.2236).
+`flash_crud` (0.1118 vs 0.1324), `flash_ai` (0.2716 vs 0.1719) and
+`ramp_gentle` (0.1776 vs 0.0275) differ enough that their cost deltas are
+confounded — including `flash_crud`, where jcac is measurably *more* expensive.
+So the derived 49% and the measured −44…−50% are **consistent in sign and
+magnitude but not yet a validated correspondence**, and must not be written up
+as one.
+
+- **NEXT SLICE:** enumerate the non-convex interior of the reactive frontier
+  (the λ sweep cannot reach it), then redo the parity read on `spike_agentic`.
+- **STILL OWED:** the `DEFENSE_QA` entry, after the replay resolves. Theorem
+  prose stays user-owned (R8) — the numbers and the verified model are the
+  agent's deliverable.
 
 ### M4 / T18 — energy/carbon + admission control  *(NEW — optional, survey-blessed)*
 
