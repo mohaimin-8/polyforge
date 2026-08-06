@@ -172,6 +172,46 @@ numbers.
   constructed cleanly over the actual lattice, report the obstruction; do not
   paper over it.
 
+**Status 2026-08-06 — THE SPECIFIED THEOREM IS VACUOUS; DIRECTION CHANGED
+(user decision).** The RISK clause fired. `research/jcac_sim/guarantee.py`
+(committed b55f91b) builds the exact construction and shows a
+recursive-feasibility theorem here would be *true and empty*: the plant is
+memoryless, so no state is a trap; the controller may hold still, so any
+configuration clearing the SLO across the orbit is trivially control-invariant;
+and replicas are cheap enough that static over-provisioning fits inside both
+the replica ceiling and the budget (at the `flash` peak, 6 replicas clear the
+SLO and 10 cost $0.00134 against a $0.01389 allowance). "Is there a terminal
+set?" collapses to "is the peak servable at all?" — a static capacity question
+the ±2 clamp plays no part in. The clamp *is* exceeded (per-interval replica
+climb 5 flash_crud, 6 flash_ai, 7 spike_agentic, 3 agentic/joint_stress vs
+authority 2; `ramp_gentle` 1, the control cell, as designed) — it just does not
+produce infeasibility.
+
+**New M3 target: the reactive-vs-predictive cost separation.** Note the
+correction that matters — a reactive controller does *not* have to violate on
+an onset; it can over-provision permanently. So the honest theorem is a **cost**
+separation, not a violation impossibility:
+
+> A controller choosing `x_{k+1}` without observing `d_{k+1}` must, to hold
+> zero violation, be robust to every demand consistent with its information —
+> the successor set of what it observed. On an orbit where a trough can be
+> followed by either a trough or a burst, that forces peak provisioning during
+> troughs. A predictive controller provisions for `d_{k+1}` alone. The gap is
+> the **price of reaction**, exact on the finite lattice.
+
+This formalizes the measured headline (−44…−50% cost vs reactive arms at
+violation parity) instead of a claim the plant contradicts. Soundness rule for
+the next slice: prove the gap by comparing a **lower** bound on reactive cost
+(relax the reach constraint) against an **achievable** predictive trajectory
+(respecting reach) — two lower bounds would prove nothing.
+
+- **NEXT SLICE:** observation/successor-set construction, the robust
+  per-layer feasibility filter, and the two cost bounds; then the
+  campaign-replay validation. The invariant-set machinery in `guarantee.py`
+  is reused as-is.
+- Also still owed from the original spec: the validation script over every
+  closed campaign, and the `DEFENSE_QA` entry.
+
 ### M4 / T18 — energy/carbon + admission control  *(NEW — optional, survey-blessed)*
 
 Add a carbon-intensity or energy term (and/or an admission-control arm for
