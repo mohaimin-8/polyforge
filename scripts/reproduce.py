@@ -71,6 +71,7 @@ CAMPAIGN_RECORDS = [
     ("analysis_econ.py", ["lm"], "RESULTS_LM_ADOPTION.md"),
     ("analysis_econ.py", ["mixp95"], "RESULTS_MIXTURE_P95.md"),
     ("analysis_econ.py", ["tierwu"], "RESULTS_TIER_WU.md"),
+    ("analysis_eviction_parity.py", [], "RESULTS_EVICTION_PARITY.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
@@ -211,6 +212,16 @@ def main() -> int:
         else:
             print(f"    not rebuilt: {f}")
     print("committed records and figures were not modified.")
+
+    # Exit status must carry the verdict. This previously returned 0
+    # unconditionally, so a CI job or a reviewer running `python
+    # scripts/reproduce.py` saw green while every record drifted and every
+    # campaign script crashed — the gate reported failure only in prose.
+    drifted = len(all_records) - matched
+    if drifted or failed_campaigns:
+        print(f"\nFAILED: {drifted} record(s) not byte-identical, "
+              f"{len(failed_campaigns)} campaign script(s) exited nonzero.")
+        return 1
     return 0
 
 

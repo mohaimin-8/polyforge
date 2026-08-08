@@ -1,0 +1,31 @@
+# PREREG_EVICTION_PARITY.md (session 35) — adjudicates the audited
+# cost-accounting confound. Frozen and pushed before any run.
+#
+# The published headline charges 16 baseline arms a 1.4581x LRU inference
+# penalty that no jcac arm pays, and pins them at a 128 MB cache they can
+# never move. This campaign re-scores the same blocked design against
+# comparators that pay neither penalty:
+#
+#   jcac, hpa, keda      the published arms, UNCHANGED (the record stands)
+#   hpa_fair, keda_fair  no LRU charge + a competently pre-sized 512 MB cache
+#   jcac_evictcharged    jcac paying the cost-aware policy's own measured
+#                        1104.9 us p99 overhead (LRU/ARC measure 0.0)
+#
+# Cells mirror the v2 headline matrix exactly (PREREG_V2 §2) so the result is
+# directly comparable, cell by cell, with the published numbers. New output DB;
+# raw_sim_v2.duckdb is never reopened (R4).
+#
+# Reports mean_excess (unbounded severity) and tier_none_step_share alongside
+# the published metrics — EP-H3 exists because mean_violation saturates at 1.0
+# and therefore cannot distinguish "slow" from "AI shed to a 30 s outage".
+name: matrix_eviction_parity
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, hpa, keda, hpa_fair, keda_fair, jcac_evictcharged]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_eviction_parity.duckdb
+retries: 2
+timeseries_reps: 0

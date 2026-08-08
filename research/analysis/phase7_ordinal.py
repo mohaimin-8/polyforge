@@ -35,6 +35,11 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
+# Two arms whose means differ by less than this are tied, and a tie yields no
+# ordinal reading. Without it, idxmin() breaks ties alphabetically and the
+# arbitrary winner is published as an AGREE/DISAGREE finding.
+TIE_EPS = 1e-9
+
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(__file__).resolve().parent / "PHASE7_ORDINAL.md"
 LIVE_DB = ROOT / "eval" / "results" / "phase7_live.duckdb"
@@ -94,11 +99,25 @@ def main() -> None:
             for substrate in ("sim", "live"):
                 sub = cell[cell.substrate == substrate]
                 means = sub.groupby("system")[col].mean()
-                winners[substrate] = means.idxmin() if len(means) == 2 else "(incomplete)"
-            agree = winners["sim"] == winners["live"]
-            agreements[name].append(f"{workload}: {'AGREE' if agree else 'DISAGREE'}")
+                if len(means) != 2:
+                    winners[substrate] = "(incomplete)"
+                elif abs(means.iloc[0] - means.iloc[1]) < TIE_EPS:
+                    # An exact tie was previously resolved by idxmin(), which
+                    # returns the alphabetically first index — so a live cell
+                    # where both arms scored identically (violation 0.0000 for
+                    # every arm, which is what the phase7 load produced)
+                    # published `hpa` as the "winner" and an AGREE/DISAGREE
+                    # verdict decided by the letter h preceding j.
+                    winners[substrate] = "(tie)"
+                else:
+                    winners[substrate] = means.idxmin()
+            tied = "(tie)" in winners.values() or "(incomplete)" in winners.values()
+            agree = (not tied) and winners["sim"] == winners["live"]
+            verdict = "TIE — no ordinal reading" if tied else (
+                "AGREE" if agree else "DISAGREE")
+            agreements[name].append(f"{workload}: {verdict}")
             w(f"- **{name} winner** — sim: `{winners['sim']}`, live: "
-              f"`{winners['live']}` -> {'**AGREE**' if agree else '**DISAGREE**'}")
+              f"`{winners['live']}` -> **{verdict}**")
         w("")
 
     w("## Verdict (primary reading = J winner per cell)")

@@ -182,6 +182,73 @@ class KnobBoundTests(unittest.TestCase):
         self.assertNotEqual(run(pin=False), "small", "control: unpinned tier should upgrade")
 
 
+class SweepOrderTests(unittest.TestCase):
+    """PREREG_ORDER_PERMUTATION: the sweep order is first-come-first-served on
+    the shared cluster caps, and the default order is confounded with priority
+    class because tenant ids are assigned by slot."""
+
+    def _configs(self, n=6):
+        return {f"t{i:02d}": TenantConfig(tenant_id=f"t{i:02d}",
+                                          hourly_budget_usd=5.0)
+                for i in range(n)}
+
+    def test_default_order_is_sorted_and_stable(self):
+        # R4: every published campaign ran sorted(); this must not drift.
+        ctl = JCACController(self._configs())
+        self.assertEqual(ctl._sweep_order(), sorted(ctl.configs))
+        self.assertEqual(ctl._sweep_order(), ctl._sweep_order())
+
+    def test_seed_permutes_and_is_deterministic_within_a_run(self):
+        ctl = JCACController(self._configs(), tenant_order_seed=1)
+        order = ctl._sweep_order()
+        self.assertEqual(sorted(order), sorted(ctl.configs), "must be a permutation")
+        # Fixed for the run: the question is whether AN order biases the
+        # result, not what reshuffling every cycle averages out to.
+        self.assertEqual(order, ctl._sweep_order())
+
+    def test_different_seeds_give_different_orders(self):
+        orders = {tuple(JCACController(self._configs(), tenant_order_seed=s)._sweep_order())
+                  for s in (1, 2, 3, 4, 5)}
+        self.assertGreater(len(orders), 1, "seeds must actually permute")
+
+
+class EvictionParityTests(unittest.TestCase):
+    """PREREG_EVICTION_PARITY: the unbounded severity pair, the pre-sized
+    cache, and the eviction overhead charged to scoring but not to planning."""
+
+    def test_excess_is_unbounded_where_violation_saturates(self):
+        # A shed AI service (tier none = 30 s) and a merely-slow service both
+        # saturate `violation` at 1.0; `excess` is what tells them apart, and
+        # it is the reason EP-H3 exists.
+        config = TenantConfig(tenant_id="t")
+        d = demand({"chat": 5.0})
+        shed = evaluate_step(config, TenantState(tier="none"), d)
+        self.assertAlmostEqual(shed.violation, 1.0, places=3)
+        self.assertGreater(shed.excess, 1.0, "excess must not saturate")
+        # And excess >= violation always, since it is the same overshoot
+        # without the min(1, .) clamp.
+        for tier in model.TIERS:
+            m = evaluate_step(config, TenantState(tier=tier), d)
+            self.assertGreaterEqual(round(m.excess, 9), round(m.violation, 9))
+
+    def test_evict_overhead_raises_latency_and_is_off_by_default(self):
+        config = TenantConfig(tenant_id="t")
+        d = demand({"chat": 4.0})
+        base = evaluate_step(config, TenantState(), d)
+        charged = evaluate_step(config, TenantState(), d, extra_ai_latency_ms=1.1049)
+        self.assertAlmostEqual(charged.ai_p95_ms - base.ai_p95_ms, 1.1049, places=4)
+        # Default must be a no-op: every published caller relies on it (R4).
+        self.assertEqual(evaluate_step(config, TenantState(), d).ai_p95_ms,
+                         base.ai_p95_ms)
+
+    def test_crud_only_traffic_is_not_charged_ai_overhead(self):
+        config = TenantConfig(tenant_id="t")
+        d = demand({"crud_read": 5.0})
+        base = evaluate_step(config, TenantState(), d)
+        charged = evaluate_step(config, TenantState(), d, extra_ai_latency_ms=50.0)
+        self.assertEqual(charged.violation, base.violation)
+
+
 class BaselineTests(unittest.TestCase):
     def test_static_never_moves(self):
         configs = {"a": TenantConfig(tenant_id="a")}

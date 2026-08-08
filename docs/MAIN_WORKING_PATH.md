@@ -30,6 +30,62 @@ reconciles every open work item into one dependency-ordered path. It sits
 3. **Survey-blessed optional strengtheners identified** (energy/carbon,
    admission control) — milestone **M4**, low priority.
 
+## 0b. Session 35 (2026-08-08): the V-series validity remediation — READ FIRST
+
+A four-perspective validity audit of the whole artifact found eleven defects.
+The decisive one is now measured and adjudicated, and **it changes the
+headline claim.**
+
+**`RESULTS_EVICTION_PARITY.md` (PREREG_EVICTION_PARITY, frozen before the
+run; 1800/1800 valid):**
+
+| comparison | result |
+|---|---|
+| published `jcac` vs `hpa` | **−36.0%** — reproduced exactly in this campaign |
+| `jcac` vs `hpa_fair` | **+0.8%** — cost-neutral, **EP-H1a FAILS** |
+| **swing** | **36.8 percentage points** |
+
+`hpa_fair` is the same reactive controller with two accounting asymmetries
+removed: the **1.4581× LRU inference charge** that sixteen baseline arms paid
+and no `jcac` arm did, and the **128 MB cache the baselines could never
+move** (pre-sized to 512 MB, the level `jcac` itself converges to). LRU was
+also the most favorable of four comparators in the project's own
+`eviction_comparison.csv` — **GDSF beats the proposed cost-aware policy at
+both capacities** (factor 0.978, i.e. it would run *against* the proposal),
+and the cost-aware policy's measured **1104.9 µs p99 overhead** was never
+charged while LRU's 0.0 µs was.
+
+**What survives, and it is real:**
+- `jcac` vs `keda_fair`: **−14.1%** (d_z −0.440, p 3.8e-16) — joint control
+  still beats event-driven scaling at parity.
+- **SLO severity is materially better**: unbounded `mean_excess` 0.2143 vs
+  0.4288 (d_z −0.435, p 6.4e-12) — roughly half the overshoot. The saturating
+  `mean_violation` (0.0691 vs 0.0699) was *understating* the proposal's
+  advantage, not flattering it.
+- `ai_cacheable`: **−14.2%** vs `hpa_fair` — the cell where a knob the
+  baseline does not have is doing real work.
+- Cost against `crud_bursty` is **+107.5%**: a pre-existing, now-explicit
+  weakness where no AI knob applies.
+
+**The restated contribution:** joint control is *cost-neutral against a
+well-configured replica autoscaler while attaining materially lower SLO
+overshoot, and cheaper than event-driven scaling* — with the advantage
+concentrated where cache and tier are load-bearing. Narrower, defensible,
+and found by the project's own audit before review rather than after it.
+`tier=none` step share (7.3% for `jcac`, 0.0% for every reactive arm) is now
+a first-class reported column.
+
+R1/R4 both hold: no published record was edited, and `reproduce.py`
+re-derives **17/17 byte-identical**.
+
+Also landed this session (all local, $0): the live plane's demand signal was
+structurally dead (`RPSWindow` never populated by any production emitter, AI
+traffic folded into `crud_read`) — fixed with a `-race`-clean rate tracker;
+`check_metrics` now rejects a run that measured nothing; `knob_preflight.py`
+is executed by the harness instead of merely documented; the operator retries
+on conflict and audits every degraded cycle; `reproduce.py` exits nonzero on
+drift. See `docs/REMAINING_WORK.md` for the full ledger.
+
 ## 1. Where we stand (reconciled, one paragraph)
 
 Desk research is complete and honestly reported: all six contested segments

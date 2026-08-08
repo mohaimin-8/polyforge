@@ -174,6 +174,41 @@ class TestResults:
         assert (status, err) == ("failed", "boom")
         assert con.execute("SELECT count(*) FROM metrics").fetchone()[0] == 0
 
+    def test_check_metrics_rejects_a_run_that_measured_nothing(self):
+        # The exact signature of the committed phase7 rows that were marked
+        # `valid`: plausible cost from the replica sampler, latencies of 0.0
+        # because telemetry never reached the exporter. This is also the
+        # signature of the shared-PG bug, which the old contract could not
+        # see because it only tested finiteness.
+        silent = {
+            "total_cost_usd": 0.258133, "mean_violation": 0.0,
+            "violation_step_share": 0.0, "mean_jain": 1.0,
+            "cache_hit_rate": 0.0, "crud_p95_ms": 0.0, "ai_p95_ms": 0.0,
+            "steps": 30,
+        }
+        assert results.check_metrics(silent, 30), \
+            "a run with a zero p95 must be rejected, not recorded as valid"
+
+        healthy = {**silent, "crud_p95_ms": 3.1}
+        assert results.check_metrics(healthy, 30) is None
+
+        # On an AI-bearing workload a zero AI p95 is equally a non-measurement.
+        assert results.check_metrics(healthy, 30, expects_ai=True)
+        assert results.check_metrics({**healthy, "ai_p95_ms": 20.0}, 30,
+                                     expects_ai=True) is None
+
+        # n_events is the direct witness when the exporter supplies it.
+        assert results.check_metrics({**healthy, "n_events": 0}, 30)
+        assert results.check_metrics({**healthy, "n_events": 8412}, 30) is None
+
+    def test_workload_has_ai_is_derived_from_the_taxonomy(self):
+        assert workloads.workload_has_ai("ai_cacheable")
+        assert workloads.workload_has_ai("agentic")
+        assert workloads.workload_has_ai("joint_stress")
+        assert not workloads.workload_has_ai("crud_bursty")
+        assert not workloads.workload_has_ai("crud_steady")
+        assert not workloads.workload_has_ai("nonexistent")
+
     def test_check_metrics_rejects_bad_aggregates(self):
         good = {
             "total_cost_usd": 1.0, "mean_violation": 0.1, "violation_step_share": 0.2,
@@ -367,6 +402,24 @@ class TestClusterBackend:
         assert jcac.count("replicaMax: 6") == 8
         assert jcac.count("modelTierMax: large") == 8
 
+    def test_knob_preflight_is_wired_into_the_run_path(self):
+        import inspect
+
+        # The audited defect: knob_preflight.py existed, was documented as the
+        # WL-H2 gate, and was called from no code path at all — so a live
+        # campaign could complete with both knobs inert and every row valid.
+        src = inspect.getsource(cluster_backend)
+        assert "run_knob_preflight(" in src
+        assert src.count("run_knob_preflight(") >= 2, \
+            "preflight must be defined AND invoked, not just defined"
+        assert hasattr(cluster_backend, "run_knob_preflight")
+
+        # It must fail loudly rather than skip when tiers are unconfigured.
+        import pathlib
+        with pytest.raises(RuntimeError, match="two configured tiers"):
+            cluster_backend.run_knob_preflight(
+                "http://127.0.0.1:1", "t00", "key", pathlib.Path("."))
+
     def test_wave4_arms_registered_and_operator_wiring(self):
         for arm in ("replica-only", "cache-only", "tier-only"):
             assert arm in SYSTEMS
@@ -414,6 +467,51 @@ class TestClusterBackend:
                     checked += 1
         # Guard the guard: the loop must actually have inspected the pins.
         assert checked >= len(cluster_backend.OPERATOR_SYSTEMS) * 8
+
+    def test_eviction_band_matches_the_committed_csv(self):
+        from harness.systems import eviction_sensitivity_band, lru_miss_cost_factor
+
+        band = eviction_sensitivity_band()
+        # The published factor is the LRU comparator, and it must stay exactly
+        # what the committed campaigns were scored with (R4).
+        assert band["lru"] == pytest.approx(lru_miss_cost_factor())
+        assert band["lru"] == pytest.approx(1.4581, abs=1e-3)
+        assert band["none"] == 1.0
+        # The audited point: GDSF beats the proposed cost-aware policy, so the
+        # factor would run AGAINST the proposal under that comparator.
+        assert band["gdsf"] < 1.0, "gdsf should disadvantage the proposal"
+        assert band["arc"] < band["lru"], "lru is the most favorable comparator"
+
+    def test_fair_arms_drop_the_charge_and_presize_the_cache(self):
+        for arm in ("hpa_fair", "keda_fair"):
+            spec = SYSTEMS[arm]
+            assert spec.lru_eviction is False, f"{arm} must not pay the LRU charge"
+            assert spec.static_cache_mb == 512
+        # The published comparators are untouched — the record still stands.
+        assert SYSTEMS["hpa"].lru_eviction is True
+        assert SYSTEMS["hpa"].static_cache_mb is None
+        # jcac pays its own eviction overhead only in the charged arm.
+        assert SYSTEMS["jcac_evictcharged"].params["evict_overhead_us"] == 1104.9
+        assert "evict_overhead_us" not in SYSTEMS["jcac"].params
+
+    def test_static_cache_pins_a_reactive_baseline(self):
+        # hpa carries state.cache_mb forward, so a pre-sized initial cache is
+        # held for the whole run — that is what makes hpa_fair a competent
+        # comparator rather than one bolted to 128 MB.
+        run = expand(tiny_spec(systems=["hpa_fair"], workloads=["ai_cacheable"]))[0]
+        out = sim_backend.execute(run)
+        assert out["metrics"]["cache_hit_rate"] > 0.0
+        plain = sim_backend.execute(
+            expand(tiny_spec(systems=["hpa"], workloads=["ai_cacheable"]))[0])
+        assert out["metrics"]["cache_hit_rate"] > plain["metrics"]["cache_hit_rate"], \
+            "512 MB must beat the 128 MB default on hit rate"
+
+    def test_severity_metrics_are_reported_for_every_arm(self):
+        run = expand(tiny_spec(systems=["jcac"], workloads=["ai_cacheable"]))[0]
+        m = sim_backend.execute(run)["metrics"]
+        assert "mean_excess" in m and "tier_none_step_share" in m
+        assert m["mean_excess"] >= m["mean_violation"] - 1e-9
+        assert 0.0 <= m["tier_none_step_share"] <= 1.0
 
     def test_sim_freeze_knobs_pins_only_named_knobs(self):
         from model import TenantConfig

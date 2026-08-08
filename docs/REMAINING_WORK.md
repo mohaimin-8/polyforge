@@ -15,6 +15,29 @@ session 30). This is the single place that answers
 one owner-split view. When it disagrees with a campaign file, the campaign file
 wins.
 
+## Session 35 (2026-08-08) — V-series validity remediation
+
+A four-perspective audit found eleven defects. Status of each:
+
+| # | defect | status |
+|---|---|---|
+| D1 | 1.4581× LRU charge on 16 baseline arms, none on `jcac` | **MEASURED** — `RESULTS_EVICTION_PARITY.md`: EP-H1a FAILS, 36.8 pp of the headline was accounting |
+| D2 | no fair-cache comparator existed | **DONE** — `hpa_fair`/`keda_fair` (512 MB, no charge) |
+| D3 | `mean_violation` saturates at 1.0, hiding shed AI | **DONE** — `mean_excess` + `tier_none_step_share` reported for every arm |
+| D4 | `RPSWindow` never populated → live planner saw zero demand and froze | **DONE** — rate tracker on both emitters, `-race` clean; AI kinds no longer folded into `crud_read` |
+| D5 | `knob_preflight.py` called from no code path | **DONE** — executed by `cluster_backend.execute()` before load, raises on inert substrate |
+| D6 | `check_metrics` could not detect "measured nothing" | **DONE** — rejects zero p95 / zero `n_events`; `n_events` now captured |
+| D7 | 48 hypotheses, no multiple-comparison correction | **DONE** — `holm_bonferroni()` in `stats.py` (6 tests); applied in the V-series records |
+| D8 | sweep order confounded with priority class | **IN FLIGHT** — `PREREG_ORDER_PERMUTATION` frozen, 540-run campaign running |
+| D9 | no envtest; fake clients hide conflicts | **PARTIAL** — retry-on-conflict landed; envtest still owed |
+| D10 | `reproduce.py` returned 0 on total failure | **DONE** — exits nonzero on drift or failed campaign scripts |
+| D11 | audit record dropped exactly when a knob moved | **DONE** — audit emitted before the status write; every degraded cycle audited |
+
+**Two committed live rows in `phase7_live.duckdb` are marked `valid` with
+`crud_p95_ms = 0.0`** — they measured nothing. `check_metrics` now rejects
+that signature; the rows themselves still need invalidating and
+`PHASE7_ORDINAL.md` regenerating (open item, listed in Bucket A below).
+
 ## Where the project stands
 
 The research is effectively complete and honestly reported. All five contested

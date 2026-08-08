@@ -455,8 +455,22 @@ def _mixture_p95_ms(branches: list[tuple[float, float, bool]], tail: float) -> f
     return math.exp(0.5 * (lo + hi))
 
 
-def evaluate_step(config: TenantConfig, state: TenantState, demand: Demand) -> StepMetrics:
-    """Predicted cost and SLO outcome of holding `state` for one interval."""
+def evaluate_step(
+    config: TenantConfig,
+    state: TenantState,
+    demand: Demand,
+    extra_ai_latency_ms: float = 0.0,
+) -> StepMetrics:
+    """Predicted cost and SLO outcome of holding `state` for one interval.
+
+    `extra_ai_latency_ms` charges a fixed per-request overhead to AI traffic —
+    the cache policy's own bookkeeping cost (PREREG_EVICTION_PARITY: the
+    cost-aware policy measures 1104.9 us p99, LRU and ARC measure 0.0, and the
+    published model gives it away free). It defaults to 0.0, so every existing
+    caller — including the controller's planning projection — is unchanged.
+    The scoring path passes it while the planning path does not, deliberately:
+    a controller must not be able to plan around its own bookkeeping cost.
+    """
     factor = SLO_CLASS_FACTOR[config.slo_class]
     wu = demand.work_units(state.cache_mb, state.tier)
     inflate = congestion(wu, state.replicas)
@@ -499,6 +513,9 @@ def evaluate_step(config: TenantConfig, state: TenantState, demand: Demand) -> S
             ai_p95 = _mixture_p95_ms(branches, tail)
         else:
             ai_p95 = weighted_ms / ai_rps * tail
+
+    if extra_ai_latency_ms and ai_p95 > 0.0:
+        ai_p95 += extra_ai_latency_ms
 
     # Violation: how far each family's p95 overshoots its target, weighted
     # by that family's share of traffic, saturating at 1.

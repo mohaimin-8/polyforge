@@ -23,6 +23,7 @@ from pathlib import Path
 
 from . import EVAL_DIR
 from .config import ExperimentSpec, RunSpec, expand, load
+from .workloads import workload_has_ai
 from .results import check_metrics, connect, record, valid_run_ids, validate
 
 DAILY_LOG = EVAL_DIR / "results" / "DAILY.md"
@@ -50,7 +51,8 @@ def _attempt(run: RunSpec, retries: int) -> tuple[str, int, dict | None, str | N
         except Exception:
             error = traceback.format_exc(limit=8)
             continue
-        reason = check_metrics(outcome["metrics"], run.steps)
+        reason = check_metrics(outcome["metrics"], run.steps,
+                               expects_ai=workload_has_ai(run.workload))
         if reason is None:
             return "valid", attempt, outcome, None
         error = reason  # completed but broke the contract: retry, then mark

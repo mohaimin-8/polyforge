@@ -59,6 +59,12 @@ type Server struct {
 	idempotencyStore idempotency.Store
 	analytics        AnalyticsEnqueuer
 	workloads        WorkloadReader
+
+	// rates measures per-(tenant, kind) request rate for Event.RPSWindow,
+	// which is the planner's entire demand signal. Before this existed the
+	// field was left zero on every production emitter and the joint
+	// controller saw an idle cluster no matter the load.
+	rates *telemetry.RateTracker
 }
 
 // AnalyticsEnqueuer mirrors accepted telemetry events into the analytical
@@ -139,6 +145,7 @@ func NewServer(log *slog.Logger, tenants tenant.Repository, telemetry telemetry.
 		metrics:   newMetrics(),
 		issuer:    issuer,
 		tracer:    provider.Tracer("polyforge/internal/platform"),
+		rates:     newReplayRateTracker(),
 	}
 	if cfg.Limiter != nil {
 		s.limiter = cfg.Limiter

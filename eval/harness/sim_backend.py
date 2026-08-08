@@ -104,6 +104,10 @@ def execute(run: RunSpec) -> dict:
     # must not know (PREREG_CHAOS_SIM.md).
     chaos_outage = params.pop("chaos_planner_outage", None)
     chaos_kill = params.pop("chaos_replica_kill", None)
+    # Eviction overhead is a property of the cache policy, not a control knob:
+    # the controller must not be able to plan around its own bookkeeping cost
+    # (PREREG_EVICTION_PARITY EP-H4, same rule as the chaos params above).
+    evict_overhead_us = params.pop("evict_overhead_us", None)
     if "isocost" in params:
         from .isocost import resolve as isocost_resolve
 
@@ -132,6 +136,8 @@ def execute(run: RunSpec) -> dict:
         interference_injection=run.interference,
         chaos_planner_outage=chaos_outage,
         chaos_replica_kill=chaos_kill,
+        initial_cache_mb=spec.static_cache_mb,
+        evict_overhead_ms=(evict_overhead_us / 1000.0) if evict_overhead_us else None,
     )
     wall_s = time.time() - started
 
@@ -147,6 +153,11 @@ def execute(run: RunSpec) -> dict:
             "cache_hit_rate": result.cache_hit_rate,
             "crud_p95_ms": result.crud_p95_ms,
             "ai_p95_ms": result.ai_p95_ms,
+            # PREREG_EVICTION_PARITY reporting pair: what mean_violation's
+            # saturation at 1.0 hides (unbounded severity, and AI shed to a
+            # 30 s outage). Nullable in the DB, so old records are unaffected.
+            "mean_excess": result.mean_excess,
+            "tier_none_step_share": result.tier_none_step_share,
             "steps": result.steps,
         },
         "timeseries": result.rows,

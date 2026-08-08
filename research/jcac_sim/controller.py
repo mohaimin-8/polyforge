@@ -30,6 +30,7 @@ this is what prevents oscillation between adjacent plans.
 from __future__ import annotations
 
 import math
+import random
 from dataclasses import dataclass, field
 
 import model
@@ -364,6 +365,7 @@ class JCACController:
         risk_quantile: float | None = None,
         risk_cost_at_point: bool = False,
         carbon_weight: float = 0.0,
+        tenant_order_seed: int | None = None,
     ):
         self.configs = configs
         # M4 / T18: price the plan's carbon alongside its dollars. 0.0 (the
@@ -424,6 +426,12 @@ class JCACController:
         # a documented, budget-safe option (committed campaigns replay
         # bit-identically); DG-H2 (never serves outside budget) holds.
         self.degrade_gracefully = degrade_gracefully
+        # PREREG_ORDER_PERMUTATION: the coordinate-descent sweep order is
+        # first-come-first-served on the shared cluster caps, and the default
+        # sorted() order is confounded with priority class because tenant ids
+        # are assigned by slot. None = sorted(), the published behavior.
+        self.tenant_order_seed = tenant_order_seed
+        self._order_cache: list[str] | None = None
         self.capacity_scale = {tid: 1.0 for tid in configs}
         self._projected: dict[str, float] = {}
 
@@ -514,7 +522,7 @@ class JCACController:
         # coordination cannot compound the per-interval actuation clamps.
         origin = dict(states) if self.anchor_moves else None
         for _ in range(2):
-            for tid in sorted(self.configs):
+            for tid in self._sweep_order():
                 chosen[tid] = self._best_for_tenant(tid, chosen, horizons, origin,
                                                     cost_horizons)
 
@@ -553,6 +561,31 @@ class JCACController:
             total += evaluate_step(
                 self.configs[tid], state, self._planning_demand(tid, demand)).carbon_g
         return total / max(1, len(horizon))
+
+    def _sweep_order(self) -> list[str]:
+        """Tenant order for the coordinate-descent sweeps.
+
+        Default is `sorted()`, which is what every published campaign ran and
+        what R4 requires this to keep returning. The order is not neutral:
+        the sweep is first-come-first-served on the shared cluster caps, so an
+        earlier tenant claims contended capacity first. Tenant ids are
+        assigned by slot (`t00`, `t01`, ...) and the mixes put premium and
+        whale tenants in the low slots, so sorted order is confounded with
+        priority class — in a controller that also reports a fairness index.
+
+        `tenant_order_seed` draws a deterministic permutation instead, which
+        is how PREREG_ORDER_PERMUTATION measures whether the published Jain
+        survives re-ordering. It is a per-run constant, not per-cycle: the
+        question is whether *an* order biases the outcome, and reshuffling
+        every cycle would average the bias away and answer a different one.
+        """
+        if self.tenant_order_seed is None:
+            return sorted(self.configs)
+        if self._order_cache is None:
+            order = sorted(self.configs)
+            random.Random(self.tenant_order_seed).shuffle(order)
+            self._order_cache = order
+        return self._order_cache
 
     def _best_for_tenant(
         self,

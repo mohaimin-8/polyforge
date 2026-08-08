@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import shutil
 import subprocess
 import tempfile
@@ -544,6 +545,39 @@ def _wait_http(url: str, deadline_s: float = 90.0) -> None:
     raise RuntimeError(f"{url} not reachable within {deadline_s}s")
 
 
+def run_knob_preflight(gateway_base: str, tenant_id: str, api_key: str,
+                       workdir: Path) -> None:
+    """Execute the WL-H2 knob-liveness gate, raising on an inert substrate.
+
+    PREREG_WAVE4_LIVE_PLANE.md makes an inert cache or tier knob VOID WL-H1:
+    a three-knob result measured on a substrate where two knobs do nothing is
+    not a weaker result, it is not a result. The check must therefore run
+    inside the harness, before load, on every live-AI run — not as a step in
+    a runbook that a tired operator can skip at 2am.
+
+    The verdict JSON is written into the run's workdir so the artifact carries
+    the evidence that the gate ran, not just the assertion that it did.
+    """
+    tiers = sorted(json.loads(TIER_BACKENDS_JSON))[:2] if TIER_BACKENDS_JSON else []
+    if len(tiers) < 2:
+        raise RuntimeError(
+            "knob preflight needs two configured tiers in "
+            "POLYFORGE_EVAL_TIER_BACKENDS to prove the tier knob routes")
+    report = workdir / "knob_preflight.json"
+    proc = subprocess.run(
+        [sys.executable, str(EVAL_DIR / "scripts" / "knob_preflight.py"),
+         "--gateway", gateway_base, "--tenant", tenant_id,
+         "--api-key", api_key, "--admin-key", ADMIN_KEY,
+         "--tiers", ",".join(tiers), "--report", str(report)],
+        capture_output=True, text=True, timeout=300,
+    )
+    print(proc.stdout, end="")
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "WL-H2 knob-liveness preflight FAILED — WL-H1 is void on this "
+            f"substrate, so the run is not scored: {proc.stderr.strip() or proc.stdout.strip()}")
+
+
 def push_default_knobs(gateway_base: str, tenant_ids) -> None:
     """Fixed data-plane posture for non-operator arms on the live-AI plane:
     every tenant holds the sim's initial world (TenantState: tier `small`,
@@ -687,6 +721,15 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                         if run.system not in OPERATOR_SYSTEMS:
                             push_default_knobs(gw_base, tenant_ids)
                         env["POLYFORGE_GATEWAY_URL"] = gw_base
+                        # WL-H2 liveness gate, executed rather than described.
+                        # An inert cache or tier knob VOIDS WL-H1, so this runs
+                        # before any load and raises on an inert substrate. It
+                        # previously existed only as a script referenced from
+                        # prose, callable from no code path, which meant a
+                        # four-arm campaign could complete with both knobs dead
+                        # and every row looking valid.
+                        run_knob_preflight(gw_base, tenant_ids[0],
+                                           tokens[tenant_ids[0]], workdir)
                     sampler = ReplicaSampler()
                     sampler.start()
                 exporting = "eval-export" in cmd
@@ -744,6 +787,11 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
             # so it persists through the harness (PREREG_LIVE_CHAOS_P99.md Part B).
             "crud_p99_ms": export.get("crud_p99_ms"),
             "ai_p99_ms": export.get("ai_p99_ms"),
+            # The exporter has always emitted n_events; the harness used to
+            # drop it, which is precisely the field that distinguishes "this
+            # run measured a low latency" from "this run measured nothing".
+            # check_metrics now rejects a run that observed zero events.
+            "n_events": export.get("n_events"),
             "steps": run.steps,
         },
         "timeseries": export.get("timeseries", []),

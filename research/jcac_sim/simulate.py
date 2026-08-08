@@ -141,6 +141,12 @@ class RunResult:
     cache_hit_rate: float = 0.0  # realized hit share of AI traffic
     crud_p95_ms: float = 0.0  # p95 across tenant-steps carrying CRUD traffic
     ai_p95_ms: float = 0.0  # p95 across tenant-steps carrying AI traffic
+    # PREREG_EVICTION_PARITY reporting pair. `mean_violation` saturates at 1.0
+    # per family (model.py), so a 2x SLO miss and a shed AI service (tier
+    # "none", a 30 s outage priced at $0) score identically. These two report
+    # what saturation hides; both are reporting-only and enter no objective.
+    mean_excess: float = 0.0  # traffic-weighted, UNBOUNDED overshoot
+    tier_none_step_share: float = 0.0  # share of tenant-steps with AI shed
     steps: int = 0
     rows: list = field(default_factory=list)
 
@@ -155,6 +161,8 @@ class RunResult:
             "cache_hit_rate": round(self.cache_hit_rate, 4),
             "crud_p95_ms": round(self.crud_p95_ms, 1),
             "ai_p95_ms": round(self.ai_p95_ms, 1),
+            "mean_excess": round(self.mean_excess, 4),
+            "tier_none_step_share": round(self.tier_none_step_share, 4),
         }
 
 
@@ -243,6 +251,8 @@ def run(
     interference_injection: bool = False,
     chaos_planner_outage: tuple | None = None,
     chaos_replica_kill: tuple | None = None,
+    initial_cache_mb: int | None = None,
+    evict_overhead_ms: float | None = None,
 ) -> RunResult:
     """Replay `buckets` under one controller.
 
@@ -254,6 +264,15 @@ def run(
       sees; scoring always uses the true demand (classifier ablation).
     - `miss_cost_factor`: scales inference (tier) spend for systems that
       evict LRU instead of cost-aware (W28 measured factor).
+    - `initial_cache_mb`: the cache every tenant starts at. The reactive
+      baselines carry it forward untouched, so this is how a *pre-sized*
+      comparator is expressed (PREREG_EVICTION_PARITY: hpa_fair at 512 MB).
+      None keeps TenantState()'s default, so published arms are unchanged.
+    - `evict_overhead_ms`: per-request bookkeeping latency charged to AI
+      traffic, for arms priced with the cost-aware policy's own measured
+      overhead (1104.9 us p99; LRU and ARC measure 0.0). Applied post-hoc to
+      the scored AI p95 exactly as `miss_cost_factor` is applied to tier
+      spend. Conservative: a p99 overhead charged against a p95 statistic.
     - `transition_costs`: reconfiguration realism. Scale-*ups* take one
       interval to serve (replica startup lag) and a grown cache serves its
       first interval half-warm, while billing follows the *nominal*
@@ -294,10 +313,13 @@ def run(
     if jitter_seed is not None:
         buckets = jitter_buckets(buckets, jitter_seed)
 
-    states = {tid: TenantState() for tid in tenant_ids}
+    states = {
+        tid: TenantState() if initial_cache_mb is None else TenantState(cache_mb=initial_cache_mb)
+        for tid in tenant_ids
+    }
     result = RunResult(controller=controller_name)
-    viol_sum = jain_sum = 0.0
-    viol_steps = tenant_steps = 0
+    viol_sum = jain_sum = excess_sum = 0.0
+    viol_steps = tenant_steps = tier_none_steps = 0
     crud_p95s: list[float] = []
     ai_p95s: list[float] = []
     ai_hit_rps = ai_total_rps = 0.0
@@ -351,7 +373,10 @@ def run(
                     serving = TenantState(
                         replicas=replicas, cache_mb=serving.cache_mb, tier=serving.tier
                     )
-            m = evaluate_step(configs[tid], serving, actual[tid])
+            m = evaluate_step(
+                configs[tid], serving, actual[tid],
+                extra_ai_latency_ms=evict_overhead_ms or 0.0,
+            )
             cost = miss_cost_factor * m.cost_tier_usd
             if serving != nominal:
                 # Billing follows the nominal configuration immediately.
@@ -361,6 +386,8 @@ def run(
             result.total_cost_usd += cost
             viol_sum += m.violation
             viol_steps += 1 if m.violation > 0.0 else 0
+            excess_sum += m.excess
+            tier_none_steps += 1 if serving.tier == "none" else 0
             tenant_steps += 1
             satisfactions.append(1.0 - m.violation)
             realized[tid] = m.violation
@@ -398,6 +425,8 @@ def run(
     if tenant_steps:
         result.mean_violation = viol_sum / tenant_steps
         result.violation_step_share = viol_steps / tenant_steps
+        result.mean_excess = excess_sum / tenant_steps
+        result.tier_none_step_share = tier_none_steps / tenant_steps
     if result.steps:
         result.mean_jain = jain_sum / result.steps
     if ai_total_rps > 0.0:

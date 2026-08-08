@@ -1,6 +1,6 @@
 run_id,experiment,backend,system,workload,tenant_mix,cluster_size,rep,seed,steps,status,attempts,wall_s,tenants,error,harness_version,recorded_at,total_cost_usd,mean_violation,mean_jain,metric_steps
-39c879b96d45ef7c,phase7_live,cluster,jcac,crud_bursty,uniform,small,0,2108076706,120,valid,1,1353.701980829239,8,,1.0.0,2026-07-15 18:45:13.361851,0.258133,0.0,1.0,120
-0f9a702d87b9c774,phase7_live,cluster,jcac,crud_bursty,uniform,small,1,991663698,120,valid,1,1358.9450998306274,8,,1.0.0,2026-07-15 19:07:52.482405,0.258133,0.0,1.0,120
+39c879b96d45ef7c,phase7_live,cluster,jcac,crud_bursty,uniform,small,0,2108076706,120,invalid,1,1353.701980829239,8,zero telemetry: crud_p95_ms=0 (retro-invalidated session 35; check_metrics now rejects this signature),1.0.0,2026-07-15 18:45:13.361851,0.258133,0.0,1.0,120
+0f9a702d87b9c774,phase7_live,cluster,jcac,crud_bursty,uniform,small,1,991663698,120,invalid,1,1358.9450998306274,8,zero telemetry: crud_p95_ms=0 (retro-invalidated session 35; check_metrics now rejects this signature),1.0.0,2026-07-15 19:07:52.482405,0.258133,0.0,1.0,120
 1545bd0834218f6b,phase7_live,cluster,jcac,crud_bursty,uniform,small,2,2070509261,120,valid,1,1366.8217506408691,8,,1.0.0,2026-07-15 19:30:39.482164,0.256,0.0,1.0,120
 60a2df2c00e0166d,phase7_live,cluster,jcac,ai_cacheable,uniform,small,0,921020150,120,valid,1,1362.290251493454,8,,1.0.0,2026-07-15 19:53:21.933708,7.0294329999975576,0.0,1.0,120
 38c493520915f6ef,phase7_live,cluster,jcac,ai_cacheable,uniform,small,1,1542135112,120,valid,1,1358.9496660232544,8,,1.0.0,2026-07-15 20:16:01.06047,7.027432999997562,0.0,1.0,120

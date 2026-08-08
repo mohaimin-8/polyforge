@@ -13,7 +13,7 @@ Protocol frozen in `phase7_ordinal.py` before the live slice finished. Ordinal r
 
 - **J winner** — sim: `jcac`, live: `hpa` -> **DISAGREE**
 - **cost winner** — sim: `jcac`, live: `hpa` -> **DISAGREE**
-- **violation winner** — sim: `hpa`, live: `hpa` -> **AGREE**
+- **violation winner** — sim: `hpa`, live: `(tie)` -> **TIE — no ordinal reading**
 
 ## Cell: crud_bursty
 
@@ -26,13 +26,13 @@ Protocol frozen in `phase7_ordinal.py` before the live slice finished. Ordinal r
 
 - **J winner** — sim: `jcac`, live: `hpa` -> **DISAGREE**
 - **cost winner** — sim: `hpa`, live: `hpa` -> **AGREE**
-- **violation winner** — sim: `jcac`, live: `hpa` -> **DISAGREE**
+- **violation winner** — sim: `jcac`, live: `(tie)` -> **TIE — no ordinal reading**
 
 ## Verdict (primary reading = J winner per cell)
 
 - J: ai_cacheable: DISAGREE; crud_bursty: DISAGREE
 - cost: ai_cacheable: DISAGREE; crud_bursty: AGREE
-- violation: ai_cacheable: AGREE; crud_bursty: DISAGREE
+- violation: ai_cacheable: TIE — no ordinal reading; crud_bursty: TIE — no ordinal reading
 
 Frozen caption (PHASE7_JCAC_PLAN.md step 3):
 

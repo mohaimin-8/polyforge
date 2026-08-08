@@ -89,6 +89,11 @@ def connect(path: str | Path) -> duckdb.DuckDBPyConnection:
     # migrate older dbs in place so a fresh schema and an existing one agree.
     con.execute("ALTER TABLE metrics ADD COLUMN IF NOT EXISTS crud_p99_ms DOUBLE")
     con.execute("ALTER TABLE metrics ADD COLUMN IF NOT EXISTS ai_p99_ms DOUBLE")
+    # PREREG_EVICTION_PARITY reporting pair. Nullable and outside
+    # METRIC_COLUMNS on purpose: every committed DB predates them, and a
+    # required column would retroactively invalidate its rows.
+    con.execute("ALTER TABLE metrics ADD COLUMN IF NOT EXISTS mean_excess DOUBLE")
+    con.execute("ALTER TABLE metrics ADD COLUMN IF NOT EXISTS tier_none_step_share DOUBLE")
     return con
 
 
@@ -99,9 +104,20 @@ def valid_run_ids(con: duckdb.DuckDBPyConnection, experiment: str) -> set[str]:
     return {r[0] for r in rows}
 
 
-def check_metrics(metrics: dict, expected_steps: int) -> str | None:
+def check_metrics(metrics: dict, expected_steps: int,
+                  expects_ai: bool = False) -> str | None:
     """Sanity contract for a run's aggregates; a violation makes the run
-    `invalid` (recorded, excluded, retried). Returns the reason or None."""
+    `invalid` (recorded, excluded, retried). Returns the reason or None.
+
+    Presence, not just finiteness. The finiteness checks below cannot tell a
+    measured zero from a measurement that never happened: a live campaign
+    once recorded latencies of exactly 0.0 for every tenant because telemetry
+    went to a per-replica database instead of a shared one, and those rows
+    passed this function, were marked `valid`, and were averaged into a
+    committed record. `n_events` is the direct witness — the Go exporter has
+    always emitted it and the harness used to discard it — and a served
+    request cannot have a p95 of zero.
+    """
     for name in METRIC_COLUMNS:
         v = metrics.get(name)
         if v is None or not math.isfinite(v):
@@ -112,6 +128,19 @@ def check_metrics(metrics: dict, expected_steps: int) -> str | None:
         return f"jain {metrics['mean_jain']} outside [0,1]"
     if metrics["total_cost_usd"] <= 0.0:
         return f"non-positive cost {metrics['total_cost_usd']}"
+
+    # A run that observed no telemetry measured nothing, whatever its cost
+    # says: infra cost is derived from the replica count and is non-zero
+    # whenever pods merely exist.
+    n_events = metrics.get("n_events")
+    if n_events is not None and n_events <= 0:
+        return "no telemetry events observed: the run measured nothing"
+    if metrics["crud_p95_ms"] <= 0.0:
+        return (f"crud_p95_ms is {metrics['crud_p95_ms']} — a served request "
+                "cannot have a zero p95; telemetry did not reach the exporter")
+    if expects_ai and metrics["ai_p95_ms"] <= 0.0:
+        return (f"ai_p95_ms is {metrics['ai_p95_ms']} on an AI-bearing "
+                "workload; the AI path produced no telemetry")
     return None
 
 
@@ -141,10 +170,12 @@ def record(con: duckdb.DuckDBPyConnection, run: RunSpec, status: str, attempts: 
                 "INSERT INTO metrics "
                 "(run_id, total_cost_usd, mean_violation, violation_step_share, "
                 "mean_jain, cache_hit_rate, crud_p95_ms, ai_p95_ms, "
-                "crud_p99_ms, ai_p99_ms, steps) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "crud_p99_ms, ai_p99_ms, mean_excess, tier_none_step_share, steps) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 [run.run_id] + [metrics[c] for c in METRIC_COLUMNS]
-                + [metrics.get("crud_p99_ms"), metrics.get("ai_p99_ms"), metrics["steps"]],
+                + [metrics.get("crud_p99_ms"), metrics.get("ai_p99_ms"),
+                   metrics.get("mean_excess"), metrics.get("tier_none_step_share"),
+                   metrics["steps"]],
             )
             rows = outcome.get("timeseries") or []
             if rows:

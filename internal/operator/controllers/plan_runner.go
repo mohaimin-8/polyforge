@@ -11,6 +11,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
@@ -270,18 +271,43 @@ func (p *PlanRunner) apply(ctx context.Context, policy *pfv1alpha1.Policy, input
 		policy.Spec.Replicas = replicas
 		policy.Spec.CacheSizeMB = cache
 		policy.Spec.ModelTier = tier
-		if err := p.Client.Update(ctx, policy); err != nil {
+		// Retry on conflict: PolicyReconciler writes this object's status on
+		// every reconcile, so the resourceVersion we planned against is
+		// routinely stale by the time we write. Without this the plan was
+		// simply dropped for the cycle and the tenant silently kept the
+		// previous configuration — invisible against a fake client, which
+		// does not enforce optimistic concurrency.
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			if err := p.Client.Update(ctx, policy); err != nil {
+				if !apierrors.IsConflict(err) {
+					return err
+				}
+				var fresh pfv1alpha1.Policy
+				key := types.NamespacedName{Name: policy.Name, Namespace: policy.Namespace}
+				if getErr := p.Client.Get(ctx, key, &fresh); getErr != nil {
+					return getErr
+				}
+				fresh.Spec.Replicas = replicas
+				fresh.Spec.CacheSizeMB = cache
+				fresh.Spec.ModelTier = tier
+				*policy = fresh
+				return p.Client.Update(ctx, policy)
+			}
+			return nil
+		}); err != nil {
 			return fmt.Errorf("update policy spec: %w", err)
 		}
 	}
 
+	// The audit entry is emitted before the status write, and its error is
+	// not allowed to suppress it. The status subresource is contended: the
+	// spec Update above bumps resourceVersion and wakes PolicyReconciler,
+	// which writes status too, so a 409 here is routine. Emitting afterwards
+	// meant a conflict silently dropped the record — and only on the
+	// `changed` branch, i.e. exactly on the cycles where a knob actually
+	// moved. The audit stream is the evidence that the controller acted, so
+	// that loss was both silent and biased toward under-reporting actuation.
 	now := metav1.Now()
-	policy.Status.LastPlanSource = pfv1alpha1.PlanSourcePlanner
-	policy.Status.LastPlanTime = &now
-	if err := p.Client.Status().Update(ctx, policy); err != nil {
-		return fmt.Errorf("update policy status: %w", err)
-	}
-
 	p.audit(ctx, AuditEntry{
 		Time:   now.Time,
 		Tenant: input.TenantID,
@@ -297,6 +323,23 @@ func (p *PlanRunner) apply(ctx context.Context, policy *pfv1alpha1.Policy, input
 		ProjectedViolation: plan.ProjectedViolation,
 		Interference:       input.Interference,
 	})
+
+	// Re-read on conflict rather than clobbering: another writer's status
+	// update must not be lost, and ours must not be dropped.
+	name := types.NamespacedName{Name: policy.Name, Namespace: policy.Namespace}
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var fresh pfv1alpha1.Policy
+		if err := p.Client.Get(ctx, name, &fresh); err != nil {
+			return err
+		}
+		fresh.Status.LastPlanSource = pfv1alpha1.PlanSourcePlanner
+		fresh.Status.LastPlanTime = &now
+		return p.Client.Status().Update(ctx, &fresh)
+	}); err != nil {
+		return fmt.Errorf("update policy status: %w", err)
+	}
+	policy.Status.LastPlanSource = pfv1alpha1.PlanSourcePlanner
+	policy.Status.LastPlanTime = &now
 	return nil
 }
 
@@ -319,12 +362,17 @@ func (p *PlanRunner) fallback(ctx context.Context, inputs []planner.TenantInput,
 	}
 	for _, input := range inputs {
 		policy := policies[input.TenantID]
-		if policy.Status.LastPlanSource == pfv1alpha1.PlanSourceFallback {
-			continue // already marked; avoid a status write per cycle
-		}
-		policy.Status.LastPlanSource = pfv1alpha1.PlanSourceFallback
-		if err := p.Client.Status().Update(ctx, policy); err != nil && p.Log != nil {
-			p.Log.Error("mark fallback", "tenant", input.TenantID, "error", err)
+		// Every degraded cycle is audited, including consecutive ones. The
+		// status write is still skipped when the mark is already set — that
+		// is what the "avoid a status write per cycle" optimisation was for —
+		// but skipping the audit with it made a one-hour planner outage
+		// indistinguishable from a single blip: both left exactly one entry
+		// in the stream that any availability claim is measured from.
+		if policy.Status.LastPlanSource != pfv1alpha1.PlanSourceFallback {
+			policy.Status.LastPlanSource = pfv1alpha1.PlanSourceFallback
+			if err := p.Client.Status().Update(ctx, policy); err != nil && p.Log != nil {
+				p.Log.Error("mark fallback", "tenant", input.TenantID, "error", err)
+			}
 		}
 		p.audit(ctx, AuditEntry{
 			Time:   time.Now(),

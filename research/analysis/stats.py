@@ -259,6 +259,39 @@ def cohens_d(a: pd.Series, b: pd.Series) -> float:
     return float((a.mean() - b.mean()) / pooled)
 
 
+def holm_bonferroni(pvals: dict[str, float],
+                    alpha: float = 0.05) -> dict[str, dict]:
+    """Holm-Bonferroni step-down correction over a family of hypotheses.
+
+    Returns, per hypothesis id: the raw p, its rank, the threshold it was
+    tested against (alpha / (n - i)), and whether it is rejected. Holm rather
+    than plain Bonferroni because it is uniformly more powerful at the same
+    family-wise error rate — there is no reason to pay for the weaker one.
+
+    The session-35 audit noted this repository pre-registers 48 hypotheses
+    across 26 preregistrations and applies no correction anywhere. At
+    alpha=0.05 that is ~2.4 expected false rejections. Results with very
+    small p (the headline comparisons are p < 1e-20) are untouched by any
+    correction; the ones that matter are the marginal PASSes, which should be
+    reported as exploratory rather than confirmatory when they do not survive.
+
+    A family is a set of hypotheses registered together to answer one
+    question. Correcting across *unrelated* preregistrations would be
+    over-conservative, so callers pass their own prereg's family.
+    """
+    ordered = sorted(pvals.items(), key=lambda kv: kv[1])
+    n = len(ordered)
+    out: dict[str, dict] = {}
+    still_rejecting = True
+    for i, (name, p) in enumerate(ordered):
+        threshold = alpha / (n - i)
+        # Step-down: once one test fails, every larger p fails too.
+        still_rejecting = still_rejecting and p <= threshold
+        out[name] = {"p": float(p), "rank": i + 1, "threshold": threshold,
+                     "reject": bool(still_rejecting)}
+    return out
+
+
 def ci95(values: pd.Series) -> tuple[float, float, float]:
     """(mean, lo, hi) t-based 95% CI."""
     n = len(values)

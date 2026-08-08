@@ -127,6 +127,17 @@ WORKLOAD_CLASSES = {
 }
 
 
+def workload_has_ai(workload: str) -> bool:
+    """True when this class drives AI traffic, so a run of it that reports a
+    zero AI latency measured nothing rather than measuring an idle AI path.
+    Derived from the class's own base_rps, not a hand-kept list, so a new
+    workload is covered the moment it is registered."""
+    cls = WORKLOAD_CLASSES.get(workload)
+    if cls is None:
+        return False
+    return any(cls.base_rps.get(k, 0.0) > 0.0 for k in ("chat", "embed", "agent"))
+
+
 @dataclass(frozen=True)
 class TenantSlot:
     slo_class: str

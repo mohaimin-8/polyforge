@@ -1,0 +1,23 @@
+# PREREG_ORDER_PERMUTATION.md (session 35) — adjudicates the audited
+# fairness confound. Frozen and pushed before any run.
+#
+# The coordinate-descent sweep is first-come-first-served on the shared
+# cluster caps, and the published sorted() order is confounded with priority
+# class: tenant ids are assigned by slot and every non-uniform mix puts the
+# premium/whale tenants in the low slots. These arms re-run the identical
+# controller under five fixed alternative permutations.
+#
+# `uniform` is deliberately excluded: with identical tenants there is no
+# priority for the order to correlate with, so it cannot answer the question.
+# The exclusion is declared in the prereg, before the run.
+name: matrix_order_permutation
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, jcac_perm1, jcac_perm2, jcac_perm3, jcac_perm4, jcac_perm5]
+workloads: [crud_bursty, ai_cacheable, agentic]
+tenant_mixes: [premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium]
+output: eval/results/raw_sim_order_permutation.duckdb
+retries: 2
+timeseries_reps: 0

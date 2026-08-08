@@ -221,12 +221,31 @@ func TestPlanRunnerFallsBackOnPlannerFailure(t *testing.T) {
 		t.Errorf("audit = %+v", audit.entries)
 	}
 
-	// A second failing cycle must not rewrite status (no write storms).
+	// A second failing cycle must not rewrite status (no write storms) — the
+	// status is already marked, so nothing changes there.
 	if err := runner.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if len(audit.entries) != 1 {
-		t.Errorf("repeat fallback re-audited: %d entries", len(audit.entries))
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "acme"}, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Status.LastPlanSource != pfv1alpha1.PlanSourceFallback {
+		t.Errorf("plan source = %q, want fallback", got.Status.LastPlanSource)
+	}
+
+	// But it MUST be audited. This assertion previously required the second
+	// cycle to emit nothing, which made a one-hour planner outage
+	// indistinguishable from a single blip in the stream that availability
+	// claims are measured from. The write-storm concern the comment above
+	// describes is about the status subresource, not the audit log.
+	if len(audit.entries) != 2 {
+		t.Errorf("every degraded cycle must be audited: %d entries, want 2",
+			len(audit.entries))
+	}
+	for i, e := range audit.entries {
+		if e.Source != string(pfv1alpha1.PlanSourceFallback) || e.Error == "" {
+			t.Errorf("entry %d = %+v, want a fallback entry carrying the cause", i, e)
+		}
 	}
 }
 

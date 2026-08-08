@@ -36,6 +36,13 @@ var replayWorkUnits = map[string]float64{
 // latency family (mirrors AI_KINDS in model.py).
 var replayAIKinds = map[string]bool{"chat": true, "embed": true, "agent": true}
 
+// newReplayRateTracker builds the per-(tenant, kind) rate tracker that fills
+// Event.RPSWindow. It lives here rather than inline in NewServer because that
+// constructor takes a parameter named `telemetry`, which shadows the package.
+func newReplayRateTracker() *telemetry.RateTracker {
+	return telemetry.NewRateTracker(telemetry.RateWindow)
+}
+
 // One work unit costs this much CPU. REPLICA_CAPACITY_WU=100 wu/s in the
 // sim means one replica saturates at 100 wu/s; at 1 ms of CPU per wu, one
 // CPU core is exactly one sim replica — the scale the eval chart's CPU
@@ -72,10 +79,15 @@ func (s *Server) replayWorkload(w http.ResponseWriter, r *http.Request) {
 	if replayAIKinds[req.Kind] {
 		tier = "small"
 	}
+	// RPSWindow is the planner's entire demand signal: operator/planner
+	// demand.go sums this field per kind, so leaving it zero — as this
+	// handler did — reports an idle tenant under any load, and the joint
+	// controller then holds its initial configuration for the whole run.
 	event := telemetry.Event{
 		TenantID:  tenantID,
 		Service:   req.Kind,
 		Timestamp: time.Now().UTC(),
+		RPSWindow: s.rates.Observe(tenantID + "|" + req.Kind),
 		LatencyMS: latencyMS,
 		ModelTier: tier,
 	}

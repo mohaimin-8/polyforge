@@ -40,6 +40,9 @@ type Server struct {
 	adminKey      string
 	mux           *http.ServeMux
 	requests      atomic.Int64
+	// rates fills Event.RPSWindow, the planner's demand signal. Without it
+	// the operator plans every tenant against zero AI demand.
+	rates *telemetry.RateTracker
 }
 
 type Config struct {
@@ -95,6 +98,7 @@ func NewServer(log *slog.Logger, cfg Config) *Server {
 		knobs:         newKnobStore(),
 		adminKey:      cfg.AdminKey,
 		mux:           http.NewServeMux(),
+		rates:         telemetry.NewRateTracker(telemetry.RateWindow),
 	}
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("GET /metrics", s.metrics)
@@ -186,7 +190,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 		// A hit still belongs to the AI latency family, so it carries the
 		// tier it *would* have been served from; eval-export charges no
 		// tier cost for cache-hit events.
-		s.record(r.Context(), tenantID, input.Messages, completion, start, true, 1, s.tierFor(tenantID))
+		s.record(r.Context(), tenantID, "chat", input.Messages, completion, start, true, 1, s.tierFor(tenantID))
 		return
 	}
 	w.Header().Set("X-PolyForge-Cache", "miss")
@@ -225,7 +229,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 		s.chargeUsage(tenantID, backendName, response)
 		s.cache.Store(r.Context(), tenantID, input.Messages, response.Message.Content)
-		s.record(r.Context(), tenantID, input.Messages, response.Message.Content, start, false, 1, tier)
+		s.record(r.Context(), tenantID, "chat", input.Messages, response.Message.Content, start, false, 1, tier)
 		return
 	}
 
@@ -238,7 +242,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) {
 	s.chargeUsage(tenantID, backendName, response)
 	s.cache.Store(r.Context(), tenantID, input.Messages, response.Message.Content)
 	writeJSON(w, http.StatusOK, response)
-	s.record(r.Context(), tenantID, input.Messages, response.Message.Content, start, false, 1, tier)
+	s.record(r.Context(), tenantID, "chat", input.Messages, response.Message.Content, start, false, 1, tier)
 }
 
 // tierFor is the tier a tenant's request is attributed to: the knob-pinned
@@ -364,7 +368,7 @@ func (s *Server) searchDocs(w http.ResponseWriter, r *http.Request) {
 	}
 	matches := s.search.Search(tenantID, vecs[0], input.K)
 	writeJSON(w, http.StatusOK, map[string]any{"matches": matches})
-	s.record(r.Context(), tenantID, nil, input.Query, start, false, 0, s.modelTier)
+	s.record(r.Context(), tenantID, "embed", nil, input.Query, start, false, 0, s.modelTier)
 }
 
 type agentInput struct {
@@ -398,7 +402,7 @@ func (s *Server) runAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
-	s.record(r.Context(), tenantID, nil, input.Prompt, start, false, spans, s.tierFor(tenantID))
+	s.record(r.Context(), tenantID, "agent", nil, input.Prompt, start, false, spans, s.tierFor(tenantID))
 }
 
 // record feeds the classifier: every AI request becomes a telemetry event,
@@ -406,7 +410,14 @@ func (s *Server) runAgent(w http.ResponseWriter, r *http.Request) {
 // become observable to the JCAC loop. The tier is per-request — the tier
 // the request was actually served from (or would have been, for a cache
 // hit) — so eval-export's $-metering follows the tier knob.
-func (s *Server) record(ctx context.Context, tenantID string, messages []Message, completion string, start time.Time, cacheHit bool, childSpans int, tier string) {
+// `kind` must be one of the workload taxonomy's AI kinds — chat, embed or
+// agent. It is recorded as the event's Service because that is the field the
+// planner keys its demand on: operator/planner/demand.go maps any service
+// outside the taxonomy to `crud_read`, so the previous literal "ai-gateway"
+// made every AI request arrive at the planner as one work unit of CRUD —
+// scored against the CRUD SLO target, with the cacheable fraction and the
+// tier's per-request price both silently inapplicable.
+func (s *Server) record(ctx context.Context, tenantID, kind string, messages []Message, completion string, start time.Time, cacheHit bool, childSpans int, tier string) {
 	if s.telemetry == nil {
 		return
 	}
@@ -416,8 +427,9 @@ func (s *Server) record(ctx context.Context, tenantID string, messages []Message
 	}
 	_, err := s.telemetry.Add(ctx, telemetry.Event{
 		TenantID:         tenantID,
-		Service:          "ai-gateway",
+		Service:          kind,
 		Timestamp:        time.Now().UTC(),
+		RPSWindow:        s.rates.Observe(tenantID + "|" + kind),
 		PayloadBytes:     payload,
 		LatencyMS:        float64(time.Since(start).Microseconds()) / 1000,
 		CacheHit:         cacheHit,

@@ -41,12 +41,20 @@ def main() -> None:
     # the frozen one in its last digits. Any consumer that needs a specific
     # order must sort explicitly and say why (see
     # research/analysis/analysis_risk_budget.py::load_null_runs).
+    # The V-series severity pair is appended only when the campaign's DB
+    # actually has it. Every campaign committed before PREREG_EVICTION_PARITY
+    # predates those columns, so this keeps their exports byte-identical while
+    # letting newer campaigns carry the metrics their records need (R4).
+    have = {r[0] for r in con.execute("DESCRIBE metrics").fetchall()}
+    extra = [c for c in ("mean_excess", "tier_none_step_share") if c in have]
+    extra_sql = "".join(f", m.{c}" for c in extra)
+
     rows = con.execute(
-        """
+        f"""
         SELECT r.run_id, r.system, r.workload, r.tenant_mix, r.cluster_size,
                r.rep, r.seed, r.steps, m.total_cost_usd, m.mean_violation,
                m.violation_step_share, m.mean_jain, m.cache_hit_rate,
-               m.crud_p95_ms, m.ai_p95_ms
+               m.crud_p95_ms, m.ai_p95_ms{extra_sql}
         FROM metrics m JOIN runs r USING (run_id)
         WHERE r.status = 'valid'
         """
