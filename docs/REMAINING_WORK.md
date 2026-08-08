@@ -1,5 +1,13 @@
 # Remaining work — the honest ledger of what is left and who owns it
 
+> **Execution route: `docs/PUBLICATION_ROADMAP.md`** (added end of session
+> 35) — work packages WP1–WP11 with exact steps, preregs, gates and a
+> progress table. This ledger stays the owner-split *view*; the roadmap is
+> what a session actually executes. Two evidence gaps found in the session-35
+> full-verification pass are WP1 (the −70%/−42% trace headlines carry the
+> 1.4581× LRU confound; raw traces are on disk) and WP2 (`RESULTS_MASTER.md`
+> scoreboard is stale vs the V-series adjudications).
+
 > **Top-level route: `docs/MAIN_WORKING_PATH.md`** (added 2026-08-05). That
 > file orders every item below into milestones M1–M6. This ledger remains the
 > owner-split *view*; the main path is the *order*. Session 2026-08-05: goal

@@ -30,6 +30,14 @@ reconciles every open work item into one dependency-ordered path. It sits
 3. **Survey-blessed optional strengtheners identified** (energy/carbon,
    admission control) — milestone **M4**, low priority.
 
+## 0a. EXECUTION ROUTE: `docs/PUBLICATION_ROADMAP.md` — start there
+
+Added end of session 35. That file is the mechanical, work-package-level
+route to Q1/Transactions (WP1–WP11): exact files, commands, frozen designs,
+verify-first steps, gates, and a progress table. A future session should
+execute it top to bottom without re-deriving anything. This file remains the
+milestone-level story; `REMAINING_WORK.md` remains the owner-split ledger.
+
 ## 0b. Session 35 (2026-08-08): the V-series validity remediation — READ FIRST
 
 A four-perspective validity audit of the whole artifact found eleven defects.
