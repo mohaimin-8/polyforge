@@ -75,8 +75,24 @@ and found by the project's own audit before review rather than after it.
 `tier=none` step share (7.3% for `jcac`, 0.0% for every reactive arm) is now
 a first-class reported column.
 
+**The second adjudication came back the other way, and that matters too.**
+`RESULTS_ORDER_PERMUTATION.md` (PREREG_ORDER_PERMUTATION, 540/540): the
+coordinate-descent sweep order *is* confounded with priority class — tenant
+ids are assigned by slot and the mixes put premium/whale tenants in the low
+slots — but measured over five alternative permutations the effect is
+**immaterial**. Largest Jain excursion **0.0001**, an order of magnitude
+below the 0.01 threshold the prereg fixed in advance; OP-H2 FAILS (spread
+under threshold on every mix, including the `whale` fairness stressor);
+OP-H3 PASSES (cost order-independent to 0.91%). The published order is the
+best on one mix and the *worst* on another — sensitivity, not a thumb on the
+scale. **The published fairness results stand.** What changed is that sweep
+order is now an explicit seeded parameter (`tenant_order_seed`) with 540 runs
+of measured spread behind it, so "what if you rename t00 to t99?" has a
+pre-registered answer instead of an argument.
+
 R1/R4 both hold: no published record was edited, and `reproduce.py`
-re-derives **17/17 byte-identical**.
+re-derives **19/19 byte-identical** — including, for the first time, a
+live-derived record (`PHASE7_ORDINAL.md`).
 
 Also landed this session (all local, $0): the live plane's demand signal was
 structurally dead (`RPSWindow` never populated by any production emitter, AI

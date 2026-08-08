@@ -75,6 +75,7 @@ CAMPAIGN_RECORDS = [
     # Live-derived records were entirely outside this gate until session 35 —
     # the audit's D10 finding. phase7_ordinal now falls back to its committed
     # csv exports, so it rebuilds on a clean clone like every other record.
+    ("analysis_order_permutation.py", [], "RESULTS_ORDER_PERMUTATION.md"),
     ("phase7_ordinal.py", [], "PHASE7_ORDINAL.md"),
 ]
 

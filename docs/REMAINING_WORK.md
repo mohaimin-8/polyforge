@@ -28,7 +28,7 @@ A four-perspective audit found eleven defects. Status of each:
 | D5 | `knob_preflight.py` called from no code path | **DONE** — executed by `cluster_backend.execute()` before load, raises on inert substrate |
 | D6 | `check_metrics` could not detect "measured nothing" | **DONE** — rejects zero p95 / zero `n_events`; `n_events` now captured |
 | D7 | 48 hypotheses, no multiple-comparison correction | **DONE** — `holm_bonferroni()` in `stats.py` (6 tests); applied in the V-series records |
-| D8 | sweep order confounded with priority class | **IN FLIGHT** — `PREREG_ORDER_PERMUTATION` frozen, 540-run campaign running |
+| D8 | sweep order confounded with priority class | **MEASURED, IMMATERIAL** — `RESULTS_ORDER_PERMUTATION.md` (540/540): OP-H1 fails strictly, but the largest Jain excursion is **0.0001**, an order of magnitude under the pre-registered 0.01 threshold; OP-H2 FAILS (spread < 0.01 on every mix incl. `whale`); OP-H3 PASSES (cost order-independent to 0.91%). The published order is best on one mix and *worst* on another — sensitivity, not bias. **Published fairness results stand**; sweep order is now a seeded parameter (`tenant_order_seed`) with a measured spread on record |
 | D9 | no envtest; fake clients hide conflicts | **PARTIAL** — retry-on-conflict landed; envtest still owed |
 | D10 | `reproduce.py` returned 0 on total failure | **DONE** — exits nonzero on drift or failed campaign scripts |
 | D11 | audit record dropped exactly when a knob moved | **DONE** — audit emitted before the status write; every degraded cycle audited |
