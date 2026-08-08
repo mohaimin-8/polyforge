@@ -51,6 +51,18 @@ jobs:
           version: v2.6.2
       - name: Test (race detector + coverage)
         run: go test ./... -count=1 -race -covermode=atomic -coverprofile=coverage.out
+      # The suite above uses fake clients, which cannot reproduce optimistic
+      # concurrency, CEL validation, or status subresources — the three
+      # mechanisms the session-35 audit found real defects in. envtest runs
+      # the operator against a real apiserver, so those tests are build-tagged
+      # (keeping `go test ./...` green without the binaries) and run here.
+      - name: Operator tests against a real apiserver (envtest)
+        run: |
+          go run sigs.k8s.io/controller-runtime/tools/setup-envtest@latest \
+            use 1.31.0 --bin-dir "$RUNNER_TEMP/envtest"
+          KUBEBUILDER_ASSETS="$(go run sigs.k8s.io/controller-runtime/tools/setup-envtest@latest \
+            use 1.31.0 --bin-dir "$RUNNER_TEMP/envtest" -p path)" \
+            go test -tags envtest ./internal/operator/controllers/ -run Envtest -count=1 -v
       - name: Coverage gate
         # Ratchet: raise toward the 80% target as packages gain tests.
         # First green CI run (2026-07-09) measured 66.5% with the PostgreSQL suite.
