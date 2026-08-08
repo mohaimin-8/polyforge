@@ -41,15 +41,27 @@ def test_holm_rejects_all_when_all_tiny():
         "the headline comparisons are far below any correction threshold"
 
 
-def test_holm_marginal_pass_becomes_a_failure():
-    # The audit's concrete example: a lone p=0.0073 is significant at 0.05,
-    # but not once it is one of a family — which is the whole point.
+def test_holm_marginal_pass_depends_on_family_size():
+    # The audit's concrete example, with the arithmetic done properly.
+    # A lone p=0.0073 is significant at alpha=0.05.
     alone = holm_bonferroni({"RB-H1": 0.0073})
     assert alone["RB-H1"]["reject"] is True
-    family = holm_bonferroni({f"H{i}": p for i, p in
-                              enumerate([0.0073, 0.01, 0.02, 0.03, 0.04, 0.045])})
-    assert family["H0"]["reject"] is False, \
-        "p=0.0073 must not survive correction inside a six-hypothesis family"
+
+    # In a small family it still survives: Holm's first threshold is
+    # alpha/n = 0.05/6 = 0.00833, and 0.0073 < 0.00833. This is exactly why
+    # Holm is used rather than plain Bonferroni — it is less brutal on the
+    # smallest p in the family.
+    small = holm_bonferroni({f"H{i}": p for i, p in
+                             enumerate([0.0073, 0.01, 0.02, 0.03, 0.04, 0.045])})
+    assert small["H0"]["reject"] is True
+
+    # Across the repository's full set of 48 pre-registered hypotheses the
+    # first threshold is 0.05/48 = 0.00104, and 0.0073 does NOT survive. So
+    # whether a marginal result stands is a statement about which family it
+    # belongs to — which is why the V-series preregs each declare their own.
+    wide = {"RB-H1": 0.0073}
+    wide.update({f"other{i}": 0.5 for i in range(47)})
+    assert holm_bonferroni(wide)["RB-H1"]["reject"] is False
 
 
 def test_holm_single_hypothesis_is_uncorrected():
