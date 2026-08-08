@@ -30,6 +30,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -82,10 +83,17 @@ func TestEnvtestCRDRejectsInvertedBands(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "inverted"},
 		Spec: pfv1alpha1.PolicySpec{
 			TenantRef: "acme", Replicas: 2, ReplicaMin: 5, ReplicaMax: 1,
+			ModelTier: pfv1alpha1.ModelTierSmall,
 		},
 	}
+	// Assert on the CEL message, not merely on "an error happened": every
+	// fixture here is otherwise valid, so a rejection for some unrelated
+	// reason (a missing required enum, say) would make this test pass
+	// vacuously while the rule it claims to check does nothing.
 	if err := c.Create(ctx, bad); err == nil {
 		t.Error("apiserver accepted replicaMin > replicaMax; CEL rule missing")
+	} else if !strings.Contains(err.Error(), "replicaMin must be <= replicaMax") {
+		t.Errorf("rejected for the wrong reason: %v", err)
 	}
 
 	badCache := &pfv1alpha1.Policy{
@@ -93,10 +101,13 @@ func TestEnvtestCRDRejectsInvertedBands(t *testing.T) {
 		Spec: pfv1alpha1.PolicySpec{
 			TenantRef: "acme", Replicas: 2, ReplicaMin: 1, ReplicaMax: 5,
 			CacheSizeMBMin: 512, CacheSizeMBMax: 128,
+			ModelTier: pfv1alpha1.ModelTierSmall,
 		},
 	}
 	if err := c.Create(ctx, badCache); err == nil {
 		t.Error("apiserver accepted cacheSizeMBMin > cacheSizeMBMax")
+	} else if !strings.Contains(err.Error(), "cacheSizeMBMin must be <= cacheSizeMBMax") {
+		t.Errorf("rejected for the wrong reason: %v", err)
 	}
 
 	good := &pfv1alpha1.Policy{
@@ -104,6 +115,7 @@ func TestEnvtestCRDRejectsInvertedBands(t *testing.T) {
 		Spec: pfv1alpha1.PolicySpec{
 			TenantRef: "acme", Replicas: 2, ReplicaMin: 1, ReplicaMax: 5,
 			CacheSizeMBMin: 128, CacheSizeMBMax: 128, // a legitimate pin
+			ModelTier: pfv1alpha1.ModelTierSmall,
 		},
 	}
 	if err := c.Create(ctx, good); err != nil {
