@@ -243,7 +243,15 @@ func duckDuckGoSearch(ctx context.Context, query string) ([]agent.SearchResult, 
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "polyforge-ai-gateway/0.1")
-	client := &http.Client{Timeout: 15 * time.Second}
+	// Refuse redirects: the search host is fixed, and a 3xx to another host
+	// (an internal service, cloud metadata) must not be followed. Mirrors the
+	// gateway providers' egress guard.
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+		CheckRedirect: func(r *http.Request, _ []*http.Request) error {
+			return fmt.Errorf("search egress guard: refusing redirect to %s", r.URL.Host)
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

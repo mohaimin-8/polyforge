@@ -27,7 +27,7 @@ func NewOpenAICompat(baseURL, apiKey, defaultModel string) *OpenAICompat {
 		baseURL: strings.TrimRight(baseURL, "/"),
 		apiKey:  apiKey,
 		model:   defaultModel,
-		client:  &http.Client{Timeout: 120 * time.Second},
+		client:  egressClient(120 * time.Second),
 	}
 }
 

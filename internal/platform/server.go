@@ -41,6 +41,16 @@ var otelPropagator = propagation.TraceContext{}
 
 const maxRequestBodyBytes = 1 << 20
 
+// Upper bounds on tenant-self-reported telemetry (see ingestTelemetry).
+// Generous physical ceilings, not tuning knobs: they exist to bound the
+// magnitude of a metric-skew attack, not to shape the data.
+const (
+	maxTelemetryLatencyMS    = 3_600_000 // 1 hour; the sim's outage cap is 30 s
+	maxTelemetryRPSWindow    = 1_000_000 // 1M rps for one tenant is not a measurement
+	maxTelemetryPayloadBytes = 1 << 30   // 1 GiB
+	maxTelemetryChildSpans   = 100_000
+)
+
 var resourceIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$`)
 var errRateLimited = errors.New("rate limit exceeded")
 
@@ -522,6 +532,19 @@ func (s *Server) ingestTelemetry(w http.ResponseWriter, r *http.Request) {
 	}
 	if event.RPSWindow < 0 || event.PayloadBytes < 0 || event.LatencyMS < 0 || event.EmbeddingDensity < 0 || event.EmbeddingDensity > 1 || event.ChildSpans < 0 {
 		s.writeError(w, r, http.StatusBadRequest, errors.New("telemetry values are outside their valid ranges"))
+		return
+	}
+	// Upper bounds on tenant-asserted values. This endpoint lets a full-scope
+	// tenant report its own metrics, which eval-export aggregates into a
+	// campaign's numbers, so an unbounded field is a metric-skew lever (a
+	// tenant emitting latency_ms=1e12 tanks a shared p95/violation figure).
+	// The bounds are generous physical ceilings — anything past them is not a
+	// measurement. They cap the magnitude of any skew; the definitive live
+	// numbers come from the server-measured /workloads/replay path, not from
+	// this self-report surface.
+	if event.LatencyMS > maxTelemetryLatencyMS || event.RPSWindow > maxTelemetryRPSWindow ||
+		event.PayloadBytes > maxTelemetryPayloadBytes || event.ChildSpans > maxTelemetryChildSpans {
+		s.writeError(w, r, http.StatusBadRequest, errors.New("telemetry values exceed their maximum plausible bounds"))
 		return
 	}
 	// The model tier is tenant-asserted but priced by eval-export, so an

@@ -24,7 +24,7 @@ dependency or image. Out of scope: malicious cluster admin, hardware.
 | API4 | Unrestricted Resource Consumption | ✅ | **Control plane**: Redis sliding-window rate limits with an in-process token-bucket fallback that now stays armed as a second tier and takes over on a Redis error instead of failing fully open (`internal/platform/server.go`, corrected session 35), request body caps (`MaxBytesReader`, 1 MiB), pagination caps (`MaxPageSize`). **AI gateway** (added session 35 — it previously had none): a per-tenant token bucket in front of every AI route (`internal/ai/gateway/ratelimit.go`, default RPM 600 / burst 60, secure-by-default), a per-tenant semantic-cache entry cap and document-index cap so one tenant cannot OOM the shared process (`cache.go` `DefaultCacheCapacityPerTenant`, `server.go` `maxDocsPerTenant`). **Both**: per-tenant daily LLM budget with cheapest-backend degradation (`gateway.Router`), K8s ResourceQuota/LimitRange in silo mode (W21). |
 | API5 | Broken Function Level Authorization | ✅ | Admin surface (tenant CRUD, isolation promotion, key rotation endpoints) requires the admin key; tenant keys cannot reach it (tested in `isolation_http_test.go`). Scope model separates read from full keys (`ScopeAllows`). |
 | API6 | Unrestricted Access to Sensitive Business Flows | ✅ | Tenant provisioning and isolation promotion are admin-only and audited to the outbox; idempotency keys (W13) stop replay-driven resource creation. |
-| API7 | Server Side Request Forgery | ⚠️ | LLM/embedding base URLs are operator config, not user input. The agent's web-search tool fetches a fixed search endpoint with the query URL-encoded — user text never becomes a URL. Gap: no egress allowlist inside the process; network-level containment relies on the W24 NetworkPolicies. |
+| API7 | Server Side Request Forgery | ✅ | LLM/embedding base URLs are operator config, not user input (`POLYFORGE_TIER_BACKENDS`, parsed at startup — a tenant cannot set a provider URL). The agent's web-search tool fetches a fixed search endpoint with the query URL-encoded — user text never becomes a URL. **Redirect-based egress is now closed (session 35):** every outbound client — both model providers and the search tool — refuses to follow any 3xx (`internal/ai/gateway/egress.go` `egressClient`), so a compromised or malicious upstream cannot 302 the process into fetching an internal address (cloud metadata at 169.254.169.254, a sibling service, localhost). Network-level containment (W24 NetworkPolicies) remains as a second layer. Residual: no positive host allowlist — containment is by fixed config + no-redirect, not an enumerated allowlist. |
 | API8 | Security Misconfiguration | ✅ | Default-deny NetworkPolicies (`deploy/k8s/networkpolicies.yaml`), mTLS everywhere via Linkerd (W22), distroless runtime image, secrets out of env into Vault chain (W23), gitleaks in CI over full history. Dev-mode manifests carry self-labeled `dev-only` placeholders. |
 | API9 | Improper Inventory Management | ✅ | One OpenAPI document (`api/openapi.yaml`) linted in CI and kept in parity with the mux; ADRs document every surface; SBOM per build (CI) and per image (release workflow). |
 | API10 | Unsafe Consumption of APIs | ✅ | Every upstream response (LLM providers, Vault, OIDC, search) is size-capped (`io.LimitReader`), schema-decoded, and status-checked; provider failures map to 502 without echoing upstream bodies to clients. |
@@ -151,16 +151,40 @@ control plane the table describes. Six gaps were closed:
 | F5 | MED | Tenant-asserted `model_tier` priced by eval-export; an unknown tier booked AI requests at $0 (research-integrity, not isolation) | whitelist tier at ingest (`validModelTier`) + eval-export fails closed on an unknown tier |
 | F6 | LOW | `RateTracker` keys never reclaimed | self-pruning of idle keys + `Forget` for explicit deletion |
 
-Residual, accepted (out of the stated threat model or low-risk):
-- `/v1/telemetry` still lets a full-scope tenant assert its own `LatencyMS` /
-  `CacheHit` within its own tenant partition. This cannot cross a tenant
-  boundary (isolation holds), but it means the campaign metrics computed
-  from tenant-asserted telemetry are trusted-input; the server-measured
-  `/workloads/replay` path is the one used for the published live numbers.
-- SSRF (API7) containment still relies on the default config (operator-set
-  provider URLs, a hardcoded search host) plus the network-level
-  NetworkPolicies; there is no in-process egress allowlist. Unchanged from
-  the table's ⚠️.
+### Follow-up hardening (same session, the residuals that were code-fixable)
+
+- **Telemetry self-report bounds (F5 follow-up).** `/v1/telemetry` still
+  lets a full-scope tenant assert its own metrics *within its own partition*
+  (isolation is unaffected), but the values are now bounded at ingest —
+  `latency_ms ≤ 1 h`, `rps_window ≤ 1M`, `payload_bytes ≤ 1 GiB`,
+  `child_spans ≤ 100k` (`internal/platform/server.go`). Previously only
+  negatives were rejected, so a tenant could assert `latency_ms=1e12` to skew
+  a shared p95/violation figure without limit; the bound caps the magnitude.
+  The definitive live numbers come from the server-measured
+  `/workloads/replay` path, not this self-report surface.
+- **SSRF redirect guard (API7).** Closed as above (`egress.go`); the residual
+  is the absence of a positive host allowlist, accepted because provider URLs
+  are fixed operator config and redirects are refused.
 - Timing-side-channel exploitability of any remaining `==`/`!=` on
   non-secret values is not a concern; the only secret comparisons are now
   constant-time or hash-based.
+
+### Genuinely out of scope or infrastructure-gated (cannot be closed in code here)
+
+- **NetworkPolicy on a non-enforcing CNI.** A NetworkPolicy is inert on a CNI
+  that does not enforce it (kind's default kindnet). This is a deployment
+  property, not a code defect — it cannot be forced from the application. The
+  load-bearing control is therefore application-layer defence in depth, which
+  exists: the planner requires a constant-time bearer token
+  (`services/planner`, `hmac.compare_digest`), Postgres/Redis are
+  credential-protected and pin their inbound peers, and the admin surfaces
+  require the admin key. Deploy on an enforcing CNI (Calico) and run the
+  verification command in the manifest header to confirm the policy is live.
+- **ZAP baseline scan (`scripts/zap-baseline.sh`).** Ready and correct;
+  requires Docker to run, which this development machine does not have. Run it
+  in the Codespace/cloud sitting alongside the B1 live plane.
+- **mTLS (Linkerd), Vault secret chain, cosign signing, SBOM.** cosign
+  keyless signing and syft SBOM generation **do run in CI/release on every
+  push** (`.github/workflows/{ci,release}.yml`) — verified there, just not on
+  this local machine. Linkerd mTLS and the Vault chain are deploy-time mesh /
+  secret-store properties confirmed at cluster bring-up, not in a unit test.

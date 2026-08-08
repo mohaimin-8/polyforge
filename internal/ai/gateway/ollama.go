@@ -26,7 +26,7 @@ func NewOllama(baseURL, defaultModel string) *Ollama {
 	return &Ollama{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		model:   defaultModel,
-		client:  &http.Client{Timeout: 300 * time.Second},
+		client:  egressClient(300 * time.Second),
 	}
 }
 
