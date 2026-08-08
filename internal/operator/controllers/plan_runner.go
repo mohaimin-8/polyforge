@@ -226,10 +226,27 @@ func (p *PlanRunner) gather(ctx context.Context) (inputs []planner.TenantInput, 
 			},
 			Demand: demand,
 		}
+		// A missing Budget legitimately means "use the default". Any OTHER
+		// error — apiserver timeout, RBAC denial, APF throttle (which the
+		// chaos campaign deliberately induces) — must not silently replace
+		// the tenant's real cap with the $5/hr default: the budget is the
+		// constraint the planner optimizes under and, in the cost arm, the
+		// experiment's independent variable. Skipping the tenant holds its
+		// last good plan, which is the honest response to not knowing.
 		var budget pfv1alpha1.Budget
-		if err := p.Client.Get(ctx, types.NamespacedName{Name: tenant.Name}, &budget); err == nil {
+		switch err := p.Client.Get(ctx, types.NamespacedName{Name: tenant.Name}, &budget); {
+		case err == nil:
 			input.HourlyBudgetUSD = float64(budget.Spec.HourlyCapMilliUSD) / 1000.0
 			input.FairnessWeight = float64(budget.Spec.FairnessWeightPermille) / 1000.0
+		case apierrors.IsNotFound(err):
+			// Defaults already set above; no Budget CR for this tenant.
+		default:
+			if p.Log != nil {
+				p.Log.Error("read budget; skipping tenant this cycle rather "+
+					"than planning against the default cap",
+					"tenant", tenant.Name, "error", err)
+			}
+			continue
 		}
 		if p.Interference != nil {
 			input.Interference = p.Interference.TenantInterference(ctx, tenant.Name)
@@ -245,13 +262,15 @@ func (p *PlanRunner) gather(ctx context.Context) (inputs []planner.TenantInput, 
 // plan source is trusted to (safety guardrail, same rule as the
 // PolicyReconciler).
 func (p *PlanRunner) apply(ctx context.Context, policy *pfv1alpha1.Policy, input planner.TenantInput, plan planner.Plan, solver string) error {
-	replicas := plan.Replicas
-	if replicas < policy.Spec.ReplicaMin {
-		replicas = policy.Spec.ReplicaMin
-	}
-	if replicas > policy.Spec.ReplicaMax {
-		replicas = policy.Spec.ReplicaMax
-	}
+	// Reuse the shared clamp rather than open-coding it. The inline copy
+	// omitted clampReplicas's `ReplicaMax >= ReplicaMin` guard, so on an
+	// inverted band (now rejected by CEL, but older objects persist) this
+	// path wrote a different value than PolicyReconciler actuated — and the
+	// next cycle read the wrong one back as the planner's "from" state, so
+	// the recorded trajectory and the actuated one diverged permanently.
+	replicaSpec := policy.Spec
+	replicaSpec.Replicas = plan.Replicas
+	replicas := clampReplicas(&replicaSpec)
 	// Clamp cache/tier to the Policy bounds too, reusing the shared clamp
 	// helpers on a copy carrying the planned value — the single source of the
 	// bound logic. The planner already plans within them, so with a bound-free

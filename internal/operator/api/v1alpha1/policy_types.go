@@ -59,6 +59,16 @@ const (
 
 // PolicySpec is the desired resource allocation for one tenant. The JCAC
 // planner writes replicas/cacheSizeMB/modelTier; humans set the bounds.
+//
+// The CEL rules below reject an inverted band at admission. Without them a
+// typo like `replicaMin: 5, replicaMax: 1` was schema-valid, and the two
+// clamp paths disagree on it — clampReplicas guards the inversion while the
+// planner's apply path did not — so the actuated value and the recorded
+// value diverge silently for the rest of the run. For an ablation arm, whose
+// whole meaning is "this knob is pinned", an unnoticed inverted or unpinned
+// band turns the arm into an unlabelled copy of the full controller.
+// +kubebuilder:validation:XValidation:rule="!has(self.replicaMax) || !has(self.replicaMin) || self.replicaMin <= self.replicaMax",message="replicaMin must be <= replicaMax"
+// +kubebuilder:validation:XValidation:rule="!has(self.cacheSizeMBMax) || self.cacheSizeMBMax == 0 || !has(self.cacheSizeMBMin) || self.cacheSizeMBMin <= self.cacheSizeMBMax",message="cacheSizeMBMin must be <= cacheSizeMBMax (0 max means no ceiling)"
 type PolicySpec struct {
 	// TenantRef names the Tenant this policy applies to.
 	// +kubebuilder:validation:MinLength=1

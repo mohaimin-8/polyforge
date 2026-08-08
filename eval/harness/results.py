@@ -97,10 +97,26 @@ def connect(path: str | Path) -> duckdb.DuckDBPyConnection:
     return con
 
 
-def valid_run_ids(con: duckdb.DuckDBPyConnection, experiment: str) -> set[str]:
-    rows = con.execute(
-        "SELECT run_id FROM runs WHERE experiment = ? AND status = 'valid'", [experiment]
-    ).fetchall()
+def valid_run_ids(con: duckdb.DuckDBPyConnection, experiment: str,
+                  backend: str | None = None) -> set[str]:
+    """Run ids already completed for this experiment, for resume.
+
+    `backend` must be passed by the runner. run_identity does not hash the
+    backend — adding it would churn every committed run_id — so without this
+    filter, pointing a `backend: cluster` spec at a DB that already holds the
+    sim rows for the same experiment name made every id look done: `pending`
+    came out empty, validate() reported ok, and the runner announced success
+    having executed nothing, with a table of sim rows under a cluster
+    experiment's name.
+    """
+    if backend is None:
+        rows = con.execute(
+            "SELECT run_id FROM runs WHERE experiment = ? AND status = 'valid'",
+            [experiment]).fetchall()
+    else:
+        rows = con.execute(
+            "SELECT run_id FROM runs WHERE experiment = ? AND status = 'valid' "
+            "AND backend = ?", [experiment, backend]).fetchall()
     return {r[0] for r in rows}
 
 
@@ -220,6 +236,19 @@ def validate(con: duckdb.DuckDBPyConnection, experiment: str, expected_runs: int
             "SELECT count(*) FROM runs r LEFT JOIN metrics m USING (run_id) "
             "WHERE r.experiment=? AND r.status='valid' AND m.run_id IS NULL", experiment
         ),
+        # More than one substrate under one experiment name means sim and
+        # live rows are pooled in a table the analysis reads as homogeneous.
+        # They are not comparable in absolute terms — the whole phase7
+        # protocol exists because they are only ordinally comparable.
+        "distinct_backends": q(
+            "SELECT count(DISTINCT backend) FROM runs WHERE experiment=?", experiment
+        ),
+        # Likewise a mixture of harness versions: results produced by
+        # different code, indistinguishable once pooled.
+        "distinct_harness_versions": q(
+            "SELECT count(DISTINCT harness_version) FROM runs WHERE experiment=?",
+            experiment
+        ),
         "null_metrics": q(
             "SELECT count(*) FROM metrics WHERE "
             + " OR ".join(f"{c} IS NULL" for c in METRIC_COLUMNS)
@@ -231,5 +260,7 @@ def validate(con: duckdb.DuckDBPyConnection, experiment: str, expected_runs: int
         and report["orphan_metrics"] == 0
         and report["valid_without_metrics"] == 0
         and report["null_metrics"] == 0
+        and report["distinct_backends"] <= 1
+        and report["distinct_harness_versions"] <= 1
     )
     return report

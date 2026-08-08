@@ -33,10 +33,27 @@ A four-perspective audit found eleven defects. Status of each:
 | D10 | `reproduce.py` returned 0 on total failure | **DONE** — exits nonzero on drift or failed campaign scripts |
 | D11 | audit record dropped exactly when a knob moved | **DONE** — audit emitted before the status write; every degraded cycle audited |
 
-**Two committed live rows in `phase7_live.duckdb` are marked `valid` with
-`crud_p95_ms = 0.0`** — they measured nothing. `check_metrics` now rejects
-that signature; the rows themselves still need invalidating and
-`PHASE7_ORDINAL.md` regenerating (open item, listed in Bucket A below).
+**Two committed live rows in `phase7_live.duckdb` were marked `valid` with
+`crud_p95_ms = 0.0`** — they measured nothing. Retro-invalidated in the
+committed export and `PHASE7_ORDINAL.md` regenerated; `check_metrics` now
+rejects the signature.
+
+### Second wave — the rest of the audit's live-plane findings
+
+The eleven above were the tracked subset; the four reviewers raised more.
+These are the ones that would have corrupted B1, all now closed:
+
+| finding | status |
+|---|---|
+| Planner requested no time window, so the feature API applied its 15-minute default — a **10-second control loop planning on a 15-minute moving average** (~45 intervals of lag), which makes a "predictive" controller strictly worse than a reactive one | **FIXED** — `FeatureDemandSource.Window` defaults to the control interval and is sent as `?since=` |
+| `FeatureSet.Truncated` was reported by the server and decoded by nobody, so above 10k events the demand estimate silently became a prefix of the window and **fell as load rose** | **FIXED** — truncation is now an error; the caller holds the last good plan |
+| Live tenants were created with **no SLO class**, so the store defaulted every one to `standard` — premium graded 2.5× too leniently, best-effort 3.2× too strictly, voiding any non-uniform-mix live/sim parity reading | **FIXED** — the mix's classes are sent at provisioning, and `eval-export` now **errors** on an unrecognised plan instead of defaulting |
+| Any Budget `Get` error (timeout, RBAC, APF throttle — which the chaos campaign *deliberately induces*) silently replaced the tenant's real cap with the $5/hr default, i.e. perturbed the cost arm's independent variable with no log | **FIXED** — only `NotFound` uses the default; other errors skip the tenant for that cycle |
+| The CRD accepted `replicaMin > replicaMax`, and the planner's apply path open-coded a clamp **without** the inversion guard `clampReplicas` has — so actuated and recorded values diverged permanently | **FIXED** — CEL rules reject inverted bands at admission; the inline clamp now calls `clampReplicas` |
+| k6 exits 0 when every request fails; the summary file was written by every run and **read by none**, and the script ignored response status | **FIXED** — k6 `thresholds` + `check_k6_delivery()` fails the run on >1% failures or any dropped iteration |
+| `ReplicaSampler` swallowed failures and a `TimeoutExpired` killed its daemon thread unnoticed, under-pricing a run whose sampler died partway (infra cost **is** total cost on CRUD cells) | **FIXED** — failures counted, exceptions caught, `check_sampler_coverage()` fails below 90% coverage |
+| `run_identity` omits `backend`, so a `backend: cluster` spec pointed at the same experiment's sim DB skipped every run and reported success having executed nothing | **FIXED** — resume is filtered by substrate; `validate()` now fails on mixed backends or harness versions (ids unchanged, so provenance holds) |
+| `--workers N` on the cluster backend had each worker delete the others' shared kind cluster mid-run | **FIXED** — refused with a clear error |
 
 ## Where the project stands
 

@@ -82,11 +82,26 @@ def _log_progress(experiment: str, done: int, total: int, failed: int, started: 
 
 def run_experiment(spec: ExperimentSpec, workers: int = 1, limit: int | None = None,
                    progress_every: int = 25) -> dict:
+    # The cluster backend provisions one kind cluster under a fixed name and
+    # begins every run by deleting it, so concurrent workers tear down each
+    # other's cluster mid-run. The dangerous case is not the loud failure but
+    # the quiet one: a delete landing after another worker's eval-export read
+    # a partially-drained store, which records as a short, plausible, valid
+    # row. Refuse instead of racing.
+    if spec.backend == "cluster" and workers > 1:
+        raise ValueError(
+            f"backend=cluster cannot run with --workers {workers}: every run "
+            "deletes and recreates the shared kind cluster, so parallel "
+            "workers destroy each other's runs. Use --workers 1.")
+
     all_runs = expand(spec)
     db_path = (EVAL_DIR.parent / spec.output).resolve()
     con = connect(db_path)
 
-    done_ids = valid_run_ids(con, spec.name)
+    # Filter resume by substrate: run_identity does not hash the backend, so
+    # without this a cluster spec pointed at a DB holding the same
+    # experiment's sim rows would skip every run and report success.
+    done_ids = valid_run_ids(con, spec.name, spec.backend)
     pending = [r for r in all_runs if r.run_id not in done_ids]
     if limit is not None:
         pending = pending[:limit]

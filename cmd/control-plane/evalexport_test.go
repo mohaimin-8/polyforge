@@ -30,7 +30,10 @@ func TestComputeEvalExportAggregatesHarnessSchema(t *testing.T) {
 		},
 	}
 
-	doc := computeEvalExport(tenants, events, 1.5)
+	doc, err := computeEvalExport(tenants, events, 1.5)
+	if err != nil {
+		t.Fatalf("computeEvalExport: %v", err)
+	}
 
 	if doc.NEvents != 5 || doc.NTenants != 3 {
 		t.Fatalf("expected 5 events over 3 tenants, got %d/%d", doc.NEvents, doc.NTenants)
@@ -76,8 +79,33 @@ func TestComputeEvalExportAggregatesHarnessSchema(t *testing.T) {
 	}
 }
 
+// An unrecognised plan must fail the export, not silently score the tenant
+// at "standard". The harness previously created live tenants with no plan
+// field at all, so every tenant in every mix was graded at the 2.5x standard
+// scale — premium 2.5x too leniently, best-effort 3.2x too strictly — which
+// voids any live/sim parity reading on a non-uniform mix.
+func TestComputeEvalExportRejectsUnknownPlan(t *testing.T) {
+	for _, plan := range []string{"", "gold", "Premium"} {
+		tenants := []tenant.Tenant{{ID: "alpha", Plan: plan}}
+		if _, err := computeEvalExport(tenants, nil, 0); err == nil {
+			t.Errorf("plan %q was accepted; want an error rather than a "+
+				"silent default to standard", plan)
+		}
+	}
+	// The three real classes are accepted.
+	for _, plan := range []string{"premium", "standard", "best-effort"} {
+		tenants := []tenant.Tenant{{ID: "alpha", Plan: plan}}
+		if _, err := computeEvalExport(tenants, nil, 0); err != nil {
+			t.Errorf("plan %q rejected: %v", plan, err)
+		}
+	}
+}
+
 func TestComputeEvalExportEmptyStoreIsWellFormed(t *testing.T) {
-	doc := computeEvalExport(nil, nil, 0)
+	doc, err := computeEvalExport(nil, nil, 0)
+	if err != nil {
+		t.Fatalf("computeEvalExport: %v", err)
+	}
 	if doc.NEvents != 0 || doc.MeanViolation != 0 || doc.TotalCostUSD != 0 {
 		t.Fatalf("expected zeroed metrics on an empty store, got %+v", doc)
 	}

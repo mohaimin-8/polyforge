@@ -402,6 +402,73 @@ class TestClusterBackend:
         assert jcac.count("replicaMax: 6") == 8
         assert jcac.count("modelTierMax: large") == 8
 
+    def test_cluster_backend_refuses_parallel_workers(self):
+        from harness.runner import run_experiment
+
+        spec = tiny_spec(backend="cluster")
+        with pytest.raises(ValueError, match="workers"):
+            run_experiment(spec, workers=4)
+
+    def test_resume_is_scoped_to_the_substrate(self, tmp_path):
+        # A cluster spec pointed at a DB holding the same experiment's sim
+        # rows must not treat them as done.
+        db = tmp_path / "mixed.duckdb"
+        con = results.connect(db)
+        run = expand(tiny_spec(systems=["hpa"]))[0]
+        outcome = sim_backend.execute(run)
+        results.record(con, run, "valid", 1, outcome, None)
+
+        assert run.run_id in results.valid_run_ids(con, run.experiment, "sim")
+        assert run.run_id not in results.valid_run_ids(con, run.experiment, "cluster"), \
+            "a sim row must not satisfy a cluster run"
+        con.close()
+
+    def test_k6_script_declares_delivery_thresholds(self):
+        run = expand(tiny_spec(systems=["hpa"]))[0]
+        script = cluster_backend.k6_script(run)
+        assert "thresholds" in script
+        assert "http_req_failed" in script
+        assert "dropped_iterations" in script
+
+    def test_k6_delivery_check_rejects_a_run_that_did_not_land(self, tmp_path):
+        import json as _json
+
+        good = tmp_path / "ok.json"
+        good.write_text(_json.dumps({"metrics": {
+            "http_req_failed": {"rate": 0.0},
+            "dropped_iterations": {"count": 0}}}), encoding="utf-8")
+        cluster_backend.check_k6_delivery(good)  # must not raise
+
+        # Every request failed but k6 still exits 0 — the exact signature the
+        # harness used to record as a valid, cheap, low-violation run.
+        bad = tmp_path / "failed.json"
+        bad.write_text(_json.dumps({"metrics": {
+            "http_req_failed": {"rate": 1.0},
+            "dropped_iterations": {"count": 0}}}), encoding="utf-8")
+        with pytest.raises(RuntimeError, match="failed requests"):
+            cluster_backend.check_k6_delivery(bad)
+
+        # The generator could not keep up: tenants did not get the demand.
+        dropped = tmp_path / "dropped.json"
+        dropped.write_text(_json.dumps({"metrics": {
+            "http_req_failed": {"rate": 0.0},
+            "dropped_iterations": {"count": 512}}}), encoding="utf-8")
+        with pytest.raises(RuntimeError, match="dropped"):
+            cluster_backend.check_k6_delivery(dropped)
+
+        with pytest.raises(RuntimeError, match="missing"):
+            cluster_backend.check_k6_delivery(tmp_path / "absent.json")
+
+    def test_sampler_coverage_check_catches_a_dead_sampler(self):
+        s = cluster_backend.ReplicaSampler(interval_s=10.0)
+        s.samples = [2] * 30           # 300 s of a 300 s window
+        cluster_backend.check_sampler_coverage(s, 300.0)
+
+        s.samples = [2] * 4            # sampler died ~40 s in
+        s.failures = 3
+        with pytest.raises(RuntimeError, match="covered"):
+            cluster_backend.check_sampler_coverage(s, 300.0)
+
     def test_knob_preflight_is_wired_into_the_run_path(self):
         import inspect
 

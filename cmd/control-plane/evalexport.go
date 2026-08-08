@@ -103,7 +103,11 @@ func evalExport(args []string) int {
 		return 1
 	}
 
-	doc := computeEvalExport(tenants, events, *infraCost)
+	doc, err := computeEvalExport(tenants, events, *infraCost)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
+		return 1
+	}
 	payload, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
@@ -170,7 +174,7 @@ func evalLoadStore(ctx context.Context, maxEvents int) ([]tenant.Tenant, map[str
 	return tenants, events, nil
 }
 
-func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Event, infraCostUSD float64) evalExportDoc {
+func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Event, infraCostUSD float64) (evalExportDoc, error) {
 	doc := evalExportDoc{
 		CostInfraUSD:        infraCostUSD,
 		GeneratedAtUTC:      time.Now().UTC().Format(time.RFC3339),
@@ -186,9 +190,17 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 	stepViolations := map[int64][2]int{} // step -> {over-target, total}
 
 	for _, t := range tenants {
-		scale, ok := evalSLOClassScale[strings.TrimSpace(t.Plan)]
+		// An unrecognised plan is a provisioning bug, not a default. Silently
+		// substituting "standard" is how every live tenant came to be graded
+		// at 2.5x regardless of its mix — premium 2.5x too leniently,
+		// best-effort 3.2x too strictly — which voids any live/sim parity
+		// reading on a non-uniform mix. Fail the export instead.
+		plan := strings.TrimSpace(t.Plan)
+		scale, ok := evalSLOClassScale[plan]
 		if !ok {
-			scale = evalSLOClassScale["standard"]
+			return evalExportDoc{}, fmt.Errorf(
+				"tenant %q has unrecognised plan %q: cannot score latency "+
+					"without its SLO class", t.ID, plan)
 		}
 		tenantOver, tenantTotal := 0, 0
 		for _, e := range events[t.ID] {
@@ -261,7 +273,7 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 		}
 	}
 	doc.TotalCostUSD = doc.CostTierUSD + doc.CostInfraUSD
-	return doc
+	return doc, nil
 }
 
 func evalP95(values []float64) float64 { return evalPercentile(values, 0.95) }
