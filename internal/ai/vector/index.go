@@ -68,6 +68,16 @@ func (x *Index) Count(tenantID string) int {
 	return len(x.docs[tenantID])
 }
 
+// Has reports whether the tenant already has a document with this id, so a
+// caller enforcing a per-tenant document cap can still allow updates to
+// existing ids once the cap is reached.
+func (x *Index) Has(tenantID, id string) bool {
+	x.mu.RLock()
+	defer x.mu.RUnlock()
+	_, ok := x.docs[tenantID][id]
+	return ok
+}
+
 // Search returns the tenant's top-k documents by cosine similarity.
 // Isolation is structural: the scan never touches another tenant's map, so
 // there is no filter to get wrong.

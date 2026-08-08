@@ -25,9 +25,14 @@ var kindProfiles = map[string]kindProfile{
 	"crud_read":  {service: "projects-api"},
 	"crud_write": {service: "projects-api"},
 	"batch":      {service: "worker"},
-	"chat":       {service: "ai-gateway", modelTier: "local", embeddingDensity: 0.6},
-	"embed":      {service: "ai-gateway", modelTier: "local", embeddingDensity: 0.9},
-	"agent":      {service: "ai-gateway", modelTier: "quality", childSpans: 4, embeddingDensity: 0.3},
+	// Tiers must be from the priced taxonomy {none,small,mid,large}; the
+	// control plane rejects anything else at ingest and eval-export prices
+	// only these. The earlier "local"/"quality" labels were outside it, so
+	// every replayed AI request was silently booked at $0. small = the cheap
+	// serving tier, large = the quality tier, mirroring model.py's TIERS.
+	"chat":  {service: "ai-gateway", modelTier: "small", embeddingDensity: 0.6},
+	"embed": {service: "ai-gateway", modelTier: "small", embeddingDensity: 0.9},
+	"agent": {service: "ai-gateway", modelTier: "large", childSpans: 4, embeddingDensity: 0.3},
 }
 
 // HTTPSender posts replayed events to the control plane's telemetry ingest

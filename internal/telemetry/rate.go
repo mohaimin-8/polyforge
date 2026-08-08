@@ -16,6 +16,10 @@ const RateWindow = 10 * time.Second
 // biases the estimate low rather than growing without limit.
 const maxRateSamples = 4096
 
+// idlePruneInterval bounds how often the map is swept for idle keys, so the
+// sweep cost is amortised across many Observe calls.
+const idlePruneInterval = 10 * time.Minute
+
 // RateTracker measures per-key request rate over a sliding window, in
 // process, with no external dependency.
 //
@@ -27,10 +31,11 @@ const maxRateSamples = 4096
 // recorded exactly that: identical cost across repetitions, replicas pinned
 // at their starting value, while the reactive baseline moved.
 type RateTracker struct {
-	mu     sync.Mutex
-	window time.Duration
-	seen   map[string][]time.Time
-	now    func() time.Time
+	mu        sync.Mutex
+	window    time.Duration
+	seen      map[string][]time.Time
+	now       func() time.Time
+	lastPrune time.Time
 }
 
 func NewRateTracker(window time.Duration) *RateTracker {
@@ -71,11 +76,34 @@ func (t *RateTracker) Observe(key string) float64 {
 	}
 	t.seen[key] = samples
 
+	t.pruneIdle(now)
 	return float64(len(samples)) / t.window.Seconds()
 }
 
-// Forget drops a key's history — used when a tenant is deleted so an idle
-// map does not grow for the process lifetime.
+// pruneIdle drops keys whose newest sample is older than the window, so the
+// map is bounded by the number of *currently active* keys rather than by
+// every key ever seen for the process lifetime. Amortised: it runs at most
+// once per idlePruneInterval. Caller holds the lock.
+func (t *RateTracker) pruneIdle(now time.Time) {
+	if t.lastPrune.IsZero() {
+		t.lastPrune = now
+		return
+	}
+	if now.Sub(t.lastPrune) < idlePruneInterval {
+		return
+	}
+	t.lastPrune = now
+	cutoff := now.Add(-t.window)
+	for key, samples := range t.seen {
+		if len(samples) == 0 || samples[len(samples)-1].Before(cutoff) {
+			delete(t.seen, key)
+		}
+	}
+}
+
+// Forget drops a key's history immediately — for an explicit tenant deletion.
+// Idle keys are also reclaimed automatically by pruneIdle, so this is an
+// optimisation, not the only bound.
 func (t *RateTracker) Forget(key string) {
 	if t == nil {
 		return

@@ -218,7 +218,20 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 					cacheHits++
 				} else {
 					tier := strings.TrimSpace(e.ModelTier)
-					doc.CostTierUSD += evalTierCostUSD[tier]
+					// Fail closed on an unrecognised tier, mirroring the plan
+					// lookup above. A bare map read returns $0 for an unknown
+					// tier while still counting it in the histogram, so a
+					// tenant asserting ModelTier:"ultra" would book AI requests
+					// for free and skew the campaign's cost metric. Ingest now
+					// rejects unknown tiers (internal/platform validModelTier);
+					// this guards older data and any non-ingest path.
+					cost, ok := evalTierCostUSD[tier]
+					if !ok {
+						return evalExportDoc{}, fmt.Errorf(
+							"tenant %q emitted unrecognised model tier %q: cannot "+
+								"price the AI request", t.ID, tier)
+					}
+					doc.CostTierUSD += cost
 					doc.TierRequests[tier]++
 				}
 			} else {

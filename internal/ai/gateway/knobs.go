@@ -10,6 +10,7 @@ package gateway
 // they are re-pushed by the next reconcile of each Policy.
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -74,7 +75,15 @@ func (s *Server) authorizeAdmin(w http.ResponseWriter, r *http.Request) bool {
 			"no admin key is configured; the knob surface is disabled")
 		return false
 	}
-	if strings.TrimSpace(r.Header.Get("X-PolyForge-Admin-Key")) != s.adminKey {
+	// Constant-time, mirroring the control plane's isAdmin
+	// (internal/platform/server.go). The gateway and control plane read the
+	// same POLYFORGE_ADMIN_KEY, so a timing oracle here recovers the key that
+	// also unlocks the control-plane admin surface (tenant CRUD, key
+	// minting) — platform-root. A plain != short-circuits on the first
+	// differing byte and leaks that.
+	provided := strings.TrimSpace(r.Header.Get("X-PolyForge-Admin-Key"))
+	if len(provided) != len(s.adminKey) ||
+		subtle.ConstantTimeCompare([]byte(provided), []byte(s.adminKey)) != 1 {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "a valid admin key is required")
 		return false
 	}

@@ -73,18 +73,27 @@ func (c *SemanticCache) partition(tenantID string) string {
 	return tenantID
 }
 
+// DefaultCacheCapacityPerTenant bounds each tenant's semantic-cache
+// partition when no explicit capacity is set. Without a default the cache
+// grew per tenant without limit — an authenticated tenant streaming distinct
+// prompts drove unbounded RSS in the shared gateway process until OOM took
+// every tenant down with it. The eviction machinery was wired but never
+// armed. 10k entries/tenant is generous for the workload and finite.
+const DefaultCacheCapacityPerTenant = 10_000
+
 func NewSemanticCache(embedder embed.Embedder, threshold float64) *SemanticCache {
 	if threshold <= 0 || threshold > 1 {
 		threshold = DefaultCacheThreshold
 	}
 	return &SemanticCache{
-		embedder:   embedder,
-		index:      vector.NewIndex(embedder.Dimensions()),
-		threshold:  threshold,
-		policies:   map[string]eviction.Policy{},
-		budgets:    map[string]int64{},
-		usedBytes:  map[string]int64{},
-		entrySizes: map[string]map[string]int64{},
+		embedder:          embedder,
+		index:             vector.NewIndex(embedder.Dimensions()),
+		threshold:         threshold,
+		capacityPerTenant: DefaultCacheCapacityPerTenant,
+		policies:          map[string]eviction.Policy{},
+		budgets:           map[string]int64{},
+		usedBytes:         map[string]int64{},
+		entrySizes:        map[string]map[string]int64{},
 	}
 }
 

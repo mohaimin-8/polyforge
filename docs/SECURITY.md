@@ -19,9 +19,9 @@ dependency or image. Out of scope: malicious cluster admin, hardware.
 | # | Risk | Status | Enforcement |
 |---|---|---|---|
 | API1 | Broken Object Level Authorization | ✅ | Every object route is tenant-scoped: the API key is authenticated *against the tenant in the URL* (`internal/platform/server.go` `authorizeTenant`, same in the AI gateway), and PostgreSQL RLS re-enforces the predicate at the database (ADR 0003), so a missed WHERE clause cannot leak rows. Cross-tenant key use returns 401 (tested). |
-| API2 | Broken Authentication | ✅ | API keys are random (24B), stored hashed, scope-fixed at creation, rotatable (`internal/tenant`). JWTs are RS256 with kid-based rotation without restart (`internal/auth`, ADR 0004). Human login federates to OIDC with mandatory S256 PKCE and pinned RS256 (`internal/auth/oidc.go`, ADR 0010). Admin key comparison is constant-time. |
+| API2 | Broken Authentication | ✅ | API keys are random (24B), stored hashed, scope-fixed at creation, rotatable (`internal/tenant`). JWTs are RS256 with kid-based rotation without restart (`internal/auth`, ADR 0004). Human login federates to OIDC with mandatory S256 PKCE and pinned RS256 (`internal/auth/oidc.go`, ADR 0010). Admin key comparison is constant-time in **both** services — `subtle.ConstantTimeCompare` in the control plane (`internal/platform/server.go` `isAdmin`) and the AI gateway (`internal/ai/gateway/knobs.go` `authorizeAdmin`, corrected session 35: it previously used a plain `!=`, a timing side channel on a key that also unlocks the control-plane admin surface). Tenant API keys are compared as SHA-256 hashes, so no invertible timing leak exists there. |
 | API3 | Broken Object Property Level Authorization | ✅ | All request bodies decode with `DisallowUnknownFields`; responses are explicit structs — no mass assignment, no reflected extra properties. Key secrets appear once at creation; audit events never carry secrets or hashes (`internal/tenant/audit.go`). |
-| API4 | Unrestricted Resource Consumption | ✅ | Redis sliding-window rate limits + in-process fallback (W13), request body caps (`MaxBytesReader`, 1 MiB), pagination caps (`MaxPageSize`), per-tenant daily LLM budget with cheapest-backend degradation (`gateway.Router`), K8s ResourceQuota/LimitRange in silo mode (W21). |
+| API4 | Unrestricted Resource Consumption | ✅ | **Control plane**: Redis sliding-window rate limits with an in-process token-bucket fallback that now stays armed as a second tier and takes over on a Redis error instead of failing fully open (`internal/platform/server.go`, corrected session 35), request body caps (`MaxBytesReader`, 1 MiB), pagination caps (`MaxPageSize`). **AI gateway** (added session 35 — it previously had none): a per-tenant token bucket in front of every AI route (`internal/ai/gateway/ratelimit.go`, default RPM 600 / burst 60, secure-by-default), a per-tenant semantic-cache entry cap and document-index cap so one tenant cannot OOM the shared process (`cache.go` `DefaultCacheCapacityPerTenant`, `server.go` `maxDocsPerTenant`). **Both**: per-tenant daily LLM budget with cheapest-backend degradation (`gateway.Router`), K8s ResourceQuota/LimitRange in silo mode (W21). |
 | API5 | Broken Function Level Authorization | ✅ | Admin surface (tenant CRUD, isolation promotion, key rotation endpoints) requires the admin key; tenant keys cannot reach it (tested in `isolation_http_test.go`). Scope model separates read from full keys (`ScopeAllows`). |
 | API6 | Unrestricted Access to Sensitive Business Flows | ✅ | Tenant provisioning and isolation promotion are admin-only and audited to the outbox; idempotency keys (W13) stop replay-driven resource creation. |
 | API7 | Server Side Request Forgery | ⚠️ | LLM/embedding base URLs are operator config, not user input. The agent's web-search tool fetches a fixed search endpoint with the query URL-encoded — user text never becomes a URL. Gap: no egress allowlist inside the process; network-level containment relies on the W24 NetworkPolicies. |
@@ -131,3 +131,36 @@ fixed or triaged.
    The gate catches reachable regressions on every push; the periodic manual
    sweep exists to pick up newly *published* advisories against pinned
    versions, which is exactly what surfaced GO-2026-6061 here.
+
+## Session-35 adversarial re-audit (2026-08-08)
+
+A four-perspective code audit re-checked every load-bearing claim above
+against the implementation rather than the prose. `govulncheck ./...` was
+clean (0 reachable vulnerabilities). Tenant isolation (BOLA + RLS), SQL
+parameterization, JWT/OIDC validation, SSRF containment, secret handling,
+and error hygiene were **verified in code** and hold as written — the
+finding was that the AI gateway was materially less hardened than the
+control plane the table describes. Six gaps were closed:
+
+| # | Sev | Gap | Fix |
+|---|---|---|---|
+| F1 | MED | Gateway admin key compared with `!=` (timing side channel on a key that also unlocks the control plane) | `subtle.ConstantTimeCompare`, mirroring the control plane |
+| F2 | HIGH | AI gateway had **no** rate limiting of any kind | per-tenant token bucket on every AI route, secure-by-default |
+| F3 | HIGH | Semantic cache + document index grew unbounded per tenant → shared-process OOM | armed the existing eviction cap (`DefaultCacheCapacityPerTenant`) + `maxDocsPerTenant` |
+| F4 | MED | Control-plane limiter failed fully open on a Redis error | keeps the in-process bucket as a second tier and degrades to it |
+| F5 | MED | Tenant-asserted `model_tier` priced by eval-export; an unknown tier booked AI requests at $0 (research-integrity, not isolation) | whitelist tier at ingest (`validModelTier`) + eval-export fails closed on an unknown tier |
+| F6 | LOW | `RateTracker` keys never reclaimed | self-pruning of idle keys + `Forget` for explicit deletion |
+
+Residual, accepted (out of the stated threat model or low-risk):
+- `/v1/telemetry` still lets a full-scope tenant assert its own `LatencyMS` /
+  `CacheHit` within its own tenant partition. This cannot cross a tenant
+  boundary (isolation holds), but it means the campaign metrics computed
+  from tenant-asserted telemetry are trusted-input; the server-measured
+  `/workloads/replay` path is the one used for the published live numbers.
+- SSRF (API7) containment still relies on the default config (operator-set
+  provider URLs, a hardcoded search host) plus the network-level
+  NetworkPolicies; there is no in-process egress allowlist. Unchanged from
+  the table's ⚠️.
+- Timing-side-channel exploitability of any remaining `==`/`!=` on
+  non-secret values is not a concern; the only secret comparisons are now
+  constant-time or hash-based.

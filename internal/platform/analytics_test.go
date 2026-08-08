@@ -80,7 +80,7 @@ func TestAcceptedTelemetryIsMirroredToAnalytics(t *testing.T) {
 	server, secret := newTelemetryFixture(t, enqueuer)
 
 	resp := postTelemetry(t, server, secret,
-		`{"tenant_id":"acme","service":"api","rps_window":10,"payload_bytes":128,"latency_ms":12.5,"model_tier":"local"}`)
+		`{"tenant_id":"acme","service":"api","rps_window":10,"payload_bytes":128,"latency_ms":12.5,"model_tier":"small"}`)
 	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("ingest status = %d", resp.StatusCode)
 	}
@@ -114,5 +114,27 @@ func TestAnalyticsQueueFullDoesNotAffectIngestResponse(t *testing.T) {
 		`{"tenant_id":"acme","service":"api","rps_window":10,"payload_bytes":128,"latency_ms":12.5}`)
 	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("a full analytics queue must not fail ingest, status = %d", resp.StatusCode)
+	}
+}
+
+// F5: the model tier is tenant-asserted but priced by eval-export, so an
+// unrecognised tier must be rejected at ingest rather than counted at $0.
+func TestIngestRejectsUnknownModelTier(t *testing.T) {
+	server, secret := newTelemetryFixture(t, &captureEnqueuer{})
+
+	// A tier outside the taxonomy is refused.
+	resp := postTelemetry(t, server, secret,
+		`{"tenant_id":"acme","service":"api","latency_ms":5,"model_tier":"ultra"}`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unknown model_tier accepted, status = %d", resp.StatusCode)
+	}
+
+	// The four real tiers and the empty (CRUD) case are accepted.
+	for _, tier := range []string{"", "none", "small", "mid", "large"} {
+		body := `{"tenant_id":"acme","service":"api","latency_ms":5,"model_tier":"` + tier + `"}`
+		resp := postTelemetry(t, server, secret, body)
+		if resp.StatusCode != http.StatusAccepted {
+			t.Fatalf("tier %q rejected, status = %d", tier, resp.StatusCode)
+		}
 	}
 }

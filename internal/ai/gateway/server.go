@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,6 +20,11 @@ import (
 )
 
 const maxBodyBytes = 1 << 20
+
+// maxDocsPerTenant caps the in-memory search index per tenant. The index
+// lives in the shared gateway process, so without a ceiling one tenant's
+// /ai/index calls could exhaust memory for all tenants.
+const maxDocsPerTenant = 10_000
 
 // AgentFunc runs an agent loop for one prompt. The agent package supplies
 // it; the gateway stays ignorant of tool-use mechanics.
@@ -43,6 +49,10 @@ type Server struct {
 	// rates fills Event.RPSWindow, the planner's demand signal. Without it
 	// the operator plans every tenant against zero AI demand.
 	rates *telemetry.RateTracker
+	// limiter is per-tenant admission control in front of every AI route.
+	// nil disables it (tests). See ratelimit.go for why the gateway needs
+	// its own — it previously had none at all.
+	limiter *tenantLimiter
 }
 
 type Config struct {
@@ -74,6 +84,10 @@ type Config struct {
 	// AdminKey guards PUT/GET /admin/tenants/{id}/knobs, the operator's
 	// knob push target. Empty disables the admin surface entirely.
 	AdminKey string
+	// RateLimit is the per-tenant admission budget. The zero value applies
+	// DefaultRateLimit (RPM 600 / burst 60); set RequestsPerMinute or Burst
+	// to a negative value to disable (tests only).
+	RateLimit RateLimit
 }
 
 func NewServer(log *slog.Logger, cfg Config) *Server {
@@ -82,6 +96,12 @@ func NewServer(log *slog.Logger, cfg Config) *Server {
 	}
 	if cfg.ModelTier == "" {
 		cfg.ModelTier = "mid"
+	}
+	// Zero value means "apply the default budget"; an explicit negative
+	// disables (tests). This makes the secure posture the default: a gateway
+	// stood up with a bare Config is rate-limited, not open.
+	if cfg.RateLimit == (RateLimit{}) {
+		cfg.RateLimit = DefaultRateLimit
 	}
 	s := &Server{
 		log:           log,
@@ -99,6 +119,7 @@ func NewServer(log *slog.Logger, cfg Config) *Server {
 		adminKey:      cfg.AdminKey,
 		mux:           http.NewServeMux(),
 		rates:         telemetry.NewRateTracker(telemetry.RateWindow),
+		limiter:       newTenantLimiter(cfg.RateLimit),
 	}
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("GET /metrics", s.metrics)
@@ -126,8 +147,21 @@ func (s *Server) metrics(w http.ResponseWriter, _ *http.Request) {
 }
 
 // authorize authenticates the tenant API key exactly like the control
-// plane: 401 for a bad credential, 403 for missing scope.
+// plane: 401 for a bad credential, 403 for missing scope. It is also the
+// admission choke point for every AI route — the per-tenant rate limit runs
+// here, keyed on the path tenant, before any authentication or model work,
+// so a flood is bounded even when it carries no valid key. (The check lives
+// here rather than in mux middleware because r.PathValue is only populated
+// after the mux routes the request.)
 func (s *Server) authorize(w http.ResponseWriter, r *http.Request, tenantID, requiredScope string) bool {
+	if s.limiter != nil {
+		if ok, retryAfter := s.limiter.allow(tenantID); !ok {
+			w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(retryAfter.Seconds())))))
+			writeError(w, http.StatusTooManyRequests, "rate_limited",
+				"per-tenant request rate exceeded; retry after the indicated delay")
+			return false
+		}
+	}
 	secret := strings.TrimSpace(r.Header.Get("X-PolyForge-API-Key"))
 	if secret == "" {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "an API key is required")
@@ -325,6 +359,16 @@ func (s *Server) indexDoc(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(input.ID) == "" || strings.TrimSpace(input.Text) == "" {
 		writeError(w, http.StatusBadRequest, "invalid_request", "id and text are required")
+		return
+	}
+	// Per-tenant document cap: the search index is in-memory in the shared
+	// gateway process, and /ai/index had no ceiling — a tenant could index
+	// unbounded documents and OOM the process for everyone. An upsert of an
+	// existing ID (Count unchanged) is always allowed so tenants at the cap
+	// can still update; only net-new documents past the cap are refused.
+	if s.search.Count(tenantID) >= maxDocsPerTenant && !s.search.Has(tenantID, input.ID) {
+		writeError(w, http.StatusTooManyRequests, "quota_exceeded",
+			fmt.Sprintf("document index limit of %d per tenant reached", maxDocsPerTenant))
 		return
 	}
 	vecs, err := s.embedder.Embed(r.Context(), []string{input.Text})

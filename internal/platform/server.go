@@ -52,9 +52,15 @@ type Server struct {
 	mux       *http.ServeMux
 	patterns  []string // registered "METHOD /path" patterns (OpenAPI-drift gate)
 	limiter   RequestLimiter
-	metrics   *metrics
-	issuer    *auth.Issuer
-	tracer    trace.Tracer
+	// fallbackLimiter is the in-process token bucket, kept as a second tier
+	// even when Redis is the primary limiter. When Redis errors, the request
+	// path used to fail fully open — zero rate limiting for the outage — so
+	// an adversary who could pressure Redis also removed admission control.
+	// Now a Redis error degrades to this local bucket instead of admitting.
+	fallbackLimiter RequestLimiter
+	metrics         *metrics
+	issuer          *auth.Issuer
+	tracer          trace.Tracer
 
 	idempotencyStore idempotency.Store
 	analytics        AnalyticsEnqueuer
@@ -147,10 +153,17 @@ func NewServer(log *slog.Logger, tenants tenant.Repository, telemetry telemetry.
 		tracer:    provider.Tracer("polyforge/internal/platform"),
 		rates:     newReplayRateTracker(),
 	}
+	// The in-process bucket is always built when a budget is configured. It
+	// is the primary limiter when Redis is absent, and the degraded-mode
+	// fallback when Redis is present but erroring.
+	localBucket := newRateLimiter(cfg.RateLimit)
 	if cfg.Limiter != nil {
 		s.limiter = cfg.Limiter
-	} else if bucket := newRateLimiter(cfg.RateLimit); bucket != nil {
-		s.limiter = bucket
+		if localBucket != nil {
+			s.fallbackLimiter = localBucket
+		}
+	} else if localBucket != nil {
+		s.limiter = localBucket
 	}
 	s.analytics = cfg.Analytics
 	s.workloads = cfg.Workloads
@@ -511,6 +524,13 @@ func (s *Server) ingestTelemetry(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, http.StatusBadRequest, errors.New("telemetry values are outside their valid ranges"))
 		return
 	}
+	// The model tier is tenant-asserted but priced by eval-export, so an
+	// unrecognised tier must be rejected at the boundary rather than counted
+	// at $0 downstream. Empty means "no AI tier" (a CRUD event) and is fine.
+	if !validModelTier(event.ModelTier) {
+		s.writeError(w, r, http.StatusBadRequest, errors.New("model_tier must be one of none, small, mid, large (or empty)"))
+		return
+	}
 	if !s.authorizeTenant(w, r, event.TenantID, tenant.ScopeFull) {
 		return
 	}
@@ -773,6 +793,18 @@ func validName(value string) bool {
 	return length > 0 && length <= 200
 }
 
+// validModelTier accepts the tiers eval-export prices, plus empty for a
+// non-AI (CRUD) event. Mirrors evalTierCostUSD's keys in
+// cmd/control-plane/evalexport.go; keep the two in lockstep.
+func validModelTier(tier string) bool {
+	switch strings.TrimSpace(tier) {
+	case "", "none", "small", "mid", "large":
+		return true
+	default:
+		return false
+	}
+}
+
 type statusWriter struct {
 	http.ResponseWriter
 	status int
@@ -893,14 +925,24 @@ func (s *Server) rateLimit(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		ok, retryAfter, err := s.limiter.Allow(r.Context(), rateLimitKey(r))
+		key := rateLimitKey(r)
+		ok, retryAfter, err := s.limiter.Allow(r.Context(), key)
 		if err != nil {
-			// Fail open: the control plane stays available when Redis is
-			// down; the in-flight gauge and this log line surface the gap.
-			s.log.Warn("rate limiter unavailable; admitting request",
-				"request_id", requestID(r.Context()), "error", err)
-			next.ServeHTTP(w, r)
-			return
+			// Degrade to the in-process bucket rather than failing fully
+			// open: an adversary who can pressure Redis must not also remove
+			// admission control. Only if there is no local fallback at all do
+			// we admit (and log it).
+			if s.fallbackLimiter != nil {
+				ok, retryAfter, err = s.fallbackLimiter.Allow(r.Context(), key)
+			}
+			if err != nil || s.fallbackLimiter == nil {
+				s.log.Warn("rate limiter unavailable; admitting request",
+					"request_id", requestID(r.Context()), "error", err)
+				next.ServeHTTP(w, r)
+				return
+			}
+			s.log.Warn("primary rate limiter unavailable; degraded to local bucket",
+				"request_id", requestID(r.Context()))
 		}
 		if !ok {
 			w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(retryAfter.Seconds())))))
