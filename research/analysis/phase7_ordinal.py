@@ -35,28 +35,55 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
+from stats import record_path
+
 # Two arms whose means differ by less than this are tied, and a tie yields no
 # ordinal reading. Without it, idxmin() breaks ties alphabetically and the
 # arbitrary winner is published as an AGREE/DISAGREE finding.
 TIE_EPS = 1e-9
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = Path(__file__).resolve().parent / "PHASE7_ORDINAL.md"
 LIVE_DB = ROOT / "eval" / "results" / "phase7_live.duckdb"
 SIM_DB = ROOT / "eval" / "results" / "phase7_sim_ref.duckdb"
+# Committed exports so this record rebuilds on a clean clone (the
+# DuckDBs are gitignored and Zenodo-archived).
+LIVE_CSV = ROOT / "eval" / "results" / "phase7_live_runs.csv"
+SIM_CSV = ROOT / "eval" / "results" / "phase7_sim_ref_runs.csv"
 TENANTS = 8
 COST_SCALE = 0.01
 
 
-def load(db: Path, label: str) -> pd.DataFrame:
-    con = duckdb.connect(str(db), read_only=True)
-    df = con.execute(
-        "select r.system, r.workload, r.rep, m.total_cost_usd, "
-        "m.mean_violation, m.mean_jain, m.steps "
-        "from runs r join metrics m on r.run_id = m.run_id "
-        "where r.status = 'valid'"
-    ).fetchdf()
-    con.close()
+def load(db: Path, label: str, csv: Path | None = None) -> pd.DataFrame:
+    """Rows from the DuckDB, else from the committed csv export.
+
+    The DuckDBs are gitignored and Zenodo-archived, so without the fallback
+    this record sat outside `reproduce.py`'s gate: it could not be rebuilt on
+    a clean clone at all. The export carries `status`, so the same
+    `valid`-only filter applies on both paths — which is what makes the
+    retro-invalidated zero-telemetry rows stay excluded either way.
+    """
+    if db.exists():
+        con = duckdb.connect(str(db), read_only=True)
+        df = con.execute(
+            "select r.system, r.workload, r.rep, m.total_cost_usd, "
+            "m.mean_violation, m.mean_jain, m.steps "
+            "from runs r join metrics m on r.run_id = m.run_id "
+            "where r.status = 'valid'"
+        ).fetchdf()
+        con.close()
+    elif csv is not None and csv.exists():
+        raw = pd.read_csv(csv)
+        raw = raw[raw.status == "valid"]
+        df = pd.DataFrame({
+            "system": raw.system, "workload": raw.workload, "rep": raw.rep,
+            "total_cost_usd": pd.to_numeric(raw.total_cost_usd),
+            "mean_violation": pd.to_numeric(raw.mean_violation),
+            "mean_jain": pd.to_numeric(raw.mean_jain),
+            "steps": pd.to_numeric(raw.metric_steps),
+        }).reset_index(drop=True)
+    else:
+        raise FileNotFoundError(
+            f"{db.name} missing and no committed export to fall back to")
     df["J"] = (df.total_cost_usd / ((df.steps - 1) * TENANTS) / COST_SCALE
                + 2.0 * df.mean_violation + 0.5 * (1.0 - df.mean_jain))
     df["substrate"] = label
@@ -64,8 +91,8 @@ def load(db: Path, label: str) -> pd.DataFrame:
 
 
 def main() -> None:
-    live = load(LIVE_DB, "live")
-    sim = load(SIM_DB, "sim")
+    live = load(LIVE_DB, "live", LIVE_CSV)
+    sim = load(SIM_DB, "sim", SIM_CSV)
     frames = pd.concat([sim, live], ignore_index=True)
 
     lines = ["# Phase 7 ordinal figure — sim ranking vs live ranking", ""]
@@ -137,8 +164,14 @@ def main() -> None:
       "carried by the LMSYS protocol (SEMANTIC_CACHE.md, "
       "CACHE_PRECISION.md), the tier knob's by the GPU tier bench "
       "(TIER_BENCH.md).")
-    OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"wrote {OUT}")
+    # record_path honours $POLYFORGE_ANALYSIS_OUT, which is how
+    # scripts/reproduce.py redirects a rebuild away from the frozen committed
+    # record. Writing to a hardcoded path meant the gate overwrote the very
+    # file it was checking and then had nothing to compare against — so this
+    # record could never actually be verified.
+    out = record_path("PHASE7_ORDINAL.md")
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"wrote {out}")
 
 
 if __name__ == "__main__":

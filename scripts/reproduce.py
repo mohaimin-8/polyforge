@@ -72,6 +72,10 @@ CAMPAIGN_RECORDS = [
     ("analysis_econ.py", ["mixp95"], "RESULTS_MIXTURE_P95.md"),
     ("analysis_econ.py", ["tierwu"], "RESULTS_TIER_WU.md"),
     ("analysis_eviction_parity.py", [], "RESULTS_EVICTION_PARITY.md"),
+    # Live-derived records were entirely outside this gate until session 35 —
+    # the audit's D10 finding. phase7_ordinal now falls back to its committed
+    # csv exports, so it rebuilds on a clean clone like every other record.
+    ("phase7_ordinal.py", [], "PHASE7_ORDINAL.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
