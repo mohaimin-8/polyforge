@@ -18,7 +18,7 @@ dependency or image. Out of scope: malicious cluster admin, hardware.
 
 | # | Risk | Status | Enforcement |
 |---|---|---|---|
-| API1 | Broken Object Level Authorization | ✅ | Every object route is tenant-scoped: the API key is authenticated *against the tenant in the URL* (`internal/platform/server.go` `authorizeTenant`, same in the AI gateway), and PostgreSQL RLS re-enforces the predicate at the database (ADR 0003), so a missed WHERE clause cannot leak rows. Cross-tenant key use returns 401 (tested). |
+| API1 | Broken Object Level Authorization | ✅ | Every object route is tenant-scoped: the API key is authenticated *against the tenant in the URL* (`internal/platform/server.go` `authorizeTenant`, same in the AI gateway), and PostgreSQL RLS re-enforces the predicate at the database (ADR 0003), so a missed WHERE clause cannot leak rows. Cross-tenant key use returns 401 (tested). **The RLS half is now empirically verified, not only code-reviewed (session 36):** `internal/storage/postgres/store_integration_test.go` was executed against a real PostgreSQL 18 with the CI role split (`polyforge_admin` BYPASSRLS / `polyforge_app` NOBYPASSRLS) — 3/3 pass, including `TestPostgresRowLevelIsolation` and `TestPostgresFeaturesAreTenantScopedByRowLevelSecurity`. These tests **skip silently** without `POLYFORGE_TEST_POSTGRES_{ADMIN,APP}_URL`, so before Docker existed on the dev machine they had never run locally and a "skip" was indistinguishable from a "pass" in a summary line. `scripts/pg-test-up.sh` makes the run a one-liner so this cannot regress into an untested claim again. |
 | API2 | Broken Authentication | ✅ | API keys are random (24B), stored hashed, scope-fixed at creation, rotatable (`internal/tenant`). JWTs are RS256 with kid-based rotation without restart (`internal/auth`, ADR 0004). Human login federates to OIDC with mandatory S256 PKCE and pinned RS256 (`internal/auth/oidc.go`, ADR 0010). Admin key comparison is constant-time in **both** services — `subtle.ConstantTimeCompare` in the control plane (`internal/platform/server.go` `isAdmin`) and the AI gateway (`internal/ai/gateway/knobs.go` `authorizeAdmin`, corrected session 35: it previously used a plain `!=`, a timing side channel on a key that also unlocks the control-plane admin surface). Tenant API keys are compared as SHA-256 hashes, so no invertible timing leak exists there. |
 | API3 | Broken Object Property Level Authorization | ✅ | All request bodies decode with `DisallowUnknownFields`; responses are explicit structs — no mass assignment, no reflected extra properties. Key secrets appear once at creation; audit events never carry secrets or hashes (`internal/tenant/audit.go`). |
 | API4 | Unrestricted Resource Consumption | ✅ | **Control plane**: Redis sliding-window rate limits with an in-process token-bucket fallback that now stays armed as a second tier and takes over on a Redis error instead of failing fully open (`internal/platform/server.go`, corrected session 35), request body caps (`MaxBytesReader`, 1 MiB), pagination caps (`MaxPageSize`). **AI gateway** (added session 35 — it previously had none): a per-tenant token bucket in front of every AI route (`internal/ai/gateway/ratelimit.go`, default RPM 600 / burst 60, secure-by-default), a per-tenant semantic-cache entry cap and document-index cap so one tenant cannot OOM the shared process (`cache.go` `DefaultCacheCapacityPerTenant`, `server.go` `maxDocsPerTenant`). **Both**: per-tenant daily LLM budget with cheapest-backend degradation (`gateway.Router`), K8s ResourceQuota/LimitRange in silo mode (W21). |
@@ -85,11 +85,46 @@ default.
 
 ## Penetration test status
 
-`scripts/zap-baseline.sh` runs the OWASP ZAP baseline scan against a
-running stack and writes `artifacts/zap-baseline.html`. **Not yet
-executed**: no Docker on this development machine. The findings table
-below is to be filled from the first run, with every Medium+ finding
-fixed or triaged.
+`scripts/zap-baseline.sh` runs OWASP ZAP against a running stack.
+**EXECUTED session 36** (Docker Desktop installed on the dev machine), in
+both modes, against the live compose stack (control plane + PostgreSQL +
+Redis).
+
+**Read the two modes carefully — the difference is the point.**
+
+| mode | URLs reached | rules | result |
+|---|---|---|---|
+| `zap-baseline.sh` (spider) | **2, both 404** | 66 PASS | 0 FAIL, 1 WARN |
+| `zap-baseline.sh --api` (OpenAPI) | the 20 declared paths | **116 → 118 PASS** | 0 FAIL, 3 WARN → **1 WARN** (the accepted timestamp) |
+
+The plain baseline scan is **near-worthless on this service and must not be
+quoted as evidence**: the control plane is a JSON API with no root route
+(`GET /` is 404) and no sitemap, so the spider found nothing to crawl and
+every passive rule "passed" against an empty surface. That is a scan of
+nothing, reported as a clean bill of health. The `--api` mode imports
+`api/openapi.yaml` so ZAP requests the real endpoints, which is where the
+rule count nearly doubles and the injection/traversal/SSTI/XXE/cloud-metadata
+families actually execute.
+
+**Findings from the first real (`--api`) run, all fixed the same session:**
+
+| Severity | Finding | Disposition |
+|---|---|---|
+| Low | `X-Content-Type-Options` missing (rule 10021, ×3) | **FIXED** — `securityHeaders` middleware sets `nosniff` on both services |
+| Low | `Cross-Origin-Resource-Policy` missing (rule 90004, ×3) | **FIXED** — set to `same-origin` |
+| Info | Storable/cacheable content (rule 10049, baseline mode) | **FIXED** — `Cache-Control: no-store`; every response is tenant data or a credential exchange |
+| Info | Unix timestamp disclosure (rule 10096, ×1) | **Accepted** — a timestamp in a health/metrics payload; no security value to an attacker |
+
+Re-scan after the fix: **0 FAIL, 1 WARN, 118 PASS** — the two header rules
+moved from WARN to PASS (116→118) and the only remaining warning is the
+accepted timestamp above. Headers are covered by
+`internal/platform/security_headers_test.go` (success, error and 404 paths)
+so they cannot silently regress.
+
+Known coverage limit, stated rather than hidden: the endpoints answer 401
+without a credential, so this run covers the **unauthenticated** surface.
+Scanning behind auth needs a ZAP context carrying a tenant API key — the
+next increment, and the honest scope of the current result.
 
 | Severity | Finding | Disposition |
 |---|---|---|

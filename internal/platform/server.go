@@ -191,7 +191,35 @@ func (s *Server) Handler() http.Handler {
 	if s.limiter != nil {
 		handler = s.rateLimit(handler)
 	}
+	handler = securityHeaders(handler)
 	return s.requestLog(handler)
+}
+
+// securityHeaders sets the response headers an API should always carry.
+// Added session 36 from the first OWASP ZAP run against the real API surface
+// (`scripts/zap-baseline.sh --api`), which reported all three as missing:
+//
+//   - X-Content-Type-Options: nosniff — stops a browser MIME-sniffing a JSON
+//     response into something executable. Cheap, and the reason ZAP rule
+//     10021 fired on every endpoint.
+//   - Cross-Origin-Resource-Policy: same-origin — Spectre-class site
+//     isolation (rule 90004); a cross-origin page cannot read these
+//     responses even if it can issue the request.
+//   - Cache-Control: no-store — every response here is tenant-scoped data or
+//     a credential-bearing exchange, so none of it belongs in a shared or
+//     disk cache. Also clears the baseline scan's "Storable and Cacheable
+//     Content" warning.
+//
+// Set before the handler runs so they apply to error paths too, and via Set
+// (not Add) so a handler with a deliberate override still wins.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Cross-Origin-Resource-Policy", "same-origin")
+		h.Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // recoverPanics converts a handler panic into a structured 500 response so a

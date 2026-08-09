@@ -132,7 +132,22 @@ func NewServer(log *slog.Logger, cfg Config) *Server {
 	return s
 }
 
-func (s *Server) Handler() http.Handler { return s.mux }
+func (s *Server) Handler() http.Handler { return securityHeaders(s.mux) }
+
+// securityHeaders mirrors the control plane's response hardening
+// (internal/platform/server.go), so both services answer with the same
+// posture rather than the gateway being the weaker one — which is exactly
+// the asymmetry the session-35 audit found across rate limiting and the
+// admin-key comparison.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Cross-Origin-Resource-Policy", "same-origin")
+		h.Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
+}
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "polyforge-ai-gateway"})

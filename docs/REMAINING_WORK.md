@@ -23,6 +23,36 @@ session 30). This is the single place that answers
 one owner-split view. When it disagrees with a campaign file, the campaign file
 wins.
 
+## Session 36 (2026-08-09) — Docker is available locally; two gates closed
+
+**The long-standing "no Docker on this machine" constraint is GONE.** Docker
+Desktop 4.85.0 + WSL2 are installed and verified (engine 29.6.2). The fault
+that blocked it was `com.docker.service` shipping as `DEMAND_START` while
+running as LocalSystem — it never started, so the engine could not provision
+its WSL distro. Set to Automatic + Started; check that service first if
+Docker ever fails to come up again.
+
+`kind`, `helm` and `k6` are installed (`GrafanaLabs.k6`, **not** `k6.k6`);
+`kubectl` ships with Docker Desktop. `cluster_backend.preflight()` now
+reports **no missing tools**, and a kind cluster was created, scheduled a
+pod, and torn down cleanly — so the **B1 live actuation dry-run is no longer
+blocked on infrastructure**. `~/.wslconfig` raises Docker from 7.6 GB to
+9.7 GB with the sizing rationale in its comments (`large`/6-node clusters
+remain tight locally; prefer Codespaces for the full matrix).
+
+Two things that were previously unverifiable are now verified:
+
+| Gate | Before | Now |
+|---|---|---|
+| PostgreSQL RLS / tenant isolation | skipped locally, CI-only — "a skip is not a pass" | **3/3 PASS** against real PostgreSQL 18; `scripts/pg-test-up.sh` makes it a one-liner |
+| OWASP ZAP pen test | "**Not yet executed**: no Docker" | **Executed**, findings fixed, re-scan 118 PASS / 0 FAIL |
+
+The ZAP run also exposed that the *default* baseline scan is near-worthless
+here — it reached 2 URLs, both 404, because the control plane is a JSON API
+with no root route, so 66 rules "passed" against nothing. `--api` mode
+(OpenAPI-driven) is the one that matters. Full detail and the fixed findings
+are in `docs/SECURITY.md` §Penetration test status.
+
 ## Session 35 (2026-08-08) — V-series validity remediation
 
 A four-perspective audit found eleven defects. Status of each:

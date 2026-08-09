@@ -46,3 +46,10 @@ research/paper/*.log
 research/paper/*.out
 research/paper/*.spl
 research/paper/main.pdf
+
+# ZAP scan outputs (scripts/zap-baseline.sh). Regenerable from a running
+# stack; the triaged findings live in docs/SECURITY.md, not in the raw HTML.
+# openapi.yaml/zap.yaml here are copies the container needs under /zap/wrk.
+artifacts/zap-*.html
+artifacts/zap.yaml
+artifacts/openapi.yaml
