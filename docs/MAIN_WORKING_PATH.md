@@ -30,6 +30,25 @@ reconciles every open work item into one dependency-ordered path. It sits
 3. **Survey-blessed optional strengtheners identified** (energy/carbon,
    admission control) — milestone **M4**, low priority.
 
+## 0a-pre. Session 36 (2026-08-09): Docker works locally — two gates closed
+
+`com.docker.service` shipped as `DEMAND_START` and never started, which is
+why Docker appeared broken; set to Automatic. Engine 29.6.2 + WSL2 verified,
+`kind`/`helm`/`k6` installed, `cluster_backend.preflight()` reports **no
+missing tools**, and a kind cluster came up, scheduled a pod and tore down.
+
+Two claims that could never be tested here are now tested:
+**PostgreSQL RLS 3/3 PASS** (real PG 18; `./scripts/pg-test-up.sh`) and
+**OWASP ZAP executed** (118 PASS / 0 FAIL after fixing the three header
+findings it surfaced). Caveat on record: the *default* ZAP baseline reaches
+2 URLs, both 404, so its "66 PASS" is a scan of nothing — use `--api`, and
+the scope is the unauthenticated surface.
+
+**Roadmap consequence: WP8 split.** The GPU is only needed for real model
+tiers (`POLYFORGE_EVAL_LIVE_AI` is opt-in), so **WP8a — the live actuation
+dry-run — is now desk-doable and is the next agent-executable item after
+Track 1.** WP8b (the scored matrix) stays user-gated on the GPU.
+
 ## 0a. EXECUTION ROUTE: `docs/PUBLICATION_ROADMAP.md` — start there
 
 Added end of session 35. That file is the mechanical, work-package-level

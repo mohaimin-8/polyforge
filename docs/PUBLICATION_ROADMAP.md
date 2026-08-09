@@ -62,6 +62,29 @@ python scripts/reproduce.py                     # ALL records byte-identical, ex
 If envtest binaries are missing (fresh machine):
 `go run sigs.k8s.io/controller-runtime/tools/setup-envtest@latest use 1.31.0 --bin-dir "$HOME/.local/share/kubebuilder-envtest"`.
 
+**Docker-dependent gates (available since session 36 — run these too when
+touching storage or the HTTP surface):**
+
+```bash
+# PostgreSQL RLS / tenant isolation. These SKIP silently without the env,
+# and a skip prints `ok` — always set it explicitly before claiming RLS.
+./scripts/pg-test-up.sh                      # starts PG, prints the exports
+eval "$(./scripts/pg-test-up.sh --env)"
+go test ./internal/storage/postgres/ -count=1   # expect 3/3 PASS
+./scripts/pg-test-up.sh --down
+
+# OWASP ZAP against the real API surface. Use --api; the plain baseline
+# spiders a JSON API with no root route and "passes" against 2x 404.
+docker compose up -d control-plane postgres redis
+./scripts/zap-baseline.sh --api              # expect 118 PASS / 0 FAIL
+docker compose down
+```
+
+PATH note: `kind`/`helm` live under
+`%LOCALAPPDATA%\Microsoft\WinGet\Packages\...`. A shell opened before they
+were installed has a stale PATH and `preflight()` will report them missing —
+re-resolve from Machine+User PATH or open a new shell.
+
 ### §0.2 The prereg template (mirror `PREREG_EVICTION_PARITY.md` exactly)
 
 Sections, in order: title (`# Pre-registration: <name> (V-series, adjudicates …)`);
@@ -104,9 +127,40 @@ once, FAIL is publishable, R4 must hold, record joins `reproduce.py`.
 - **Fairness confound adjudicated immaterial**: `RESULTS_ORDER_PERMUTATION.md`
   — largest Jain excursion 0.0001 vs pre-registered 0.01; published results
   stand; `tenant_order_seed` is now an explicit parameter.
-- **7 commits local-only on `v-series-validity-remediation`, NOT pushed.**
+- **12 commits local-only on `v-series-validity-remediation`, NOT pushed.**
 - Raw traces ARE on disk: `research/traces/data/BurstGPT_{1,2,3}.csv`,
   `research/traces/data/azure-llm/`, `lmsys-chat-1m/`.
+
+### Session 36 addendum (2026-08-09) — Docker is available locally
+
+`ec7a230..9f66192` (V-series) plus `992f8d7` (this roadmap), `cfeca12`
+(gateway security hardening), `849c478` (security residuals), `2db9c3e`
+(Docker enablement).
+
+- **Docker Desktop 4.85.0 / engine 29.6.2 + WSL2 work on this machine.** The
+  blocker was `com.docker.service` shipping as `DEMAND_START` while running
+  as LocalSystem — it never started, so the engine could not provision its
+  WSL distro. Set to Automatic. **Check that service first** if Docker ever
+  fails to start again.
+- `kind`, `helm`, `k6` installed (**`GrafanaLabs.k6`**, not `k6.k6`);
+  `kubectl` ships with Docker Desktop. `cluster_backend.preflight()` reports
+  **no missing tools**. A kind cluster was created, scheduled a pod and torn
+  down cleanly. → **WP8a is now desk-doable** (see the split below).
+- `~/.wslconfig`: Docker 7.6 GB → **9.7 GB**, 8 CPU, 4 GB swap, mirrored
+  networking. `large`/6-node clusters stay tight locally.
+- **PostgreSQL RLS verified for the first time — 3/3 PASS** against real
+  PostgreSQL 18. These tests skip silently without
+  `POLYFORGE_TEST_POSTGRES_{ADMIN,APP}_URL`, so the deepest claim in
+  SECURITY.md had never executed here. Use **`./scripts/pg-test-up.sh`**.
+- **OWASP ZAP executed for the first time**, findings fixed, re-scan
+  **118 PASS / 0 FAIL**. Caveat that matters: the *default* baseline scan
+  reaches 2 URLs (both 404) because the control plane is a JSON API with no
+  root route — its "66 PASS" is a scan of nothing. Use `--api`. Scope is the
+  **unauthenticated** surface; authenticated scanning is WP12.
+- Security posture: the session-35/36 audit closed 6 code findings plus 2
+  residuals (telemetry bounds, SSRF redirect guard). Remaining are
+  deployment-layer only (NetworkPolicy needs an enforcing CNI; Linkerd mTLS
+  and Vault are cluster properties).
 
 ## §2 Dependency graph and venue map
 
@@ -116,12 +170,16 @@ WP2 MASTER fix ────┤
 WP3 layered fix ───┤──► FGCS (Q1) evidence-complete ─┐
                    │                                  ├─(+ WP9 reframe)─► submit
 WP7 push ──────────┤                                  │
-WP8 B1 live ───────┴──► TCC / TSC (Transactions) ─────┘
+WP8a dry-run (desk)┤                                  │
+WP8b B1 scored ────┴──► TCC / TSC (Transactions) ─────┘
 WP4 cells + WP5 O(N²) + WP6 mismatch ──► TPDS additionally
+WP12 authenticated ZAP ──► security-section completeness (small)
 ```
 
 Execute order: **WP7 (2 min, do it first — it fixes the anchor weakness for
-everything after) → WP1 → WP2 → WP3 → WP4 → WP5 → WP6 → WP8 → WP9–11.**
+everything after) → WP1 → WP2 → WP3 → WP8a (desk-doable since session 36;
+do it before WP8b so the GPU sitting is not spent debugging plumbing) →
+WP4 → WP5 → WP6 → WP12 → WP8b (user gate) → WP9–11.**
 
 ---
 
@@ -369,14 +427,47 @@ demand signal live (`RPSWindow` + kinds + 10 s window + truncation error),
 SLO classes provisioned, WL-H2 preflight EXECUTED in-harness, k6 delivery
 thresholds, sampler coverage, substrate-scoped resume, CEL-validated pins.
 
+**SPLIT INTO WP8a / WP8b (session 36).** Docker is now installed locally and
+`cluster_backend.preflight()` reports no missing tools, so the two halves no
+longer share a gate. The GPU is only needed for **real model tiers**:
+`POLYFORGE_EVAL_LIVE_AI` is opt-in (`cluster_backend.py`), and with it unset
+the harness deploys no AI gateway and needs no `POLYFORGE_EVAL_TIER_BACKENDS`.
+Kubernetes actuation — which is what the dry-run checks — needs a cluster,
+not a GPU.
+
+#### WP8a — live actuation dry-run (**NOW DESK-DOABLE, agent-executable, $0**)
+
+This was deferred out of M1 for want of Docker and is the last item standing
+between the repo and a scored B1. Non-scored; it proves the plumbing.
+
+1. `kind` is verified working locally (session 36: cluster up in 16 s,
+   scheduled a pod, torn down clean). Tools: all five on PATH — note they
+   live under `%LOCALAPPDATA%\Microsoft\WinGet\Packages\...`, so a shell that
+   predates the install has a stale PATH; re-resolve from Machine+User PATH.
+2. Render and apply all four frozen arms (`jcac`, `replica-only`,
+   `cache-only`, `tier-only`) from `eval/experiments/wave4_live_plane.yaml`
+   with `POLYFORGE_EVAL_LIVE_AI` **unset**.
+3. Assert, per arm: the CRs admit against the committed CRDs (the CEL bound
+   rules are live), the operator actuates, and a **pinned** knob does not
+   move while the free knob does. That is the ablation's whole meaning.
+4. Record the outcome in `REMAINING_WORK.md`. If a pin leaks, that is a
+   finding, not a nuisance — an unpinned arm is an unlabelled copy of the
+   full controller.
+
+Constraint: `~/.wslconfig` gives Docker 9.7 GB, so `small` (2 nodes) and
+`medium` (4) are comfortable and `large` (6) is tight. The dry-run does not
+need `large`.
+
+#### WP8b — the scored matrix (**still user-gated on a GPU**)
+
 Substrate (all free): `docs/WAVE4_FREE_ROUTE.md` — Kaggle P100 (30 GPU-h/wk,
 tier bench already proven there) runs `kaggle_tier_server.py` → tunnel URL →
 `POLYFORGE_EVAL_TIER_BACKENDS`; Codespaces (Education: 180 core-h/mo) runs
-the kind cluster + harness.
+the kind cluster + harness. (Local Docker can host the cluster half now, but
+the tiers still need the GPU.)
 
 Order INSIDE the sitting (from `PREREG_WAVE4_LIVE_PLANE.md` §Status):
-1. **Live actuation dry-run** of all four arms (deferred from M1): each arm
-   renders, CRs admit, operator actuates, knobs visibly move. Non-scored.
+1. WP8a's dry-run, if it has not already been done at the desk.
 2. `knob_preflight.py` WL-H2 gate — now runs automatically inside
    `execute()`; an inert knob RAISES and voids the run. **If it raises:
    report SUBSTRATE INADEQUATE; WL-H1 is void; do NOT fake or lower
@@ -384,6 +475,18 @@ Order INSIDE the sitting (from `PREREG_WAVE4_LIVE_PLANE.md` §Status):
 3. The frozen 4 arms × 4 cells matrix, `--workers 1` (enforced), once.
 4. Export csv.gz, write the RESULTS record against the frozen prereg,
    register in `reproduce.py`, full checklist.
+
+### WP12 — authenticated ZAP scan (small, desk-doable)
+
+Session 36 ran ZAP for the first time and fixed the three findings it
+surfaced (see `docs/SECURITY.md` §Penetration test status). The scan covers
+the **unauthenticated** surface only: every real endpoint answers 401, so the
+rules never exercise authenticated behaviour. Build a ZAP context carrying a
+tenant API key (provision via `/v1/tenants` + `/v1/tenants/{id}/api-keys`,
+as `cluster_backend.provision_tenants` does) and re-run
+`./scripts/zap-baseline.sh --api`. Triage into the same findings table. Until
+then, the honest claim is "unauthenticated surface, 118 rules, 0 FAIL" —
+never "the API passed a pen test".
 
 ---
 
@@ -407,15 +510,22 @@ Order INSIDE the sitting (from `PREREG_WAVE4_LIVE_PLANE.md` §Status):
 
 | WP | Status | Evidence |
 |---|---|---|
-| WP1 trace parity | NOT STARTED | — |
+| WP1 trace parity | NOT STARTED — **highest-value open item** | — |
 | WP2 MASTER reconcile | NOT STARTED | — |
 | WP3 layered fix | NOT STARTED | — |
-| WP4 cells verify/fix | NOT STARTED (claim UNVERIFIED) | — |
+| WP4 cells verify/fix | NOT STARTED (claim UNVERIFIED — verify before fixing) | — |
 | WP5 O(N²) memoize | NOT STARTED (profile first) | — |
 | WP6 model mismatch | NOT STARTED | — |
-| WP7 push | **WAITING ON USER** | — |
-| WP8 B1 live | WAITING ON USER (gate) — prereqs all landed session 35 | — |
+| WP7 push | **WAITING ON USER** (2 min) | — |
+| **WP8a dry-run** | **UNBLOCKED session 36 — agent-executable, $0** | kind verified: cluster in 16 s, pod scheduled, clean teardown; preflight reports no missing tools |
+| WP8b B1 scored | WAITING ON USER (GPU gate) | prereqs landed session 35; cluster half now runnable locally |
+| WP12 authenticated ZAP | NOT STARTED (small) | unauth surface done: 118 PASS / 0 FAIL |
 | WP9–11 | user-owned | — |
+
+**Infrastructure status (session 36):** Docker + WSL2 + kind/helm/k6 all
+working locally; PostgreSQL RLS 3/3 PASS via `./scripts/pg-test-up.sh`; ZAP
+executable via `./scripts/zap-baseline.sh --api`. Nothing on Track 1 or WP8a
+is blocked on tooling any more — only WP8b (GPU) and WP7/WP9–11 (user).
 
 ## §7 Risk register
 
