@@ -50,9 +50,19 @@ VIOLATION_PARITY_ARMS = SYSTEMS_UNDER_TEST + [
     "jcac_b4", "jcac_b8", "jcac_b16", "jcac_b32", "jcac_b64",
 ]
 
+# PREREG_BUDGET_PARITY §Design + Amendment 1.
+BUDGET_PARITY_ARMS = SYSTEMS_UNDER_TEST + [
+    "hpa_budget", "keda_budget", "jcac_nobudget",
+]
+
 TRACES = {
     "burstgpt": OUT / "trace_parity_burstgpt_runs.csv",
     "azure": OUT / "trace_parity_azure_runs.csv",
+}
+
+BUDGET_TRACES = {
+    "burstgpt": OUT / "budget_parity_burstgpt_runs.csv",
+    "azure": OUT / "budget_parity_azure_runs.csv",
 }
 
 VIOLATION_TRACES = {
@@ -63,6 +73,7 @@ VIOLATION_TRACES = {
 CAMPAIGNS = {
     "parity": (SYSTEMS_UNDER_TEST, TRACES),
     "violation": (VIOLATION_PARITY_ARMS, VIOLATION_TRACES),
+    "budget": (BUDGET_PARITY_ARMS, BUDGET_TRACES),
 }
 
 
