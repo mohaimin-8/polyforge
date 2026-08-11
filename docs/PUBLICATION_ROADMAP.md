@@ -207,7 +207,7 @@ of each other; nothing is lost by running them after, and everything is
 gained by learning B1's outcome (and whether the live plane needs a
 follow-up rep — see the §8b note) before investing further desk time:
 
-**WP7 (2 min, done session 37) → WP1 → WP2 → WP13 (theory, parallel-safe) →
+**WP7 (done) → WP1 (done) → WP2 (done) → WP15 (budget parity, TOP) → WP13 (theory, parallel-safe) →
 WP3 → WP8a (desk-doable since session 36, no GPU — start Docker Desktop
 first) → WP14 (live soak, desk, needs Docker + the laptop kept awake) →
 WP8b (user opens the GPU gate here, NOT last) → WP4 → WP5 → WP6 → WP12 →
@@ -448,6 +448,60 @@ constants while the world keeps the published ones.
    register, checklist. *This record is the direct answer to "why should I
    believe an MPC that was tuned on its own simulator" — quote it in WP9.*
 **Effort:** ~1 day + campaign hours.
+
+### WP15 — Budget parity: make the arms solve the same problem (session 38, TOP PRIORITY)
+
+**Why.** WP1's comparison has a third confound, structural and larger than
+the eviction one. `controller.py:647` rejects any candidate whose projected
+spend exceeds the per-tenant Budget CRD (`hourly_budget_usd`, default $5/hr)
+**before the objective is evaluated**; `baselines.py` has **no affordability
+check anywhere** in its scaling path (`hourly_budget_usd` appears there only
+as a fairness weight). So jcac is the only arm subject to the budget
+constraint it was built to honour. Measured on BurstGPT window 57:
+`hpa_fair` spends **574.14** with 0% shed; jcac spends **11.93** with 93.6%
+shed. jcac looks cheap partly because it is *forbidden* to spend, and
+overshoots because shedding is the budget-respecting response to that same
+prohibition. **Cost and severity are not two axes here — they are one
+constraint seen twice.**
+
+This also explains why the pre-registered β sweep is inert (`f045e68`): β
+prices a tradeoff, but a hard filter is binding. **Do not run
+`PREREG_VIOLATION_PARITY`'s ladder** — it is measured inert and would burn
+hours restating the probe. That prereg stays frozen and pushed with its
+premise falsified, per R1.
+
+Prior art in-repo, never connected to the baseline comparison: session 29's
+risk-MPC null ("the knob was fighting the Budget CRD, not the demand") and
+`guarantee.py`'s header ("what does bind is the per-tenant budget against AI
+tier spend").
+
+**Steps.**
+1. VERIFY FIRST: confirm the asymmetry by code reading, not inference —
+   `budget_per_step` in `controller.py`, and its absence in every
+   `baselines.py` scaling path. Record file:line for both.
+2. Freeze `PREREG_BUDGET_PARITY.md` (§0.2 template), push before any run.
+   One factor: **which arms the budget filter applies to.** Two directions,
+   both frozen in the same prereg because they bracket the truth:
+   - `hpa_budget` / `keda_budget`: the fair comparators **subject to the
+     same per-tenant filter** (the honest like-for-like — what a reactive
+     autoscaler under a real Budget CRD would do).
+   - `jcac_nobudget`: the proposal with the filter **lifted** (what the
+     controller does when allowed to spend like the baselines).
+   Published arms untouched; new arms default-off (R4).
+   Hypotheses: BP-H1 against budget-capped comparators, jcac's cost
+   advantage survives at violation parity. BP-H2 with the filter lifted,
+   jcac reaches the comparators' `mean_excess`. BP-H3 (descriptive) how much
+   of WP1's cost gap and of its severity gap each direction explains.
+3. Run once over both traces (WP1's protocols), analysis →
+   `RESULTS_BUDGET_PARITY.md` via `record_path()`, register, checklist.
+
+**Contingency.** If BP-H2 shows jcac reaches parity once unconstrained, then
+WP1's severity FAIL is an artefact of the constraint asymmetry and must be
+reported as such — without claiming the constrained arm's cost number, which
+was earned under the constraint. If BP-H1 fails, the cost contribution does
+not survive a like-for-like comparison and is withdrawn per
+`PREREG_VIOLATION_PARITY`'s pre-committed response. **Effort:** ~half day +
+campaign hours (the ladder's runtime, roughly 2–3 h for both traces).
 
 ### WP13 — Multi-tenant extension of the cost separation (the Transactions theory strengthener)
 
@@ -793,6 +847,7 @@ never "the API passed a pen test".
 | WP1 trace parity | **DONE (session 37, `5c75e8a`)** — split verdict, see below | `RESULTS_TRACE_PARITY.md`; replication PASS bit-for-bit both traces; gate 21/21 |
 | WP13 step 0 | **DONE (session 37, `67a32a5`)** | `RESULTS_SEPARATION.md` registered; 2 of 3 published rows EXACT, mechanism row not reproducible and replaced by a runnable test |
 | WP2 MASTER reconcile | **DONE (session 37)** | Cost/SLO/Fairness scoreboard rows + ablation annotation + 3 disambiguation-table rows updated with the EP/WP1 adjudications; hand-curated only, no generated record touched |
+| **WP15 budget parity** | **NOT STARTED — now the top desk priority** (new, session 38; supersedes the inert β approach) | probe at `f045e68`: β×32 moves excess 0.0005 because `controller.py:647` rejects over-budget candidates *before* the objective; `baselines.py` has no affordability check at all |
 | WP3 layered fix | NOT STARTED | — |
 | WP4 cells verify/fix | NOT STARTED (claim UNVERIFIED — verify before fixing) | — |
 | WP5 O(N²) memoize | NOT STARTED (profile first) | — |
