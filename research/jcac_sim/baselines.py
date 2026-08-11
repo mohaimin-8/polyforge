@@ -14,6 +14,8 @@ import json
 import math
 import random
 
+import model
+
 from model import (
     AI_KINDS,
     CACHE_LEVELS_MB,
@@ -689,9 +691,55 @@ BASELINES = (
 )
 
 
+class BudgetFiltered:
+    """Wrap a baseline so it obeys the same per-tenant Budget CRD the
+    proposal obeys (PREREG_BUDGET_PARITY).
+
+    The audited asymmetry: `controller.py:604,647` computes a per-step cap
+    from `hourly_budget_usd` and rejects any candidate exceeding it *before*
+    the objective is evaluated, while every baseline `plan()` here scales on
+    arrival rate alone and never prices its own move. jcac is therefore the
+    only arm solving "best SLO within budget"; the baselines solve "meet the
+    SLO, ignore money". Comparing their cost head to head conflates a
+    constraint with a policy.
+
+    The rule applied here is the controller's own, verbatim -- same per-step
+    cap, and the same reject-and-hold response when nothing qualifies -- so
+    the comparison tests the constraint, not two dialects of it.
+
+    Wrapping rather than editing each baseline is deliberate: the published
+    arms keep running the exact code they were measured with (R4), and this
+    class is reachable only through the `*_budget` registry names.
+    """
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.configs = inner.configs
+        self.name = f"{inner.name}_budget"
+
+    def observe_feedback(self, realized_violation: dict[str, float]) -> None:
+        observe = getattr(self.inner, "observe_feedback", None)
+        if observe is not None:
+            observe(realized_violation)
+
+    def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
+        proposed = self.inner.plan(states, demands)
+        out = {}
+        for tid, want in proposed.items():
+            config = self.configs[tid]
+            cap = config.hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
+            billed = model.evaluate_step(config, want, demands.get(tid, Demand()))
+            # Hold the incumbent when the proposed move cannot be afforded --
+            # the controller's own response to an empty affordable set.
+            out[tid] = want if billed.cost_usd <= cap else states[tid]
+        return out
+
+
 def make_baseline(name: str, configs: dict[str, TenantConfig], **params):
     """Instantiate a baseline by name. `params` are the controller's tuning
     knobs (W34 grid search sweeps them); unknown names fail loudly."""
+    if name.endswith("_budget"):
+        return BudgetFiltered(make_baseline(name[: -len("_budget")], configs, **params))
     for cls in BASELINES:
         if cls.name == name:
             return cls(configs, **params)

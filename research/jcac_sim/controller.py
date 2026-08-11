@@ -366,6 +366,7 @@ class JCACController:
         risk_cost_at_point: bool = False,
         carbon_weight: float = 0.0,
         tenant_order_seed: int | None = None,
+        enforce_budget: bool = True,
     ):
         self.configs = configs
         # M4 / T18: price the plan's carbon alongside its dollars. 0.0 (the
@@ -431,6 +432,9 @@ class JCACController:
         # sorted() order is confounded with priority class because tenant ids
         # are assigned by slot. None = sorted(), the published behavior.
         self.tenant_order_seed = tenant_order_seed
+        # See the filter site in `plan()` for why this exists. Default True =
+        # published behaviour.
+        self.enforce_budget = enforce_budget
         self._order_cache: list[str] | None = None
         self.capacity_scale = {tid: 1.0 for tid in configs}
         self._projected: dict[str, float] = {}
@@ -644,7 +648,15 @@ class JCACController:
                         # spend the arriving demand will bill, not against the
                         # headroom we provisioned for.
                         cost = self._project(tid, candidate, cost_horizons[tid])[0]
-                    if cost > budget_per_step:
+                    # PREREG_BUDGET_PARITY: the per-tenant Budget CRD is a hard
+                    # filter applied BEFORE the objective, and no baseline in
+                    # baselines.py has an equivalent -- so the proposal is the
+                    # only arm solving "best SLO within budget". `jcac_nobudget`
+                    # lifts it to measure how much of the WP1 severity gap the
+                    # constraint accounts for. True (the default) is the
+                    # published behaviour, so every committed arm replays
+                    # bit-identically (R4).
+                    if self.enforce_budget and cost > budget_per_step:
                         continue
                     switches = (
                         (candidate.replicas != base.replicas)

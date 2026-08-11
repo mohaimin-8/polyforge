@@ -276,6 +276,26 @@ SYSTEMS: dict[str, SystemSpec] = {
     "jcac_b64": SystemSpec(
         "jcac", beta=64.0,
         description="PolyForge at SLO weight 64 (PREREG_VIOLATION_PARITY ladder)"),
+    # PREREG_BUDGET_PARITY: the two directions that bracket the confound.
+    # controller.py:647 rejects over-budget candidates before the objective;
+    # baselines.py:97-105 has no affordability check at all, so jcac is the
+    # only arm solving "best SLO within budget". These make the arms solve the
+    # same problem, in both directions, so neither can be called the unfair one.
+    "hpa_budget": SystemSpec(
+        "hpa_budget", lru_eviction=False, static_cache_mb=512,
+        description="Reactive HPA under the SAME per-tenant Budget CRD filter "
+                    "the proposal obeys, fair cache posture (PREREG_BUDGET_PARITY "
+                    "BP-H1a: the like-for-like cost comparator)"),
+    "keda_budget": SystemSpec(
+        "keda_budget", lru_eviction=False, static_cache_mb=512,
+        description="Event-driven KEDA under the same budget filter and fair "
+                    "cache posture (PREREG_BUDGET_PARITY BP-H1b)"),
+    "jcac_nobudget": SystemSpec(
+        "jcac", params={"enforce_budget": False},
+        description="PolyForge with the per-tenant budget filter LIFTED — what "
+                    "the controller does when allowed to spend like the reactive "
+                    "baselines (PREREG_BUDGET_PARITY BP-H2: tests whether WP1's "
+                    "severity failure is constraint-induced)"),
     "jcac_evictcharged": SystemSpec(
         "jcac", params={"evict_overhead_us": 1104.9},
         description="PolyForge paying its own eviction cost: the cost-aware "
