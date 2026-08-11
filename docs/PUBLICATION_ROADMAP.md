@@ -792,7 +792,7 @@ never "the API passed a pen test".
 |---|---|---|
 | WP1 trace parity | **DONE (session 37, `5c75e8a`)** — split verdict, see below | `RESULTS_TRACE_PARITY.md`; replication PASS bit-for-bit both traces; gate 21/21 |
 | WP13 step 0 | **DONE (session 37, `67a32a5`)** | `RESULTS_SEPARATION.md` registered; 2 of 3 published rows EXACT, mechanism row not reproducible and replaced by a runnable test |
-| WP2 MASTER reconcile | NOT STARTED | — |
+| WP2 MASTER reconcile | **DONE (session 37)** | Cost/SLO/Fairness scoreboard rows + ablation annotation + 3 disambiguation-table rows updated with the EP/WP1 adjudications; hand-curated only, no generated record touched |
 | WP3 layered fix | NOT STARTED | — |
 | WP4 cells verify/fix | NOT STARTED (claim UNVERIFIED — verify before fixing) | — |
 | WP5 O(N²) memoize | NOT STARTED (profile first) | — |

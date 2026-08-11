@@ -72,6 +72,16 @@ caused by observational aliasing rather than arithmetic. It is not currently
 backed by runnable code. Full detail and the instruction not to silently
 substitute a reproducing number: `PUBLICATION_ROADMAP.md` WP13 step 0.
 
+**WP13 step 0 CLOSED (`67a32a5`).** `analysis_separation.py` now regenerates
+the whole table from `guarantee.py` alone — `RESULTS_SEPARATION.md`,
+registered in `reproduce.py`. The unreproducible row was not patched to
+match the prose: it is reported as unreproducible in the record itself, with
+a replacement mechanism test (the ramp family, aliasing-free by
+construction) that shows the same sign inversion the prose claimed, computed
+rather than asserted. `flash` (+49.0%) and `ramp_gentle` (+2.7%, at period
+20 — previously undocumented) both reproduce exactly. The multi-tenant
+extension proper (WP13 steps 1–5) is separate and NOT started.
+
 **WP1 in flight.** The finding is verified, not inherited:
 `trace_matrix.run_one` charged `lru_miss_cost_factor()` = 1.4581 to every
 `lru_eviction` arm *and never threaded `spec.static_cache_mb`*, so
@@ -83,6 +93,27 @@ four decimals, because they are pinned at 128 MB for the whole run, while
 PolyForge reports 0.1703 / 0.2182. Wiring fixed and R4-verified at `077be71`
 (19/19 byte-identical; the three trace records byte-identical via
 `--analyze`); campaign running.
+
+**WP1 CLOSED (`5c75e8a`), verdict split by trace.** `RESULTS_TRACE_PARITY.md`
+is in and registered (`reproduce.py`: 21/21 byte-identical). Replication of
+the five published arms is bit-for-bit exact on both traces before any new
+arm is scored — the substrate is sound. Then: **Azure** shrinks from the
+published −42.5%/window to a real, pervasive **−7.1%** against
+`hpa_fair`/`keda_fair` (TP-H1a/b PASS, p≤9.5e-05; 69.4% of windows favour
+jcac; severity non-inferior, TP-H3a/b PASS). **BurstGPT** shrinks from
+published −70.4% to −52.2% but **FAILS its own pre-registered Wilcoxon
+test** (TP-H1a p=0.0133 against the Holm threshold 0.01250) — the mean is
+pulled by a minority of extreme windows (median diff **+2.232**: jcac is
+*more expensive* than the fair comparator in 57.3% of windows), and severity
+**reverses**: jcac's unbounded `mean_excess` is 0.5134 against `hpa_fair`'s
+0.008818 — **58× worse**, with AI shed on 9.3% of tenant-steps against 0.0%
+for every reactive arm (TP-H3a/b FAIL). This directly damages the "half the
+SLO overshoot" fallback framing, which now holds only on the synthetic
+matrix and Azure, not universally. WP2 (RESULTS_MASTER reconciliation) has
+been carried out reflecting all of this — see its scoreboard's Cost/SLO rows
+and the "which number to cite" table. The venue-decision rule in
+`PUBLICATION_ROADMAP.md` §5 governs what this means for WP9; it is not
+re-litigated here.
 
 ## Session 36 (2026-08-09) — Docker is available locally; two gates closed
 
