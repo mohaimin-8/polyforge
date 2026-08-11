@@ -494,5 +494,78 @@ def _rebuild_cycle(config, orbit, target):
     return None
 
 
+class PublishedSeparationNumbers(unittest.TestCase):
+    """Pin the M3 numbers the write-up quotes (WP13 step 0).
+
+    Until session 37 nothing pinned these: `guarantee.py` was imported by this
+    test module and nothing else, and no test asserted any published value, so
+    the prose in `docs/MAIN_WORKING_PATH.md` §3 M3 could have drifted from the
+    code silently and indefinitely. `analysis_separation.py` now regenerates
+    the record; these tests make drift fail loudly.
+    """
+
+    # The percentage the write-up quotes is gap / reactive_cost_floor.
+    @staticmethod
+    def _pct(result: dict) -> float:
+        return ((result["reactive_cost_floor"] - result["predictive_cycle_cost"])
+                / result["reactive_cost_floor"] * 100.0)
+
+    @staticmethod
+    def _dealias(orbit):
+        """Make every observation unique without touching capacity demand."""
+        return [Demand(rps=dict(d.rps), crud_base_ms=d.crud_base_ms + 1e-9 * k)
+                for k, d in enumerate(orbit)]
+
+    def test_flash_row_matches_the_published_numbers(self):
+        r = guarantee.price_of_reaction(standard_config(), flash_orbit())
+        self.assertAlmostEqual(r["reactive_cost_floor"], 0.012800, places=6)
+        self.assertAlmostEqual(r["predictive_cycle_cost"], 0.006533, places=6)
+        self.assertAlmostEqual(self._pct(r), 49.0, places=1)
+
+    def test_gentle_row_matches_at_the_period_the_writeup_used(self):
+        """The published +2.7% row is period 20, NOT this module's default 40
+        (which gives 0.019333 / 0.018800 / +2.8%). The period was never
+        recorded in the prose; session 37 recovered it by scan. Pinning it
+        here stops the number depending on an undocumented choice again."""
+        r = guarantee.price_of_reaction(standard_config(), gentle_orbit(20))
+        self.assertAlmostEqual(r["reactive_cost_floor"], 0.009733, places=6)
+        self.assertAlmostEqual(r["predictive_cycle_cost"], 0.009467, places=6)
+        self.assertAlmostEqual(self._pct(r), 2.7, places=1)
+
+        default = guarantee.price_of_reaction(standard_config(), gentle_orbit())
+        self.assertNotAlmostEqual(
+            default["reactive_cost_floor"], 0.009733, places=6,
+            msg="the default period must stay distinguishable from the published row")
+
+    def test_removing_aliasing_collapses_the_gap_on_a_smooth_orbit(self):
+        """MECHANISM (replacement for the unreproducible published row).
+
+        Remove only the ability to tell orbit positions apart -- capacity
+        requirements untouched -- and the gentle orbit's separation must
+        vanish exactly: singleton successor sets make the relaxed reactive
+        optimum achievable, and the reach clamp cannot bind on a slope
+        actuation can follow.
+        """
+        r = guarantee.price_of_reaction(
+            standard_config(), self._dealias(gentle_orbit(20)))
+        self.assertAlmostEqual(
+            r["reactive_cost_floor"], r["predictive_cycle_cost"], places=12)
+
+    def test_removing_aliasing_inverts_the_gap_on_a_sharp_orbit(self):
+        """The other half of the mechanism: on `flash` the clamp does bind, so
+        de-aliasing drives the relaxed floor strictly BELOW an achievable
+        cycle. Gap positive when aliased, negative when not -- the separation
+        is caused by the information asymmetry, not by the arithmetic."""
+        aliased = guarantee.price_of_reaction(standard_config(), flash_orbit())
+        clear = guarantee.price_of_reaction(
+            standard_config(), self._dealias(flash_orbit()))
+        self.assertGreater(self._pct(aliased), 0.0)
+        self.assertLess(self._pct(clear), 0.0)
+        # The predictive side cannot notice aliasing: it plans on d_{k+1} either
+        # way. If this drifts, de-aliasing changed more than the observation.
+        self.assertAlmostEqual(aliased["predictive_cycle_cost"],
+                               clear["predictive_cycle_cost"], places=12)
+
+
 if __name__ == "__main__":
     unittest.main()
