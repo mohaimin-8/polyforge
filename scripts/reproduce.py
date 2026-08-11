@@ -83,6 +83,7 @@ CAMPAIGN_RECORDS = [
     # committed command. It needs no campaign data: it derives from the
     # plant constants, so it rebuilds on a clean clone unconditionally.
     ("analysis_separation.py", [], "RESULTS_SEPARATION.md"),
+    ("analysis_trace_parity.py", [], "RESULTS_TRACE_PARITY.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",

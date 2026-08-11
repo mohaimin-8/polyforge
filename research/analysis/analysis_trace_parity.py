@@ -188,7 +188,7 @@ def score_trace(key: str, meta: dict, w) -> dict:
                else f"{r['mean_diff']:+.4f} excess")
         w(f"| **{hid}** | {desc[hid]} | {r['n']} | {eff} | {r['dz']:+.3f} | "
           f"{r['p']:.3g} | {hr['threshold']:.5f} | {r['t_p']:.3g} | "
-          f"{'PASS' if hr['rejected'] else 'FAIL'} |")
+          f"{'PASS' if hr['reject'] else 'FAIL'} |")
 
     # --- TP-H2 -----------------------------------------------------------
     swings = {}
@@ -254,8 +254,8 @@ def main() -> None:
 
     w("\n## Verdict\n")
     for v in verdicts:
-        primary = [hid for hid in ("TP-H1a", "TP-H1b") if v["holm"][hid]["rejected"]]
-        sev = [hid for hid in ("TP-H3a", "TP-H3b") if v["holm"][hid]["rejected"]]
+        primary = [hid for hid in ("TP-H1a", "TP-H1b") if v["holm"][hid]["reject"]]
+        sev = [hid for hid in ("TP-H3a", "TP-H3b") if v["holm"][hid]["reject"]]
         w(f"- **{v['meta']['label']}**: published delta vs `hpa` "
           f"{v['published_rel'] * 100:+.1f}%, fair delta vs `hpa_fair` "
           f"{v['fair_rel'] * 100:+.1f}%. Cost primaries passing: "
