@@ -17,7 +17,12 @@ package says VERIFY FIRST and gives the command.
 ## §0 How to use this document (cold-session bootstrap)
 
 1. `cd "c:/Users/DARKR/Documents/Thesis Project/polyforge"` — Windows box,
-   Git Bash + PowerShell, **no Docker locally**, Python 3.13, Go per go.mod.
+   Git Bash + PowerShell, Python 3.13, Go per go.mod. **Docker IS available
+   locally since session 36** (Desktop 4.85.0 + WSL2; the daemon is often
+   not running — start Docker Desktop and if it fails check
+   `com.docker.service` is Automatic+Started). kind/helm/k6/kubectl on
+   PATH. Sizing: 9.7 GB via `~/.wslconfig`; `small`/`medium` kind clusters
+   fit, `large` does not.
 2. `git log --oneline -8` — you should see the session-35 V-series commits
    (`ec7a230..9f66192`) on branch `v-series-validity-remediation`. If the
    branch was merged/pushed since, fine; the WPs below are independent of
@@ -169,17 +174,60 @@ WP1 trace parity ──┐
 WP2 MASTER fix ────┤
 WP3 layered fix ───┤──► FGCS (Q1) evidence-complete ─┐
                    │                                  ├─(+ WP9 reframe)─► submit
-WP7 push ──────────┤                                  │
+WP7 push (done) ───┤                                  │
 WP8a dry-run (desk)┤                                  │
-WP8b B1 scored ────┴──► TCC / TSC (Transactions) ─────┘
+WP8b B1 scored ────┼──► TCC / TSC (Transactions) ─────┘
+WP13 MT separation ┤      ▲ the three session-37 Transactions
+WP14 live soak ────┘      │ strengtheners: theory weight (WP13),
+                          │ live duration (WP14), and the venue
+                          │ decision rule in WP9 (WP1's outcome
+                          │ picks the pitch BEFORE writing)
 WP4 cells + WP5 O(N²) + WP6 mismatch ──► TPDS additionally
 WP12 authenticated ZAP ──► security-section completeness (small)
 ```
 
-Execute order: **WP7 (2 min, do it first — it fixes the anchor weakness for
-everything after) → WP1 → WP2 → WP3 → WP8a (desk-doable since session 36;
-do it before WP8b so the GPU sitting is not spent debugging plumbing) →
-WP4 → WP5 → WP6 → WP12 → WP8b (user gate) → WP9–11.**
+**Why WP13/WP14 exist (session 37).** The original Transactions-tier
+strengthener — M3's recursive-feasibility theorem — proved vacuous, and its
+replacement (the cost separation, `bec0f62`) is honest but explicitly
+"suggestive corroboration at one operating point". A Transactions submission
+resting on one confirmatory B1 sitting plus a single-operating-point theorem
+is thin. WP13 restores theory weight (the multi-tenant extension the M3
+close-out itself names as the open item); WP14 turns "we ran it live once"
+into "we ran it live for a day with faults, and here is how it behaved" —
+at $0, on the Docker that now works locally. Neither blocks FGCS; both are
+specifically for the TCC/TSC bar.
+
+**Execute order, reprioritized session 37 for a Transactions-tier target
+(TCC/TSC, not just FGCS/Q1).** The user's actual target is Transactions,
+not a Q1-safe fallback, so B1 — the only live evidence for the joint
+controller and the single highest-uncertainty item on the whole path — is
+pulled forward instead of trailing behind the desk-only polish work that a
+Transactions reviewer weighs less. WP4–WP6/WP12 are independent of B1 and
+of each other; nothing is lost by running them after, and everything is
+gained by learning B1's outcome (and whether the live plane needs a
+follow-up rep — see the §8b note) before investing further desk time:
+
+**WP7 (2 min, done session 37) → WP1 → WP2 → WP13 (theory, parallel-safe) →
+WP3 → WP8a (desk-doable since session 36, no GPU — start Docker Desktop
+first) → WP14 (live soak, desk, needs Docker + the laptop kept awake) →
+WP8b (user opens the GPU gate here, NOT last) → WP4 → WP5 → WP6 → WP12 →
+WP9–11.**
+
+WP13 touches only `research/jcac_sim/` and blocks nothing — run it in any
+gap (e.g. while a campaign is in flight). WP14 must come AFTER WP8a: the
+dry-run proves the actuation plumbing the soak depends on. The venue
+decision (TCC/TSC vs FGCS-first) is made when WP1's record lands — see the
+WP9 note in §5; do not start the manuscript carve before then.
+
+Note for WP8b specifically: `eval/experiments/wave4_live_plane.yaml` is
+frozen at `reps: 1` (the prereg's stopping rule) — a single confirmatory
+sitting, which is thin evidence by Transactions standards even though it is
+honestly pre-registered. Do not edit that frozen design. If the first B1
+result lands clean and the user wants stronger-than-single-sitting
+evidence, the correct move is a NEW small follow-up prereg (one changed
+factor: more reps or longer duration), mirroring the RB-H1 follow-up
+pattern (session 30) — frozen and pushed before it runs, decided only
+*after* seeing the first result, not pre-committed now.
 
 ---
 
@@ -401,6 +449,143 @@ constants while the world keeps the published ones.
    believe an MPC that was tuned on its own simulator" — quote it in WP9.*
 **Effort:** ~1 day + campaign hours.
 
+### WP13 — Multi-tenant extension of the cost separation (the Transactions theory strengthener)
+
+**Why.** M3's replacement theorem (`bec0f62`, `research/jcac_sim/guarantee.py`,
+756 lines) derives the reactive-vs-predictive cost separation for a **single
+tenant** — the per-tenant frontier enumeration is *exact* only because
+tenants are independent. The M3 close-out itself records the gap
+(`docs/MAIN_WORKING_PATH.md` §3 M3): **the multi-tenant coupling is
+load-bearing, not optional**. Ignoring cluster caps gives `flash_crud` the
+*wrong sign* (−19.5% derived vs +11.5% measured); equal-share makes the cell
+*infeasible*; the truth sits between because per-tenant phases are drawn
+independently, so bursts rarely coincide and a tenant borrows capacity while
+neighbours sit in troughs. Today only 2 of 5 matched parity pairs agree in
+sign, and the record honestly says "suggestive corroboration at one
+operating point". A bracket that contains the measured value on the coupled
+cells upgrades that to a validated correspondence — the single biggest
+theory upgrade available for TCC/TSC. Tools: Python 3.13 + pytest only; no
+Docker, no campaign, no GPU.
+
+**Preconditions.** None on other WPs. Read BEFORE designing anything:
+(1) `research/jcac_sim/guarantee.py` end to end — the machinery to extend is
+`reactive_cost_floor` (line ~336), `predictive_cycle_cost` (~372),
+`price_of_reaction` (~442), `cost_at_violation_parity` (~674), and the
+docstring at line ~74 listing the three couplings deliberately left out;
+(2) `docs/MAIN_WORKING_PATH.md` §3 M3 in full, including the RETRACTED
+sign-agreement claim and the do-not-say list in `DEFENSE_QA` #28 — do not
+resurrect the retracted claim in any form; (3) `test_guarantee.py` for the
+test conventions.
+
+**Steps.**
+1. VERIFY FIRST (half day): reproduce the current per-pair table — the 5
+   matched parity pairs on the `uniform` mix (medium/`spike_agentic` +43.4
+   derived vs +53.1 measured; large/`flash_ai` +42.5 vs +79.1;
+   small/`flash_crud` not computable; both `ramp_gentle` pairs out of
+   scope). The commands are in the M3 status block. Confirm the two broken
+   coupling models reproduce (−19.5% no-cap sign flip; equal-share
+   infeasibility) before deriving anything new.
+2. Design — two candidate routes, try in this order, keep whichever yields
+   a bracket that *bites* (is narrower than the no-cap/equal-share gap):
+   - **Route A (exact, preferred): aggregate-demand enumeration.** Phases
+     are independent uniform draws over deterministic orbits, so the joint
+     phase space is the finite product of orbit positions and every
+     coincidence probability is *exactly countable* — no concentration
+     inequality needed. The cluster cap binds on aggregate work units, so
+     convolve the per-tenant orbit work-unit distributions (a DP over
+     tenants × orbit length × aggregate WU, not the L^N product) to get the
+     exact distribution of aggregate demand per step; the reactive floor
+     under coupling becomes the expected cost of clearing every aliased
+     aggregate successor, allocated by the same rule the simulator uses.
+   - **Route B (bracket): refine the two broken bounds.** Lower: no-cap
+     corrected by the exactly-computed probability mass of coincident
+     bursts. Upper: equal-share relaxed by the borrowable headroom
+     (neighbours' trough capacity × probability both are in trough).
+     Cruder, but still an honest interval.
+3. Implement in `guarantee.py` (new functions; existing functions
+   UNTOUCHED — the single-tenant results are published), tests in
+   `test_guarantee.py`: degenerate case (1 tenant) must reduce exactly to
+   the existing floor; a hand-computable 2-tenant × 2-position case checked
+   against brute-force enumeration of the full product space.
+4. **State the validation reading in writing BEFORE computing it** (in the
+   analysis script's docstring, committed first — this is a derivation over
+   already-committed campaign data, so no prereg/R2 applies, mirroring how
+   `bec0f62` itself landed; the pre-stated reading is what keeps it
+   honest): the derived bracket contains the measured cost delta on ≥4 of
+   the 5 matched pairs INCLUDING `flash_crud`'s sign, or the extension is
+   reported as failed.
+5. `research/analysis/analysis_separation_mt.py` →
+   `RESULTS_SEPARATION_MT.md` via `stats.record_path()`, register in
+   `reproduce.py` `CAMPAIGN_RECORDS`, full §0.3 checklist, update
+   `MAIN_WORKING_PATH.md` §3 M3 (append, dated — the closed M3 record is
+   not edited).
+
+**Contingencies.** If neither route produces a bracket narrower than the
+no-cap/equal-share gap, that adjudication IS the deliverable: the record
+states the coupling is analytically intractable at this generality, with
+the enumeration evidence, and the paper cites the theorem as single-tenant
+scope only. Do NOT widen the acceptance rule after seeing numbers, and do
+NOT tune constants until a pair agrees. **Effort:** 1–2 days.
+
+### WP14 — Live CRUD-plane soak with faults (the Transactions duration strengthener)
+
+**Why.** Everything live on record is short: B2/B3 was one Codespace
+sitting; WP8b is frozen at `reps: 1`. Transactions reviewers distinguish
+"ran live once" from "ran live for a day and here is how it behaved through
+faults". The GPU is NOT needed for this: `POLYFORGE_EVAL_LIVE_AI` is opt-in
+(`eval/harness/cluster_backend.py`) — unset, the harness deploys no AI
+gateway and exercises the operator, planner, replica + cache knobs, chaos
+injection and the full audit path on CRUD load alone. Local Docker
+(session 36) makes a 12–24 h soak $0.
+
+**Preconditions.** WP8a dry-run PASSED (the soak stands on that plumbing).
+Docker Desktop running (`docker version` answers; if not, check
+`Get-Service com.docker.service` is Automatic+Started — the session-36
+fault). Tools already on PATH: `kind`, `helm`, `kubectl`, `k6`
+(**GrafanaLabs.k6**, not k6.k6; note winget tools live under
+`%LOCALAPPDATA%\Microsoft\WinGet\Packages\`, so a stale shell may need PATH
+re-resolved). Cluster size `small` or `medium` ONLY — `~/.wslconfig` gives
+Docker 9.7 GB and `large` does not fit. **Keep the laptop awake for the
+duration**: `powercfg /change standby-timeout-ac 0` before, restore after
+(record the prior value first: `powercfg /query SCHEME_CURRENT SUB_SLEEP`).
+Free disk ≥ 10 GB for metrics + PG.
+
+**Steps.**
+1. Freeze `PREREG_LIVE_SOAK.md` (§0.2 template), commit AND PUSH before the
+   run (R1/R2 — this scores new live measurement). Design shape (exact
+   margins frozen by the implementer FROM committed B2/B3 values in
+   `eval/results/live_chaos_p99_runs.csv` and `RESULTS_LIVE_CHAOS_P99.md` —
+   never invented): duration 12 h minimum / 24 h target on one kind
+   cluster, CRUD-only load via the session-19/23 harness
+   (`docs/WAVE3_LIVE_RUNBOOK.md` is the proven pattern), `medium` cell,
+   `POLYFORGE_EVAL_SHARED_PG=1` (R5), fault schedule injected at frozen
+   hours reusing B2's two injectors (planner crash + apiserver throttle),
+   ≥2 occurrences each. Hypotheses to freeze: SK-H1 every fault recovers
+   without operator intervention (binary); SK-H2 audit-record continuity —
+   every degraded cycle audited across the whole soak (the D11 fix under
+   sustained load); SK-H3 hour-bucketed crud p95 stays within a band around
+   the B2 committed values; SK-H4 zero invalid-run signatures
+   (`check_metrics` gates: nonzero p95, nonzero `n_events`, sampler
+   coverage ≥90%, k6 delivery thresholds).
+2. Write the soak driver as a thin spec over the existing harness — a new
+   `eval/experiments/live_soak.yaml` + whatever minimal runner glue the
+   chaos campaign scripts don't already provide. Do NOT fork the harness;
+   the B2 fault injectors and the k6/`check_k6_delivery` path are the
+   proven components. Run `kubectl get events -w` logging to a file for the
+   post-mortem trail.
+3. Run once. If the machine sleeps, the run is VOID — report, do not
+   splice two half-runs (the prereg forbids it).
+4. Export csv.gz, `analysis_live_soak.py` → `RESULTS_LIVE_SOAK.md` via
+   `record_path()`, register in `reproduce.py`, §0.3 checklist.
+
+**Contingencies.** Instability surfacing mid-soak (planner leak, operator
+crash-loop, PG exhaustion) **is the finding, not a nuisance**: report it,
+fix forward, and re-sit under a NEW small prereg (one changed factor),
+mirroring the RB-H1 follow-up pattern. Never truncate or splice the record.
+If Docker cannot hold `medium` for 24 h, drop to `small` and disclose —
+duration outranks width for this WP's purpose. **Effort:** ~half day desk +
+12–24 h unattended wall-clock.
+
 ---
 
 ## §4 Track 2 — user-gated (agent prepares, user opens the gate)
@@ -499,6 +684,23 @@ never "the API passed a pen test".
   the validity-methodology story (self-audit found and published its own
   confound: EVICTION_PARITY + ORDER_PERMUTATION + [WP1/WP3/WP6 records]).
   Sources: MAIN_WORKING_PATH §0b, the V-series records, WP2's MASTER.
+
+  **Venue decision rule (session 37 — decide BEFORE writing a word).**
+  The pitch is selected by `RESULTS_TRACE_PARITY.md` (WP1), not by
+  ambition:
+  - **TP-H1 survives on ≥1 trace** (a real cost advantage against fair
+    comparators on real demand): primary target **TCC or TSC**
+    (Transactions), with WP13's theory bracket and WP14's soak as the
+    supporting weight; FGCS is the resubmission fallback, not the first
+    shot.
+  - **TP-H1 fails on both traces** (parity, as the synthetic EP-H1a
+    result suggests it may): primary target **FGCS (Q1)** with the
+    parity-plus-half-the-overshoot framing and the methodology story as
+    the lead; a Transactions attempt then waits on B1 landing clean AND
+    the WP14 soak, and is a second paper cycle, not this one.
+  - Either way: the arXiv preprint (WP11) goes up when the manuscript is
+    done and is NOT delayed by venue strategy; the security paper split
+    (Computers & Security / PETS) is unaffected by this rule.
 - **WP10** RB-H1 family decision (p=0.0073: survives Holm in its own
   6-hypothesis family at 0.05/6=0.00833; fails vs all 48 at 0.00104).
   Decide which family it belongs to; state it in the paper's stats section.
@@ -520,12 +722,23 @@ never "the API passed a pen test".
 | **WP8a dry-run** | **UNBLOCKED session 36 — agent-executable, $0** | kind verified: cluster in 16 s, pod scheduled, clean teardown; preflight reports no missing tools |
 | WP8b B1 scored | WAITING ON USER (GPU gate) | prereqs landed session 35; cluster half now runnable locally |
 | WP12 authenticated ZAP | NOT STARTED (small) | unauth surface done: 118 PASS / 0 FAIL |
-| WP9–11 | user-owned | — |
+| **WP13 MT separation** | NOT STARTED (new, session 37 — Transactions theory strengthener) | machinery: `guarantee.py`; open item named in M3 close-out |
+| **WP14 live CRUD soak** | NOT STARTED (new, session 37 — needs WP8a first, Docker started, laptop kept awake 12–24 h) | harness proven in B2/B3; GPU not required |
+| WP9–11 | user-owned; **WP9 waits on WP1's record (venue decision rule, §5)** | — |
 
 **Infrastructure status (session 36):** Docker + WSL2 + kind/helm/k6 all
 working locally; PostgreSQL RLS 3/3 PASS via `./scripts/pg-test-up.sh`; ZAP
 executable via `./scripts/zap-baseline.sh --api`. Nothing on Track 1 or WP8a
 is blocked on tooling any more — only WP8b (GPU) and WP7/WP9–11 (user).
+**Session 37: Docker Desktop is installed but the daemon is not running by
+default** — start it before WP8a/WP8b/WP12; if it refuses, check
+`com.docker.service` is Automatic + Started (the session-36 fault). WP1–WP6
+need no Docker at all — pure `research/jcac_sim`/`research/analysis` work.
+
+**Target is Transactions tier (TCC/TSC), not FGCS/Q1 as a ceiling** — see
+the reprioritized execute order in §2. WP8b is pulled forward, ahead of
+WP4–WP6/WP12, so the live-evidence outcome is known before further desk
+polish is invested.
 
 ## §7 Risk register
 
@@ -537,4 +750,9 @@ is blocked on tooling any more — only WP8b (GPU) and WP7/WP9–11 (user).
 | WP5: memoization drifts one byte | Do not ship default-on. Fix key or ship default-off arm. |
 | WP6: advantage collapses at ±25% mismatch | Publish the boundary; it becomes the "when does this controller apply" section — a contribution, not an embarrassment. |
 | WP8: WL-H2 inert knob | SUBSTRATE INADEQUATE, WL-H1 void, report honestly, fix substrate, re-sit. |
+| WP13: no bracket narrower than the no-cap/equal-share gap | The adjudication IS the deliverable: theorem cited as single-tenant scope; acceptance rule never widened after seeing numbers. |
+| WP13: bracket misses `flash_crud`'s sign | Reported as measured; the retracted sign-agreement claim stays retracted; no constant tuning until a pair agrees. |
+| WP14: instability surfaces mid-soak | That IS the finding. Report, fix forward, re-sit under a NEW one-factor prereg. Never truncate or splice a record. |
+| WP14: machine sleeps mid-soak | Run VOID. Disclose, re-sit. Two half-runs are never joined. |
+| WP1 fails on both traces | Venue rule in §5 fires: FGCS-first pitch, Transactions deferred to a second cycle behind B1 + WP14. Not a crisis — pre-decided. |
 | Any record drifts under reproduce.py | Stop. Find cause. Never re-freeze a prereg to match an outcome. |
