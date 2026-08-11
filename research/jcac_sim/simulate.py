@@ -147,6 +147,13 @@ class RunResult:
     # what saturation hides; both are reporting-only and enter no objective.
     mean_excess: float = 0.0  # traffic-weighted, UNBOUNDED overshoot
     tier_none_step_share: float = 0.0  # share of tenant-steps with AI shed
+    # PREREG_TRACE_PARITY reporting field: tier spend BEFORE `miss_cost_factor`
+    # is applied. Because the factor scales only `cost_tier_usd` below, cost at
+    # any eviction comparator f is exactly `infra + f * total_tier_cost_usd`, so
+    # the sensitivity band is recomputed from measurement instead of asserted.
+    # Reporting-only, enters no objective, and absent from `summary()` so every
+    # record generated through that path replays bit-identically (R4).
+    total_tier_cost_usd: float = 0.0
     steps: int = 0
     rows: list = field(default_factory=list)
 
@@ -377,6 +384,7 @@ def run(
                 configs[tid], serving, actual[tid],
                 extra_ai_latency_ms=evict_overhead_ms or 0.0,
             )
+            result.total_tier_cost_usd += m.cost_tier_usd  # unscaled, reporting-only
             cost = miss_cost_factor * m.cost_tier_usd
             if serving != nominal:
                 # Billing follows the nominal configuration immediately.

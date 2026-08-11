@@ -638,6 +638,39 @@ class SimulateTests(unittest.TestCase):
         # Same decisions, so violation profile is untouched.
         self.assertEqual(lru.mean_violation, base.mean_violation)
 
+    def test_total_tier_cost_supports_exact_band_recomputation(self):
+        """PREREG_TRACE_PARITY reports the headline delta at every eviction
+        comparator. That is only honest if cost at factor f can be derived
+        exactly rather than approximated, which needs the UNSCALED tier spend:
+        total(f) == infra + f * tier, with tier invariant under f."""
+        import simulate
+
+        buckets = self._buckets()
+        base = simulate.run("static", ["a", "b"], buckets, collect_rows=False)
+        f = 2.0
+        scaled = simulate.run(
+            "static", ["a", "b"], buckets, collect_rows=False, miss_cost_factor=f
+        )
+        self.assertGreater(base.total_tier_cost_usd, 0.0)
+        # The factor scales tier spend and nothing else, so the unscaled total
+        # is identical and the whole cost difference is (f - 1) x tier.
+        self.assertAlmostEqual(
+            scaled.total_tier_cost_usd, base.total_tier_cost_usd, places=12
+        )
+        self.assertAlmostEqual(
+            scaled.total_cost_usd - base.total_cost_usd,
+            (f - 1.0) * base.total_tier_cost_usd,
+            places=12,
+        )
+
+    def test_tier_cost_is_absent_from_summary(self):
+        """R4 guard. `summary()` feeds committed records; a new key there would
+        drift them. The field is reporting-only and read off the result."""
+        import simulate
+
+        result = simulate.run("static", ["a"], self._buckets(), collect_rows=False)
+        self.assertNotIn("total_tier_cost_usd", result.summary())
+
     def test_plan_transform_blinds_controller_not_scoring(self):
         import simulate
 

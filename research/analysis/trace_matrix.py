@@ -118,12 +118,23 @@ def run_one(args: tuple) -> dict:
     params.update(spec.params)
     if spec.seeded:
         params["seed"] = SEED_BASE + widx
+    # Mirror `eval/harness/sim_backend.py` on the two spec attributes this
+    # substrate previously dropped on the floor, so an arm means the same
+    # thing here as it does on the matrix substrate (PREREG_TRACE_PARITY):
+    # `static_cache_mb` pins the arm's cache (the reactive baselines carry
+    # `state.cache_mb` forward unchanged, so the initial value holds for the
+    # whole run), and `evict_overhead_us` is a simulator argument, not a
+    # controller parameter. Both are None on every published arm, so every
+    # published record replays bit-identically (R4).
+    evict_overhead_us = params.pop("evict_overhead_us", None)
     weights = Weights(gamma=spec.gamma) if spec.gamma is not None else None
     result = simulate.run(
         spec.controller, tenant_ids, buckets,
         configs=configs, weights=weights, limits=MEDIUM,
         collect_rows=False, controller_params=params or None,
         miss_cost_factor=lru_miss_cost_factor() if spec.lru_eviction else 1.0,
+        initial_cache_mb=spec.static_cache_mb,
+        evict_overhead_ms=(evict_overhead_us / 1000.0) if evict_overhead_us else None,
     )
     scored = result.steps * TENANTS
     j = (result.total_cost_usd / scored / 0.01
@@ -135,6 +146,16 @@ def run_one(args: tuple) -> dict:
         "violation_step_share": result.violation_step_share,
         "mean_jain": result.mean_jain,
         "cache_hit_rate": result.cache_hit_rate,
+        # PREREG_TRACE_PARITY §Design: the engine computes these and this
+        # substrate discarded them. `mean_violation` saturates at 1.0, so a 2x
+        # SLO miss and a shed AI service score identically; `mean_excess` is the
+        # unbounded overshoot and `tier_none_step_share` the shed rate.
+        # `total_tier_cost_usd` is unscaled, so the eviction sensitivity band is
+        # recomputed exactly. Appending columns cannot change any published
+        # record: `--analyze` reads the committed CSV, which does not have them.
+        "mean_excess": result.mean_excess,
+        "tier_none_step_share": result.tier_none_step_share,
+        "total_tier_cost_usd": result.total_tier_cost_usd,
         "J": j, "steps": result.steps,
     }
 
