@@ -484,6 +484,19 @@ engineering only.**
 The critical path is now **M2**, which is user-gated: B1 needs a GPU host, and
 its first step is the live actuation dry-run M1 could not run here.
 
-**Next desk action: M3** (formal SLO guarantee, the TPDS strengthener). It is
-the only remaining agent-doable item on the main path, it touches a disjoint
-part of the tree (`research/jcac_sim/`), and it does not wait on M2.
+~~**Next desk action: M3**~~ — **stale, corrected 2026-08-11.** M3 closed in
+session 34 (the specified theorem was vacuous; the redirect to the
+reactive-vs-predictive cost separation is done and committed at `bec0f62`,
+DEFENSE_QA #28). Two things now supersede this section:
+
+1. **The execution level is `docs/PUBLICATION_ROADMAP.md`**, written after
+   this file. Its §6 progress table is the live status; read it, not this
+   paragraph. Milestone-level, the map is unchanged: **M2 (B1) is the
+   critical path and is user-gated on a GPU**; WP8a, its live actuation
+   dry-run, became desk-doable when Docker landed in session 36.
+2. **The next desk action is WP1** (trace-replay eviction parity), not M3.
+   It is the highest-value open item: `RESULTS_EVICTION_PARITY.md` showed
+   the *synthetic* cost headline was substantially eviction accounting, and
+   the two real-demand headlines (−70.4% / −42.5%) run through the same
+   unfair code path and have never been re-scored. WP7 (push) closed
+   2026-08-11; WP1's prereg is anchored at `97f5879`.

@@ -510,13 +510,13 @@ never "the API passed a pen test".
 
 | WP | Status | Evidence |
 |---|---|---|
-| WP1 trace parity | NOT STARTED — **highest-value open item** | — |
+| WP1 trace parity | **IN FLIGHT (session 37)** — prereg anchored, wiring landed, campaign running | prereg `97f5879` pushed before implementation existed; wiring `077be71`; R4 held 19/19 + all three published trace records byte-identical via `--analyze` |
 | WP2 MASTER reconcile | NOT STARTED | — |
 | WP3 layered fix | NOT STARTED | — |
 | WP4 cells verify/fix | NOT STARTED (claim UNVERIFIED — verify before fixing) | — |
 | WP5 O(N²) memoize | NOT STARTED (profile first) | — |
 | WP6 model mismatch | NOT STARTED | — |
-| WP7 push | **WAITING ON USER** (2 min) | — |
+| WP7 push | **DONE (session 37, 2026-08-11)** | 26 commits pushed to `origin/v-series-validity-remediation`; permanent anchor disclosure for the two session-35 preregs recorded in `REMAINING_WORK.md` §Session 37 |
 | **WP8a dry-run** | **UNBLOCKED session 36 — agent-executable, $0** | kind verified: cluster in 16 s, pod scheduled, clean teardown; preflight reports no missing tools |
 | WP8b B1 scored | WAITING ON USER (GPU gate) | prereqs landed session 35; cluster half now runnable locally |
 | WP12 authenticated ZAP | NOT STARTED (small) | unauth surface done: 118 PASS / 0 FAIL |
