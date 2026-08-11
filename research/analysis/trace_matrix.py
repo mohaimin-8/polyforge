@@ -127,7 +127,14 @@ def run_one(args: tuple) -> dict:
     # controller parameter. Both are None on every published arm, so every
     # published record replays bit-identically (R4).
     evict_overhead_us = params.pop("evict_overhead_us", None)
-    weights = Weights(gamma=spec.gamma) if spec.gamma is not None else None
+    # `gamma` was the only weight this substrate could express; PREREG_
+    # VIOLATION_PARITY sweeps `beta` (the SLO weight), so both are forwarded.
+    # Both default to None on every published arm, leaving `weights=None` and
+    # the engine defaults exactly as before (R4).
+    weight_kw = {k: v for k, v in (("gamma", spec.gamma),
+                                   ("beta", getattr(spec, "beta", None)))
+                 if v is not None}
+    weights = Weights(**weight_kw) if weight_kw else None
     result = simulate.run(
         spec.controller, tenant_ids, buckets,
         configs=configs, weights=weights, limits=MEDIUM,

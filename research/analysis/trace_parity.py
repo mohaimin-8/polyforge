@@ -43,9 +43,26 @@ SYSTEMS_UNDER_TEST = [
     "jcac", "jcac_v2", "hpa", "keda", "firm", "hpa_fair", "keda_fair",
 ]
 
+# PREREG_VIOLATION_PARITY §Design: the WP1 arms plus the frozen geometric
+# beta ladder. Selected with `--campaign violation`, which writes its own
+# CSVs — the WP1 outputs are never overwritten (R1).
+VIOLATION_PARITY_ARMS = SYSTEMS_UNDER_TEST + [
+    "jcac_b4", "jcac_b8", "jcac_b16", "jcac_b32", "jcac_b64",
+]
+
 TRACES = {
     "burstgpt": OUT / "trace_parity_burstgpt_runs.csv",
     "azure": OUT / "trace_parity_azure_runs.csv",
+}
+
+VIOLATION_TRACES = {
+    "burstgpt": OUT / "violation_parity_burstgpt_runs.csv",
+    "azure": OUT / "violation_parity_azure_runs.csv",
+}
+
+CAMPAIGNS = {
+    "parity": (SYSTEMS_UNDER_TEST, TRACES),
+    "violation": (VIOLATION_PARITY_ARMS, VIOLATION_TRACES),
 }
 
 
@@ -59,7 +76,7 @@ def _burstgpt_jobs() -> tuple[list[tuple], dict]:
           f"seed base {tm2.SEED_BASE}")
     jobs = [(system, widx, start_s)
             for widx, start_s in enumerate(starts)
-            for system in SYSTEMS_UNDER_TEST]
+            for system in _ARMS]
     return jobs, {"initializer": tm2._init_worker}
 
 
@@ -70,9 +87,11 @@ def _azure_jobs() -> tuple[list[tuple], dict]:
           f"seed base {az.SEED_BASE}")
     jobs = [(system, widx)
             for widx in range(az.N_WINDOWS)
-            for system in SYSTEMS_UNDER_TEST]
+            for system in _ARMS]
     return jobs, {"initializer": az._init_worker, "initargs": (rates,)}
 
+
+_ARMS: list[str] = SYSTEMS_UNDER_TEST   # rebound by main() per --campaign
 
 BUILDERS = {"burstgpt": _burstgpt_jobs, "azure": _azure_jobs}
 RUNNERS = {"burstgpt": tm2._run_job, "azure": az._run_job}
@@ -81,14 +100,18 @@ RUNNERS = {"burstgpt": tm2._run_job, "azure": az._run_job}
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--trace", choices=sorted(TRACES), required=True)
+    ap.add_argument("--campaign", choices=sorted(CAMPAIGNS), default="parity",
+                    help="'parity' = WP1 arms; 'violation' = + the frozen beta ladder")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--smoke", action="store_true",
                     help="run one job per arm and print timings; writes nothing")
     args = ap.parse_args()
 
+    global _ARMS
+    _ARMS, out_map = CAMPAIGNS[args.campaign]
     jobs, pool_kwargs = BUILDERS[args.trace]()
     runner = RUNNERS[args.trace]
-    out_csv = TRACES[args.trace]
+    out_csv = out_map[args.trace]
 
     if args.smoke:
         # Timing probe only — these rows are discarded and never scored.
@@ -102,7 +125,7 @@ def main() -> None:
                   f"hit={row['cache_hit_rate']:.4f} (discarded)")
         return
 
-    print(f"{len(jobs)} runs over {len(SYSTEMS_UNDER_TEST)} arms")
+    print(f"{len(jobs)} runs over {len(_ARMS)} arms ({args.campaign})")
     t0 = time.perf_counter()
     rows = []
     with ProcessPoolExecutor(max_workers=args.workers, **pool_kwargs) as pool:

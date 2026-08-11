@@ -123,6 +123,7 @@ class SystemSpec:
         seeded: bool = False,
         knob_freeze: frozenset[str] = frozenset(),
         static_cache_mb: int | None = None,
+        beta: float | None = None,
         description: str = "",
     ):
         self.controller = controller
@@ -145,6 +146,14 @@ class SystemSpec:
         # (PREREG_EVICTION_PARITY §Design: hpa_fair / keda_fair at 512 MB).
         # None keeps the engine default, so every published arm is untouched.
         self.static_cache_mb = static_cache_mb
+        # SLO weight in the controller's objective (`Weights.beta`, default
+        # 2.0). The objective is alpha*cost/COST_SCALE + beta*log1p(excess) +
+        # gamma*fairness: cost enters linearly and overshoot logarithmically,
+        # so beta selects a point on the cost/SLO frontier. Raising it buys
+        # attainment with money. PREREG_VIOLATION_PARITY sweeps it to reach the
+        # fair comparators' violation; None keeps the published point, so every
+        # committed arm replays bit-identically (R4).
+        self.beta = beta
         self.description = description
 
 
@@ -246,6 +255,27 @@ SYSTEMS: dict[str, SystemSpec] = {
                     "pre-sized 512 MB cache and no LRU cost penalty "
                     "(PREREG_EVICTION_PARITY EP-H1)",
     ),
+    # PREREG_VIOLATION_PARITY: the frozen geometric beta ladder. WP1 compared
+    # jcac at 0.5134 mean excess against hpa_fair at 0.008818 -- a 58x severity
+    # gap -- and read off a cost difference, which is not the "cost at
+    # violation parity" comparison the thesis claims. These arms buy attainment
+    # with money so the comparison can be made at matched severity. The
+    # published `jcac` (beta 2.0) is untouched.
+    "jcac_b4": SystemSpec(
+        "jcac", beta=4.0,
+        description="PolyForge at SLO weight 4 (PREREG_VIOLATION_PARITY ladder)"),
+    "jcac_b8": SystemSpec(
+        "jcac", beta=8.0,
+        description="PolyForge at SLO weight 8 (PREREG_VIOLATION_PARITY ladder)"),
+    "jcac_b16": SystemSpec(
+        "jcac", beta=16.0,
+        description="PolyForge at SLO weight 16 (PREREG_VIOLATION_PARITY ladder)"),
+    "jcac_b32": SystemSpec(
+        "jcac", beta=32.0,
+        description="PolyForge at SLO weight 32 (PREREG_VIOLATION_PARITY ladder)"),
+    "jcac_b64": SystemSpec(
+        "jcac", beta=64.0,
+        description="PolyForge at SLO weight 64 (PREREG_VIOLATION_PARITY ladder)"),
     "jcac_evictcharged": SystemSpec(
         "jcac", params={"evict_overhead_us": 1104.9},
         description="PolyForge paying its own eviction cost: the cost-aware "
