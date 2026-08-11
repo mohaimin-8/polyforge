@@ -494,6 +494,50 @@ prose numbers still match the code.
 So **WP13 step 0 is to make the EXISTING result reproducible**, and that is
 independently valuable even if the multi-tenant extension later fails.
 
+**PARTIAL VERIFICATION ALREADY DONE (session 37) — start from here, do not
+redo it.** The orbit constructors are in `test_guarantee.py`
+(`crud_demand`, `flash_orbit`, `gentle_orbit`, `standard_config`); the
+published percentage is `gap / reactive_cost_floor`. Results:
+
+| published row | reproduces? | how |
+|---|---|---|
+| `flash` $0.012800 / $0.006533 / **+49.0%** | **EXACT** | `price_of_reaction(standard_config(), flash_orbit())` |
+| `ramp_gentle` $0.009733 / $0.009467 / **+2.7%** | **EXACT** | `gentle_orbit(period=20)` — **NOT** the test file's default 40, which gives 0.019333 / 0.018800 / +2.8% |
+| all-distinct $0.004533 / $0.004800 / **−5.9%** | **NO — could not be reproduced** | ~20 constructions tried, none matches |
+
+**The mechanism row does not reproduce, and appears structurally
+impossible as described.** De-aliasing a *smooth* orbit provably gives
+gap **+0.0%** (floor == cycle): with singleton successor sets the relaxed
+reactive optimum is achievable, and the reach clamp never binds on a gentle
+slope. Confirmed empirically at periods 10/12/20, perturbing either
+`crud_base_ms` or `rps`, at five magnitudes each — every variant returned
+floor == cycle exactly. So a **negative** gap cannot arise in the family
+the prose names. The row's cycle $0.004800 does equal `gentle_orbit(10)`'s
+cycle exactly, so it is gentle(10)-family; but that family de-aliases to a
+floor of $0.004800, not $0.004533. Negative gaps DO arise for orbits that
+are distinct **and** sharp (monotone ramps over the same 0.5–6.0×
+envelope: n=10 → −8.3%, n=16 → −7.1%, n=20 → −5.6%), none hitting −5.9%.
+
+**Why this matters more than the arithmetic:** row 3 is the *mechanism
+test* — its job is to show the +49.0% gap is caused by observational
+aliasing rather than by the arithmetic. Rows 1–2 stand exactly; the row
+that carries the causal argument has no runnable derivation today.
+
+**What step 0 must do about it** (do NOT quietly substitute a number that
+reproduces): find the original construction, or, failing that, report the
+row as unreproducible in `RESULTS_SEPARATION.md` and derive a *new*
+mechanism test that is runnable — the natural one is the ramp family
+above, which is genuinely aliasing-free and does show the sign inversion.
+State plainly in the record that the published −5.9% could not be
+regenerated and what replaced it. Do not edit the M3 prose to match;
+supersede it in the open, per R1.
+
+**Loose thread for whoever picks this up:** `flash_orbit` de-aliased gives
+exactly **−19.5%**, which is also the number `MAIN_WORKING_PATH` §3 M3
+reports for the *no-cap `flash_crud`* case. That may be coincidence or may
+indicate the prose numbers came from overlapping throwaway scripts. Worth
+checking; not asserted.
+
 **Steps.**
 0. **Make M3 reproducible (do this first, ~half day).** Write
    `research/analysis/analysis_separation.py` that regenerates, from
