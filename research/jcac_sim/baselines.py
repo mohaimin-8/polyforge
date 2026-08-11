@@ -723,15 +723,50 @@ class BudgetFiltered:
             observe(realized_violation)
 
     def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
+        """Take the inner baseline's move when it is affordable; otherwise the
+        cheapest affordable state reachable this interval.
+
+        Mirrors `controller.py`'s semantics rather than a hold. The controller
+        picks the best *affordable* candidate from a set, so it can step DOWN
+        when demand outruns the budget. An earlier version of this wrapper held
+        the incumbent instead, which stranded the baseline at whatever expensive
+        state it had ratcheted to while demand was still cheap -- it blocked
+        increases without ever enforcing a budget (`hpa_budget` came out 2.5%
+        under `hpa_fair`, i.e. not constrained at all). That was caught by the
+        pre-scoring mechanism check and is disclosed in PREREG_BUDGET_PARITY
+        §Amendment 1; the rule below is the corrected one.
+
+        When nothing reachable is affordable the cheapest reachable state is
+        taken -- the budget is a guardrail the arm cannot escape, which is
+        exactly the constraint the proposal runs under.
+        """
         proposed = self.inner.plan(states, demands)
         out = {}
         for tid, want in proposed.items():
             config = self.configs[tid]
+            state = states[tid]
+            demand = demands.get(tid, Demand())
             cap = config.hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
-            billed = model.evaluate_step(config, want, demands.get(tid, Demand()))
-            # Hold the incumbent when the proposed move cannot be afforded --
-            # the controller's own response to an empty affordable set.
-            out[tid] = want if billed.cost_usd <= cap else states[tid]
+
+            def billed(candidate):
+                return model.evaluate_step(config, candidate, demand).cost_usd
+
+            if billed(want) <= cap:
+                out[tid] = want
+                continue
+            # Reachable this interval under the baselines' own +/-2 clamp,
+            # keeping the cache and tier the inner controller chose so the only
+            # thing the budget moves is the lever the baseline actually drives.
+            reach = [
+                apply_action(config, state, delta, want.cache_mb, want.tier)
+                for delta in (-2, -1, 0, 1, 2)
+            ]
+            affordable = [c for c in reach if billed(c) <= cap]
+            pool = affordable or reach
+            # Closest to what the baseline wanted among the affordable ones;
+            # cheapest outright when none qualify.
+            out[tid] = (min(affordable, key=lambda c: abs(c.replicas - want.replicas))
+                        if affordable else min(pool, key=billed))
         return out
 
 

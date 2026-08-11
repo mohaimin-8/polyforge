@@ -144,3 +144,57 @@ result is seen.
 
 `reproduce.py` must re-derive every previously committed record
 byte-identically after this work lands (R4). The new record joins the gate.
+
+---
+
+## Amendment 1 (2026-08-12, before any hypothesis was scored)
+
+Disclosed under the project's amendment rule. **No campaign had been run and
+no hypothesis scored**; both changes below come from the pre-scoring
+mechanism check this prereg's design requires.
+
+**1. The baseline budget rule as first frozen did not enforce a budget.**
+It said "hold the previous state when the move is unaffordable". A baseline
+proposes exactly one move, so holding stranded it at whatever expensive
+state it had ratcheted to while demand was still cheap: `hpa_budget` came out
+**2.5% under `hpa_fair`**, i.e. not constrained. The controller cannot get
+stuck that way — it selects the best *affordable* candidate from a set and so
+can step down. **Corrected rule:** take the inner baseline's move when
+affordable; otherwise the affordable state closest to it within the
+baselines' own ±2 clamp; otherwise the cheapest reachable state.
+
+**2. The corrected rule changed almost nothing, and *that* is the finding.**
+`hpa_budget` still costs 558.01 against `hpa_fair`'s 574.14. The cause is
+structural, not a wrapper defect. At the per-tenant cap of **$0.013889 per
+step**, measured on a standard tenant under 40 rps of chat:
+
+| tier | replicas | tier spend | infra spend | total | affordable? |
+|---|---:|---:|---:|---:|---|
+| `none` | 1 | $0.000000 | $0.000140 | $0.000140 | **yes** |
+| `none` | 10 | $0.000000 | $0.001340 | $0.001340 | **yes** |
+| `small` | 1 | $0.030933 | $0.000140 | $0.031074 | no (2.2×) |
+| `mid` | 1 | $0.309333 | $0.000140 | $0.309474 | no (22×) |
+| `large` | 1 | $3.093333 | $0.000140 | $3.093474 | no (223×) |
+
+Infra spend spans $0.00014–$0.00134 across the entire replica range; tier
+spend spans $0–$3.09. **Tier dominates cost by three orders of magnitude, so
+the replica knob cannot move affordability at all.** Under AI load the only
+configuration inside the budget is `tier="none"` — shedding.
+
+**Consequence for BP-H1, stated before scoring.** A replica-only reactive
+controller **cannot satisfy the per-tenant budget under AI load by any
+scaling decision available to it.** BP-H1 is therefore not a cost
+comparison; it is a **feasibility** result, and it is reported as one: the
+budget constraint is satisfiable only by a controller holding the tier knob.
+The cost figures for `hpa_budget`/`keda_budget` are still reported, with the
+disclosure that those arms are over budget in essentially every AI-loaded
+step and so are *not* budget-respecting comparators — no such comparator
+exists in the replica-only class.
+
+This also completes WP1's explanation. jcac is not "efficient" on BurstGPT;
+it is the only arm that *can* meet the constraint, the only way to meet it is
+to shed AI, and shedding is what produces the overshoot that failed TP-H3.
+The cost advantage and the severity failure are the same mechanism, and that
+mechanism is the tier knob's price, not control quality.
+
+BP-H2 is unaffected by this amendment and stays as frozen.
