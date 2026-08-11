@@ -23,6 +23,52 @@ session 30). This is the single place that answers
 one owner-split view. When it disagrees with a campaign file, the campaign file
 wins.
 
+## Session 38 (2026-08-12) — WP15: the budget constraint is infeasible for replica-only control
+
+**The finding that reframes the contribution.** Per-tenant budget cap is
+**$0.013889 per step**. Measured on a standard tenant under 40 rps chat:
+
+| tier | replicas | tier spend | infra spend | total | affordable? |
+|---|---:|---:|---:|---:|---|
+| `none` | 1 | $0.000000 | $0.000140 | $0.000140 | **yes** |
+| `none` | 10 | $0.000000 | $0.001340 | $0.001340 | **yes** |
+| `small` | 1 | $0.030933 | $0.000140 | $0.031074 | no (2.2×) |
+| `mid` | 1 | $0.309333 | $0.000140 | $0.309474 | no (22×) |
+| `large` | 1 | $3.093333 | $0.000140 | $3.093474 | no (223×) |
+
+Infra spend spans $0.00014–$0.00134 across the **whole** replica range; tier
+spend spans $0–$3.09. **Tier dominates by three orders of magnitude, so the
+replica knob cannot move affordability at all.** Therefore **a replica-only
+reactive controller cannot satisfy the per-tenant budget under AI load by
+any scaling decision available to it** — structurally, not by mis-tuning.
+
+**This is now the primary framing of the joint-control contribution** (the
+chosen option, session 38): a *feasibility* argument that follows from the
+price table rather than from a benchmark, so it cannot be answered with
+"you tuned the baseline badly". Cost percentages become supporting detail.
+
+**It also closes WP1's explanation.** jcac is not "efficient" on BurstGPT —
+it is the only arm that *can* meet the constraint, the only way to meet it
+is to shed AI (`tier="none"`), and shedding is exactly what produced the
+overshoot that failed TP-H3. The cost advantage and the severity failure are
+one mechanism: the tier knob's price, not control quality.
+
+**Two mechanisms measured inert/inadequate before scoring, both disclosed:**
+`PREREG_VIOLATION_PARITY`'s β ladder moves `mean_excess` 4.8319 → 4.8314
+across a 32× weight increase (`f045e68`) — a weight cannot buy what a filter
+forbids, so that prereg stays frozen with its premise falsified and its
+ladder unrun. `PREREG_BUDGET_PARITY`'s first baseline rule ("hold when
+unaffordable") only blocked increases and left `hpa_budget` 2.5% under
+`hpa_fair`; corrected to the controller's own best-affordable-candidate
+semantics as Amendment 1, before any hypothesis was scored.
+
+Mechanisms landed default-OFF at `365ac40`/`38f12ff`; R4 held 21/21
+byte-identical throughout, 143 sim tests green. BP-H2 (is the overshoot
+constraint-induced?) is scoreable as frozen and its campaign is running;
+early single-window evidence says **partly** — lifting the budget takes
+jcac's excess 4.83 → 3.15, still short of `hpa_fair`'s 0.19, so some of the
+overshoot is genuine.
+
 ## Session 37 (2026-08-11) — WP7 closed; WP1 opened with its anchor intact
 
 **WP7 is done.** `v-series-validity-remediation` is pushed to `origin`
