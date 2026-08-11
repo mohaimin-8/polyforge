@@ -62,6 +62,21 @@ The five published arms were re-run here; 480 per-window rows are shared with `t
 
 **TP-H2 PASS** (threshold: |swing| > 10 pp).
 
+
+### Where the advantage lives (descriptive — no hypothesis, no verdict)
+
+The per-window differences are strongly bimodal, which is what makes the mean and the median disagree. Splitting the windows by which arm was cheaper, and reporting what each group cost and overshot:
+
+
+| group | windows | `hpa_fair` spend | cost diff (total) | worst window | mean excess diff | above 0.05 margin |
+|---|---:|---:|---:|---:|---:|---:|
+| jcac cheaper than `hpa_fair` | 41 (43%) | 144.6 | -3575.7 | -562.2 | +1.1810 | 98% |
+| `hpa_fair` cheaper | 55 (57%) | 11.2 | +159.5 | +5.3 | +0.0004 | 0% |
+
+Spearman correlation between the per-window cost difference and the per-window `mean_excess` difference: **-0.826**. The windows where jcac is cheaper are the windows where it overshoots: the baseline spends **12.9×** more in them, so they are the high-demand windows.
+
+**Read this before quoting either number.** The aggregate saving is real and large — it is what an operator's bill actually reflects — but on this trace it is not obtained at violation parity: it is concentrated in high-demand windows and is bought there with SLO overshoot. A cost claim and a severity claim about this trace are the same claim seen from two sides, and neither should be quoted without the other.
+
 ### Eviction comparator sensitivity band
 
 The delta vs `hpa` recomputed at every policy in `eviction_comparison.csv`, from measured unscaled tier spend — not re-simulated. GDSF, a standard policy in the same table, **beats** the proposed cost-aware policy at both capacities.
@@ -119,6 +134,21 @@ The five published arms were re-run here; 360 per-window rows are shared with `t
 | `keda` | -42.0% | -6.9% | **+35.1 pp** |
 
 **TP-H2 PASS** (threshold: |swing| > 10 pp).
+
+
+### Where the advantage lives (descriptive — no hypothesis, no verdict)
+
+The per-window differences are strongly bimodal, which is what makes the mean and the median disagree. Splitting the windows by which arm was cheaper, and reporting what each group cost and overshot:
+
+
+| group | windows | `hpa_fair` spend | cost diff (total) | worst window | mean excess diff | above 0.05 margin |
+|---|---:|---:|---:|---:|---:|---:|
+| jcac cheaper than `hpa_fair` | 50 (69%) | 45.8 | -213.5 | -20.8 | +0.0953 | 28% |
+| `hpa_fair` cheaper | 22 (31%) | 17.4 | +22.8 | +1.9 | +0.0014 | 0% |
+
+Spearman correlation between the per-window cost difference and the per-window `mean_excess` difference: **-0.933**. The windows where jcac is cheaper are the windows where it overshoots: the baseline spends **2.6×** more in them, so they are the high-demand windows.
+
+**Read this before quoting either number.** The aggregate saving is real and large — it is what an operator's bill actually reflects — but on this trace it is not obtained at violation parity: it is concentrated in high-demand windows and is bought there with SLO overshoot. A cost claim and a severity claim about this trace are the same claim seen from two sides, and neither should be quoted without the other.
 
 ### Eviction comparator sensitivity band
 

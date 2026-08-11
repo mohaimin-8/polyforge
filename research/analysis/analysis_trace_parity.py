@@ -134,6 +134,41 @@ def band_table(df: pd.DataFrame, base: str) -> list[tuple[str, float, float]]:
     return out
 
 
+def regime_split(df: pd.DataFrame, base: str = "hpa_fair") -> dict:
+    """Split the windows by which arm was cheaper and describe each group.
+
+    Purely descriptive: it adds no hypothesis and cannot change a verdict.
+    It exists because the mean and the median per-window cost difference
+    disagree in *sign* on BurstGPT, and a reader who sees only one of them
+    draws the wrong conclusion either way.
+    """
+    m = (df[df.system == "jcac"]
+         .merge(df[df.system == base], on="window", suffixes=("_j", "_b")))
+    cost = m.total_cost_usd_j - m.total_cost_usd_b
+    excess = m.mean_excess_j - m.mean_excess_b
+    cheaper = cost < 0
+    groups = []
+    for label, mask in ((f"jcac cheaper than `{base}`", cheaper),
+                        (f"`{base}` cheaper", ~cheaper)):
+        n = int(mask.sum())
+        groups.append((label, {
+            "n": n,
+            "share": n / len(m) if len(m) else 0.0,
+            "base_cost": float(m.total_cost_usd_b[mask].mean()) if n else 0.0,
+            "cost_total": float(cost[mask].sum()) if n else 0.0,
+            "cost_worst": float(cost[mask].min() if mask is cheaper else cost[mask].max()) if n else 0.0,
+            "excess_mean": float(excess[mask].mean()) if n else 0.0,
+            "above_margin": float((excess[mask] > NI_MARGIN).mean()) if n else 0.0,
+        }))
+    hi = float(m.total_cost_usd_b[cheaper].mean()) if cheaper.any() else 0.0
+    lo = float(m.total_cost_usd_b[~cheaper].mean()) if (~cheaper).any() else 0.0
+    return {
+        "groups": groups,
+        "spearman": float(pd.Series(cost).corr(pd.Series(excess), method="spearman")),
+        "spend_ratio": (hi / lo) if lo else float("nan"),
+    }
+
+
 def score_trace(key: str, meta: dict, w) -> dict:
     parity = pd.read_csv(meta["parity"])
     published = pd.read_csv(meta["published"])
@@ -202,6 +237,31 @@ def score_trace(key: str, meta: dict, w) -> dict:
           f"**{swings[pub]:+.1f} pp** |")
     h2 = max(abs(v) for v in swings.values()) > SWING_PP
     w(f"\n**TP-H2 {'PASS' if h2 else 'FAIL'}** (threshold: |swing| > {SWING_PP:.0f} pp).\n")
+
+    # --- regime split (descriptive; adds no hypothesis, changes no verdict) --
+    regime = regime_split(parity)
+    w("\n### Where the advantage lives (descriptive — no hypothesis, no verdict)\n")
+    w("The per-window differences are strongly bimodal, which is what makes "
+      "the mean and the median disagree. Splitting the windows by which arm "
+      "was cheaper, and reporting what each group cost and overshot:\n")
+    w("\n| group | windows | `hpa_fair` spend | cost diff (total) | worst window | mean excess diff | above 0.05 margin |")
+    w("|---|---:|---:|---:|---:|---:|---:|")
+    for label, g in regime["groups"]:
+        w(f"| {label} | {g['n']} ({g['share'] * 100:.0f}%) | {g['base_cost']:.1f} | "
+          f"{g['cost_total']:+.1f} | {g['cost_worst']:+.1f} | {g['excess_mean']:+.4f} | "
+          f"{g['above_margin'] * 100:.0f}% |")
+    w(f"\nSpearman correlation between the per-window cost difference and the "
+      f"per-window `mean_excess` difference: **{regime['spearman']:+.3f}**. "
+      f"The windows where jcac is cheaper are the windows where it overshoots: "
+      f"the baseline spends **{regime['spend_ratio']:.1f}×** more in them, so "
+      "they are the high-demand windows.\n")
+    w("**Read this before quoting either number.** The aggregate saving is "
+      "real and large — it is what an operator's bill actually reflects — but "
+      "on this trace it is not obtained at violation parity: it is "
+      "concentrated in high-demand windows and is bought there with SLO "
+      "overshoot. A cost claim and a severity claim about this trace are the "
+      "same claim seen from two sides, and neither should be quoted without "
+      "the other.\n")
 
     # --- sensitivity band -------------------------------------------------
     w("### Eviction comparator sensitivity band\n")
