@@ -790,7 +790,8 @@ never "the API passed a pen test".
 
 | WP | Status | Evidence |
 |---|---|---|
-| WP1 trace parity | **IN FLIGHT (session 37)** — prereg anchored, wiring landed, campaign running | prereg `97f5879` pushed before implementation existed; wiring `077be71`; R4 held 19/19 + all three published trace records byte-identical via `--analyze` |
+| WP1 trace parity | **DONE (session 37, `5c75e8a`)** — split verdict, see below | `RESULTS_TRACE_PARITY.md`; replication PASS bit-for-bit both traces; gate 21/21 |
+| WP13 step 0 | **DONE (session 37, `67a32a5`)** | `RESULTS_SEPARATION.md` registered; 2 of 3 published rows EXACT, mechanism row not reproducible and replaced by a runnable test |
 | WP2 MASTER reconcile | NOT STARTED | — |
 | WP3 layered fix | NOT STARTED | — |
 | WP4 cells verify/fix | NOT STARTED (claim UNVERIFIED — verify before fixing) | — |
@@ -803,6 +804,42 @@ never "the API passed a pen test".
 | **WP13 MT separation** | NOT STARTED (new, session 37 — Transactions theory strengthener) | machinery: `guarantee.py`; open item named in M3 close-out |
 | **WP14 live CRUD soak** | NOT STARTED (new, session 37 — needs WP8a first, Docker started, laptop kept awake 12–24 h) | harness proven in B2/B3; GPU not required |
 | WP9–11 | user-owned; **WP9 waits on WP1's record (venue decision rule, §5)** | — |
+
+### WP1's verdict and what the venue rule now says (session 37)
+
+| trace | published vs `hpa` | fair vs `hpa_fair` | cost TP-H1 | severity TP-H3 |
+|---|---:|---:|---|---|
+| BurstGPT (n=96) | −70.4% | **−52.2%** | **FAIL** | **FAIL** |
+| Azure (n=72) | −42.5% | **−7.1%** | **PASS** | **PASS** |
+
+**The venue rule's cost condition is met** (TP-H1 survives on Azure), which
+reads as "TCC/TSC primary". **Do not apply it mechanically — two findings
+the rule did not contemplate cut against that**, and WP9 must weigh them:
+
+1. **The BurstGPT cost advantage is not typical, it is concentrated.** Mean
+   window diff −35.586 but **median +2.232**, with only **42.7%** of windows
+   favouring jcac: PolyForge is *more expensive* than a fairly-configured HPA
+   in the majority of 6-hour windows. The paired t (p=0.000205, mean-driven)
+   would have passed at the published α=0.01; the pre-registered Wilcoxon
+   gate (rank-driven) does not. The FAIL stands — the prereg named the gate
+   in advance precisely so this could not be chosen afterwards — but the
+   *shape* of the advantage is the real finding. Azure is genuinely
+   pervasive by contrast: median −0.666, 69.4% of windows favour jcac.
+2. **The severity claim reverses on real demand.** `RESULTS_EVICTION_PARITY`
+   found jcac at ~half `hpa_fair`'s unbounded overshoot (0.2143 vs 0.4288).
+   On BurstGPT it is **0.5134 vs 0.008818 — 58× worse**, above the 0.05
+   margin in 41.7% of windows, with AI shed on 9.3% of tenant-steps against
+   0.0% for every reactive arm. **This damages the "parity at half the
+   overshoot" fallback framing WP9 was going to lean on**: that claim holds
+   on the synthetic matrix and reverses on the larger real trace.
+
+Practical reading for WP9: the defensible claim is now *trace-dependent* —
+a pervasive but modest (~7%) advantage on Azure with severity within
+margin, against a concentrated-in-a-minority advantage on BurstGPT bought
+with materially worse overshoot. That is publishable and honest, but it is
+an FGCS-shaped story unless B1 (WP8b) and the WP14 soak add live weight.
+**Decide the venue after B1, not now**; nothing here is a reason to soften
+the record.
 
 **Infrastructure status (session 36):** Docker + WSL2 + kind/helm/k6 all
 working locally; PostgreSQL RLS 3/3 PASS via `./scripts/pg-test-up.sh`; ZAP
