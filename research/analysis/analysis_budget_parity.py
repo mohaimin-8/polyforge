@@ -124,6 +124,25 @@ def spend_split(df: pd.DataFrame, arm: str) -> tuple[float, float]:
     return float(sub.total_cost_usd.mean()) - tier, tier
 
 
+def ni_shape(df: pd.DataFrame, base: str) -> dict:
+    """Descriptive shape of the BP-H2 differences. Added after the result was
+    seen, reported as descriptive, and it changes no verdict.
+
+    It exists because on BurstGPT the Wilcoxon PASSes while the *mean*
+    difference exceeds the very margin it was tested against. Both facts are
+    true: the rank test is about the typical window, and the typical window
+    is fine; the mean is carried by a tail of windows that are not. A reader
+    given only the PASS would draw a conclusion the tail does not support,
+    so the tail is reported next to it.
+    """
+    m = (df[df.system == "jcac_nobudget"]
+         .merge(df[df.system == base], on="window", suffixes=("_t", "_b")))
+    d = m.mean_excess_t - m.mean_excess_b
+    return {"n": int(len(d)), "mean": float(d.mean()), "median": float(d.median()),
+            "over": float((d > NI_MARGIN).mean()), "worst": float(d.max()),
+            "no_worse": float((d <= 0).mean())}
+
+
 def decomposition(df: pd.DataFrame, fair: str, capped: str) -> dict:
     """BP-H3: how much of WP1's gap each direction of the bracket accounts for.
 
@@ -217,6 +236,37 @@ def score_trace(key: str, meta: dict, w) -> dict:
           f"{r['p']:.3g} | {hr['threshold']:.5f} | {r['t_p']:.3g} | "
           f"{'PASS' if hr['reject'] else 'FAIL'} |")
 
+    # --- shape of the BP-H2 differences (descriptive, no verdict) --------
+    w("\n### What the BP-H2 PASS rests on (descriptive — no hypothesis, no verdict)\n")
+    w("The gate is a rank test, so it speaks about the typical window. Where "
+      "the differences are heavy-tailed the mean and the rank test can "
+      "disagree, and a PASS quoted without the tail overstates what was "
+      "shown. Both are therefore reported:\n")
+    w("\n| comparator | n | mean diff | median diff | windows no worse | windows over the 0.05 margin | worst window |")
+    w("|---|---:|---:|---:|---:|---:|---:|")
+    shape = {}
+    for base in ("hpa_fair", "keda_fair"):
+        s = ni_shape(df, base)
+        shape[base] = s
+        w(f"| `{base}` | {s['n']} | {s['mean']:+.4f} | {s['median']:+.4f} | "
+          f"{s['no_worse'] * 100:.0f}% | {s['over'] * 100:.0f}% | {s['worst']:+.4f} |")
+    tension = any(s["mean"] > NI_MARGIN for s in shape.values())
+    w("\n" + ("**The mean difference exceeds the margin the rank test "
+              "passed.** The median window is exactly at parity and about "
+              "half are no worse, which is what the Wilcoxon rejects on; but "
+              "a fifth of windows breach the margin and the worst breaches "
+              "it by a wide multiple. The pre-registered verdict stands as "
+              "scored — the gate was frozen before the campaign and is not "
+              "renegotiated after seeing it — and it must be quoted as "
+              "*non-inferior in the typical window, not in the tail*. The "
+              "tail is where SLO harm actually lands, so this record does "
+              "not support the sentence 'lifting the budget removes the "
+              "overshoot'.\n"
+              if tension else
+              "The mean, the median and the rank test agree here: the mean "
+              "difference is inside the margin and the tail does not carry "
+              "the result.\n"))
+
     # --- Amendment 1's feasibility reading, measured on this trace -------
     w("\n### What the budget filter could actually move (Amendment 1, measured)\n")
     w("The wrapper applies the controller's own per-step cap to a "
@@ -273,7 +323,7 @@ def score_trace(key: str, meta: dict, w) -> dict:
         for a in all_arms) + " |")
 
     return {"key": key, "meta": meta, "h": h, "holm": holm,
-            "replicated": ok, "dec": dec, "feas": feas}
+            "replicated": ok, "dec": dec, "feas": feas, "shape": shape}
 
 
 def main() -> None:
@@ -320,11 +370,14 @@ def main() -> None:
     for v in verdicts:
         h1 = [hid for hid in ("BP-H1a", "BP-H1b") if v["holm"][hid]["reject"]]
         h2 = [hid for hid in ("BP-H2a", "BP-H2b") if v["holm"][hid]["reject"]]
+        tail = max(s["mean"] for s in v["shape"].values()) > NI_MARGIN
         w(f"- **{v['meta']['label']}**: BP-H1 (cost vs a capped comparator) "
           f"passing: {', '.join(h1) if h1 else '**none**'}. "
           f"BP-H2 (severity non-inferiority with the cap lifted) passing: "
-          f"{', '.join(h2) if h2 else '**none**'}. "
-          f"Replication of WP1's arms: "
+          f"{', '.join(h2) if h2 else '**none**'}"
+          + (" — **typical window only**; the mean difference exceeds the "
+             "margin, see the shape table" if h2 and tail else "")
+          + f". Replication of WP1's arms: "
           f"{'PASS' if v['replicated'] else '**FAIL**'}.")
     w("\nEvery hypothesis is reported in the direction it landed, and the "
       "response to each outcome was fixed in the prereg before the campaign "
@@ -333,7 +386,9 @@ def main() -> None:
       "cost advantage over a budget-respecting reactive controller — it is "
       "evidence that no such controller exists in the replica-only class. A "
       "BP-H2 PASS makes WP1's severity FAIL constraint-induced, and the cost "
-      "and severity results must then be quoted together or not at all.\n")
+      "and severity results must then be quoted together or not at all — "
+      "bounded, where the shape table says so, to the typical window rather "
+      "than the tail.\n")
     if pending:
         w(f"\n**Not yet scored:** {', '.join(pending)}. This record is not "
           "registered in `scripts/reproduce.py` until the campaign completes; "

@@ -84,6 +84,11 @@ CAMPAIGN_RECORDS = [
     # plant constants, so it rebuilds on a clean clone unconditionally.
     ("analysis_separation.py", [], "RESULTS_SEPARATION.md"),
     ("analysis_trace_parity.py", [], "RESULTS_TRACE_PARITY.md"),
+    # Both traces of the budget-parity campaign are in, so the record joins
+    # the gate as PREREG_BUDGET_PARITY requires. It was deliberately held out
+    # while only Azure had landed: an interim record cannot carry a
+    # byte-identity guarantee it is about to break.
+    ("analysis_budget_parity.py", [], "RESULTS_BUDGET_PARITY.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
