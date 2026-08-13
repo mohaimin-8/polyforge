@@ -89,6 +89,10 @@ CAMPAIGN_RECORDS = [
     # while only Azure had landed: an interim record cannot carry a
     # byte-identity guarantee it is about to break.
     ("analysis_budget_parity.py", [], "RESULTS_BUDGET_PARITY.md"),
+    # WP3: the -joint-control ablation re-scored against a tier rule that is
+    # not absorbing. Reads its own campaign DB, falling back to the committed
+    # export, so a clean clone rebuilds it like every other record.
+    ("analysis_layered_fix.py", [], "RESULTS_LAYERED_FIX.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",

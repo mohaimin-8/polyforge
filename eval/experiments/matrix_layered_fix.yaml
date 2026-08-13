@@ -1,0 +1,32 @@
+# PREREG_LAYERED_FIX.md (session 38, WP3) — adjudicates the −joint-control
+# ablation. Frozen and pushed before the new arms were implemented.
+#
+# systems.py:455 defines `jcac_nojoint` as SystemSpec("layered"), so the
+# published "−joint control +2884%" is a property of the layered baseline's
+# tier rule. That rule orders tiers BY NAME while TIER_BASE_LATENCY_MS makes
+# `agent` non-monotonic in that order (small 6000, mid 2500, large 3500), and
+# the 0.3x de-escalation threshold (1875 ms) is below every tier's minimum
+# achievable p95 — so the rule ratchets to `large` and can never step down.
+# Measured: 850 of 960 tenant-steps latched in the 100x-price tier.
+#
+#   jcac                 the reference, unchanged
+#   jcac_nojoint         published `layered`, UNCHANGED (it replicates)
+#   gptcache             published, UNCHANGED (it replicates)
+#   jcac_nojoint_v2      `layered_v2`: tiers ranked by measured latency,
+#                        de-escalation gated on an evaluate_step projection
+#   gptcache_v2          same rule, cache-everything posture kept
+#
+# Cells mirror `ablations.yaml` exactly so the result is directly comparable
+# cell by cell with the published ablation. New output DB; ablations.duckdb
+# is never reopened (R4).
+name: matrix_layered_fix
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, jcac_nojoint, gptcache, jcac_nojoint_v2, gptcache_v2]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [medium]
+output: eval/results/raw_sim_layered_fix.duckdb
+retries: 2
+timeseries_reps: 0

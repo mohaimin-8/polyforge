@@ -455,6 +455,19 @@ SYSTEMS: dict[str, SystemSpec] = {
         "layered",
         description="PolyForge minus joint controller: per-layer local controllers",
     ),
+    # --- PREREG_LAYERED_FIX (WP3): the same ablation against a tier rule
+    # that is not absorbing. The published arms above are untouched, so the
+    # committed ablation table replays bit-for-bit (R4).
+    "jcac_nojoint_v2": SystemSpec(
+        "layered_v2",
+        description="PolyForge minus joint controller, layer-local tier rule ranked "
+                    "by measured latency instead of by tier name (PREREG_LAYERED_FIX)",
+    ),
+    "gptcache_v2": SystemSpec(
+        "gptcache_v2", lru_eviction=True,
+        description="GPTCache posture with the latency-ranked tier rule: cache "
+                    "everything with LRU, HPA replicas, no absorbing tier",
+    ),
     "jcac_noeviction": SystemSpec(
         "jcac", lru_eviction=True,
         description="PolyForge minus cost-aware eviction: LRU miss economics",

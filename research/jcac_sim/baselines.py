@@ -678,6 +678,92 @@ class LearnedJointController:
         return out
 
 
+# --- PREREG_LAYERED_FIX: the competent tier rule ---------------------------
+# Cheapest first. The published rule uses this same sequence as a *latency*
+# ordering, which is the defect: `model.TIER_BASE_LATENCY_MS` makes `agent`
+# non-monotonic in it (small 6000, mid 2500, large 3500), so escalating by
+# name walks past the fastest tier to one that is slower and 10x dearer.
+TIER_PRICE_ORDER = ("small", "mid", "large")
+
+# Frozen in PREREG_LAYERED_FIX §Design. Hysteresis, not a tuned constant: the
+# published 0.3 is unreachable for every tier on `agent` traffic, which is
+# what makes the published rule absorbing.
+V2_DEESCALATE_MARGIN = 0.8
+
+
+def dominant_ai_kind(demand: Demand) -> str | None:
+    """The AI kind carrying the most traffic this step, ties broken by
+    `AI_KINDS` order. The tier ranking is per-kind because the latency table
+    is per-kind — a rule that ranks tiers without knowing the kind cannot be
+    correct for more than one of them."""
+    best, best_rate = None, 0.0
+    for kind in AI_KINDS:
+        rate = demand.rps.get(kind, 0.0)
+        if rate > best_rate:
+            best, best_rate = kind, rate
+    return best
+
+
+def latency_ranked_tier(config: TenantConfig, state: TenantState,
+                        demand: Demand,
+                        margin: float = V2_DEESCALATE_MARGIN) -> str:
+    """PREREG_LAYERED_FIX's replacement rule, stated exactly as registered.
+
+    Rank admissible tiers by *measured* latency for the dominant AI kind;
+    escalate one rank toward faster when the projection violates; otherwise
+    de-escalate to the next cheaper tier when its projection holds at
+    `margin` of target. Same information the published rule already has --
+    one `evaluate_step` projection -- and still strictly layer-local: it sees
+    no other tenant, no cost term and no fairness term.
+    """
+    kind = dominant_ai_kind(demand)
+    if kind is None:
+        return state.tier
+    admissible = [t for t in TIER_PRICE_ORDER
+                  if config.knob_admits(state.cache_mb, t)]
+    if not admissible:
+        return state.tier
+    by_speed = sorted(admissible, key=lambda t: model.TIER_BASE_LATENCY_MS[kind][t])
+    current = state.tier if state.tier in admissible else by_speed[0]
+    target = SLO_BASE_MS["ai"] * SLO_CLASS_FACTOR[config.slo_class]
+
+    def p95_at(tier: str) -> float:
+        probe = TenantState(replicas=state.replicas, cache_mb=state.cache_mb, tier=tier)
+        return evaluate_step(config, probe, demand).ai_p95_ms
+
+    if p95_at(current) > target:
+        i = by_speed.index(current)
+        return by_speed[i - 1] if i > 0 else current
+
+    pi = TIER_PRICE_ORDER.index(current)
+    if pi > 0:
+        cheaper = TIER_PRICE_ORDER[pi - 1]
+        if cheaper in admissible and p95_at(cheaper) <= margin * target:
+            return cheaper
+    return current
+
+
+class LayeredV2Controller(LayeredController):
+    """`layered` with the latency-ranked tier rule. Every other knob rule is
+    inherited unchanged, so the arm isolates the one factor the prereg
+    froze, and `layered` itself is untouched (R4)."""
+
+    name = "layered_v2"
+
+    def _tier_rule(self, config: TenantConfig, state: TenantState, demand: Demand) -> str:
+        return latency_ranked_tier(config, state, demand)
+
+
+class GPTCacheV2Controller(GPTCacheLRUController):
+    """`gptcache` with the same replacement rule. The cache-everything
+    posture is deliberately kept: the factor under test is the tier rule."""
+
+    name = "gptcache_v2"
+
+    def _tier_rule(self, config: TenantConfig, state: TenantState, demand: Demand) -> str:
+        return latency_ranked_tier(config, state, demand)
+
+
 BASELINES = (
     StaticController,
     HPAController,
@@ -688,6 +774,8 @@ BASELINES = (
     VTCReplicaController,
     ConcurrencyController,
     LearnedJointController,
+    LayeredV2Controller,
+    GPTCacheV2Controller,
 )
 
 

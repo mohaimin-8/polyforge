@@ -102,8 +102,19 @@ class TestWorkloads:
 class TestSystems:
     def test_registry_covers_baselines_and_ablations(self):
         assert {"jcac", "hpa", "keda", "firm", "static", "gptcache"} <= set(SYSTEMS)
+        # Exact, not a subset: an arm named `jcac_no*` claims to be "PolyForge
+        # minus one contribution", and a stray one would be read as an
+        # ablation result. Every addition here is deliberate and dated.
         assert {s for s in SYSTEMS if s.startswith("jcac_no")} == {
+            # W36 ablation set.
             "jcac_noclassifier", "jcac_nojoint", "jcac_noeviction", "jcac_nofairness",
+            # Session 38, PREREG_BUDGET_PARITY: the proposal with its budget
+            # filter lifted, to measure how much of the WP1 severity gap the
+            # constraint accounts for.
+            "jcac_nobudget",
+            # Session 38, PREREG_LAYERED_FIX: the −joint-control ablation
+            # against a tier rule that is not absorbing.
+            "jcac_nojoint_v2",
         }
 
     def test_lru_factor_comes_from_w28_data(self):
