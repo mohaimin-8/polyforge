@@ -1256,3 +1256,5 @@ Appended by the runner every progress tick.
 | 2026-08-13 07:22 | matrix_model_mismatch | 1450/1500 | 0 | 3130 runs/h |
 | 2026-08-13 07:22 | matrix_model_mismatch | 1475/1500 | 0 | 3119 runs/h |
 | 2026-08-13 07:23 | matrix_model_mismatch | 1500/1500 | 0 | 3118 runs/h |
+| 2026-08-13 07:32 | live_dryrun | 1/1 | 1 | 27 runs/h |
+| 2026-08-13 07:37 | live_dryrun | 1/1 | 1 | 17 runs/h |

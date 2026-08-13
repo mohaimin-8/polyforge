@@ -57,6 +57,29 @@ verify-first steps, gates, and a progress table. A future session should
 execute it top to bottom without re-deriving anything. This file remains the
 milestone-level story; `REMAINING_WORK.md` remains the owner-split ledger.
 
+## 0a. Session 38 (2026-08-13): what changed at the top — READ THIS FIRST
+
+Eight work packages landed in one session. Two results move the headline and
+one closes the sharpest open attack on it. Detail lives in the records; this
+is the orientation.
+
+| WP | Outcome |
+|---|---|
+| **WP15** budget parity | The comparative **cost claim is withdrawn on both real traces.** BP-H1 FAILS against a budget-capped comparator (Azure −3.3%/−1.3%, BurstGPT −50.2%/−49.8%, none surviving the rank gate). What replaces it is a **feasibility** result: tier spend dominates infra spend by three orders of magnitude, so **no replica-only reactive controller can meet the per-tenant budget under AI load** — an argument from the price table that no amount of baseline retuning answers. |
+| **WP6** model mismatch | **The controller survives being wrong.** MM-H1 and MM-H2 both PASS, all twelve sub-tests under Holm: ±25% mismatch on replica capacity, tier price or cache saturation leaves the `keda_fair` cost win and `hpa_fair` severity non-inferiority intact, with no cliff across 0.5–2.0. This is the direct answer to "it was tuned on its own simulator". |
+| **WP3** layered fix | The **+2884% −joint-control ablation is withdrawn**: it measured a baseline latched in its most expensive tier. Honest number **+318.5%**. jcac still beats a competently-tiered GPTCache posture on J. |
+| **WP13** MT separation | Coupling is **exactly computable** (cap binds 21.7% of steps) but the derivation's own pre-stated V2 check **falsified it**. Reported, not patched. |
+| **WP5** | O(N²) planner wall removed: 108× fewer projections, 13.7× faster, byte-identical. |
+| **WP4** | Audit C6 adjudicated **FALSE** — planning cells never wipe forecast history. No code change. |
+| **WP8a / WP12** | Live dry-run found a pin that never reached the CRs; the authenticated ZAP scan found it was measuring the rate limiter, then found a **Medium** NUL-byte→500 defect. Both fixed. |
+
+**Net effect on the pitch.** The cost headline is gone at every level it was
+ever stated. What stands is stronger against the objections that actually get
+raised: a feasibility argument about joint control, mismatch robustness,
+fairness, forecasting, security, and a validity methodology that keeps
+catching its own errors. The venue rule's cost condition now reads FAIL —
+see `PUBLICATION_ROADMAP.md` §6.
+
 ## 0b. Session 35 (2026-08-08): the V-series validity remediation — READ FIRST
 
 A four-perspective validity audit of the whole artifact found eleven defects.

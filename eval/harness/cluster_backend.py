@@ -653,7 +653,7 @@ def run_knob_preflight(gateway_base: str, tenant_id: str, api_key: str,
          "--gateway", gateway_base, "--tenant", tenant_id,
          "--api-key", api_key, "--admin-key", ADMIN_KEY,
          "--tiers", ",".join(tiers), "--report", str(report)],
-        capture_output=True, text=True, timeout=300,
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
     )
     print(proc.stdout, end="")
     if proc.returncode != 0:
@@ -707,7 +707,11 @@ def provision_tenants(base: str, tenant_ids, slo_classes=None) -> dict[str, str]
             headers={"Content-Type": "application/json",
                      "X-PolyForge-Admin-Key": ADMIN_KEY})
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            # 60 s, not 15: a cold control plane runs its schema migration on
+            # the first write, and the WP8a dry-run (session 38) timed out
+            # here on an otherwise healthy cluster. `_wait_http` only proves
+            # /healthz answers, which it does before the store is ready.
+            with urllib.request.urlopen(req, timeout=60) as resp:
                 return json.loads(resp.read() or b"{}")
         except urllib.error.HTTPError as err:
             if err.code == 409:  # tenant already exists on a retried attempt
@@ -743,7 +747,7 @@ class ReplicaSampler(threading.Thread):
                 proc = subprocess.run(
                     ["kubectl", "--namespace", "polyforge", "get",
                      "deployment/polyforge-control-plane", "-o", "jsonpath={.status.replicas}"],
-                    capture_output=True, text=True, timeout=30)
+                    capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
                 if proc.returncode == 0 and proc.stdout.strip().isdigit():
                     self.samples.append(int(proc.stdout.strip()))
                 else:
@@ -852,7 +856,7 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                 if exporting:
                     cmd = cmd + [f"--infra-cost-usd={infra_cost:.6f}"]
                 proc = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=timeout_s, env=env
+                    cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout_s, env=env
                 )
                 if exporting and proc.returncode == 0:
                     (workdir / "eval-export.json").write_text(proc.stdout, encoding="utf-8")

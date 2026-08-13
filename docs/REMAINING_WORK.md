@@ -102,6 +102,50 @@ arm pins exactly the knobs its name claims, and no ablation arm may render
 CRs identical to `jcac`'s. `reproduce.py` 23/23 byte-identical after the
 change (the cluster backend feeds no committed record).
 
+### WP8a actuation half — RUN, and it FAILED. WP14 is blocked on it.
+
+The CR half of WP8a passed earlier this session. The actuation half — deploy
+the chart, let the operator drive the knobs, put load through it — needed the
+three images, which now build. It was run twice end to end on kind
+(`eval/experiments/live_dryrun.yaml`, non-scored, its own output DB so the
+frozen WP8b matrix is never pre-consumed). **Both runs failed**, and the
+findings are worth more than the run would have been.
+
+**Finding 1 — the harness cannot read its own tools on Windows (FIXED).**
+`subprocess.run(..., text=True)` decodes with the OS default codec, cp1252
+here, while `kind`/`helm`/`kubectl` emit UTF-8. First run died on byte
+`0x8f`. Three call sites in `cluster_backend.py` now decode UTF-8 with
+`errors="replace"`. This would have hit **any** live run on this machine,
+WP8b's scored sitting included.
+
+**Finding 2 — tenant provisioning hangs (NOT fixed; this is the blocker).**
+`POST /v1/tenants` times out against a freshly-deployed control plane.
+Raised the client timeout 15 s → 60 s on the theory that a cold store runs
+its schema migration on first write; **it timed out again at 60 s**, in both
+SQLite and `POLYFORGE_EVAL_SHARED_PG=1` modes. `/healthz` answers throughout
+(`_wait_http` passes), so the service is up and it is the *write path* that
+hangs.
+
+**Leading hypothesis, verified from code but not yet from a live cluster:**
+`cluster_backend.py:468` sets `replicaCount = n_tenants × TenantState().replicas`
+= **16 control-plane pods** for an 8-tenant uniform mix, on a 2-node `small`
+kind cluster with 9.7 GB of Docker memory. The port-forward targets the
+*service*, so a POST can land on a pod that never became ready while
+`/healthz` is answered by one that did. That is consistent with every
+symptom, and it is a hypothesis, not a diagnosis — the teardown is in a
+`finally` block, so neither run left a cluster to inspect.
+
+**Consequence for WP14.** The soak is **not startable**. A 12–24 h
+unattended run on a path that fails at minute two would produce a void
+record, and the prereg forbids splicing. The next session's first live step
+is to reproduce Finding 2 with teardown suppressed, read the pod states, and
+fix it — then re-run this dry-run before anything long is committed to.
+
+**What this already bought.** WP8a has now found three defects — the
+`replica-only` pin that never reached the CRs, the encoding bug, and this —
+none of which would have surfaced until WP8b's scored GPU sitting, where
+each would have cost a sitting rather than an afternoon.
+
 ### WP4 / audit C6 — adjudicated **FALSE**, closed without a code change
 
 **What the audit claimed.** With planning cells enabled (`PLANNER_CELLS.md`,

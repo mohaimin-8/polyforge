@@ -1,0 +1,22 @@
+# WP8a completion — the actuation half of the live dry-run.
+#
+# NON-SCORED and deliberately its own spec with its own output DB: the
+# frozen WP8b matrix (`wave4_live_plane.yaml`, reps: 1 by its stopping rule)
+# must not be pre-consumed by a plumbing check. Nothing here is a result.
+#
+# POLYFORGE_EVAL_LIVE_AI stays unset, so no AI gateway is deployed and the
+# run exercises the operator, the planner, the replica/cache knobs and the
+# audit path on CRUD load alone -- exactly the surface WP14's soak depends
+# on. One arm, one cell, short: this proves the deploy path works before a
+# 12-24 h soak is committed to it.
+name: live_dryrun
+backend: cluster
+steps: 10
+reps: 1
+systems: [jcac]
+workloads: [crud_bursty]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/live_dryrun.duckdb
+retries: 0
+timeseries_reps: 0
