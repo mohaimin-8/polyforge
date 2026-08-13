@@ -88,6 +88,29 @@ def dealias(orbit: list[Demand]) -> list[Demand]:
             for k, d in enumerate(orbit)]
 
 
+def coupling_models() -> dict:
+    """WP13 step 1: the two coupling models the M3 prose brackets the truth
+    with, run rather than quoted.
+
+    `MAIN_WORKING_PATH.md` §3 M3 states that ignoring the cluster caps makes
+    `flash_crud` come out **-19.5%** — the opposite sign to the measured
+    +11.5% — while an equal per-tenant share makes the cell infeasible, and
+    that the two bracket the truth. WP13's extension was specified as
+    narrowing that bracket, so the bracket has to exist first.
+    """
+    orbit = flash_orbit()
+    caps = {}
+    for rmax in (3, 6, 10, 16, 24):
+        cfg = TenantConfig(tenant_id="t", slo_class="standard", replica_max=rmax)
+        r = guarantee.price_of_reaction(cfg, orbit)
+        floor, cycle = r["reactive_cost_floor"], r["predictive_cycle_cost"]
+        caps[rmax] = {
+            "floor": floor, "cycle": cycle,
+            "pct": ((floor - cycle) / floor * 100.0) if floor else None,
+        }
+    return caps
+
+
 def standard_config() -> TenantConfig:
     return TenantConfig(tenant_id="t", slo_class="standard", replica_max=10)
 
@@ -226,6 +249,56 @@ def main() -> None:
     w("\nEvery one is negative: with nothing to be uncertain about, the "
       "relaxed reactive floor sits *below* an achievable predictive cycle, "
       "which must respect the reach clamp. Aliasing is the whole mechanism.\n")
+
+    # --- WP13 step 1: the coupling bracket, verified ----------------------
+    caps = coupling_models()
+    w("\n## The coupling bracket the M3 prose asserts (WP13 step 1 — verified)\n")
+    w("`MAIN_WORKING_PATH.md` §3 M3 brackets the multi-tenant truth between "
+      "two models: *\"ignoring the caps entirely makes `flash_crud` come out "
+      "−19.5% — the opposite sign to the measured +11.5%\"*, and *\"applying "
+      "the equal share instead makes the cell infeasible\"*. WP13's extension "
+      "was specified as narrowing that bracket, so the bracket was run before "
+      "anything was derived. **It does not hold as stated.**\n")
+    w("\n| per-tenant replica ceiling | reactive floor | predictive cycle | gap |")
+    w("|---|---:|---:|---:|")
+    for rmax, r in caps.items():
+        if r["floor"] is None:
+            w(f"| {rmax} | — | — | **INFEASIBLE** |")
+        else:
+            w(f"| {rmax} | {fmt(r['floor'])} | {fmt(r['cycle'])} | "
+              f"{pct(r['pct'])} |")
+    equal_share_infeasible = caps[3]["floor"] is None
+    varied = {round(r["pct"], 6) for r in caps.values() if r["pct"] is not None}
+    w("\n**The equal-share half reproduces.** A 3-replica share (24 cluster "
+      "replicas over 8 tenants) cannot serve a peak needing 6, so the cell is "
+      + ("infeasible, exactly as the prose says.\n" if equal_share_infeasible
+         else "**feasible here, contradicting the prose**.\n"))
+    w("**The no-cap half does not.** The gap is "
+      + ("identical at every feasible ceiling"
+         if len(varied) == 1 else "not constant across ceilings")
+      + f" ({', '.join(f'{v:+.1f}%' for v in sorted(varied))}), because the "
+      "`flash` peak needs six replicas and any ceiling at or above six leaves "
+      "the reach clamp — not the cap — as the only binding constraint. "
+      "**There is no distinct \"no-cap\" model on this orbit**: removing the "
+      "cluster cap changes nothing, so it cannot produce −19.5% and cannot "
+      "serve as the lower arm of a bracket.\n")
+    w(f"Where −19.5% *does* come from is measured above: it is the de-aliased "
+      f"`flash` gap ({pct(flash_da['pct'])}) — a **mechanism** number about "
+      "observational aliasing, not a coupling number. A session-38 sweep of "
+      "`cost_at_violation_parity` over the same orbit reaches the identical "
+      "figure by a second route: reading the reactive frontier at violation "
+      "0.0625 against a predictive cycle at violation 0.0000. That is the "
+      "sparse-frontier offset the function's own docstring warns is *not* a "
+      "parity comparison. Both routes are about information and frontier "
+      "shape; neither is about tenant coupling.\n")
+    w("**Consequence for WP13.** The extension cannot be specified as "
+      "\"narrow the no-cap/equal-share bracket\", because only one arm of that "
+      "bracket exists. What survives is one-sided and still useful: the equal "
+      "share is infeasible and the real system is not, so the true coupled "
+      "floor lies strictly below the equal-share bound and at or above the "
+      "single-tenant floor computed here. Any multi-tenant derivation must be "
+      "validated against that, and the retracted sign-agreement claim stays "
+      "retracted.\n")
 
     w("\n## Scope — what this record does NOT claim\n")
     w("- This is a **single-tenant** derivation. Cluster caps couple tenants "

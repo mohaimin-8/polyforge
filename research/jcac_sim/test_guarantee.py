@@ -569,3 +569,40 @@ class PublishedSeparationNumbers(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CouplingBracketTests(unittest.TestCase):
+    """WP13 step 1: the coupling bracket the M3 prose asserts, pinned.
+
+    The prose brackets the multi-tenant truth between a no-cap model giving
+    `flash_crud` −19.5% and an equal-share model making the cell infeasible.
+    Only the second arm exists. These pin both halves of that finding so the
+    extension cannot later be specified against a bracket that isn't there.
+    """
+
+    def _flash_orbit(self):
+        return [Demand(rps={"crud_read": 60.0 * f, "crud_write": 10.0 * f},
+                       crud_base_ms=40.0)
+                for f in ([6.0] * 5 + [0.5] * 11)]
+
+    def test_the_replica_ceiling_is_inert_above_the_peak(self):
+        """No "no-cap" model exists on this orbit: the flash peak needs six
+        replicas, so every ceiling at or above six gives the identical gap.
+        Removing the cluster cap therefore cannot produce −19.5%."""
+        orbit = self._flash_orbit()
+        gaps = set()
+        for rmax in (6, 10, 16, 24):
+            cfg = TenantConfig(tenant_id="t", slo_class="standard", replica_max=rmax)
+            r = guarantee.price_of_reaction(cfg, orbit)
+            gaps.add(round((r["reactive_cost_floor"] - r["predictive_cycle_cost"])
+                           / r["reactive_cost_floor"] * 100.0, 6))
+        self.assertEqual(len(gaps), 1, f"ceiling changed the gap: {gaps}")
+        self.assertAlmostEqual(gaps.pop(), 49.0, places=1)
+
+    def test_the_equal_share_really_is_infeasible(self):
+        """The half that does reproduce: 24 cluster replicas over 8 tenants
+        is a 3-replica share, and a peak needing 6 cannot be served."""
+        cfg = TenantConfig(tenant_id="t", slo_class="standard", replica_max=3)
+        r = guarantee.price_of_reaction(cfg, self._flash_orbit())
+        self.assertIsNone(r["reactive_cost_floor"])
+        self.assertIsNone(r["predictive_cycle_cost"])

@@ -69,6 +69,28 @@ A second, independent form of the same test uses orbits that are aliasing-free *
 Every one is negative: with nothing to be uncertain about, the relaxed reactive floor sits *below* an achievable predictive cycle, which must respect the reach clamp. Aliasing is the whole mechanism.
 
 
+## The coupling bracket the M3 prose asserts (WP13 step 1 — verified)
+
+`MAIN_WORKING_PATH.md` §3 M3 brackets the multi-tenant truth between two models: *"ignoring the caps entirely makes `flash_crud` come out −19.5% — the opposite sign to the measured +11.5%"*, and *"applying the equal share instead makes the cell infeasible"*. WP13's extension was specified as narrowing that bracket, so the bracket was run before anything was derived. **It does not hold as stated.**
+
+
+| per-tenant replica ceiling | reactive floor | predictive cycle | gap |
+|---|---:|---:|---:|
+| 3 | — | — | **INFEASIBLE** |
+| 6 | $0.012800 | $0.006533 | +49.0% |
+| 10 | $0.012800 | $0.006533 | +49.0% |
+| 16 | $0.012800 | $0.006533 | +49.0% |
+| 24 | $0.012800 | $0.006533 | +49.0% |
+
+**The equal-share half reproduces.** A 3-replica share (24 cluster replicas over 8 tenants) cannot serve a peak needing 6, so the cell is infeasible, exactly as the prose says.
+
+**The no-cap half does not.** The gap is identical at every feasible ceiling (+49.0%), because the `flash` peak needs six replicas and any ceiling at or above six leaves the reach clamp — not the cap — as the only binding constraint. **There is no distinct "no-cap" model on this orbit**: removing the cluster cap changes nothing, so it cannot produce −19.5% and cannot serve as the lower arm of a bracket.
+
+Where −19.5% *does* come from is measured above: it is the de-aliased `flash` gap (-19.5%) — a **mechanism** number about observational aliasing, not a coupling number. A session-38 sweep of `cost_at_violation_parity` over the same orbit reaches the identical figure by a second route: reading the reactive frontier at violation 0.0625 against a predictive cycle at violation 0.0000. That is the sparse-frontier offset the function's own docstring warns is *not* a parity comparison. Both routes are about information and frontier shape; neither is about tenant coupling.
+
+**Consequence for WP13.** The extension cannot be specified as "narrow the no-cap/equal-share bracket", because only one arm of that bracket exists. What survives is one-sided and still useful: the equal share is infeasible and the real system is not, so the true coupled floor lies strictly below the equal-share bound and at or above the single-tenant floor computed here. Any multi-tenant derivation must be validated against that, and the retracted sign-agreement claim stays retracted.
+
+
 ## Scope — what this record does NOT claim
 
 - This is a **single-tenant** derivation. Cluster caps couple tenants and the coupling is load-bearing, not an optional refinement: ignoring caps flips `flash_crud`'s sign, and an equal per-tenant share makes that cell infeasible. The multi-tenant extension is WP13 proper; until it lands, the correspondence with the campaigns is **suggestive structural corroboration at one operating point**, not a validated correspondence, and must be cited that way.
