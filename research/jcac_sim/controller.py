@@ -438,6 +438,18 @@ class JCACController:
         self._order_cache: list[str] | None = None
         self.capacity_scale = {tid: 1.0 for tid in configs}
         self._projected: dict[str, float] = {}
+        # WP5: within-cycle projection memo. `_project` is a pure function of
+        # (tenant, state, horizon) for the duration of one `plan()` -- the
+        # config, the capacity correction and both horizons are all fixed
+        # before the sweeps start and none is mutated during them -- so
+        # caching it cannot change a single result. It is cleared at the top
+        # of every cycle, so no state crosses cycles and R4 holds by
+        # construction rather than by luck. The waste it removes is the
+        # O(N^2) wall the audit named: each tenant's `_best_for_tenant`
+        # re-projects every *other* tenant at its unchanged state, so an
+        # N-tenant sweep recomputes the same (tenant, state) projection up to
+        # N-1 times.
+        self._project_memo: dict = {}
 
     def snapshot(self) -> dict:
         """Serializable planner state for failover (W31): per-tenant forecast
@@ -507,6 +519,9 @@ class JCACController:
         resource expansion, so the planner throttles it rather than feeding
         the interference."""
         self._interference = interference or {}
+        # WP5: the memo is per cycle. Clearing here (not in __init__)
+        # is what makes cross-cycle state impossible.
+        self._project_memo.clear()
         for tid, demand in demands.items():
             self.forecasts[tid].observe(demand)
         horizons = {tid: self.forecasts[tid].horizon(self.risk_quantile)
@@ -535,18 +550,31 @@ class JCACController:
             cost, violation, _ = self._project(tid, state, horizons[tid])
             if cost_horizons is not None:
                 # Report the spend you will actually be billed for.
-                cost = self._project(tid, state, cost_horizons[tid])[0]
+                cost = self._project(tid, state, cost_horizons[tid], 1)[0]
             self._projected[tid] = violation  # feedback baseline (adaptive)
             plans[tid] = PlanEntry(state=state, projected_cost_usd=cost, projected_violation=violation)
         return plans
 
-    def _project(self, tid: str, state: TenantState, horizon: list[Demand]) -> tuple[float, float, float]:
+    def _project(self, tid: str, state: TenantState, horizon: list[Demand],
+                 tag: int = 0) -> tuple[float, float, float]:
         """Horizon-mean (cost, bounded violation, objective violation).
 
         The objective term is log1p(excess): unbounded so deep overload
         still has a gradient, compressive so the controller doesn't
         sacrifice everything else to a single hopeless tenant-step.
+
+        `tag` names *which* horizon was passed (0 = the risk-inflated one
+        the SLO is judged on, 1 = the point forecast money is judged on).
+        It exists only to key the within-cycle memo: the two horizons differ
+        for the same tenant whenever `risk_cost_at_point` is on, so the
+        tenant and state alone do not identify a projection. Passing an
+        explicit tag rather than hashing the horizon keeps the key exact and
+        the fast path free of list comparisons.
         """
+        key = (tid, state, tag)
+        hit = self._project_memo.get(key)
+        if hit is not None:
+            return hit
         cost = violation = obj = 0.0
         for demand in horizon:
             m = evaluate_step(self.configs[tid], state, self._planning_demand(tid, demand))
@@ -554,7 +582,9 @@ class JCACController:
             violation += m.violation
             obj += math.log1p(m.excess)
         n = max(1, len(horizon))
-        return cost / n, violation / n, obj / n
+        out = (cost / n, violation / n, obj / n)
+        self._project_memo[key] = out
+        return out
 
     def _project_carbon(self, tid: str, state: TenantState, horizon: list[Demand]) -> float:
         """Horizon-mean carbon in grams. Kept separate from `_project` so the
@@ -618,7 +648,7 @@ class JCACController:
             if self.carbon_weight:
                 other_carbon += self._project_carbon(oid, ostate, horizons[oid])
             if cost_horizons is not None:
-                cost = self._project(oid, ostate, cost_horizons[oid])[0]
+                cost = self._project(oid, ostate, cost_horizons[oid], 1)[0]
             other_cost += cost
             other_obj += obj
             other_satisfaction.append(1.0 - viol)
@@ -647,7 +677,7 @@ class JCACController:
                         # Budget is a *money* guardrail: test it against the
                         # spend the arriving demand will bill, not against the
                         # headroom we provisioned for.
-                        cost = self._project(tid, candidate, cost_horizons[tid])[0]
+                        cost = self._project(tid, candidate, cost_horizons[tid], 1)[0]
                     # PREREG_BUDGET_PARITY: the per-tenant Budget CRD is a hard
                     # filter applied BEFORE the objective, and no baseline in
                     # baselines.py has an equivalent -- so the proposal is the

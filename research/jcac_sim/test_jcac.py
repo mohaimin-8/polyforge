@@ -1320,3 +1320,84 @@ class EnergyCarbonTests(unittest.TestCase):
 def replace_state(state: TenantState, **kw) -> TenantState:
     from dataclasses import replace
     return replace(state, **kw)
+
+
+class ProjectionMemoTests(unittest.TestCase):
+    """WP5: the within-cycle projection memo removes the O(N^2) planner wall.
+
+    The audit reported the lattice search re-evaluating `evaluate_step` for
+    identical (config, state, demand) tuples across sweeps and candidates.
+    Profiling a 64-tenant, 120-step run confirmed it: 5,859,776 calls, 35.6%
+    of runtime, 84% of cumulative time. The cause is structural rather than
+    incidental — every tenant's `_best_for_tenant` re-projects every *other*
+    tenant at its unchanged state, so one sweep repeats the same projection
+    up to N-1 times.
+
+    The memo is correct only because it is cleared each cycle, so both halves
+    are pinned here: that it clears, and that the cost is now linear.
+    """
+
+    def _fleet(self, n: int):
+        ids = [f"t{i:02d}" for i in range(n)]
+        configs = {t: TenantConfig(tenant_id=t) for t in ids}
+        states = {t: TenantState() for t in ids}
+        demands = {t: demand({"chat": 2.0, "crud_read": 10.0}) for t in ids}
+        ctl = JCACController(configs, weights=Weights(),
+                             limits=ClusterLimits(cache_mb=1 << 20, replicas=10_000))
+        return ctl, states, demands
+
+    def test_memo_is_cleared_between_cycles(self):
+        """The safety property the whole optimisation rests on. If a
+        projection survived into the next cycle, a tenant whose demand
+        changed would be planned against last cycle's numbers."""
+        ctl, states, demands = self._fleet(3)
+        ctl.plan(states, demands)
+        self.assertTrue(ctl._project_memo, "nothing was memoised at all")
+        cached = dict(ctl._project_memo)
+
+        hot = {t: demand({"chat": 60.0, "crud_read": 300.0}) for t in demands}
+        ctl.plan(states, hot)
+        changed = [k for k, v in ctl._project_memo.items()
+                   if k in cached and cached[k] != v]
+        self.assertTrue(changed,
+                        "projections identical after a 30x demand change — "
+                        "the memo leaked across cycles")
+
+    def test_projection_cost_is_linear_in_tenants(self):
+        """The wall itself. Under the O(N^2) search, doubling the fleet
+        roughly quadrupled `evaluate_step` calls; memoised, the work is one
+        projection per distinct (tenant, state), so it must scale close to
+        linearly. The threshold is deliberately loose — this is a guard
+        against the wall returning, not a performance benchmark."""
+        counts = {}
+        real = model.evaluate_step
+        for n in (4, 8):
+            ctl, states, demands = self._fleet(n)
+            calls = [0]
+
+            def counting(config, state, dem, _real=real, _calls=calls):
+                _calls[0] += 1
+                return _real(config, state, dem)
+
+            import controller as controller_mod
+            controller_mod.evaluate_step = counting
+            try:
+                ctl.plan(states, demands)
+            finally:
+                controller_mod.evaluate_step = real
+            counts[n] = calls[0]
+
+        ratio = counts[8] / max(1, counts[4])
+        self.assertLess(ratio, 3.0,
+                        f"evaluate_step scaling looks quadratic again: "
+                        f"{counts} (ratio {ratio:.2f})")
+
+    def test_memoised_projection_matches_a_cold_computation(self):
+        """A hit must return exactly what a miss would have computed."""
+        ctl, states, demands = self._fleet(2)
+        ctl.plan(states, demands)
+        (tid, state, tag), cached = next(iter(ctl._project_memo.items()))
+        ctl._project_memo.clear()
+        self.assertEqual(ctl._project(tid, state,
+                                      ctl.forecasts[tid].horizon(ctl.risk_quantile), tag),
+                         cached)

@@ -850,7 +850,7 @@ never "the API passed a pen test".
 | **WP15 budget parity** | **DONE (session 38, `c6a021f` Azure + `b3cd766` BurstGPT)** — BP-H1 FAIL both traces (cost claim withdrawn), BP-H2 PASS both (typical-window only on BurstGPT) | `RESULTS_BUDGET_PARITY.md`; replication EXACT both traces (504 + 672 rows, 0.00e+00); gate 22/22; 14 pinning tests |
 | WP3 layered fix | NOT STARTED | — |
 | WP4 cells verify/fix | **DONE (session 38)** — audit claim **FALSE**, closed as an adjudication, no code change | `REMAINING_WORK.md` §WP4/C6: `planner.py:245-256` keeps the tenant set out of the rebuild signature by design, `:266-289` carries survivor history across both paths, `planner_cells.py:81-88,126-144` partitions by index with cores built once; 3 new `PlanningCellTests` demonstrate partitioned == monolithic history |
-| WP5 O(N²) memoize | NOT STARTED (profile first) | — |
+| WP5 O(N²) memoize | **DONE (session 38)** — shipped default-on; R4 gate PASSED | profile before: `evaluate_step` 5,859,776 calls, 35.6% tottime, 84% cumtime on a 64-tenant × 120-step run; after: **54,074 calls (108× fewer), 132.75 s → 9.66 s (13.7×)**; `reproduce.py` 22/22 byte-identical; 3 `ProjectionMemoTests` pin per-cycle clearing + linear scaling |
 | WP6 model mismatch | NOT STARTED | — |
 | WP7 push | **DONE (session 37, 2026-08-11)** | 26 commits pushed to `origin/v-series-validity-remediation`; permanent anchor disclosure for the two session-35 preregs recorded in `REMAINING_WORK.md` §Session 37 |
 | **WP8a dry-run** | **UNBLOCKED session 36 — agent-executable, $0** | kind verified: cluster in 16 s, pod scheduled, clean teardown; preflight reports no missing tools |
