@@ -787,6 +787,13 @@ class ReplicaSampler(threading.Thread):
 
 
 def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
+    # WP14: the per-step subprocess timeout has to cover the load window, or
+    # a long run is killed mid-k6 and recorded as failed. The default 3600 s
+    # was written when every live run was minutes; a 24 h soak is 8640 steps
+    # x 10 s. Derived from the run rather than raised globally, so short runs
+    # keep the tight timeout that catches a hung step.
+    timeout_s = max(timeout_s, run.steps * STEP_SECONDS + 1800)
+
     missing = preflight()
     if missing:
         raise BackendUnavailable(

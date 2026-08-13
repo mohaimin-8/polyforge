@@ -1,0 +1,27 @@
+# PREREG_LIVE_SOAK.md (session 38, WP14) — the 24 h live CRUD-plane soak.
+# Frozen and pushed before the run.
+#
+# 8640 steps x STEP_SECONDS (10 s) = 24 h of continuous k6 load against one
+# kind cluster. POLYFORGE_EVAL_LIVE_AI stays UNSET: no AI gateway, no GPU,
+# CRUD load only — the surface the prereg scores (operator, planner, replica
+# and cache knobs, audit path). POLYFORGE_EVAL_SHARED_PG=1 is required (R5)
+# so every control-plane replica writes one Postgres and eval-export sees the
+# whole run rather than one pod's slice.
+#
+# Faults come from scripts/chaos_inject.sh — B2's proven injectors, not new
+# code — launched alongside on the frozen schedule: planner crash at T+2/8/
+# 14/20 h, apiserver throttle at T+5/11/17/23 h.
+#
+# `medium` per the prereg; drop to `small` and disclose if Docker cannot hold
+# it, because duration outranks width for this work package.
+name: live_soak
+backend: cluster
+steps: 8640
+reps: 1
+systems: [jcac]
+workloads: [crud_bursty]
+tenant_mixes: [uniform]
+cluster_sizes: [medium]
+output: eval/results/live_soak.duckdb
+retries: 0
+timeseries_reps: 0
