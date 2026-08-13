@@ -310,9 +310,20 @@ def _arm_knob_bounds(system: str, initial: "TenantState", size) -> tuple:
     spans the full envelope (cacheMax 0 = no ceiling, the cluster limit still
     binds; tiers none..large). This mirrors the sim's SystemSpec.knob_freeze so
     the live ablations pin exactly the knobs their sim counterparts do:
-      - jcac         all three free
-      - cache-only   replicas + tier frozen, cache free
-      - tier-only    replicas + cache frozen, tier free
+      - jcac          all three free
+      - replica-only  cache + tier frozen, replicas free
+      - cache-only    replicas + tier frozen, cache free
+      - tier-only     replicas + cache frozen, tier free
+
+    WP8a (session 38) found `replica-only` falling through to the jcac branch,
+    so its CRs rendered **byte-identical to jcac's** — the full three-knob
+    envelope on an arm the prereg describes as "cache/tier held fixed". The
+    pin was never actually absent: that arm runs `planner.enabled=false` and
+    takes its knobs from `push_default_knobs`, so nothing moved them and no
+    measurement was affected (the live plane has not been run). But the
+    invariant was enforced only by a helm value and a comment, invisible in
+    the CRs and uncheckable by the apiserver. It is declared here as well, so
+    the arm's own manifests state what the arm is.
     """
     free_r = (1, size.replica_max)
     frozen_r = (initial.replicas, initial.replicas)
@@ -320,6 +331,8 @@ def _arm_knob_bounds(system: str, initial: "TenantState", size) -> tuple:
     frozen_c = (initial.cache_mb, initial.cache_mb)
     free_t = ("none", "large")
     frozen_t = (initial.tier, initial.tier)
+    if system == "replica-only":
+        return free_r, frozen_c, frozen_t
     if system == "cache-only":
         return frozen_r, free_c, frozen_t
     if system == "tier-only":

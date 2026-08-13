@@ -874,3 +874,78 @@ class TestModelFormOverride:
         # the two measured corrections push in opposite directions and both
         # must be live for this ratio to differ from 1.
         assert measured.crud_p95_ms != flat.crud_p95_ms
+
+
+class TestWave4ArmPins:
+    """WP8a: every Wave 4 arm's CRs must encode the pin its name claims.
+
+    `PREREG_WAVE4_LIVE_PLANE` §Arms isolates *jointness* by pinning two knobs
+    per ablation. An arm whose pin does not reach its Policy CR is an
+    unlabelled copy of the full controller, and its result would mean
+    nothing. Session 38 found `replica-only` rendering CRs byte-identical to
+    `jcac`'s; these keep that from recurring silently.
+    """
+
+    EXPECTED_PINS = {
+        "jcac": set(),
+        "replica-only": {"cache", "tier"},
+        "cache-only": {"replicas", "tier"},
+        "tier-only": {"replicas", "cache"},
+    }
+
+    def _pins(self, system):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "research" / "jcac_sim"))
+        from model import TenantState
+
+        from harness import workloads
+        from harness.cluster_backend import _arm_knob_bounds
+
+        size = workloads.CLUSTER_SIZES["small"]
+        (rmin, rmax), (cmin, cmax), (tmin, tmax) = _arm_knob_bounds(
+            system, TenantState(), size)
+        pins = set()
+        if rmin == rmax:
+            pins.add("replicas")
+        # cacheSizeMBMax 0 is the CRD's "no ceiling" sentinel, not a pin.
+        if cmin == cmax and not (cmin == 0 and cmax == 0):
+            pins.add("cache")
+        if tmin == tmax:
+            pins.add("tier")
+        return pins
+
+    def test_every_arm_pins_exactly_what_its_name_claims(self):
+        for system, expected in self.EXPECTED_PINS.items():
+            assert self._pins(system) == expected, (
+                f"{system}: CRs pin {sorted(self._pins(system))}, "
+                f"name claims {sorted(expected)}")
+
+    def test_no_ablation_arm_renders_the_same_crs_as_jcac(self):
+        """The sharpest form of the same check: identical manifests mean an
+        identical deployment, whatever the arm is called."""
+        import hashlib
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from harness.cluster_backend import operator_crs
+        from harness.config import RunSpec, load, run_identity
+
+        spec = load(str(Path(__file__).resolve().parents[1]
+                        / "experiments" / "wave4_live_plane.yaml"))
+
+        def digest(system):
+            rid, seed = run_identity(spec, system, "ai_cacheable", "uniform",
+                                     "small", 0)
+            run = RunSpec(run_id=rid, experiment=spec.name, system=system,
+                          workload="ai_cacheable", tenant_mix="uniform",
+                          cluster_size="small", rep=0, seed=seed,
+                          steps=spec.steps, backend=spec.backend,
+                          store_timeseries=False)
+            return hashlib.sha256(operator_crs(run).encode()).hexdigest()
+
+        jcac = digest("jcac")
+        for system in ("replica-only", "cache-only", "tier-only"):
+            assert digest(system) != jcac, (
+                f"{system} renders CRs identical to jcac -- it is an "
+                "unlabelled copy of the full controller")

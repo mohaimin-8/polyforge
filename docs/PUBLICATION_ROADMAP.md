@@ -853,7 +853,7 @@ never "the API passed a pen test".
 | WP5 O(N²) memoize | **DONE (session 38)** — shipped default-on; R4 gate PASSED | profile before: `evaluate_step` 5,859,776 calls, 35.6% tottime, 84% cumtime on a 64-tenant × 120-step run; after: **54,074 calls (108× fewer), 132.75 s → 9.66 s (13.7×)**; `reproduce.py` 22/22 byte-identical; 3 `ProjectionMemoTests` pin per-cycle clearing + linear scaling |
 | WP6 model mismatch | NOT STARTED | — |
 | WP7 push | **DONE (session 37, 2026-08-11)** | 26 commits pushed to `origin/v-series-validity-remediation`; permanent anchor disclosure for the two session-35 preregs recorded in `REMAINING_WORK.md` §Session 37 |
-| **WP8a dry-run** | **UNBLOCKED session 36 — agent-executable, $0** | kind verified: cluster in 16 s, pod scheduled, clean teardown; preflight reports no missing tools |
+| **WP8a dry-run** | **DONE (session 38)** — ran against a real apiserver; found `replica-only` rendering CRs **byte-identical to `jcac`'s** | `eval/scripts/live_actuation_dryrun.py`; 4/4 arms admit, both CEL bound rules fire on negative tests, pin now declared for all four arms; no measurement affected (WP8b never ran, and the pin was already enforced by `planner.enabled=false`); 2 `TestWave4ArmPins` tests; gate 23/23 |
 | WP8b B1 scored | WAITING ON USER (GPU gate) | prereqs landed session 35; cluster half now runnable locally |
 | WP12 authenticated ZAP | NOT STARTED (small) | unauth surface done: 118 PASS / 0 FAIL |
 | **WP13 MT separation** | NOT STARTED (new, session 37 — Transactions theory strengthener) | machinery: `guarantee.py`; open item named in M3 close-out |

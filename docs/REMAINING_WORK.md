@@ -69,6 +69,39 @@ early single-window evidence says **partly** — lifting the budget takes
 jcac's excess 4.83 → 3.15, still short of `hpa_fair`'s 0.19, so some of the
 overshoot is genuine.
 
+### WP8a — live actuation dry-run: run, and it found a pin that never reached the CRs
+
+Executed against a real kube-apiserver (kind, 2 nodes, the committed CRDs),
+not a mock. `eval/scripts/live_actuation_dryrun.py` is committed so it can be
+re-run before WP8b.
+
+**What passed.** All four frozen arms' Policy/Budget/Tenant CRs admit. The
+CRD's CEL bound rules are **live**, proven by negative test: a Policy with
+`replicaMin 9 > replicaMax 3` and one with `cacheSizeMBMin 512 >
+cacheSizeMBMax 64` are both rejected by the apiserver.
+
+**What failed.** `replica-only` rendered Policy CRs **byte-identical to
+`jcac`'s** (sha256 `43daddb3…` for both) — the full three-knob envelope on
+an arm `PREREG_WAVE4_LIVE_PLANE` §Arms describes as "cache/tier held fixed".
+`_arm_knob_bounds` had branches for `cache-only` and `tier-only` only;
+everything else fell through to the all-free jcac case.
+
+**Severity, stated accurately.** This did **not** corrupt any measurement,
+and no result changes: the live plane has never been run (WP8b is still
+user-gated), and the arm's pin was in fact enforced by a different mechanism
+— `replica-only` runs `planner.enabled=false` and takes its knobs from
+`push_default_knobs`, so nothing was moving cache or tier regardless of what
+its CRs allowed. The defect is that the invariant lived only in a helm value
+and a code comment: invisible in the manifests, unenforceable by the
+apiserver, and silently lost if that arm ever gained a planner. It is now
+declared in the CRs as well, so the arm's own manifests state what the arm
+is.
+
+Pinned by two tests in `eval/tests/test_harness.py::TestWave4ArmPins`: every
+arm pins exactly the knobs its name claims, and no ablation arm may render
+CRs identical to `jcac`'s. `reproduce.py` 23/23 byte-identical after the
+change (the cluster backend feeds no committed record).
+
 ### WP4 / audit C6 — adjudicated **FALSE**, closed without a code change
 
 **What the audit claimed.** With planning cells enabled (`PLANNER_CELLS.md`,
