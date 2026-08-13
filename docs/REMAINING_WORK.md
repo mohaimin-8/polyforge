@@ -69,6 +69,48 @@ early single-window evidence says **partly** — lifting the budget takes
 jcac's excess 4.83 → 3.15, still short of `hpa_fair`'s 0.19, so some of the
 overshoot is genuine.
 
+### WP4 / audit C6 — adjudicated **FALSE**, closed without a code change
+
+**What the audit claimed.** With planning cells enabled (`PLANNER_CELLS.md`,
+the PS-H1 1024-tenant scaling result), each re-partition wipes per-tenant
+forecast history, degrading the forecaster to persistence — which would gut
+the TPDS scalability story. The claim was never independently verified; the
+roadmap's WP4 says VERIFY FIRST, then fix *or* adjudicate.
+
+**What the code actually does.** Verified by reading, file:line:
+
+- `services/planner/planner.py:245-256` — the rebuild signature is
+  `(alpha, beta, gamma, cache_mb, replicas)`. The comment states the intent
+  outright: *"the tenant set is deliberately not part of the rebuild
+  signature … a rebuild costs every tenant its forecast history … one tenant
+  arriving must never cold-start the fleet's demand forecasts."* Tenant
+  churn cannot trigger a rebuild.
+- `services/planner/planner.py:266-275` — even when a rebuild *does* happen
+  (a weights/limits retune), surviving tenants' `forecasts` and
+  `capacity_scale` are carried across to the new controller explicitly.
+- `services/planner/planner.py:277-289` — on the no-rebuild path, churn is
+  reconciled per tenant: arrivals get a fresh forecaster, departures are
+  dropped, **survivors keep their history untouched**.
+- `research/analysis/planner_cells.py:81-88, 126-144` — "planning cells" is
+  a harness-level wrapper, not a production feature. The partition is
+  round-robin **by index** under a frozen rule, and the per-cell
+  `PlannerCore`s are constructed **once** (line 129) and reused. A tenant
+  cannot migrate between cells, so the re-partition the audit describes
+  does not occur anywhere in the repo.
+
+**Demonstration run (committed, not throwaway).** `PlanningCellTests` in
+`services/planner/test_planner.py`: four tenants planned five cycles
+partitioned and unpartitioned end with **identical per-tenant forecast
+history lengths**; a cell's controller identity survives re-planning the
+same portfolio (no rebuild); and swapping one tenant out of a cell costs
+only that tenant. Three existing `PlannerLifecycleTests` (W31) already
+covered the single-core half of the same property.
+
+**Disposition.** Nothing to fix. The alleged defect is the exact failure
+mode `planner.py` was hardened against in W31, and the mechanism that would
+cause it (re-partitioning) does not exist. WP4 is closed as an adjudication;
+per the roadmap's own rule, *do not fix what is not broken*.
+
 ## Session 37 (2026-08-11) — WP7 closed; WP1 opened with its anchor intact
 
 **WP7 is done.** `v-series-validity-remediation` is pushed to `origin`
