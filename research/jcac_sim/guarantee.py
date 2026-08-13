@@ -754,3 +754,163 @@ def replica_floor(config: TenantConfig, demand: Demand, cap: int | None = None) 
                         best = n
                     break
     return best
+
+
+# --- WP13: the multi-tenant extension -------------------------------------
+# Everything above is single-tenant and is published; nothing here changes it.
+#
+# The cluster cap is what couples tenants, and the M3 close-out called that
+# coupling "load-bearing, not optional" while bracketing it between two
+# models. WP13 step 1 measured that bracket and found only one arm real: the
+# equal share is genuinely infeasible, but there is no distinct "no-cap"
+# model, because the per-tenant replica ceiling never binds on these orbits.
+#
+# What makes an exact treatment possible here — and what the M3 prose reached
+# for a concentration inequality to avoid — is that nothing is stochastic in
+# the usual sense. Each tenant replays a deterministic periodic orbit with a
+# phase drawn once, uniformly, at run start (`workloads.build`). So the joint
+# phase space is a finite product, every coincidence probability is exactly
+# countable, and the aggregate demand distribution is a convolution rather
+# than something to be bounded.
+
+
+def orbit_replica_needs(config: TenantConfig, demands: list[Demand],
+                        cap: int | None = None) -> tuple[int, ...]:
+    """Replicas this tenant needs at each orbit position to hold the SLO,
+    cache and tier chosen freely. `None` at a position means no admissible
+    configuration clears it."""
+    return tuple(replica_floor(config, d, cap) for d in demands)
+
+
+def aggregate_need_distribution(needs: tuple[int, ...],
+                                tenants: int) -> dict[int, float]:
+    """Exact distribution of the *aggregate* replica requirement.
+
+    Phases are independent uniform draws over orbit positions, so the
+    aggregate is a sum of `tenants` i.i.d. draws from the per-position need
+    and its distribution is an exact convolution. No inequality, no
+    sampling: the numbers below are the true probabilities for the demand
+    construction the campaigns actually replay.
+    """
+    if any(n is None for n in needs):
+        raise ValueError("orbit has an unservable position; no aggregate is defined")
+    single: dict[int, float] = {}
+    for n in needs:
+        single[n] = single.get(n, 0.0) + 1.0 / len(needs)
+    dist = {0: 1.0}
+    for _ in range(tenants):
+        nxt: dict[int, float] = {}
+        for total, p in dist.items():
+            for value, q in single.items():
+                nxt[total + value] = nxt.get(total + value, 0.0) + p * q
+        dist = nxt
+    return dist
+
+
+def cap_binding_probability(needs: tuple[int, ...], tenants: int,
+                            cap: int) -> float:
+    """P(the cluster replica cap binds) — the number that decides whether
+    the single-tenant derivation is a description of the coupled system or
+    merely a lower bound on it."""
+    dist = aggregate_need_distribution(needs, tenants)
+    return sum(p for total, p in dist.items() if total > cap)
+
+
+def fcfs_allocation(needs: list[int], cap: int) -> list[int]:
+    """The simulator's own contention rule, made explicit.
+
+    `controller._sweep_order` is `sorted(configs)` and the sweep is
+    first-come-first-served on the shared caps: an earlier tenant claims
+    contended capacity before a later one sees it. Any coupled floor has to
+    allocate the same way or it is describing a different system.
+    """
+    out, remaining = [], cap
+    for need in needs:
+        take = min(need, remaining)
+        out.append(take)
+        remaining -= take
+    return out
+
+
+def coupled_floor(config: TenantConfig, demands: list[Demand], tenants: int,
+                  cap: int, max_states: int = 1 << 20) -> dict:
+    """Expected per-tenant violation floor under the cluster cap.
+
+    Enumerates the joint phase space exactly. The state that matters is the
+    *vector of per-tenant needs*, not the vector of phases, and needs take
+    few distinct values, so the enumeration is over `|values|^tenants`
+    rather than `orbit_length^tenants` — 256 rather than 4.3e9 on the
+    published `flash` orbit.
+
+    Returns the coupled floor, the uncoupled one (each tenant served in
+    isolation) and the gap between them, which is exactly the quantity the
+    single-tenant derivation cannot see.
+    """
+    needs = orbit_replica_needs(config, demands)
+    if any(n is None for n in needs):
+        raise ValueError("orbit has an unservable position")
+    values = sorted(set(needs))
+    weight = {v: sum(1 for n in needs if n == v) / len(needs) for v in values}
+    if len(values) ** tenants > max_states:
+        raise ValueError(
+            f"joint enumeration is {len(values)}^{tenants} states; raise "
+            "max_states deliberately or reduce the tenant count")
+
+    # Best achievable violation at a given replica allocation, per need level.
+    # Cached because the inner loop revisits the same (need, allocation) pairs.
+    best: dict[tuple[int, int], float] = {}
+
+    def violation_at(position_need: int, allocated: int) -> float:
+        key = (position_need, allocated)
+        if key in best:
+            return best[key]
+        # Which orbit positions carry this need — they share a demand shape
+        # only up to the need level, so take the worst, which keeps this a
+        # floor rather than an average dressed as one.
+        worst = 0.0
+        for demand, need in zip(demands, needs):
+            if need != position_need:
+                continue
+            local = min(
+                violation_of(config, TenantState(replicas=max(1, allocated),
+                                                 cache_mb=cache_mb, tier=tier),
+                             demand)
+                for cache_mb in CACHE_LEVELS_MB
+                for tier in TIERS
+                if config.knob_admits(cache_mb, tier)
+            )
+            worst = max(worst, local)
+        best[key] = worst
+        return worst
+
+    coupled = uncoupled = 0.0
+    for combo in _product(values, tenants):
+        p = 1.0
+        for v in combo:
+            p *= weight[v]
+        if p == 0.0:
+            continue
+        allocation = fcfs_allocation(list(combo), cap)
+        coupled += p * sum(violation_at(need, got)
+                           for need, got in zip(combo, allocation)) / tenants
+        uncoupled += p * sum(violation_at(need, need) for need in combo) / tenants
+    return {
+        "coupled_violation": coupled,
+        "uncoupled_violation": uncoupled,
+        "gap": coupled - uncoupled,
+        "bind_probability": cap_binding_probability(needs, tenants, cap),
+        "needs": needs,
+        "cap": cap,
+        "tenants": tenants,
+    }
+
+
+def _product(values: list[int], repeat: int):
+    """itertools.product without the import, kept local so this block adds
+    no module-level dependency to a published analysis module."""
+    if repeat == 0:
+        yield ()
+        return
+    for head in values:
+        for rest in _product(values, repeat - 1):
+            yield (head,) + rest
