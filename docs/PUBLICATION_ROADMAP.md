@@ -847,7 +847,7 @@ never "the API passed a pen test".
 | WP1 trace parity | **DONE (session 37, `5c75e8a`)** — split verdict, see below | `RESULTS_TRACE_PARITY.md`; replication PASS bit-for-bit both traces; gate 21/21 |
 | WP13 step 0 | **DONE (session 37, `67a32a5`)** | `RESULTS_SEPARATION.md` registered; 2 of 3 published rows EXACT, mechanism row not reproducible and replaced by a runnable test |
 | WP2 MASTER reconcile | **DONE (session 37)** | Cost/SLO/Fairness scoreboard rows + ablation annotation + 3 disambiguation-table rows updated with the EP/WP1 adjudications; hand-curated only, no generated record touched |
-| **WP15 budget parity** | **NOT STARTED — now the top desk priority** (new, session 38; supersedes the inert β approach) | probe at `f045e68`: β×32 moves excess 0.0005 because `controller.py:647` rejects over-budget candidates *before* the objective; `baselines.py` has no affordability check at all |
+| **WP15 budget parity** | **DONE (session 38, `c6a021f` Azure + `b3cd766` BurstGPT)** — BP-H1 FAIL both traces (cost claim withdrawn), BP-H2 PASS both (typical-window only on BurstGPT) | `RESULTS_BUDGET_PARITY.md`; replication EXACT both traces (504 + 672 rows, 0.00e+00); gate 22/22; 14 pinning tests |
 | WP3 layered fix | NOT STARTED | — |
 | WP4 cells verify/fix | NOT STARTED (claim UNVERIFIED — verify before fixing) | — |
 | WP5 O(N²) memoize | NOT STARTED (profile first) | — |
@@ -895,6 +895,33 @@ with materially worse overshoot. That is publishable and honest, but it is
 an FGCS-shaped story unless B1 (WP8b) and the WP14 soak add live weight.
 **Decide the venue after B1, not now**; nothing here is a reason to soften
 the record.
+
+### Session 38 supersedes the cost condition above (WP15)
+
+**The venue rule's cost condition is no longer met.** It was keyed on TP-H1
+surviving on Azure, but WP15 showed that comparison still carried a third
+confound: only jcac was subject to the per-tenant budget filter. Against
+comparators carrying the controller's own budget rule, **BP-H1 FAILS on
+both traces** (Azure −3.3%/−1.3%, p=0.379/0.91; BurstGPT −50.2%/−49.8%,
+p=0.112/0.191). The comparative cost claim is withdrawn at every level:
+−70%/−42% → −52.2%/−7.1% → **withdrawn**.
+
+What replaces it is stronger against the "you tuned the baseline badly"
+objection and weaker as a headline: a **feasibility** result. At the
+per-tenant cap, tier spend dominates infra spend by three orders of
+magnitude; capping a replica-only arm moves infra −45.7%/−57.4% and tier by
+**exactly 0.00%**. No replica-only reactive controller can satisfy the
+budget under AI load by any scaling decision available to it, so no
+budget-respecting comparator exists in that class. That is an argument from
+the price table, not a benchmark outcome, and it cannot be answered by
+retuning a baseline.
+
+Consequence for the venue rule: the FAIL branch of §5's rule now fires on
+the cost condition. **This does not by itself select FGCS** — the joint
+control feasibility argument plus fairness, forecasting, security and the
+validity methodology are the Transactions case now, and B1 (WP8b) + WP14
+remain the deciding live evidence. Re-read §5's rule with the cost
+condition scored FAIL, and still decide after B1.
 
 **Infrastructure status (session 36):** Docker + WSL2 + kind/helm/k6 all
 working locally; PostgreSQL RLS 3/3 PASS via `./scripts/pg-test-up.sh`; ZAP
