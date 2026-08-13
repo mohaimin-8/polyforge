@@ -21,12 +21,26 @@ THROTTLE_OFFSET_S=${THROTTLE_OFFSET_S:-840}   # T=14min
 THROTTLE_DURATION_S=${THROTTLE_DURATION_S:-60}
 ts() { date -u +%H:%M:%S; }
 
+# k6 detection has to work on both hosts this repo runs on. `pgrep` sees only
+# the POSIX process table, so under Git Bash on Windows it cannot see a native
+# k6.exe -- WP14's first soak attempt (session 38) lost all eight faults to
+# exactly that: k6 ran for hours while four injectors sat waiting for it and
+# then aborted. B2 ran on a Linux Codespace, where pgrep works, so this never
+# surfaced. `tasklist` covers the Windows case; the `//FI` doubles the slash
+# so MSYS does not rewrite the flag into a path.
+k6_running() {
+  pgrep -x k6 >/dev/null 2>&1 && return 0
+  command -v tasklist >/dev/null 2>&1 &&
+    tasklist //FI "IMAGENAME eq k6.exe" 2>/dev/null | grep -qi "k6.exe" && return 0
+  return 1
+}
+
 echo "[inject] waiting for the k6 load window to start..."
 for _ in $(seq 1 480); do
-  pgrep -x k6 >/dev/null 2>&1 && break
+  k6_running && break
   sleep 5
 done
-if ! pgrep -x k6 >/dev/null 2>&1; then
+if ! k6_running; then
   echo "[inject] ERROR: k6 never started within 40min; aborting injector"
   exit 1
 fi
