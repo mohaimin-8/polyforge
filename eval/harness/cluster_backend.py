@@ -295,6 +295,16 @@ export default function () {{
 HELM_EVAL_BASE_VALUES = {
     "postgres.adminURL": "",
     "postgres.appURL": "",
+    # The eval cluster deploys no Redis, and the chart's default
+    # `redis://redis:6379/0` (deploy/helm/polyforge/values.yaml:20) therefore
+    # points at a service that does not resolve. The limiter is documented to
+    # "degrade to the local bucket" on a Redis error -- but the DIAL is what
+    # fails, five attempts behind a DNS timeout, so every rate-limited request
+    # blocks for seconds first. `/healthz` is exempt from the limiter
+    # (test_rate_limit_bypasses_healthz), which is exactly why WP8a's dry-run
+    # saw health checks answer instantly while POST /v1/tenants timed out.
+    # Empty disables Redis, as the chart's own comment says.
+    "redis.url": "",
     "ingress.enabled": "false",
     "rateLimit.requestsPerMinute": "1000000",
     "rateLimit.burst": "100000",
