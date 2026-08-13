@@ -828,3 +828,58 @@ func TestMetricsEndpointExposesRequestAndTelemetryMetrics(t *testing.T) {
 		}
 	}
 }
+
+// TestNullByteInputIsRejectedWith400 pins WP12's finding. The authenticated
+// ZAP scan (session 38) was the first to reach the handlers rather than a
+// wall of 401s, and it found a NUL byte in user input travelling all the way
+// to PostgreSQL, which refused it with SQLSTATE 22021 and surfaced a 500.
+// Nothing leaked and nothing was injectable — the query was parameterised,
+// which is exactly why the driver rejected the value — but malformed input
+// must not be answered with a server-fault status.
+func TestNullByteInputIsRejectedWith400(t *testing.T) {
+	ctx := context.Background()
+	tenantStore := tenant.NewStore()
+	telemetryStore := telemetry.NewStore(100)
+	_, _ = tenantStore.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
+	key, _ := tenantStore.CreateAPIKey(ctx, "alpha", "alpha", tenant.ScopeFull)
+
+	server := httptest.NewServer(NewServer(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		tenantStore, telemetryStore, Config{AdminKey: "admin-test"}).Handler())
+	defer server.Close()
+
+	cases := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{"percent-encoded NUL in a query parameter", http.MethodGet,
+			"/v1/tenants/alpha/projects?limit=50&cursor=%00", ""},
+		{"escaped NUL inside a JSON body", http.MethodPost,
+			"/v1/tenants/alpha/api-keys", `{"name":"a\u0000b","scope":"full"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var body io.Reader
+			if tc.body != "" {
+				body = strings.NewReader(tc.body)
+			}
+			req, err := http.NewRequest(tc.method, server.URL+tc.path, body)
+			if err != nil {
+				t.Fatalf("build request: %v", err)
+			}
+			req.Header.Set("X-PolyForge-API-Key", key.Secret)
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("request: %v", err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400 (a NUL byte is malformed input, "+
+					"not a server fault)", resp.StatusCode)
+			}
+		})
+	}
+}

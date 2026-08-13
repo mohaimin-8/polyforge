@@ -121,14 +121,47 @@ accepted timestamp above. Headers are covered by
 `internal/platform/security_headers_test.go` (success, error and 404 paths)
 so they cannot silently regress.
 
-Known coverage limit, stated rather than hidden: the endpoints answer 401
-without a credential, so this run covers the **unauthenticated** surface.
-Scanning behind auth needs a ZAP context carrying a tenant API key — the
-next increment, and the honest scope of the current result.
+Known coverage limit of the session-36 runs, stated rather than hidden: the
+endpoints answer 401 without a credential, so those runs covered the
+**unauthenticated** surface only. That limit is now closed — see below.
+
+### Authenticated scan (WP12, session 38) — EXECUTED
+
+`./scripts/zap-baseline.sh --auth` runs the OpenAPI-driven scan with a real
+tenant API key injected on every request (ZAP `replacer`, header
+`X-PolyForge-API-Key`), and rewrites `{tenant_id}` to the scanned tenant so
+a key scoped to one tenant does not collect 403s that look like coverage.
+
+**The first authenticated run measured the rate limiter, not the API.** Of
+~3,800 responses, **2,079 were 429**. The scan came back "0 FAIL" against a
+wall of throttling — the same failure mode as the session-36 spider run,
+which "passed" against two 404s. `compose.yaml` now exposes
+`POLYFORGE_RATE_LIMIT_RPM` / `_BURST` (defaults unchanged at 600/60) so a
+scan can be run un-throttled; the re-run reached the handlers for the first
+time — **167×200, 132×201, 127×202** — and immediately found a defect.
 
 | Severity | Finding | Disposition |
 |---|---|---|
-| _pending first run_ | – | – |
+| Medium | **NUL byte in user input reaches PostgreSQL → HTTP 500.** `GET /v1/tenants/{id}/projects?cursor=%00` and a ` ` inside a JSON body both surfaced `invalid byte sequence for encoding "UTF8": 0x00 (SQLSTATE 22021)` as a server fault | **FIXED** — `rejectNullBytes` middleware (URL) + a body check in `readJSON`; both now return 400 `invalid_argument`. Pinned by `TestNullByteInputIsRejectedWith400` |
+| Info | Unix timestamp disclosure (rule 10096, ×1) on `/metrics` | **Accepted** — Prometheus `process_start_time_seconds`; no security value to an attacker |
+
+**What the NUL finding was and was not.** It was *not* injection: the query
+was parameterised, which is precisely why the driver rejected the value
+instead of the database executing it, and nothing leaked — the response was
+the generic `internal_error` envelope with no driver detail. It *was*
+unvalidated input reaching the storage layer, answered with a server-fault
+status: that burns error budget, pages on-call for a client mistake, and
+masks real 500s. NUL is never valid in any identifier, cursor or name this
+API accepts, so it is refused at the edge.
+
+Result after the fix: **0 FAIL, 1 WARN (the accepted timestamp), 118 PASS**,
+with the authenticated surface genuinely exercised.
+
+**Honest scope of the current claim.** "118 rules, 0 FAIL, authenticated and
+unauthenticated surface, one Medium finding found and fixed." Still not a
+full pen test: ZAP's passive+API rules are not an adversary, the scan runs
+one tenant against a single-node dev stack, and no active-attack or
+authenticated-fuzzing campaign has been run.
 
 ## Known gaps (honest list)
 

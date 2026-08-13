@@ -12,6 +12,13 @@ services:
       POLYFORGE_POSTGRES_ADMIN_URL: postgres://polyforge_admin@postgres:5432/polyforge
       POLYFORGE_POSTGRES_APP_URL: postgres://polyforge_app@postgres:5432/polyforge
       POLYFORGE_REDIS_URL: redis://redis:6379/0
+      # Defaults match cmd/control-plane/main.go, so ordinary `up` is
+      # unchanged. Overridable because a security scan is the one client
+      # that must NOT be throttled: WP12's first authenticated ZAP run spent
+      # 2079 of ~3800 responses on 429s, and the resulting "0 FAIL" measured
+      # the rate limiter rather than the API.
+      POLYFORGE_RATE_LIMIT_RPM: ${POLYFORGE_RATE_LIMIT_RPM:-600}
+      POLYFORGE_RATE_LIMIT_BURST: ${POLYFORGE_RATE_LIMIT_BURST:-60}
       # Uncomment to ship traces to the collector (observability profile):
       # POLYFORGE_OTLP_ENDPOINT: otel-collector:4318
     ports:

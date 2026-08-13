@@ -25,9 +25,30 @@ set -eu
 # need a ZAP context with a tenant API key, which is the next increment.
 set -eu
 
+#
+# THIRD MODE (WP12). `--auth` is `--api` plus a credential, and it is the
+# only mode that exercises authenticated behaviour. Without it every real
+# endpoint answers 401 and the passive rules pass against a wall of refusals
+# — which is a true statement about the unauthenticated surface and no
+# statement at all about the API. Never quote a `--api` result as "the API
+# passed a pen test".
+#
+#   POLYFORGE_ZAP_TENANT=zapscan POLYFORGE_ZAP_KEY=pf_live_... \
+#     ./scripts/zap-baseline.sh --auth
+#
+# The credential is injected with ZAP's `replacer` (add-if-absent on every
+# request) rather than through a context + session-management script: the
+# auth is a static API-key header, so a context would add machinery without
+# adding coverage. The spec is rewritten so `{tenant_id}` resolves to the
+# scanned tenant — the key is scoped to one tenant, so leaving ZAP to invent
+# an id would score 403s as if they were the authenticated surface.
+#
 MODE="baseline"
 if [ "${1:-}" = "--api" ]; then
     MODE="api"
+    shift
+elif [ "${1:-}" = "--auth" ]; then
+    MODE="auth"
     shift
 fi
 
@@ -46,7 +67,27 @@ HOSTDIR="$(pwd -W 2>/dev/null || pwd)"
 
 # MSYS_NO_PATHCONV stops Git Bash rewriting the *container-side* path
 # (/zap/wrk) into a Windows path when it crosses the argument boundary.
-if [ "$MODE" = "api" ]; then
+if [ "$MODE" = "auth" ]; then
+    : "${POLYFORGE_ZAP_KEY:?set POLYFORGE_ZAP_KEY to a tenant API key secret (pf_live_...)}"
+    ZAP_TENANT="${POLYFORGE_ZAP_TENANT:-zapscan}"
+    # Pin every {tenant_id} to the scanned tenant. ZAP fills path parameters
+    # from the schema otherwise, and a key scoped to one tenant would then
+    # collect 403s that look like coverage.
+    sed "s|{tenant_id}|${ZAP_TENANT}|g" api/openapi.yaml > artifacts/openapi-auth.yaml
+    MSYS_NO_PATHCONV=1 docker run --rm \
+      --add-host=host.docker.internal:host-gateway \
+      -v "${HOSTDIR}/artifacts:/zap/wrk:rw" \
+      ghcr.io/zaproxy/zaproxy:stable \
+      zap-api-scan.py -t /zap/wrk/openapi-auth.yaml -f openapi \
+      -O "$TARGET" -r zap-auth.html -I \
+      -z "-config replacer.full_list(0).description=pf-api-key \
+          -config replacer.full_list(0).enabled=true \
+          -config replacer.full_list(0).matchtype=REQ_HEADER \
+          -config replacer.full_list(0).matchstr=X-PolyForge-API-Key \
+          -config replacer.full_list(0).regex=false \
+          -config replacer.full_list(0).replacement=${POLYFORGE_ZAP_KEY}"
+    echo "report: artifacts/zap-auth.html (tenant ${ZAP_TENANT})"
+elif [ "$MODE" = "api" ]; then
     # zap-api-scan.py reads the spec and requests every declared path, so
     # coverage comes from the contract rather than from spidering a JSON API
     # that exposes no links. The spec is copied into the mounted dir because

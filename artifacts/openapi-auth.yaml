@@ -1,0 +1,1334 @@
+openapi: 3.1.0
+info:
+  title: PolyForge Control Plane API
+  version: 0.6.0
+  description: Multi-tenant control-plane API for PolyForge research infrastructure.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: /
+    description: Current deployment origin
+paths:
+  /healthz:
+    get:
+      summary: Check service health
+      operationId: health
+      security: []
+      responses:
+        "200":
+          description: Service is healthy.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+            traceparent:
+              $ref: "#/components/headers/TraceParent"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service]
+                properties:
+                  status:
+                    type: string
+                  service:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /metrics:
+    get:
+      summary: Scrape Prometheus-compatible runtime metrics
+      operationId: metrics
+      security: []
+      responses:
+        "200":
+          description: Prometheus text exposition containing request and accepted telemetry metrics.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+            traceparent:
+              $ref: "#/components/headers/TraceParent"
+          content:
+            text/plain:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /.well-known/jwks.json:
+    get:
+      summary: Fetch the JSON Web Key Set for access-token verification
+      operationId: jwks
+      security: []
+      responses:
+        "200":
+          description: RFC 7517 key set containing the current and, after a rotation, previous public signing keys.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+            traceparent:
+              $ref: "#/components/headers/TraceParent"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JWKS"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /v1/auth/token:
+    post:
+      summary: Exchange a tenant API key for an RS256 access/refresh token pair
+      operationId: issueToken
+      security:
+        - TenantAPIKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant_id]
+              additionalProperties: false
+              properties:
+                tenant_id:
+                  $ref: "#/components/schemas/ResourceID"
+      responses:
+        "200":
+          description: Token pair. The access token inherits the API key's scope and expires in 15 minutes.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+            traceparent:
+              $ref: "#/components/headers/TraceParent"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /v1/auth/token/refresh:
+    post:
+      summary: Rotate a refresh token for a new token pair
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              additionalProperties: false
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "200":
+          description: New token pair. Refresh tokens are single-use; the presented token is consumed and replaying it returns 401.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+            traceparent:
+              $ref: "#/components/headers/TraceParent"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /v1/auth/keys/rotate:
+    post:
+      summary: Rotate the JWT signing key
+      operationId: rotateSigningKeys
+      description: Swaps in a fresh signing key without a restart. The previous key remains in the JWKS for verification, so already-issued tokens stay valid until expiry.
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: The updated key set, now listing the new current key first.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+            traceparent:
+              $ref: "#/components/headers/TraceParent"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JWKS"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /v1/tenants:
+    get:
+      summary: List tenants
+      operationId: listTenants
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Tenant list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tenant"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      summary: Create a tenant
+      operationId: createTenant
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTenant"
+      responses:
+        "201":
+          description: Tenant and one-time bootstrap API key.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tenant, bootstrap_api_key]
+                properties:
+                  tenant:
+                    $ref: "#/components/schemas/Tenant"
+                  bootstrap_api_key:
+                    $ref: "#/components/schemas/APIKey"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/tenants/zapscan/isolation:
+    parameters:
+      - $ref: "#/components/parameters/TenantID"
+    post:
+      summary: Promote the tenant's isolation mode
+      description: >
+        Moves the tenant up the isolation ladder (pool -> bridge -> silo).
+        Upward-only: downgrades are rejected with 409 because they weaken
+        the tenant's security posture and require a migration project, not
+        an API call.
+      operationId: promoteTenantIsolation
+      security:
+        - AdminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  type: string
+                  enum: [pool, bridge, silo]
+      responses:
+        "200":
+          description: The tenant after promotion.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/tenants/zapscan/api-keys:
+    parameters:
+      - $ref: "#/components/parameters/TenantID"
+    get:
+      summary: List tenant API-key metadata
+      operationId: listAPIKeys
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      responses:
+        "200":
+          description: API keys, never including plaintext secrets.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/APIKey"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      summary: Create a tenant API key
+      operationId: createAPIKey
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAPIKey"
+      responses:
+        "201":
+          description: New API key. The secret is returned only in this response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKey"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/tenants/zapscan/api-keys/{key_id}:
+    parameters:
+      - $ref: "#/components/parameters/TenantID"
+      - $ref: "#/components/parameters/APIKeyID"
+    delete:
+      summary: Revoke an API key
+      operationId: revokeAPIKey
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      responses:
+        "204":
+          description: API key revoked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/tenants/zapscan/api-keys/{key_id}/rotate:
+    parameters:
+      - $ref: "#/components/parameters/TenantID"
+      - $ref: "#/components/parameters/APIKeyID"
+    post:
+      summary: Atomically rotate an API key
+      operationId: rotateAPIKey
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+      responses:
+        "201":
+          description: Replacement key; the previous key is revoked atomically.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKey"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/tenants/zapscan/projects:
+    parameters:
+      - $ref: "#/components/parameters/TenantID"
+    get:
+      summary: List tenant projects using keyset pagination
+      operationId: listProjects
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      parameters:
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          description: Page of projects belonging only to the authenticated tenant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      summary: Create a tenant project
+      operationId: createProject
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProject"
+      responses:
+        "201":
+          description: Project created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/tenants/zapscan/projects/{project_id}:
+    parameters:
+      - $ref: "#/components/parameters/TenantID"
+      - $ref: "#/components/parameters/ProjectID"
+    get:
+      summary: Get a tenant project
+      operationId: getProject
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      responses:
+        "200":
+          description: Project details.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      summary: Update a tenant project
+      operationId: updateProject
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProject"
+      responses:
+        "200":
+          description: Updated project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      summary: Delete a tenant project
+      operationId: deleteProject
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "204":
+          description: Project deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/telemetry:
+    post:
+      summary: Ingest tenant telemetry
+      operationId: ingestTelemetry
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelemetryEvent"
+      responses:
+        "202":
+          description: Telemetry accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelemetryEvent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/tenants/zapscan/workloads/replay:
+    post:
+      summary: Replay one evaluation workload request
+      description: >-
+        Evaluation data plane (cluster backend): burns CPU proportional to
+        the declared kind's work units so real autoscalers observe genuine
+        load, and records the request's telemetry so eval-export can compute
+        run metrics. Kinds mirror the workload taxonomy of the simulator's
+        work-unit table.
+      operationId: replayWorkload
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind:
+                  type: string
+                  enum: [crud_read, crud_write, batch, embed, chat, agent]
+                run:
+                  type: string
+                  description: Run identifier, echoed back for correlation.
+      responses:
+        "202":
+          description: Request replayed and recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, latency_ms]
+                properties:
+                  kind:
+                    type: string
+                  run:
+                    type: string
+                  latency_ms:
+                    type: number
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/tenants/zapscan/telemetry/features:
+    get:
+      summary: Query aggregated classifier features for a tenant
+      description: >-
+        Aggregates raw telemetry into per-service feature rows over a half-open
+        time window `[since, until)`. This is the feature-query path used to
+        assemble classifier training and online-inference inputs, and the
+        operator's JCAC demand source. Uniquely among tenant-scoped routes it
+        also accepts the platform admin key: the operator reads every managed
+        tenant's features, which no tenant-scoped credential can authorize.
+      operationId: telemetryFeatures
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+        - AdminKey: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - $ref: "#/components/parameters/FeatureService"
+        - $ref: "#/components/parameters/FeatureSince"
+        - $ref: "#/components/parameters/FeatureUntil"
+      responses:
+        "200":
+          description: Aggregated feature rows for the requested window.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelemetryFeatureSet"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/tenants/zapscan/workload-profile:
+    get:
+      summary: Get the current workload profile
+      operationId: workloadProfile
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Current workload classification.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkloadProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/tenants/zapscan/policy-recommendation:
+    get:
+      summary: Get an adaptive policy recommendation
+      operationId: policyRecommendation
+      security:
+        - TenantAPIKey: []
+        - BearerToken: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Current adaptive policy recommendation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyRecommendation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/admin/workloads:
+    get:
+      summary: List every tenant's live workload class (admin)
+      description: >-
+        Snapshot of the online classifier (W27): current label, confidence,
+        and window size per tenant, plus the population PSI drift status.
+        Admin-only — labels reveal cross-tenant behavior.
+      operationId: adminWorkloads
+      security:
+        - AdminKey: []
+      responses:
+        "200":
+          description: Current workload classes and drift status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkloadSnapshot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          description: The online classifier is not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /v1/admin/workloads/zapscan/history:
+    get:
+      summary: Get one tenant's workload label history (admin)
+      operationId: adminWorkloadHistory
+      security:
+        - AdminKey: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: Bounded label history, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkloadHistory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          description: The online classifier is not running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+components:
+  securitySchemes:
+    AdminKey:
+      type: apiKey
+      in: header
+      name: X-PolyForge-Admin-Key
+    TenantAPIKey:
+      type: apiKey
+      in: header
+      name: X-PolyForge-API-Key
+    BearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RS256 access token minted by POST /v1/auth/token; carries the issuing API key's tenant and scope.
+  headers:
+    RequestID:
+      description: Correlation identifier assigned to the request.
+      schema:
+        type: string
+    TraceParent:
+      description: W3C trace-context header. Incoming valid trace IDs are preserved with a new server span ID; invalid or missing values are replaced.
+      schema:
+        type: string
+        pattern: "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: >-
+        Makes the request repeat-safe. A retry carrying the same key and the
+        same body replays the original response (marked with an
+        Idempotency-Replayed: true response header) instead of executing the
+        write again; the same key with a different body executes as a
+        distinct operation. Honored on every mutating endpoint; cached for
+        24 hours; a concurrent duplicate returns 409. 5xx responses are not
+        cached, so failures can be retried with the same key.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+    TenantID:
+      name: tenant_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/ResourceID"
+    ProjectID:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/ResourceID"
+    APIKeyID:
+      name: key_id
+      in: path
+      required: true
+      schema:
+        type: string
+    PageLimit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    PageCursor:
+      name: cursor
+      in: query
+      required: false
+      description: Last project ID returned by the preceding page.
+      schema:
+        type: string
+    FeatureService:
+      name: service
+      in: query
+      required: false
+      description: Restrict aggregation to a single service.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+    FeatureSince:
+      name: since
+      in: query
+      required: false
+      description: >-
+        Inclusive RFC 3339 lower bound. Defaults to 15 minutes before `until`.
+      schema:
+        type: string
+        format: date-time
+    FeatureUntil:
+      name: until
+      in: query
+      required: false
+      description: Exclusive RFC 3339 upper bound. Defaults to the current time.
+      schema:
+        type: string
+        format: date-time
+  responses:
+    BadRequest:
+      description: Request validation failed.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+        traceparent:
+          $ref: "#/components/headers/TraceParent"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Unauthorized:
+      description: Missing or invalid credentials.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+        traceparent:
+          $ref: "#/components/headers/TraceParent"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Forbidden:
+      description: The credential is valid but its scope does not permit this operation.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+        traceparent:
+          $ref: "#/components/headers/TraceParent"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: The tenant-scoped resource was not found.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+        traceparent:
+          $ref: "#/components/headers/TraceParent"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Conflict:
+      description: A resource with the same identifier already exists.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+        traceparent:
+          $ref: "#/components/headers/TraceParent"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    InternalError:
+      description: An internal failure occurred.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+        traceparent:
+          $ref: "#/components/headers/TraceParent"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    RateLimited:
+      description: Requests exceeded the configured per-credential or per-address token bucket.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+        traceparent:
+          $ref: "#/components/headers/TraceParent"
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    ServiceUnavailable:
+      description: Service is not ready.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    TokenPair:
+      type: object
+      required: [access_token, token_type, expires_in, refresh_token]
+      properties:
+        access_token:
+          type: string
+          description: RS256-signed JWT carrying iss, sub, tenant_id, scope, iat, exp, jti.
+        token_type:
+          type: string
+          const: Bearer
+        expires_in:
+          type: integer
+          description: Access-token lifetime in seconds.
+        refresh_token:
+          type: string
+          description: Single-use opaque token; consumed by POST /v1/auth/token/refresh.
+    JWKS:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            type: object
+            required: [kty, use, alg, kid, n, e]
+            properties:
+              kty:
+                type: string
+                const: RSA
+              use:
+                type: string
+                const: sig
+              alg:
+                type: string
+                const: RS256
+              kid:
+                type: string
+              n:
+                type: string
+                description: Base64url-encoded modulus.
+              e:
+                type: string
+                description: Base64url-encoded exponent.
+    ResourceID:
+      type: string
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$"
+    Tenant:
+      type: object
+      required: [id, name, plan, isolation_mode, created_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/ResourceID"
+        name:
+          type: string
+        plan:
+          type: string
+        isolation_mode:
+          type: string
+          enum: [pool, bridge, silo]
+        created_at:
+          type: string
+          format: date-time
+    CreateTenant:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          $ref: "#/components/schemas/ResourceID"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        plan:
+          type: string
+        isolation_mode:
+          type: string
+          enum: [pool, bridge, silo]
+    Project:
+      type: object
+      required: [id, tenant_id, name, created_at, updated_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/ResourceID"
+        tenant_id:
+          $ref: "#/components/schemas/ResourceID"
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ProjectPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
+        next_cursor:
+          type: string
+    CreateProject:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          $ref: "#/components/schemas/ResourceID"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+    UpdateProject:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+    CreateAPIKey:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        scope:
+          type: string
+          enum: [read, full]
+          default: full
+          description: >-
+            read keys may only call read-only endpoints; full keys may also
+            mutate. Scope is fixed for the key's lifetime and preserved by
+            rotation.
+    APIKey:
+      type: object
+      required: [id, tenant_id, name, scope, prefix, created_at]
+      properties:
+        id:
+          type: string
+        tenant_id:
+          $ref: "#/components/schemas/ResourceID"
+        name:
+          type: string
+        scope:
+          type: string
+          enum: [read, full]
+        prefix:
+          type: string
+        secret:
+          type: string
+          description: Returned only when a key is created or rotated.
+        created_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+    TelemetryEvent:
+      type: object
+      additionalProperties: false
+      required: [tenant_id, service]
+      properties:
+        tenant_id:
+          $ref: "#/components/schemas/ResourceID"
+        service:
+          type: string
+          minLength: 1
+          maxLength: 200
+        timestamp:
+          type: string
+          format: date-time
+        rps_window:
+          type: number
+          minimum: 0
+        payload_bytes:
+          type: integer
+          minimum: 0
+        latency_ms:
+          type: number
+          minimum: 0
+        cache_hit:
+          type: boolean
+        embedding_density:
+          type: number
+          minimum: 0
+          maximum: 1
+        model_tier:
+          type: string
+        child_spans:
+          type: integer
+          minimum: 0
+    TelemetryFeatureSet:
+      type: object
+      required: [tenant_id, since, until, items, truncated]
+      properties:
+        tenant_id:
+          $ref: "#/components/schemas/ResourceID"
+        since:
+          type: string
+          format: date-time
+        until:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetryFeatureRow"
+        truncated:
+          type: boolean
+          description: >-
+            True when the window matched more than the 10,000-event cap.
+            Aggregates then cover only the earliest 10,000 events of
+            [since, until), so percentiles and averages describe a prefix of
+            the window, not the window. Narrow the window or filter by
+            service to obtain an untruncated measurement.
+    TelemetryFeatureRow:
+      type: object
+      required:
+        - tenant_id
+        - service
+        - event_count
+        - avg_rps_window
+        - avg_payload_bytes
+        - avg_latency_ms
+        - p95_latency_ms
+        - cache_hit_rate
+        - avg_embedding_density
+        - avg_child_spans
+        - model_tier_counts
+        - first_event_timestamp
+        - last_event_timestamp
+      properties:
+        tenant_id:
+          $ref: "#/components/schemas/ResourceID"
+        service:
+          type: string
+        event_count:
+          type: integer
+          minimum: 0
+        avg_rps_window:
+          type: number
+        avg_payload_bytes:
+          type: number
+        avg_latency_ms:
+          type: number
+        p95_latency_ms:
+          type: number
+        cache_hit_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+        avg_embedding_density:
+          type: number
+        avg_child_spans:
+          type: number
+        model_tier_counts:
+          type: object
+          description: Event count per model tier. Unset tiers are reported as `unknown`.
+          additionalProperties:
+            type: integer
+        first_event_timestamp:
+          type: string
+          format: date-time
+        last_event_timestamp:
+          type: string
+          format: date-time
+    WorkloadProfile:
+      type: object
+      required: [tenant_id, label, confidence, reason]
+      properties:
+        tenant_id:
+          type: string
+        label:
+          type: string
+          enum: [CRUD-bursty, CRUD-steady, AI-cacheable, AI-uncacheable, agentic-multistep, unknown]
+        confidence:
+          type: number
+        reason:
+          type: string
+    WorkloadSnapshot:
+      type: object
+      required: [tenants, drift]
+      properties:
+        tenants:
+          type: array
+          items:
+            $ref: "#/components/schemas/TenantWorkload"
+        drift:
+          $ref: "#/components/schemas/DriftStatus"
+    TenantWorkload:
+      type: object
+      required: [tenant_id, label, confidence, since, observed_at, events_in_window]
+      properties:
+        tenant_id:
+          type: string
+        label:
+          type: string
+          enum: [CRUD-bursty, CRUD-steady, AI-cacheable, AI-uncacheable, agentic-multistep, unknown]
+        confidence:
+          type: number
+        since:
+          type: string
+          format: date-time
+          description: When the current label was first observed.
+        observed_at:
+          type: string
+          format: date-time
+        events_in_window:
+          type: integer
+    DriftStatus:
+      type: object
+      required: [drifted, worst_feature, worst_psi, window_size, checked_at]
+      properties:
+        drifted:
+          type: boolean
+          description: True when any feature's PSI exceeds 0.25 — a retrain is due.
+        worst_feature:
+          type: string
+        worst_psi:
+          type: number
+        window_size:
+          type: integer
+        checked_at:
+          type: string
+          format: date-time
+    WorkloadHistory:
+      type: object
+      required: [tenant_id, samples]
+      properties:
+        tenant_id:
+          type: string
+        samples:
+          type: array
+          items:
+            type: object
+            required: [at, label, confidence]
+            properties:
+              at:
+                type: string
+                format: date-time
+              label:
+                type: string
+              confidence:
+                type: number
+    PolicyRecommendation:
+      type: object
+      required: [tenant_id, workload, replicas, cache_mb, model_tier, fairness_mode, reason]
+      properties:
+        tenant_id:
+          type: string
+        workload:
+          type: string
+        replicas:
+          type: integer
+        cache_mb:
+          type: integer
+        model_tier:
+          type: string
+        fairness_mode:
+          type: string
+        reason:
+          type: string
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            request_id:
+              type: string

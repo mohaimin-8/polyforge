@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -192,7 +193,37 @@ func (s *Server) Handler() http.Handler {
 		handler = s.rateLimit(handler)
 	}
 	handler = securityHeaders(handler)
+	handler = rejectNullBytes(handler)
 	return s.requestLog(handler)
+}
+
+// rejectNullBytes turns a NUL byte in the request line into a 400 instead of
+// a 500. Added session 38 from WP12's authenticated ZAP run, which reached
+// the handlers for the first time and found
+// `GET /v1/tenants/{id}/projects?cursor=%00` returning 500: the byte reached
+// PostgreSQL, which refused it with `invalid byte sequence for encoding
+// "UTF8": 0x00 (SQLSTATE 22021)`.
+//
+// Nothing leaked — the error body is the generic internal_error envelope and
+// the query was parameterised, which is *why* the driver rejected the value
+// instead of the database executing it. The defect is that unvalidated input
+// reached the storage layer at all, and that malformed input was answered
+// with a server-fault status: it burns error budget and hides real faults.
+// NUL is never valid in any identifier, cursor or name this API accepts, so
+// it is refused at the edge rather than defended against per handler.
+func rejectNullBytes(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.ContainsRune(r.URL.Path, 0) || strings.ContainsRune(r.URL.RawQuery, 0) ||
+			strings.Contains(r.URL.RawQuery, "%00") || strings.Contains(r.URL.RawPath, "%00") {
+			writeJSON(w, http.StatusBadRequest, errorEnvelope{Error: apiError{
+				Code:      "invalid_argument",
+				Message:   "request contains a NUL byte",
+				RequestID: requestID(r.Context()),
+			}})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // securityHeaders sets the response headers an API should always carry.
@@ -751,7 +782,19 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	}
 	defer func() { _ = r.Body.Close() }()
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
-	decoder := json.NewDecoder(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	// The URL half of this check lives in rejectNullBytes; this is the body
+	// half, and it needs both spellings. A raw 0x00 is not legal inside a
+	// JSON string so the decoder would reject it anyway, but `\u0000` is
+	// legal JSON and decodes to a real NUL that PostgreSQL then refuses with
+	// SQLSTATE 22021 — a 500 for what is a malformed request (WP12).
+	if bytes.ContainsRune(body, 0) || bytes.Contains(bytes.ToLower(body), []byte(`\u0000`)) {
+		return errors.New("request body contains a NUL byte")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(dst); err != nil {
 		return err
