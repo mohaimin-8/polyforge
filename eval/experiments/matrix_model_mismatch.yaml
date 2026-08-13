@@ -1,0 +1,34 @@
+# PREREG_MODEL_MISMATCH.md (session 38, WP6) — the MPC with a wrong plant.
+# Frozen and pushed before any run.
+#
+# controller.py::_project calls the same evaluate_step the engine scores
+# with, so with realism flags off the controller's model is bit-identical to
+# the plant and every sensitivity campaign moves world and beliefs together
+# (model.py:144-147 says so outright). This is the first campaign in which
+# the controller believes WRONG constants while the world keeps the
+# published ones.
+#
+# One constant wrong at a time, four scales each, plus the 1.0 control and
+# the two WP1 fair comparators:
+#   jcac                    the control (no belief_scale)
+#   jcac_belief_cap*        replica_capacity x {0.5, 0.75, 1.25, 2.0}
+#   jcac_belief_tier*       tier_cost       x {0.5, 0.75, 1.25, 2.0}
+#   jcac_belief_cache*      cache_half      x {0.5, 0.75, 1.25, 2.0}
+#   hpa_fair, keda_fair     the fair-accounting comparators (WP1's standard)
+#
+# Cells mirror ablations.yaml so the mismatch arms are directly comparable
+# with the control cell by cell. New output DB (R1/R4).
+name: matrix_model_mismatch
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, hpa_fair, keda_fair,
+          jcac_belief_cap5, jcac_belief_cap75, jcac_belief_cap125, jcac_belief_cap20,
+          jcac_belief_tier5, jcac_belief_tier75, jcac_belief_tier125, jcac_belief_tier20,
+          jcac_belief_cache5, jcac_belief_cache75, jcac_belief_cache125, jcac_belief_cache20]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [medium]
+output: eval/results/raw_sim_model_mismatch.duckdb
+retries: 2
+timeseries_reps: 0

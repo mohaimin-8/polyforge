@@ -476,4 +476,57 @@ SYSTEMS: dict[str, SystemSpec] = {
         "jcac", gamma=0.0,
         description="PolyForge minus fairness objective (γ=0, no interference term)",
     ),
+    # --- PREREG_MODEL_MISMATCH (WP6): the MPC with a wrong plant ----------
+    # One belief wrong at a time, the world unchanged. `belief_scale` is
+    # applied inside JCACController._project only, so the engine still scores
+    # every arm against the published constants. `jcac` itself is the 1.0
+    # control and is NOT duplicated here.
+    "jcac_belief_cap5": SystemSpec(
+        "jcac", params={"belief_scale": {"replica_capacity": 0.5}},
+        description="PolyForge believing replica_capacity x0.5 (world unchanged)",
+    ),
+    "jcac_belief_cap75": SystemSpec(
+        "jcac", params={"belief_scale": {"replica_capacity": 0.75}},
+        description="PolyForge believing replica_capacity x0.75 (world unchanged)",
+    ),
+    "jcac_belief_cap125": SystemSpec(
+        "jcac", params={"belief_scale": {"replica_capacity": 1.25}},
+        description="PolyForge believing replica_capacity x1.25 (world unchanged)",
+    ),
+    "jcac_belief_cap20": SystemSpec(
+        "jcac", params={"belief_scale": {"replica_capacity": 2.0}},
+        description="PolyForge believing replica_capacity x2.0 (world unchanged)",
+    ),
+    "jcac_belief_tier5": SystemSpec(
+        "jcac", params={"belief_scale": {"tier_cost": 0.5}},
+        description="PolyForge believing tier_cost x0.5 (world unchanged)",
+    ),
+    "jcac_belief_tier75": SystemSpec(
+        "jcac", params={"belief_scale": {"tier_cost": 0.75}},
+        description="PolyForge believing tier_cost x0.75 (world unchanged)",
+    ),
+    "jcac_belief_tier125": SystemSpec(
+        "jcac", params={"belief_scale": {"tier_cost": 1.25}},
+        description="PolyForge believing tier_cost x1.25 (world unchanged)",
+    ),
+    "jcac_belief_tier20": SystemSpec(
+        "jcac", params={"belief_scale": {"tier_cost": 2.0}},
+        description="PolyForge believing tier_cost x2.0 (world unchanged)",
+    ),
+    "jcac_belief_cache5": SystemSpec(
+        "jcac", params={"belief_scale": {"cache_half": 0.5}},
+        description="PolyForge believing cache_half x0.5 (world unchanged)",
+    ),
+    "jcac_belief_cache75": SystemSpec(
+        "jcac", params={"belief_scale": {"cache_half": 0.75}},
+        description="PolyForge believing cache_half x0.75 (world unchanged)",
+    ),
+    "jcac_belief_cache125": SystemSpec(
+        "jcac", params={"belief_scale": {"cache_half": 1.25}},
+        description="PolyForge believing cache_half x1.25 (world unchanged)",
+    ),
+    "jcac_belief_cache20": SystemSpec(
+        "jcac", params={"belief_scale": {"cache_half": 2.0}},
+        description="PolyForge believing cache_half x2.0 (world unchanged)",
+    ),
 }

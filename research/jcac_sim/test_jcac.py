@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import unittest
 
 import baselines
@@ -1401,3 +1402,107 @@ class ProjectionMemoTests(unittest.TestCase):
         self.assertEqual(ctl._project(tid, state,
                                       ctl.forecasts[tid].horizon(ctl.risk_quantile), tag),
                          cached)
+
+
+class BeliefScaleTests(unittest.TestCase):
+    """WP6 / PREREG_MODEL_MISMATCH: the controller may believe wrong
+    constants while the world keeps the published ones.
+
+    `_project` calls the same `evaluate_step` the engine scores with, so with
+    realism flags off the controller's model is bit-identical to the plant
+    and every sensitivity campaign moves world and beliefs together. These
+    pin the three properties that make the decoupling meaningful: None is a
+    no-op, each scale moves the projection the direction it claims, and the
+    scoring path never sees a scale.
+    """
+
+    def _ctl(self, belief=None):
+        configs = {"t": TenantConfig(tenant_id="t")}
+        return JCACController(configs, weights=Weights(),
+                              limits=ClusterLimits(cache_mb=1 << 20, replicas=1000),
+                              belief_scale=belief)
+
+    def _horizon(self, rps=8.0):
+        return [demand({"chat": rps, "crud_read": 20.0})] * 3
+
+    def test_none_takes_the_published_code_path(self):
+        """R4's guarantee, made executable. Not "equals within tolerance" —
+        the published branch must be entered, so the arithmetic is the
+        committed arithmetic to the last bit."""
+        ctl = self._ctl()
+        self.assertIsNone(ctl.belief_scale)
+        state = TenantState(replicas=3, cache_mb=128, tier="small")
+        cost, viol, obj = ctl._project("t", state, self._horizon())
+        # Recompute the published way, independently of the controller.
+        want_cost = want_viol = want_obj = 0.0
+        for d in self._horizon():
+            m = model.evaluate_step(ctl.configs["t"], state, d)
+            want_cost += m.cost_usd
+            want_viol += m.violation
+            want_obj += math.log1p(m.excess)
+        n = 3
+        self.assertEqual(cost, want_cost / n)
+        self.assertEqual(viol, want_viol / n)
+        self.assertEqual(obj, want_obj / n)
+
+    def test_tier_cost_belief_moves_only_the_cost_term(self):
+        """Believing inference is dearer must raise projected spend and leave
+        the SLO terms untouched — otherwise the arm is not one factor."""
+        state = TenantState(replicas=3, cache_mb=128, tier="small")
+        base_c, base_v, base_o = self._ctl()._project("t", state, self._horizon())
+        hi_c, hi_v, hi_o = self._ctl({"tier_cost": 2.0})._project(
+            "t", state, self._horizon())
+        self.assertGreater(hi_c, base_c)
+        self.assertAlmostEqual(hi_v, base_v, places=12)
+        self.assertAlmostEqual(hi_o, base_o, places=12)
+
+    def test_replica_capacity_belief_moves_the_slo_term(self):
+        """Believing a replica is weaker than it is must make the projection
+        pessimistic about the SLO; believing it stronger, optimistic."""
+        # 4 replicas at 20 rps sits in the responsive band: below it the
+        # projection is already at zero overshoot and above it the congestion
+        # term has saturated, so neither end can move and the test would pass
+        # or fail for the wrong reason.
+        state = TenantState(replicas=4, cache_mb=128, tier="small")
+        h = self._horizon(rps=20.0)
+        base = self._ctl()._project("t", state, h)[2]
+        pessimistic = self._ctl({"replica_capacity": 0.5})._project("t", state, h)[2]
+        optimistic = self._ctl({"replica_capacity": 2.0})._project("t", state, h)[2]
+        self.assertGreater(pessimistic, base,
+                           "a weaker-replica belief must project MORE overshoot")
+        self.assertLess(optimistic, base,
+                        "a stronger-replica belief must project LESS overshoot")
+
+    def test_cache_half_belief_moves_the_believed_hit_rate(self):
+        """A smaller believed half-saturation means the controller thinks the
+        same cache absorbs more, so it should project less work and a lower
+        objective."""
+        state = TenantState(replicas=2, cache_mb=256, tier="small")
+        h = self._horizon(rps=40.0)
+        base = self._ctl()._project("t", state, h)[2]
+        generous = self._ctl({"cache_half": 0.25})._project("t", state, h)[2]
+        stingy = self._ctl({"cache_half": 4.0})._project("t", state, h)[2]
+        self.assertLess(generous, base)
+        self.assertGreater(stingy, base)
+
+    def test_the_scoring_path_never_sees_the_belief(self):
+        """The experiment's whole meaning: the world is unchanged. A plan
+        made under a wrong belief must still be SCORED by the true plant, so
+        `evaluate_step` on the chosen state is identical either way."""
+        states = {"t": TenantState(replicas=2, cache_mb=128, tier="small")}
+        demands = {"t": demand({"chat": 20.0, "crud_read": 30.0})}
+        wrong = self._ctl({"tier_cost": 4.0, "replica_capacity": 0.5})
+        plan = wrong.plan(states, demands)["t"]
+        truth = model.evaluate_step(wrong.configs["t"], plan.state, demands["t"])
+        # The controller's own projected cost is the believed one and may
+        # differ; the plant's verdict on the same configuration must not.
+        again = model.evaluate_step(wrong.configs["t"], plan.state, demands["t"])
+        self.assertEqual(truth.cost_usd, again.cost_usd)
+        self.assertEqual(truth.violation, again.violation)
+        self.assertGreater(plan.projected_cost_usd, 0.0)
+
+    def test_unknown_or_nonpositive_keys_fail_loudly(self):
+        with self.assertRaises(ValueError):
+            self._ctl({"tier_price": 1.5})
+        with self.assertRaises(ValueError):
+            self._ctl({"tier_cost": 0.0})

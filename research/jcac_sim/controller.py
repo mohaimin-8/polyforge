@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import math
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import model
 from model import (
@@ -367,8 +367,36 @@ class JCACController:
         carbon_weight: float = 0.0,
         tenant_order_seed: int | None = None,
         enforce_budget: bool = True,
+        belief_scale: dict | None = None,
     ):
         self.configs = configs
+        # PREREG_MODEL_MISMATCH (WP6): let the controller believe *wrong*
+        # constants while the world keeps the published ones.
+        #
+        # `_project` calls the same `evaluate_step` the engine scores with, so
+        # with realism flags off the controller's model is bit-identical to
+        # the plant and every sensitivity campaign moves world and beliefs
+        # together (`model.set_economy` says so in as many words). For an MPC
+        # paper "what happens when the model is wrong?" is the first
+        # structural question a reviewer asks, and no experiment answered it.
+        #
+        # Keys, each a multiplier on what the controller BELIEVES:
+        #   replica_capacity  0.8 = "a replica delivers 80% of true capacity"
+        #   tier_cost         1.5 = "inference costs 50% more than it does"
+        #   cache_half        0.5 = "the cache saturates twice as fast"
+        #
+        # None (the default) takes the published code path verbatim -- not an
+        # equivalent one -- so every committed campaign replays bit-for-bit
+        # (R4). The scales are applied ONLY inside `_project`; the scoring
+        # path never sees them, which is the whole point of the experiment.
+        self.belief_scale = dict(belief_scale) if belief_scale else None
+        if self.belief_scale:
+            unknown = set(self.belief_scale) - {"replica_capacity", "tier_cost",
+                                                "cache_half"}
+            if unknown:
+                raise ValueError(f"unknown belief_scale keys: {sorted(unknown)}")
+            if any(v <= 0.0 for v in self.belief_scale.values()):
+                raise ValueError("belief_scale values must be positive")
         # M4 / T18: price the plan's carbon alongside its dollars. 0.0 (the
         # default) leaves the objective untouched — the term is guarded, not
         # multiplied by zero, so the published campaigns replay bit-for-bit.
@@ -498,8 +526,23 @@ class JCACController:
         rps/scale on nominal capacity equals planning for rps on
         scale-degraded capacity."""
         scale = self.capacity_scale.get(tid, 1.0)
-        if scale >= 1.0:
-            return demand
+        if self.belief_scale is None:
+            # Published guard, unchanged: `capacity_scale` is a degradation
+            # correction and is never above 1.0, so >= 1.0 means "nothing to
+            # correct". A belief CAN exceed 1.0 (an over-optimistic
+            # controller), which is why the belief branch tests != instead.
+            if scale >= 1.0:
+                return demand
+        else:
+            # PREREG_MODEL_MISMATCH: a `replica_capacity` belief of b says
+            # "a replica delivers b times the capacity it really does".
+            # Planning for demand d against capacity b*C is identical to
+            # planning for d/b against C, which is the transform this method
+            # already performs — so the two compose by multiplication rather
+            # than needing a second mechanism.
+            scale *= self.belief_scale.get("replica_capacity", 1.0)
+            if scale == 1.0:
+                return demand
         return Demand(
             rps={k: v / scale for k, v in demand.rps.items()},
             crud_base_ms=demand.crud_base_ms,
@@ -576,15 +619,51 @@ class JCACController:
         if hit is not None:
             return hit
         cost = violation = obj = 0.0
-        for demand in horizon:
-            m = evaluate_step(self.configs[tid], state, self._planning_demand(tid, demand))
-            cost += m.cost_usd
-            violation += m.violation
-            obj += math.log1p(m.excess)
+        if self.belief_scale is None:
+            # The published path, verbatim. Deliberately not folded into the
+            # belief branch with neutral multipliers: `cost_usd` and
+            # `cost_infra + cost_tier` are equal in real arithmetic but need
+            # not be equal in floating point, and R4 is a byte-identity gate.
+            for demand in horizon:
+                m = evaluate_step(self.configs[tid], state,
+                                  self._planning_demand(tid, demand))
+                cost += m.cost_usd
+                violation += m.violation
+                obj += math.log1p(m.excess)
+        else:
+            believed = self._believed_state(state)
+            tier_belief = self.belief_scale.get("tier_cost", 1.0)
+            for demand in horizon:
+                m = evaluate_step(self.configs[tid], believed,
+                                  self._planning_demand(tid, demand))
+                cost += m.cost_infra_usd + tier_belief * m.cost_tier_usd
+                violation += m.violation
+                obj += math.log1p(m.excess)
         n = max(1, len(horizon))
         out = (cost / n, violation / n, obj / n)
         self._project_memo[key] = out
         return out
+
+    def _believed_state(self, state: TenantState) -> TenantState:
+        """The configuration the projection *thinks* it is evaluating.
+
+        `cache_half` is a belief about how fast the hit-rate curve saturates:
+        `hit_rate(c) = HMAX * c / (c + CACHE_HALF_MB)`, so believing a half
+        of `b * CACHE_HALF_MB` is exactly evaluating the true curve at `c / b`.
+        Re-scaling the believed cache size rather than the module constant
+        keeps the world untouched — mutating `model.CACHE_HALF_MB` would move
+        the plant too, which is the confound this experiment exists to break.
+
+        The one impurity, stated rather than hidden: a scaled cache size also
+        scales the *memory* cost the projection believes it pays. That term is
+        `MEM_COST_USD_GB_HR = 0.005`, i.e. $1.8e-6 per step at 128 MB against
+        a $0.0139 per-step budget and ~$0.031 of tier spend — five orders of
+        magnitude below the quantities any hypothesis reads.
+        """
+        half = self.belief_scale.get("cache_half", 1.0)
+        if half == 1.0:
+            return state
+        return replace(state, cache_mb=max(0, int(round(state.cache_mb / half))))
 
     def _project_carbon(self, tid: str, state: TenantState, horizon: list[Demand]) -> float:
         """Horizon-mean carbon in grams. Kept separate from `_project` so the
