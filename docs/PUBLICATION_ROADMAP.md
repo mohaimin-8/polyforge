@@ -855,7 +855,7 @@ never "the API passed a pen test".
 | WP7 push | **DONE (session 37, 2026-08-11)** | 26 commits pushed to `origin/v-series-validity-remediation`; permanent anchor disclosure for the two session-35 preregs recorded in `REMAINING_WORK.md` §Session 37 |
 | **WP8a dry-run** | **DONE (session 38)** — ran against a real apiserver; found `replica-only` rendering CRs **byte-identical to `jcac`'s** | `eval/scripts/live_actuation_dryrun.py`; 4/4 arms admit, both CEL bound rules fire on negative tests, pin now declared for all four arms; no measurement affected (WP8b never ran, and the pin was already enforced by `planner.enabled=false`); 2 `TestWave4ArmPins` tests; gate 23/23 |
 | WP8b B1 scored | WAITING ON USER (GPU gate) | prereqs landed session 35; cluster half now runnable locally |
-| WP12 authenticated ZAP | NOT STARTED (small) | unauth surface done: 118 PASS / 0 FAIL |
+| WP12 authenticated ZAP | **DONE (session 38)** — found the scan was measuring the rate limiter, then found a **Medium** defect once it wasn't | `./scripts/zap-baseline.sh --auth`; first run 2079/3800 responses were 429; un-throttled re-run reached handlers (167×200/132×201/127×202) and found NUL→PostgreSQL→500 on two paths; fixed at the edge, re-scan 0 FAIL / 1 accepted WARN / 118 PASS; `docs/SECURITY.md` updated |
 | **WP13 MT separation** | NOT STARTED (new, session 37 — Transactions theory strengthener) | machinery: `guarantee.py`; open item named in M3 close-out |
 | **WP14 live CRUD soak** | NOT STARTED (new, session 37 — needs WP8a first, Docker started, laptop kept awake 12–24 h) | harness proven in B2/B3; GPU not required |
 | WP9–11 | user-owned; **WP9 waits on WP1's record (venue decision rule, §5)** | — |
