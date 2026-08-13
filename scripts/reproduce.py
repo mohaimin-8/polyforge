@@ -93,6 +93,13 @@ CAMPAIGN_RECORDS = [
     # not absorbing. Reads its own campaign DB, falling back to the committed
     # export, so a clean clone rebuilds it like every other record.
     ("analysis_layered_fix.py", [], "RESULTS_LAYERED_FIX.md"),
+    # WP13: the coupled floor. Its V2 check FALSIFIED the first construction
+    # and the record says so; it is gated anyway, because a falsified
+    # derivation that cannot be regenerated is worse than no record at all.
+    ("analysis_separation_mt.py", [], "RESULTS_SEPARATION_MT.md"),
+    # WP6: the MPC with a wrong plant. The belief arms read their own
+    # campaign DB, falling back to the committed export like every other.
+    ("analysis_model_mismatch.py", [], "RESULTS_MODEL_MISMATCH.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",

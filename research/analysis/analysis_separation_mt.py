@@ -211,9 +211,47 @@ def main() -> None:
              f"floor of {floor:.6f}. Per the pre-stated reading the "
              "derivation is FALSIFIED and is reported as such, not "
              "adjusted.\n"))
+        if not v2:
+            w("\n#### Diagnosis — where the derivation is wrong\n")
+            w("The falsification is informative rather than merely "
+              "disappointing, and the cause is in the **allocation rule**, "
+              "not in the demand model. Checked, so it is not a guess: the "
+              "need vector derived from the hand-built orbit and the one "
+              "derived from `workloads.build('flash_crud', 'uniform', "
+              "'small')` have the identical composition — five positions at "
+              "the peak of 6, eleven at 1, differing only by phase — so the "
+              "aggregate distribution above is right.\n")
+            w("`fcfs_allocation` hands each tenant `min(need, remaining)` "
+              "**from zero**, so under contention a late tenant can be "
+              "allocated nothing and is scored at one replica. The simulator "
+              "does not do that. `controller._best_for_tenant` filters "
+              "candidates with `others_replicas + candidate.replicas > "
+              "limits.replicas` and the tenant simply **keeps the state it "
+              "already holds**, moving by at most ±2 per interval. A starved "
+              "tenant therefore retains its previous replicas rather than "
+              "collapsing to the floor.\n")
+            w("So this construction models a strictly more punitive cluster "
+              "than the one being measured, and over-estimates the "
+              "unavoidable violation. That is exactly the failure V2 was "
+              "written to catch, and it caught it.\n")
+            w("**Not fixed here, deliberately.** The pre-stated reading says "
+              "a falsified derivation is reported, not adjusted — the whole "
+              "point of writing the reading down first. The corrected "
+              "construction is a *new* derivation over the incremental "
+              "allocation the planner actually performs, and it needs its own "
+              "reading stated before it runs. It is named as the next step "
+              "rather than smuggled into this record.\n")
 
     # --- V3 -----------------------------------------------------------------
     w("\n### V3 — does it bite? (pre-stated: describes, never gates)\n")
+    if v2 is False:
+        w("**Read this only as a statement about the (falsified) "
+          "construction above.** V2 rejected the derivation, so the gap below "
+          "describes how far an over-punitive allocation rule moved the "
+          "floor — not how hard the real coupling bites. The honest summary "
+          "of this record: the machinery for an exact coupled floor works and "
+          "V1 validates it, the *allocation model inside it* is wrong, and "
+          "the corrected version has not been run.\n")
     if coupled["gap"] > 0:
         w(f"The coupled floor is **{coupled['gap']:.6f}** above the uncoupled "
           "one. The single-tenant derivation reports a floor of "
