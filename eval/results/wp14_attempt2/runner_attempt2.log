@@ -1,0 +1,15 @@
+experiment=live_soak backend=cluster total=1 already-valid=0 pending=1 db=C:\Users\DARKR\Documents\Thesis Project\polyforge\eval\results\live_soak.duckdb
+  [1/1] not-valid=1 (86607s elapsed)
+{
+  "experiment": "live_soak",
+  "expected_runs": 1,
+  "valid_runs": 0,
+  "failed_runs": 1,
+  "duplicate_run_ids": 0,
+  "orphan_metrics": 0,
+  "valid_without_metrics": 0,
+  "distinct_backends": 1,
+  "distinct_harness_versions": 1,
+  "null_metrics": 0,
+  "ok": false
+}

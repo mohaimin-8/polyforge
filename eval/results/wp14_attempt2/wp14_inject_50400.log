@@ -1,0 +1,34 @@
+[inject] waiting for the k6 load window to start...
+[inject] k6 load started at 10:49:51 (T0=1786618191)
+[inject] === FAULT 1 planner-crash at 00:49:53 (T+50400s) ===
+[inject] NAME                                          READY   STATUS    RESTARTS      AGE   IP            NODE                     NOMINATED NODE   READINESS GATES
+[inject] polyforge-control-plane-64554f8d96-4s4nd      1/1     Running   0             14h   10.244.2.12   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-55qrg      1/1     Running   0             14h   10.244.2.14   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-7d9bt      1/1     Running   0             14h   10.244.3.9    polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-8fnvq      1/1     Running   0             14h   10.244.2.10   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-9xrrc      1/1     Running   0             14h   10.244.3.8    polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-bnbg9      1/1     Running   0             14h   10.244.2.11   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-c7r9h      1/1     Running   0             14h   10.244.1.13   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-c9hll      1/1     Running   0             14h   10.244.3.10   polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-flq9h      1/1     Running   0             14h   10.244.3.4    polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-ft7zr      1/1     Running   0             14h   10.244.1.10   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-n2hjx      1/1     Running   1 (13h ago)   14h   10.244.1.9    polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-nx57f      1/1     Running   0             14h   10.244.3.11   polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-p9l8l      1/1     Running   0             14h   10.244.3.6    polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-rqqz5      1/1     Running   1 (13h ago)   14h   10.244.1.11   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-tbcfp      1/1     Running   0             14h   10.244.1.12   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-wc5mt      1/1     Running   0             14h   10.244.2.13   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-operator-7889d4586b-ztxsf           1/1     Running   0             14h   10.244.1.8    polyforge-eval-worker    <none>           <none>
+[inject] polyforge-operator-planner-697c74cf95-l6szj   1/1     Running   0             6h    10.244.2.15   polyforge-eval-worker3   <none>           <none>
+[inject] postgres-f557b6fb6-mrlnt                      1/1     Running   0             14h   10.244.3.2    polyforge-eval-worker2   <none>           <none>
+[inject] deleting planner pod(s): pod/polyforge-operator-planner-697c74cf95-l6szj
+[inject] pod "polyforge-operator-planner-697c74cf95-l6szj" deleted from polyforge namespace
+[inject] === FAULT 2 apiserver-throttle at 03:49:51 (T+61200s) ===
+[inject] throttling ServiceAccount polyforge/polyforge-operator for 60s
+[inject] prioritylevelconfiguration.flowcontrol.apiserver.k8s.io/pf-chaos-throttle created
+[inject] flowschema.flowcontrol.apiserver.k8s.io/pf-chaos-throttle created
+[inject] APF throttle applied; holding 60s
+[inject] flowschema.flowcontrol.apiserver.k8s.io "pf-chaos-throttle" deleted
+[inject] prioritylevelconfiguration.flowcontrol.apiserver.k8s.io "pf-chaos-throttle" deleted
+[inject] throttle cleared at 03:50:52
+[inject] DONE at 03:50:52
