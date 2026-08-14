@@ -682,7 +682,7 @@ duration**: `powercfg /change standby-timeout-ac 0` before, restore after
 (record the prior value first: `powercfg /query SCHEME_CURRENT SUB_SLEEP`).
 Free disk ≥ 10 GB for metrics + PG.
 
-**Steps.**
+**Steps (original design, frozen under `PREREG_LIVE_SOAK.md`).**
 1. Freeze `PREREG_LIVE_SOAK.md` (§0.2 template), commit AND PUSH before the
    run (R1/R2 — this scores new live measurement). Design shape (exact
    margins frozen by the implementer FROM committed B2/B3 values in
@@ -710,13 +710,113 @@ Free disk ≥ 10 GB for metrics + PG.
 4. Export csv.gz, `analysis_live_soak.py` → `RESULTS_LIVE_SOAK.md` via
    `record_path()`, register in `reproduce.py`, §0.3 checklist.
 
+**Attempt log (session 38).**
+
+| # | Duration | Outcome | Cause |
+|---|---|---|---|
+| 1 | voided at 2h45m | no fault ever fired | `chaos_inject.sh` used `pgrep -x k6`, which cannot see a native `k6.exe` under Git Bash on Windows — the injectors waited 40 min and aborted while k6 ran the whole time. **Fixed**: `k6_running()` helper falls back to `tasklist //FI "IMAGENAME eq k6.exe"`, verified against the live process before relaunch. |
+| 2 | completed the full 24 h (86,607 s) | **INVALID — SK-H4 FAILS** | `check_k6_delivery` (the harness's own post-hoc validity gate) found k6 reported **36.4% failed requests**, far past its 1% threshold. **Zero metrics rows were recorded** — the run is unscoreable, not merely weak. |
+
+Attempt 2's fault-injection mechanism itself worked — 7 of 8 injected faults
+showed verified pod-level recovery (0 restarts, all 8 policies re-applied,
+checked live against the cluster at each occurrence and logged in
+`C:\Users\DARKR\AppData\Local\Temp\wp14_FAULT_JOURNAL.md`; fault 8 was
+injected with no observed perturbation and is disclosed as such, not padded
+into an eighth recovery). That evidence is real but sits inside a run whose
+quantitative hypotheses (SK-H2, SK-H3, and SK-H1's frozen metric-based form)
+cannot be scored, because the traffic that would have produced
+`mean_violation`/`crud_p95` never landed for over a third of requests.
+
+**Root-cause lead, not yet confirmed.** Two of the sixteen `control-plane`
+pods (`n2hjx`, `rqqz5`) show exactly one restart each, first observed
+"7h59m ago" in a log captured at the fault-5 event (~06:50) — i.e. a restart
+at ≈16:51, about one minute after T0. `kubectl port-forward service/X`
+resolves to **one specific pod** at the moment it starts and does not follow
+the Service if that pod is replaced; the harness spawns it once
+(`cluster_backend.execute`, `subprocess.Popen`, output to `DEVNULL`) and
+never checks or restarts it for the life of a run. If the forward happened
+to pin to one of these two pods, that is a real mechanism for sustained
+failure — though a single dead pinned pod for 24 h would read closer to
+100% than 36.4%, so it likely is not the whole story. The k6 summary that
+would show *when* the failures accumulated was written to a
+`tempfile.TemporaryDirectory` and deleted on exit, so this run cannot be
+diagnosed further after the fact — fixing that is step 1 below.
+
+**Attempt 3 — hardening plan (session 38).** 24 h stays the target: it is
+the reason this WP exists for a Transactions pitch, not a number to shave
+down after two failed sittings. The plan hardens *reliability*, not scope.
+
+1. **Persist the delivery evidence (~10 min).** Copy `k6-summary.json` out
+   of the run's temp workdir before it is deleted (`cluster_backend.execute`
+   currently uses `tempfile.TemporaryDirectory`, which self-cleans). Also
+   log which pod IP/name the port-forward actually resolved to at start
+   (`kubectl get endpoints polyforge-control-plane`). Without this, a third
+   failure is diagnosed by guesswork again.
+2. **Self-healing port-forward (~30–45 min).** Wrap the port-forward in a
+   supervisor thread, mirroring the existing `ReplicaSampler` pattern
+   already in `cluster_backend.py`: poll `/healthz` through the forwarded
+   port every 30 s; on failure or on the subprocess exiting, kill and
+   respawn `kubectl port-forward`, re-verify health, and log every restart
+   with a timestamp and reason into the now-persisted workdir. This is the
+   direct fix for the root-cause lead above, and removes the single biggest
+   structural fragility in routing 24 h of traffic through one unsupervised
+   `Popen`.
+3. **Independent early-warning probe (~10 min, session-side only, no repo
+   change).** Extend the read-only soak watcher (scratchpad, outside the
+   repo, self-terminating — see the WP14 execution log) to curl the same
+   local port every 5 minutes and tally consecutive failures. Purpose:
+   attempt 2 was diagnosed as invalid only at hour 24. A doomed attempt 3
+   should be visible inside the first hour, so it can be stopped and fixed
+   forward instead of run to completion a third time.
+4. **De-risk the fix before spending another 24 h (~30 min).** Short
+   (20–30 min) live smoke test of the hardened harness, mirroring WP8a's own
+   "prove the plumbing before trusting it" discipline. During it,
+   deliberately delete the specific control-plane pod the port-forward
+   resolved to (a targeted probe of the fix, distinct from the soak's own
+   frozen fault schedule) and confirm the supervisor detects and reconnects
+   it, with the delivery probe showing a clean (or near-1%) failure rate
+   across the window.
+5. **Write up attempt 2 as `RESULTS_LIVE_SOAK.md` (~20 min), before any
+   retry.** Per the prereg's own outcome-handling rule, a FAIL is the
+   headline of the record, not something quietly re-run past: SK-H4 FAIL
+   stated plainly with the 36.4% figure; SK-H1's frozen metric-based test
+   marked **unscoreable** (no metrics exist), with the qualitative
+   pod-level fault-journal evidence disclosed alongside it as an
+   *operational* observation, not a scored pass; SK-H2/SK-H3 marked
+   unscoreable for the same reason.
+6. **Freeze `PREREG_LIVE_SOAK_V2.md` (~20 min), ONE changed factor.** Commit
+   AND PUSH before any run (R1/R2), same rule as every other WP this
+   session. The one change: the delivery path is now self-healing
+   (steps 2–3) instead of unsupervised. Duration (24 h target / 12 h
+   minimum), cell, fault schedule and offsets, hypotheses SK-H1–H4 and their
+   margins all carry over from `PREREG_LIVE_SOAK.md` unchanged — mirrors the
+   RB-H1 follow-up pattern (session 30) named in the original prereg.
+7. **Confirm with the user before starting the clock.** Another full 24 h
+   is another day of the user's laptop kept awake with Docker open; restate
+   the constraints and get an explicit go-ahead, exactly as attempt 1 did —
+   do not silently relaunch a day-long commitment.
+8. **Run attempt 3.** Same live-reporting cadence proven across attempt 2
+   (30-min heartbeat + immediate fault events, verified against the cluster
+   rather than trusted from logs alone), plus the new delivery early-warning
+   layer from step 3.
+9. **On completion:** confirm `check_k6_delivery` PASSES this time (the
+   actual gate being cleared); export `metrics_live_soak.csv.gz`; finalize
+   `analysis_live_soak.py` → `RESULTS_LIVE_SOAK.md` scoring all four
+   hypotheses against real metrics; register in `reproduce.py`; run the
+   byte-identity gate; restore power settings
+   (`docs/WP14_SOAK_RESTORE.md` has the exact prior values); stop and
+   delete the scratchpad watcher.
+
 **Contingencies.** Instability surfacing mid-soak (planner leak, operator
 crash-loop, PG exhaustion) **is the finding, not a nuisance**: report it,
 fix forward, and re-sit under a NEW small prereg (one changed factor),
-mirroring the RB-H1 follow-up pattern. Never truncate or splice the record.
-If Docker cannot hold `medium` for 24 h, drop to `small` and disclose —
-duration outranks width for this WP's purpose. **Effort:** ~half day desk +
-12–24 h unattended wall-clock.
+mirroring the RB-H1 follow-up pattern — attempt 3's plan above IS this
+clause being exercised, not a departure from it. Never truncate or splice
+the record. If Docker cannot hold `medium` for 24 h, drop to `small` and
+disclose — duration outranks width for cluster *sizing*; it does not license
+shrinking the 24 h *target* itself, which is what attempt 3 exists to reach
+reliably. **Effort:** ~2–2.5 h desk work (steps 1–7) + ~30 min smoke test +
+12–24 h unattended wall-clock for attempt 3 itself.
 
 ---
 
@@ -857,7 +957,7 @@ never "the API passed a pen test".
 | WP8b B1 scored | WAITING ON USER (GPU gate) | prereqs landed session 35; cluster half now runnable locally |
 | WP12 authenticated ZAP | **DONE (session 38)** — found the scan was measuring the rate limiter, then found a **Medium** defect once it wasn't | `./scripts/zap-baseline.sh --auth`; first run 2079/3800 responses were 429; un-throttled re-run reached handlers (167×200/132×201/127×202) and found NUL→PostgreSQL→500 on two paths; fixed at the edge, re-scan 0 FAIL / 1 accepted WARN / 118 PASS; `docs/SECURITY.md` updated |
 | **WP13 MT separation** | **step 1 DONE; the derivation itself is FALSIFIED and reported as such** | `RESULTS_SEPARATION_MT.md`: the coupling is exactly computable (cap binds **21.7%** of steps, convolution not inequality) and V1 soundness PASSES — but the pre-stated **V2 FAILED** (`keda` measured 0.001886 against a derived floor of 0.036487). Cause: `fcfs_allocation` starves from zero while the planner *retains previous state*. NOT patched; the corrected construction needs its own stated reading |
-| **WP14 live CRUD soak** | **UNBLOCKED — ready to run** (prereg `PREREG_LIVE_SOAK.md` frozen; needs the machine awake 12–24 h) | WP8a actuation half now PASSES 1/1 after two harness fixes (UTF-8 decode; eval `redis.url` blanked — the chart pointed at an absent Redis and the limiter's slow dial hung every write while `/healthz` stayed exempt). Live `crud_p99` 8.0071 ms vs B2's 8.0072 |
+| **WP14 live CRUD soak** | **Attempt 2 INVALID (SK-H4 FAIL)** — hardening plan for attempt 3 written, needs the delivery-path fix + a new machine-awake 24 h sitting | Attempt 1 voided (`pgrep` couldn't see Windows k6, fixed). Attempt 2 ran the full 24 h, 7/8 faults verified recovering unaided, but `check_k6_delivery` found **36.4% failed requests** — 0 metrics recorded, unscoreable. Root-cause lead: 2/16 control-plane pods restarted at T+1min; the port-forward pins to one pod and never reconnects. See WP14 §Attempt log / §Attempt 3 above for the full plan (self-healing port-forward, persisted k6 summary, smoke test, `PREREG_LIVE_SOAK_V2.md`) |
 | WP9–11 | user-owned; **WP9 waits on WP1's record (venue decision rule, §5)** | — |
 
 ### WP1's verdict and what the venue rule now says (session 37)
