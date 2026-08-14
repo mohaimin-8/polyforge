@@ -720,7 +720,10 @@ Free disk ≥ 10 GB for metrics + PG.
 Attempt 2's fault-injection mechanism itself worked — 7 of 8 injected faults
 showed verified pod-level recovery (0 restarts, all 8 policies re-applied,
 checked live against the cluster at each occurrence and logged in
-`C:\Users\DARKR\AppData\Local\Temp\wp14_FAULT_JOURNAL.md`; fault 8 was
+`eval/results/wp14_attempt2/FAULT_JOURNAL.md` — committed, after the user
+caught that the journal was first written to `%LOCALAPPDATA%\Temp`, the same
+class of self-cleaning location that lost the k6 summary; the injector logs
+and runner verdict are preserved alongside it in the same directory; fault 8 was
 injected with no observed perturbation and is disclosed as such, not padded
 into an eighth recovery). That evidence is real but sits inside a run whose
 quantitative hypotheses (SK-H2, SK-H3, and SK-H1's frozen metric-based form)
@@ -761,13 +764,20 @@ down after two failed sittings. The plan hardens *reliability*, not scope.
    direct fix for the root-cause lead above, and removes the single biggest
    structural fragility in routing 24 h of traffic through one unsupervised
    `Popen`.
-3. **Independent early-warning probe (~10 min, session-side only, no repo
-   change).** Extend the read-only soak watcher (scratchpad, outside the
-   repo, self-terminating — see the WP14 execution log) to curl the same
-   local port every 5 minutes and tally consecutive failures. Purpose:
-   attempt 2 was diagnosed as invalid only at hour 24. A doomed attempt 3
-   should be visible inside the first hour, so it can be stopped and fixed
-   forward instead of run to completion a third time.
+3. **Independent early-warning probe (~10 min).** Extend the read-only soak
+   watcher (the script itself stays in the session scratchpad,
+   self-terminating) to curl the same local port every 5 minutes and tally
+   consecutive failures — **with its probe log written under
+   `eval/results/wp14_attempt3/`, never `%TEMP%`**. That is the attempt-2
+   lesson twice over: the harness lost its k6 summary to a self-deleting
+   temp dir, and the session fault journal nearly repeated it in
+   `%LOCALAPPDATA%\Temp` until it was moved and committed
+   (`eval/results/wp14_attempt2/`). All attempt-3 evidence — probe log,
+   fault journal, port-forward supervisor log, k6 summary — lands in that
+   repo directory from the start. Purpose: attempt 2 was diagnosed as
+   invalid only at hour 24. A doomed attempt 3 should be visible inside the
+   first hour, so it can be stopped and fixed forward instead of run to
+   completion a third time.
 4. **De-risk the fix before spending another 24 h (~30 min).** Short
    (20–30 min) live smoke test of the hardened harness, mirroring WP8a's own
    "prove the plumbing before trusting it" discipline. During it,
