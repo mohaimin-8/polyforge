@@ -1260,3 +1260,4 @@ Appended by the runner every progress tick.
 | 2026-08-13 07:37 | live_dryrun | 1/1 | 1 | 17 runs/h |
 | 2026-08-13 07:50 | live_dryrun | 1/1 | 0 | 14 runs/h |
 | 2026-08-16 16:47 | live_smoke_pf | 1/1 | 1 | 3 runs/h |
+| 2026-08-16 17:58 | live_smoke_pf | 1/1 | 0 | 3 runs/h |

@@ -1,0 +1,15 @@
+experiment=live_smoke_pf backend=cluster total=1 already-valid=0 pending=1 db=C:\Users\DARKR\Documents\Thesis Project\polyforge\eval\results\live_smoke_pf.duckdb
+  [1/1] not-valid=0 (1058s elapsed)
+{
+  "experiment": "live_smoke_pf",
+  "expected_runs": 1,
+  "valid_runs": 1,
+  "failed_runs": 0,
+  "duplicate_run_ids": 0,
+  "orphan_metrics": 0,
+  "valid_without_metrics": 0,
+  "distinct_backends": 1,
+  "distinct_harness_versions": 1,
+  "null_metrics": 0,
+  "ok": true
+}

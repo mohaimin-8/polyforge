@@ -103,10 +103,43 @@ non-scored, its own output DB; evidence in
 `eval/results/live_smoke_pf_evidence/`). A 15-minute live run on `small`,
 with the delivery path deliberately broken mid-load:
 
+**Smoke run 1** (supervisor under deliberate attack):
+
 | test | result |
 |---|---|
 | Kill the `kubectl port-forward` process outright | **RESTART #1 logged 6 s later** (`process exited`), new forward spawned, delivery returned `200` — one failed probe total |
 | Delete 3 control-plane pods mid-load (endpoint churn) | delivery held `200` across 6 consecutive probes; the forward was not pinned to those pods, so the supervisor was not exercised |
+| Gate outcome | delivery **0.73% PASS**, but **647 dropped iterations FAIL** — which is how defect B was found |
+
+**Smoke run 2** (clean, no deliberate break, VU pool fixed — one variable at
+a time, since the supervisor was already proven above):
+
+| metric | run 1 | run 2 | threshold |
+|---|---|---|---|
+| `http_req_failed` | 0.73% | **0.000%** (0 of 269,934) | <1% |
+| `dropped_iterations` | **647** | **0** | <1 |
+| `http_req_duration` max | 3,418 ms | **670 ms** | — |
+| `http_req_duration` avg | 23.0 ms | **10.1 ms** | — |
+| VUs peak / allocated | 832 / 968 | **228 / 1200** | — |
+| supervisor restarts | 1 (induced) | **0** | — |
+| runner verdict | `ok: false` | **`ok: true`** | — |
+
+The fix removed the *cause*, not just the symptom: peak VU usage fell from
+832 to 228 and max latency fell 5×, because k6 was no longer thrashing to
+allocate VUs mid-excursion. The queueing delay was the generator's own.
+
+**Independent corroboration of SK-H3's threshold.** Run 2 recorded
+`crud_p99 = 8.0079 ms` against B2's committed **8.0072 ms** — a
+seven-microsecond difference on an unrelated 15-minute sitting. The live
+path measures what B2 measured.
+
+**What the smoke runs do NOT establish, stated before the run rather than
+after.** Zero drops across 15 minutes on `small` does not guarantee zero
+across 24 hours on `medium`. The `dropped_iterations` threshold is absolute:
+a single drop in roughly 26 million iterations fails SK-H4. These runs
+remove the *systematic* cause; they cannot rule out a rare stochastic drop
+over a far longer window. If attempt 3 fails on a handful of drops, that is
+the honest finding — and the response is NOT to relax the threshold.
 
 Under the pre-fix code the first test would have black-holed every
 subsequent request for the remainder of the run while k6 kept posting and
