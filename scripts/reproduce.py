@@ -100,6 +100,12 @@ CAMPAIGN_RECORDS = [
     # WP6: the MPC with a wrong plant. The belief arms read their own
     # campaign DB, falling back to the committed export like every other.
     ("analysis_model_mismatch.py", [], "RESULTS_MODEL_MISMATCH.md"),
+    # WP14 attempt 2: a FAILED sitting, gated like any other. It rebuilds
+    # from the injector logs and run record committed under
+    # eval/results/wp14_attempt2/ rather than from campaign metrics -- there
+    # are none, which is the finding. A failure record that cannot be
+    # regenerated is a failure record that can quietly drift.
+    ("analysis_live_soak.py", [], "RESULTS_LIVE_SOAK.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
