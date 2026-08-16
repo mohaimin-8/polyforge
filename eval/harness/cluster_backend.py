@@ -209,12 +209,25 @@ def k6_script(run: RunSpec, interval_s: int = 10) -> str:
             {"target": max(1, round(bucket[tid].total_rps())), "duration": f"{interval_s}s"}
             for bucket in buckets
         ]
+        # VU pool sizing (WP14, session 38). `preAllocatedVUs` was 50, sized
+        # for the AVERAGE request: this cell peaks at ~94 req/s per tenant and
+        # `http_req_duration` averages 23 ms, so Little's law says ~2 VUs.
+        # But the tail reaches 3.4 s, and at peak arrival that demands ~322
+        # VUs for as long as the excursion lasts. k6 then has to allocate VUs
+        # *dynamically*, and drops iterations while it does — 647 of them in
+        # the WP14 smoke run, which `check_k6_delivery`'s zero-drop threshold
+        # correctly rejected.
+        #
+        # 150 is not tuned to make a gate pass: the smoke run's own pool grew
+        # to 968 VUs across 8 tenants (peak 832 in use), so this pre-allocates
+        # roughly what the load demonstrably needed instead of making k6
+        # discover it mid-excursion. maxVUs keeps generous headroom above it.
         scenarios[f"tenant_{tid}"] = {
             "executor": "ramping-arrival-rate",
             "startRate": stages[0]["target"],
             "timeUnit": "1s",
-            "preAllocatedVUs": 50,
-            "maxVUs": 500,
+            "preAllocatedVUs": 150,
+            "maxVUs": 1000,
             "stages": stages,
             "env": {"TENANT": tid},
         }
