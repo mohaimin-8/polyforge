@@ -4,11 +4,17 @@ Registered 2026-08-16 (session 38). Committed and **pushed before the run
 starts**; the push event is the timestamp anchor. This scores new live
 measurement, so R1/R2 apply in full.
 
-This is a **re-sit under one changed factor**, the pattern
-`PREREG_LIVE_SOAK.md` §Outcome handling named in advance and the same shape
+This is a **re-sit under a changed factor** — the pattern
+`PREREG_LIVE_SOAK.md` §Outcome handling named in advance, and the same shape
 as the RB-H1 follow-up (session 30). It does not re-score, edit or soften
 attempt 2: `RESULTS_LIVE_SOAK.md` stands exactly as committed, with SK-H4
 FAIL as its headline.
+
+**Read §The changed factor before assuming "one".** The factor is one
+*mechanism* — the load-delivery path — but it contains **two** distinct
+defects, the second of which was discovered by this prereg's own pre-flight
+after the first was fixed. Both are documented in full below. Nothing is
+being smuggled under a singular noun.
 
 ## Why a re-sit (provenance)
 
