@@ -1,0 +1,22 @@
+# WP14 attempt-3 pre-flight: does the supervised port-forward survive the pod
+# it is pinned to?
+#
+# NON-SCORED, its own output DB. This exists only to de-risk a 24 h sitting:
+# attempt 2 burned a full day before its delivery failure surfaced, so the
+# hardened path gets proven on a ~15 min run first, with a deliberate kill of
+# the exact pod the forward resolved to.
+#
+# 90 steps x STEP_SECONDS (10 s) = 15 min of load. `small` keeps the cluster
+# cheap; the fix under test is delivery-path resilience, which does not
+# depend on cluster width.
+name: live_smoke_pf
+backend: cluster
+steps: 90
+reps: 1
+systems: [jcac]
+workloads: [crud_bursty]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/live_smoke_pf.duckdb
+retries: 0
+timeseries_reps: 0
