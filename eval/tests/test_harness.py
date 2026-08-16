@@ -9,6 +9,7 @@ metrics exactly, and the cluster backend refuses politely without Docker.
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -949,3 +950,105 @@ class TestWave4ArmPins:
             assert digest(system) != jcac, (
                 f"{system} renders CRs identical to jcac -- it is an "
                 "unlabelled copy of the full controller")
+
+
+class TestPortForwardSupervisor:
+    """WP14: the port-forward must survive the pod it was pinned to.
+
+    Attempt 2 lost a 24 h soak to an unsupervised forward — `check_k6_delivery`
+    rejected the run at 36.4% failed requests. `kubectl port-forward
+    service/X` resolves to ONE pod and does not follow the Service, so a
+    single pod restart black-holes every later request while k6 keeps posting
+    and exits 0.
+
+    These exercise the supervisor's decision logic with the subprocess and
+    health probe stubbed, because the real failure takes a day to reproduce
+    and must not need a cluster to test.
+    """
+
+    def _supervisor(self, tmp_path, healthy_seq, alive_seq):
+        from harness.cluster_backend import PortForwardSupervisor
+
+        sup = PortForwardSupervisor("polyforge", "svc", 18080,
+                                    evidence_log=tmp_path / "pf.log",
+                                    interval_s=0.01)
+        health = iter(healthy_seq)
+        alive = iter(alive_seq)
+
+        class FakeProc:
+            def __init__(self):
+                self.pid = 999
+                self.terminated = False
+
+            def poll(self):
+                return None if next(alive, True) else 1
+
+            def terminate(self):
+                self.terminated = True
+
+        sup._healthy = lambda: next(health, True)
+        sup._spawn = lambda: setattr(sup, "proc", FakeProc())
+        sup._resolve_endpoints = lambda: "10.0.0.1"
+        sup._spawn()
+        return sup
+
+    def test_healthy_forward_is_never_restarted(self, tmp_path):
+        sup = self._supervisor(tmp_path, [True] * 20, [True] * 20)
+        sup.start()
+        time.sleep(0.15)
+        sup.stop()
+        sup.join(timeout=5)
+        assert sup.restarts == 0, "a healthy forward must be left alone"
+
+    def test_dead_process_triggers_a_restart(self, tmp_path):
+        # poll() returns non-None (exited) -> restart without needing a
+        # second health probe, because a dead process cannot recover.
+        sup = self._supervisor(tmp_path, [False] * 20, [False] * 20)
+        sup.start()
+        time.sleep(0.15)
+        sup.stop()
+        sup.join(timeout=5)
+        assert sup.restarts >= 1, "an exited port-forward must be respawned"
+
+    def test_transient_probe_blip_does_not_restart(self, tmp_path):
+        """The soak deliberately kills the planner pod four times. A single
+        failed probe during that must not trigger a restart stampede — the
+        supervisor confirms twice before acting."""
+        # process stays alive; health alternates fail/pass, so the confirm
+        # probe always succeeds.
+        sup = self._supervisor(tmp_path, [False, True] * 20, [True] * 40)
+        sup.start()
+        time.sleep(0.15)
+        sup.stop()
+        sup.join(timeout=5)
+        assert sup.restarts == 0, "a confirmed-healthy blip must not restart"
+
+    def test_restarts_are_logged_to_the_evidence_file(self, tmp_path):
+        sup = self._supervisor(tmp_path, [False] * 20, [False] * 20)
+        sup.start()
+        time.sleep(0.15)
+        sup.stop()
+        sup.join(timeout=5)
+        log = (tmp_path / "pf.log").read_text(encoding="utf-8")
+        assert "RESTART" in log, "a restart must leave a post-mortem trail"
+        assert sup.summary()["restarts"] >= 1
+
+
+class TestEvidenceDirIsNotTemp:
+    r"""WP14, twice-learned: evidence for a scored record must not live where
+    the OS may delete it. The harness lost `k6-summary.json` to a
+    self-deleting TemporaryDirectory, and the session fault journal was first
+    written to %LOCALAPPDATA%\Temp."""
+
+    def test_evidence_dir_is_inside_the_repo_results_tree(self):
+        from harness.cluster_backend import evidence_dir_for
+        from harness.config import RunSpec
+
+        run = RunSpec(run_id="abc", experiment="live_soak", system="jcac",
+                      workload="crud_bursty", tenant_mix="uniform",
+                      cluster_size="medium", rep=0, seed=1, steps=10,
+                      backend="cluster", store_timeseries=False)
+        path = evidence_dir_for(run)
+        parts = [p.lower() for p in path.parts]
+        assert "results" in parts and "eval" in parts
+        assert "temp" not in parts and "tmp" not in parts

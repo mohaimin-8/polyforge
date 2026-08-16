@@ -786,6 +786,171 @@ class ReplicaSampler(threading.Thread):
         return replica_seconds / 3600.0 * REPLICA_COST_USD_HR
 
 
+def evidence_dir_for(run: RunSpec) -> Path:
+    """Where a live run's diagnostics are kept **after** it ends.
+
+    Under `eval/results/`, inside the repo — never `%TEMP%`. Two WP14 losses
+    taught this: the harness wrote `k6-summary.json` into a
+    `tempfile.TemporaryDirectory` that self-deleted the moment the delivery
+    gate rejected the run, and the session-side fault journal was first
+    written to `%LOCALAPPDATA%\\Temp`, which Windows may clean on its own
+    schedule. Evidence for a scored record does not live where the OS is
+    allowed to delete it.
+    """
+    return REPO_ROOT / "eval" / "results" / f"{run.experiment}_evidence"
+
+
+def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
+                       supervisor: "PortForwardSupervisor | None") -> None:
+    """Copy the run's diagnostics out of the temp workdir. Best-effort and
+    never raising: a failure to save evidence must not also fail the run."""
+    if evidence_dir is None:
+        return
+    try:
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        for name in ("k6-summary.json", "eval-export.json"):
+            src = workdir / name
+            if src.exists():
+                shutil.copy2(src, evidence_dir / name)
+        if supervisor is not None:
+            (evidence_dir / "port_forward_summary.json").write_text(
+                json.dumps(supervisor.summary(), indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+class PortForwardSupervisor(threading.Thread):
+    """Keeps a `kubectl port-forward` alive for the whole load window.
+
+    WP14 attempt 2 (session 38) lost a full 24 h soak to this being absent:
+    `check_k6_delivery` rejected the run at **36.4% failed requests**, and the
+    leading explanation is that the forward died or was pinned to a pod that
+    was replaced. `kubectl port-forward service/X` resolves to ONE pod when it
+    starts and does not follow the Service afterwards, so a single pod restart
+    silently black-holes every subsequent request — while k6 keeps posting and
+    exits 0, which is exactly the trap `check_k6_delivery`'s docstring warns
+    about.
+
+    The old code spawned the forward once with `subprocess.Popen(..., stderr=
+    DEVNULL)` and never looked at it again for the life of the run. This polls
+    the forwarded port and respawns on failure, mirroring `ReplicaSampler`'s
+    structure — including the lesson in its comments, that a daemon thread
+    dying quietly corrupts the run it was meant to protect.
+
+    Every restart is logged with a timestamp and reason so a post-mortem can
+    tell "the forward flapped" from "the service was genuinely down".
+    """
+
+    def __init__(self, namespace: str, service: str, local_port: int,
+                 evidence_log: Path | None = None, interval_s: float = 15.0):
+        super().__init__(daemon=True)
+        self.namespace = namespace
+        self.service = service
+        self.local_port = local_port
+        self.evidence_log = evidence_log
+        self.interval_s = interval_s
+        self.proc: subprocess.Popen | None = None
+        self.restarts = 0
+        self.probe_failures = 0
+        self.events: list[str] = []
+        self._halt = threading.Event()
+
+    # -- lifecycle ---------------------------------------------------------
+    def _log(self, message: str) -> None:
+        line = f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {message}"
+        self.events.append(line)
+        if self.evidence_log is not None:
+            try:
+                with self.evidence_log.open("a", encoding="utf-8") as fh:
+                    fh.write(line + "\n")
+            except OSError:
+                pass  # never let evidence logging take down the run
+
+    def _spawn(self) -> None:
+        self.proc = subprocess.Popen(
+            ["kubectl", "--namespace", self.namespace, "port-forward",
+             f"service/{self.service}", f"{self.local_port}:80"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def start_forward(self) -> str:
+        """Spawn the initial forward and record which pod it resolved to.
+
+        The pod identity is the diagnostic attempt 2 lacked: without it there
+        is no way to correlate a delivery collapse with a specific pod's
+        restart.
+        """
+        self._spawn()
+        endpoints = self._resolve_endpoints()
+        self._log(f"forward started pid={self.proc.pid if self.proc else '?'} "
+                  f"service={self.service} endpoints={endpoints}")
+        return endpoints
+
+    def _resolve_endpoints(self) -> str:
+        try:
+            proc = subprocess.run(
+                ["kubectl", "--namespace", self.namespace, "get", "endpoints",
+                 self.service, "-o",
+                 "jsonpath={.subsets[*].addresses[*].ip}"],
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=30)
+            return proc.stdout.strip() or "(none)"
+        except Exception:
+            return "(unreadable)"
+
+    def _healthy(self) -> bool:
+        # Imported locally, matching this module's existing convention
+        # (`_wait_http`, `provision_tenants`, `push_default_knobs` all do the
+        # same). Module-level would be tidier, but a NameError raised inside a
+        # daemon thread mid-soak is silent — the thread dies, the forward stops
+        # being supervised, and the run degrades exactly the way this class
+        # exists to prevent.
+        import urllib.request
+
+        try:
+            with urllib.request.urlopen(
+                    f"http://127.0.0.1:{self.local_port}/healthz", timeout=5) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+
+    def run(self) -> None:
+        while not self._halt.is_set():
+            self._halt.wait(self.interval_s)
+            if self._halt.is_set():
+                break
+            dead = self.proc is not None and self.proc.poll() is not None
+            healthy = self._healthy()
+            if dead or not healthy:
+                self.probe_failures += 1
+                # One failed probe can be a transient blip during a planner
+                # crash (which this soak injects deliberately). Confirm once
+                # before restarting, so a fault does not cause a stampede.
+                if not dead and self._healthy():
+                    continue
+                reason = "process exited" if dead else "health probe failed"
+                self.restarts += 1
+                self._log(f"RESTART #{self.restarts} ({reason}); "
+                          f"endpoints={self._resolve_endpoints()}")
+                try:
+                    if self.proc is not None:
+                        self.proc.terminate()
+                except Exception:
+                    pass
+                self._spawn()
+
+    def stop(self) -> None:
+        self._halt.set()
+        try:
+            if self.proc is not None:
+                self.proc.terminate()
+        except Exception:
+            pass
+
+    def summary(self) -> dict:
+        return {"restarts": self.restarts, "probe_failures": self.probe_failures,
+                "events": list(self.events)}
+
+
 def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
     # WP14: the per-step subprocess timeout has to cover the load window, or
     # a long run is killed mid-k6 and recorded as failed. The default 3600 s
@@ -829,6 +994,9 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
             )
 
         plan = command_plan(run, workdir)
+        # WP14: diagnostics land here and survive the run (and the workdir).
+        evidence_dir = evidence_dir_for(run)
+        evidence_dir.mkdir(parents=True, exist_ok=True)
         portforward = None
         gw_portforward = None
         sampler = None
@@ -839,10 +1007,16 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                 if cmd[0] == "k6":
                     # The load window: reach the service, mint tenant keys,
                     # meter replicas while k6 replays the demand buckets.
-                    portforward = subprocess.Popen(
-                        ["kubectl", "--namespace", "polyforge", "port-forward",
-                         "service/polyforge-control-plane", f"{LOCAL_PORT}:80"],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    #
+                    # WP14: supervised rather than fire-and-forget. An
+                    # unsupervised forward is the leading explanation for
+                    # attempt 2's 36.4% delivery failure over 24 h.
+                    portforward = PortForwardSupervisor(
+                        "polyforge", "polyforge-control-plane", LOCAL_PORT,
+                        evidence_log=evidence_dir / "port_forward.log"
+                        if evidence_dir else None)
+                    endpoints = portforward.start_forward()
+                    portforward.start()
                     base = f"http://127.0.0.1:{LOCAL_PORT}"
                     _wait_http(base + "/healthz")
                     tokens = provision_tenants(base, tenant_ids, slo_classes)
@@ -883,9 +1057,15 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                         sampler.join(timeout=30)
                         infra_cost = sampler.infra_cost_usd()
                         check_sampler_coverage(sampler, run.steps * STEP_SECONDS)
+                    # WP14: copy the delivery evidence OUT of the temp workdir
+                    # BEFORE check_k6_delivery can raise. Attempt 2's summary —
+                    # the only artifact carrying the failure timeline — died
+                    # with the TemporaryDirectory when the gate rejected the
+                    # run, which is why that failure could not be diagnosed.
+                    _preserve_evidence(workdir, evidence_dir, portforward)
                     check_k6_delivery(workdir / "k6-summary.json")
                     if portforward is not None:
-                        portforward.terminate()
+                        portforward.stop()
                         portforward = None
                     if gw_portforward is not None:
                         gw_portforward.terminate()
@@ -900,8 +1080,12 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
         finally:
             if sampler is not None:
                 sampler.stop()
+            # Second attempt at preserving evidence: the first is before the
+            # delivery gate (so a rejected run keeps its diagnostics); this one
+            # covers every other exit path, including an exception mid-load.
+            _preserve_evidence(workdir, evidence_dir, portforward)
             if portforward is not None:
-                portforward.terminate()
+                portforward.stop()
             if gw_portforward is not None:
                 gw_portforward.terminate()
             subprocess.run(
