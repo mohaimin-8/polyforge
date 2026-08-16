@@ -1,0 +1,7 @@
+{
+  "restarts": 0,
+  "probe_failures": 0,
+  "events": [
+    "2026-08-16T23:42:48 forward started pid=17216 service=polyforge-control-plane endpoints=10.244.1.15 10.244.1.20"
+  ]
+}
