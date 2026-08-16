@@ -1,0 +1,15 @@
+{
+  "run_id": "d0f4828641c05137",
+  "experiment": "live_soak",
+  "system": "jcac",
+  "workload": "crud_bursty",
+  "tenant_mix": "uniform",
+  "cluster_size": "medium",
+  "steps": 8640,
+  "seed": 596898397,
+  "status": "failed",
+  "attempts": 1,
+  "recorded_at": "2026-08-14 16:50:24.216390",
+  "error": "Traceback (most recent call last):\n  File \"C:\\Users\\DARKR\\Documents\\Thesis Project\\polyforge\\eval\\harness\\runner.py\", line 50, in _attempt\n    outcome = execute_backend(run)\n  File \"C:\\Users\\DARKR\\Documents\\Thesis Project\\polyforge\\eval\\harness\\runner.py\", line 40, in execute_backend\n    return cluster_backend.execute(run)\n           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^\n  File \"C:\\Users\\DARKR\\Documents\\Thesis Project\\polyforge\\eval\\harness\\cluster_backend.py\", line 886, in execute\n    check_k6_delivery(workdir / \"k6-summary.json\")\n    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\DARKR\\Documents\\Thesis Project\\polyforge\\eval\\harness\\cluster_backend.py\", line 596, in check_k6_delivery\n    raise RuntimeError(\n    ...<2 lines>...\n        \"artifacts of traffic that never arrived\")\nRuntimeError: k6 reported 36.4% failed requests (>1%): the load did not land, so the low cost/violation this run would record are artifacts of traffic that never arrived\n",
+  "metrics_rows": 0
+}
