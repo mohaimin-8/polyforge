@@ -1,0 +1,9 @@
+NAME   TENANT   REPLICAS   CACHEMB   TIER    SOURCE    AGE
+t00    t00      2          128       small   planner   16h
+t01    t01      2          128       small   planner   16h
+t02    t02      2          128       small   planner   16h
+t03    t03      2          128       small   planner   16h
+t04    t04      2          128       small   planner   16h
+t05    t05      2          128       small   planner   16h
+t06    t06      2          128       small   planner   16h
+t07    t07      2          128       small   planner   16h

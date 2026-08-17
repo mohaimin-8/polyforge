@@ -1,0 +1,4 @@
+polyforge-eval-worker2 2.256GiB / 9.713GiB 332.17%
+polyforge-eval-worker3 1.674GiB / 9.713GiB 13.29%
+polyforge-eval-worker 1.4GiB / 9.713GiB 12.76%
+polyforge-eval-control-plane 1008MiB / 9.713GiB 64.51%
