@@ -1,0 +1,33 @@
+=== polyforge-control-plane-64554f8d96-2w4h4 ===
+restarts=3 reason=OOMKilled exit=137 at=2026-08-17T10:23:45Z
+=== polyforge-control-plane-64554f8d96-44p26 ===
+restarts=3 reason=OOMKilled exit=137 at=2026-08-17T10:19:51Z
+=== polyforge-control-plane-64554f8d96-56ngn ===
+restarts=3 reason=OOMKilled exit=137 at=2026-08-17T10:28:31Z
+=== polyforge-control-plane-64554f8d96-6fjdx ===
+restarts=4 reason=OOMKilled exit=137 at=2026-08-17T10:35:51Z
+=== polyforge-control-plane-64554f8d96-dpwf8 ===
+restarts=3 reason=OOMKilled exit=137 at=2026-08-17T10:17:47Z
+=== polyforge-control-plane-64554f8d96-f2tdr ===
+restarts=3 reason=OOMKilled exit=137 at=2026-08-17T10:20:42Z
+=== polyforge-control-plane-64554f8d96-l4pzj ===
+restarts=4 reason=OOMKilled exit=137 at=2026-08-17T10:39:07Z
+=== polyforge-control-plane-64554f8d96-mw46g ===
+restarts=4 reason=OOMKilled exit=137 at=2026-08-17T10:32:53Z
+=== polyforge-control-plane-64554f8d96-p5b75 ===
+restarts=3 reason=OOMKilled exit=137 at=2026-08-17T10:24:46Z
+=== polyforge-control-plane-64554f8d96-pbc4m ===
+restarts=3 reason=OOMKilled exit=137 at=2026-08-17T10:27:28Z
+=== polyforge-control-plane-64554f8d96-pnmxz ===
+restarts=4 reason=OOMKilled exit=137 at=2026-08-17T10:40:18Z
+=== polyforge-control-plane-64554f8d96-qd5sw ===
+restarts=4 reason=OOMKilled exit=137 at=2026-08-17T10:36:51Z
+=== polyforge-control-plane-64554f8d96-s9tl2 ===
+restarts=3 reason=OOMKilled exit=137 at=2026-08-17T10:16:02Z
+=== polyforge-control-plane-64554f8d96-tdvf6 ===
+restarts=4 reason=OOMKilled exit=137 at=2026-08-17T10:31:42Z
+=== polyforge-control-plane-64554f8d96-wnqjs ===
+restarts=4 reason=OOMKilled exit=137 at=2026-08-17T10:15:19Z
+=== polyforge-control-plane-64554f8d96-xb8dv ===
+restarts=4 reason=OOMKilled exit=137 at=2026-08-17T10:29:28Z
+TOTAL RESTARTS: 56

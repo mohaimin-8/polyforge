@@ -1,0 +1,5 @@
+NAME                         READY   UP-TO-DATE   AVAILABLE   AGE
+polyforge-control-plane      16/16   16           16          16h
+polyforge-operator           1/1     1            1           16h
+polyforge-operator-planner   1/1     1            1           16h
+postgres                     1/1     1            1           16h
