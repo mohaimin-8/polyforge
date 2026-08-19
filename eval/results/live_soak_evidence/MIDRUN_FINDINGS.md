@@ -58,12 +58,41 @@ fallback warnings per fault, and produced none in five.
 The plan loop is demonstrably alive: all 8 policies report
 `lastPlanSource=planner` with `lastPlanTime` 6 s old at the time of checking.
 
-**I could not resolve why.** Either the plan calls genuinely never failed
-during the outage windows, or the deployed `polyforge/operator:dev` image
-behaves differently from this working tree. Both are testable after the run;
-neither is testable without disturbing it. It is recorded as an open question
-rather than guessed at, because the answer decides whether SK-H1's four
-planner-crash occurrences tested anything at all.
+**One of the two candidate explanations is now eliminated.** The suspicion
+that the deployed `polyforge/operator:dev` predates this working tree is
+**false**. containerd in the kind node reports the running image as built
+`2026-08-13T07:26:01.907970007Z`; the host image carries the identical
+timestamp to the nanosecond, so they are one build. Extracting that image's
+filesystem (a container created and removed without ever being started —
+the cluster was not touched) confirms the binary contains every relevant
+string:
+
+    planner unavailable, holding last good plan   PRESENT
+    plan cycle failed                             PRESENT
+    JCAC plan loop enabled                        PRESENT
+    POLYFORGE_NATS_URL                            PRESENT
+    audit publish                                 PRESENT
+
+So the fallback path exists in the running binary and simply never executed.
+
+**What remains** is that the plan calls genuinely did not fail — which
+requires the planner's *endpoint* gap to be shorter than the 10 s plan
+interval on essentially every fault. That is plausible: `kubectl delete pod`
+lets the ReplicaSet schedule a replacement immediately, the image is already
+resident on the node, and at fault 5 the new pod was `Running` 69 s after
+injection — an upper bound on the outage, not a measurement of it. The
+Service may have carried a ready endpoint again far sooner.
+
+**This is measurable without disturbing the run.** At fault 7 (planner crash,
+11:50 local) the `polyforge-operator-planner` Endpoints object will be polled
+once a second through the injection window to record how long it holds zero
+ready addresses. A gap materially under 10 s explains the missing fallbacks
+and makes the four planner-crash occurrences much weaker tests than the
+prereg assumed; a gap well over 10 s means something else is wrong and the
+fallback path is not being reached when it should be. Both outcomes are
+recorded either way. Registering the observation here, before the fault, so
+the interpretation is fixed in advance rather than chosen once the number is
+known.
 
 ## 3. Two live defects visible in the operator log (independent of the soak)
 
