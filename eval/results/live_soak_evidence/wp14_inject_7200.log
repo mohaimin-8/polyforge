@@ -1,0 +1,34 @@
+[inject] waiting for the k6 load window to start...
+[inject] k6 load started at 09:50:27 (T0=1787046627)
+[inject] === FAULT 1 planner-crash at 11:50:27 (T+7200s) ===
+[inject] NAME                                          READY   STATUS    RESTARTS       AGE    IP            NODE                     NOMINATED NODE   READINESS GATES
+[inject] polyforge-control-plane-64554f8d96-757fl      1/1     Running   0              120m   10.244.3.9    polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-7npb8      1/1     Running   1 (120m ago)   120m   10.244.1.13   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-b2bb7      1/1     Running   1 (120m ago)   120m   10.244.1.6    polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-bmp7r      1/1     Running   1 (120m ago)   120m   10.244.2.11   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-dcq2g      1/1     Running   0              120m   10.244.2.12   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-f62jn      1/1     Running   0              120m   10.244.1.11   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-nlftc      1/1     Running   1 (120m ago)   120m   10.244.3.10   polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-nnhp9      1/1     Running   0              120m   10.244.3.8    polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-pkcvf      1/1     Running   0              120m   10.244.1.9    polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-pknl8      1/1     Running   1 (120m ago)   120m   10.244.3.7    polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-pn28g      1/1     Running   1 (120m ago)   120m   10.244.2.13   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-tm8cg      1/1     Running   0              120m   10.244.2.14   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-wrp86      1/1     Running   1 (120m ago)   120m   10.244.3.11   polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-xglkn      1/1     Running   0              120m   10.244.1.10   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-xp98k      1/1     Running   0              120m   10.244.2.10   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-ztrtl      1/1     Running   0              120m   10.244.1.12   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-operator-7889d4586b-cs8bt           1/1     Running   0              120m   10.244.1.8    polyforge-eval-worker    <none>           <none>
+[inject] polyforge-operator-planner-697c74cf95-t8s4s   1/1     Running   0              120m   10.244.2.9    polyforge-eval-worker3   <none>           <none>
+[inject] postgres-f557b6fb6-dhj5w                      1/1     Running   0              121m   10.244.3.2    polyforge-eval-worker2   <none>           <none>
+[inject] deleting planner pod(s): pod/polyforge-operator-planner-697c74cf95-t8s4s
+[inject] pod "polyforge-operator-planner-697c74cf95-t8s4s" deleted from polyforge namespace
+[inject] === FAULT 2 apiserver-throttle at 14:50:27 (T+18000s) ===
+[inject] throttling ServiceAccount polyforge/polyforge-operator for 60s
+[inject] prioritylevelconfiguration.flowcontrol.apiserver.k8s.io/pf-chaos-throttle created
+[inject] flowschema.flowcontrol.apiserver.k8s.io/pf-chaos-throttle created
+[inject] APF throttle applied; holding 60s
+[inject] flowschema.flowcontrol.apiserver.k8s.io "pf-chaos-throttle" deleted
+[inject] prioritylevelconfiguration.flowcontrol.apiserver.k8s.io "pf-chaos-throttle" deleted
+[inject] throttle cleared at 14:51:28
+[inject] DONE at 14:51:28
