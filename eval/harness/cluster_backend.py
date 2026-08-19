@@ -895,6 +895,7 @@ def provision_tenants(base: str, tenant_ids, slo_classes=None) -> dict[str, str]
     best-effort 3.2x too strictly, which voids any live/sim parity reading on
     premium_heavy, besteffort_heavy or whale."""
     import urllib.error
+    import http.client
     import urllib.request
 
     def post(path: str, body: dict) -> dict:
@@ -902,17 +903,38 @@ def provision_tenants(base: str, tenant_ids, slo_classes=None) -> dict[str, str]
             base + path, data=json.dumps(body).encode(), method="POST",
             headers={"Content-Type": "application/json",
                      "X-PolyForge-Admin-Key": ADMIN_KEY})
-        try:
-            # 60 s, not 15: a cold control plane runs its schema migration on
-            # the first write, and the WP8a dry-run (session 38) timed out
-            # here on an otherwise healthy cluster. `_wait_http` only proves
-            # /healthz answers, which it does before the store is ready.
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                return json.loads(resp.read() or b"{}")
-        except urllib.error.HTTPError as err:
-            if err.code == 409:  # tenant already exists on a retried attempt
-                return {}
-            raise RuntimeError(f"POST {path} -> {err.code}: {err.read()[:500]}") from err
+        # Retry transient transport failures. Behind a NodePort the request
+        # can land on any of sixteen replicas, and a replica that is restarting
+        # closes the connection without answering -- `RemoteDisconnected`,
+        # which is not an HTTPError and so used to abort the whole run during
+        # setup. WP14 Stage B died that way 167 s in, on a cluster that was
+        # healthy 30 seconds later. The underlying cause (concurrent GRANTs
+        # crashing a replica at startup) is fixed in
+        # internal/storage/postgres/migrate.go, but provisioning should not be
+        # one dropped connection away from losing a multi-hour stage either.
+        last: Exception | None = None
+        for attempt in range(5):
+            try:
+                # 60 s, not 15: a cold control plane runs its schema migration
+                # on the first write, and the WP8a dry-run (session 38) timed
+                # out here on an otherwise healthy cluster. `_wait_http` only
+                # proves /healthz answers, which it does before the store is
+                # ready.
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    return json.loads(resp.read() or b"{}")
+            except urllib.error.HTTPError as err:
+                if err.code == 409:  # tenant already exists on a retried attempt
+                    return {}
+                # A status code is the server's considered answer, not a
+                # transport failure: retrying it would just repeat the error.
+                raise RuntimeError(
+                    f"POST {path} -> {err.code}: {err.read()[:500]}") from err
+            except (urllib.error.URLError, http.client.HTTPException,
+                    ConnectionError, TimeoutError) as err:
+                last = err
+                time.sleep(2 * (attempt + 1))
+        raise RuntimeError(
+            f"POST {path} failed after 5 attempts, last error: {last}") from last
 
     tokens = {}
     for tid in tenant_ids:
