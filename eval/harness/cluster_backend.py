@@ -81,6 +81,19 @@ PG_APP_URL = "postgres://polyforge_app@postgres:5432/polyforge?sslmode=disable"
 # servers — without real tier backends the tier knob is inert and the run
 # would void WL-H2, so the harness refuses to build the plan instead.
 EVAL_LIVE_AI = os.environ.get("POLYFORGE_EVAL_LIVE_AI") == "1"
+# WP14 attempt 5. `execute` ends `eval-export` -> `kind delete cluster`, and
+# the finally block deletes again on every exit path. Attempt 4's end-of-run
+# extraction lost that race by seconds, and hours 17-24 of a 24 h run went
+# with the Postgres that held them -- unrecoverable, because the cluster is
+# where the evidence lives until eval-export has read it. With bucketed export
+# this is belt-and-braces rather than load-bearing, which is the right
+# relationship to have with a teardown race. Default stays delete-on-exit so
+# CI never leaks clusters.
+EVAL_KEEP_CLUSTER = os.environ.get("POLYFORGE_EVAL_KEEP_CLUSTER") == "1"
+# Bucket width for eval-export's time-resolved output. SK-H3 is frozen on
+# hour buckets; a short validation stage sets 60 so a 10-minute smoke still
+# produces ten scoreable windows.
+EVAL_BUCKET_SECONDS = int(os.environ.get("POLYFORGE_EVAL_BUCKET_SECONDS", "3600"))
 TIER_BACKENDS_JSON = os.environ.get("POLYFORGE_EVAL_TIER_BACKENDS", "")
 GATEWAY_IMAGE = "polyforge/ai-gateway:dev"
 GATEWAY_LOCAL_PORT = 18081
@@ -291,11 +304,25 @@ def k6_script(run: RunSpec, interval_s: int = 10) -> str:
         "discardResponseBodies": True,
         "thresholds": {
             # >1% failed requests is a broken run, not a measurement.
-            "http_req_failed": ["rate<0.01"],
+            #
+            # WP14 attempt 5: `abortOnFail` makes k6 stop the moment the run is
+            # already unscoreable, instead of driving load for the remaining
+            # hours to produce a number the delivery gate will reject anyway.
+            # Attempt 4 spent 6.5 h in that state -- the OOM cycle started
+            # around T+17.5 h and the run continued to 24 h to be rejected at
+            # 4.567%. `delayAbortEval` gives the cluster its startup window
+            # first, so a cold-start blip cannot abort a healthy run.
+            "http_req_failed": [
+                {"threshold": "rate<0.01", "abortOnFail": True,
+                 "delayAbortEval": "60s"}
+            ],
             # The load generator must not be the bottleneck: dropped
             # iterations mean k6 could not keep up with its own arrival rate,
             # so the tenant did not receive the demand the cell specifies.
-            "dropped_iterations": ["count<1"],
+            "dropped_iterations": [
+                {"threshold": "count<1", "abortOnFail": True,
+                 "delayAbortEval": "60s"}
+            ],
         },
     }
     pools = prompt_pools(run, tenant_ids) if EVAL_LIVE_AI else {}
@@ -622,9 +649,11 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         # The pod's rootfs is read-only and distroless has no tar (kubectl cp
         # needs it), so the export streams to stdout and execute() captures it.
         ["kubectl", "--namespace", "polyforge", "exec", "deploy/polyforge-control-plane", "--",
-         "/control-plane", "eval-export", "--format=json", "--out=-"],
-        ["kind", "delete", "cluster", "--name", CLUSTER_NAME],
+         "/control-plane", "eval-export", "--format=json", "--out=-",
+         f"--bucket-seconds={EVAL_BUCKET_SECONDS}"],
     ]
+    if not EVAL_KEEP_CLUSTER:
+        plan += [["kind", "delete", "cluster", "--name", CLUSTER_NAME]]
     return plan
 
 
@@ -969,6 +998,42 @@ def evidence_dir_for(run: RunSpec) -> Path:
     return REPO_ROOT / "eval" / "results" / f"{run.experiment}_evidence"
 
 
+def _run_step(cmd: list[str], *, env, timeout_s: float,
+              live_log: "Path | None" = None):
+    """Run one plan step, optionally streaming its output to a file as it goes.
+
+    WP14 attempt 5. The load generator used to run under `capture_output=True`,
+    which buffers everything in memory until the process exits -- so the runner
+    log was **0 bytes for 24 hours** and `http_req_failed`, the number that
+    decides whether the whole sitting counts, was unknowable until the end.
+    Attempt 2's record could not even say whether its 36.4% failures began at
+    minute one or accumulated late, because nothing observed the run while it
+    ran.
+
+    Streaming to a file gives k6's periodic progress lines a home, at a few KB
+    per hour. `--out csv` would give a finer timeline and was rejected: at
+    ~300 req/s over 24 h it writes millions of rows per metric, which is a
+    second data-management problem rather than a fix for this one.
+
+    The tail is read back into both stdout and stderr so the caller's existing
+    error reporting (`proc.stderr[-2000:]`) keeps working unchanged.
+    """
+    if live_log is None:
+        return subprocess.run(cmd, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace",
+                              timeout=timeout_s, env=env)
+    live_log.parent.mkdir(parents=True, exist_ok=True)
+    with live_log.open("w", encoding="utf-8", errors="replace") as fh:
+        proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT,
+                              timeout=timeout_s, env=env)
+    try:
+        tail = live_log.read_text(encoding="utf-8", errors="replace")[-4000:]
+    except OSError:
+        tail = ""
+    return subprocess.CompletedProcess(cmd, proc.returncode,
+                                       stdout=tail, stderr=tail)
+
+
 def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
                        supervisor: "PortForwardSupervisor | None",
                        loadspread: "LoadDistributionSampler | None" = None) -> None:
@@ -1240,8 +1305,13 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                 exporting = "eval-export" in cmd
                 if exporting:
                     cmd = cmd + [f"--infra-cost-usd={infra_cost:.6f}"]
-                proc = subprocess.run(
-                    cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout_s, env=env
+                # Only the load generator streams: every other step's stdout
+                # is consumed as data (eval-export's JSON above all), and a
+                # file handle would take that away.
+                proc = _run_step(
+                    cmd, env=env, timeout_s=timeout_s,
+                    live_log=(evidence_dir / "k6-live.log")
+                    if (cmd[0] == "k6" and evidence_dir) else None,
                 )
                 if exporting and proc.returncode == 0:
                     (workdir / "eval-export.json").write_text(proc.stdout, encoding="utf-8")
@@ -1296,10 +1366,15 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                 portforward.stop()
             if gw_portforward is not None:
                 gw_portforward.terminate()
-            subprocess.run(
-                ["kind", "delete", "cluster", "--name", CLUSTER_NAME],
-                capture_output=True, timeout=600,
-            )
+            if EVAL_KEEP_CLUSTER:
+                print(f"[cluster] POLYFORGE_EVAL_KEEP_CLUSTER=1: leaving "
+                      f"{CLUSTER_NAME} up. Remove it with: "
+                      f"kind delete cluster --name {CLUSTER_NAME}", flush=True)
+            else:
+                subprocess.run(
+                    ["kind", "delete", "cluster", "--name", CLUSTER_NAME],
+                    capture_output=True, timeout=600,
+                )
 
         export = json.loads((workdir / "eval-export.json").read_text(encoding="utf-8"))
     return {

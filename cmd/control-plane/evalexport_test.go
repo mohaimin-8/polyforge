@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -30,7 +32,7 @@ func TestComputeEvalExportAggregatesHarnessSchema(t *testing.T) {
 		},
 	}
 
-	doc, err := computeEvalExport(tenants, events, 1.5)
+	doc, err := computeEvalExport(tenants, events, 1.5, 0)
 	if err != nil {
 		t.Fatalf("computeEvalExport: %v", err)
 	}
@@ -87,7 +89,7 @@ func TestComputeEvalExportAggregatesHarnessSchema(t *testing.T) {
 func TestComputeEvalExportRejectsUnknownPlan(t *testing.T) {
 	for _, plan := range []string{"", "gold", "Premium"} {
 		tenants := []tenant.Tenant{{ID: "alpha", Plan: plan}}
-		if _, err := computeEvalExport(tenants, nil, 0); err == nil {
+		if _, err := computeEvalExport(tenants, nil, 0, 0); err == nil {
 			t.Errorf("plan %q was accepted; want an error rather than a "+
 				"silent default to standard", plan)
 		}
@@ -95,14 +97,14 @@ func TestComputeEvalExportRejectsUnknownPlan(t *testing.T) {
 	// The three real classes are accepted.
 	for _, plan := range []string{"premium", "standard", "best-effort"} {
 		tenants := []tenant.Tenant{{ID: "alpha", Plan: plan}}
-		if _, err := computeEvalExport(tenants, nil, 0); err != nil {
+		if _, err := computeEvalExport(tenants, nil, 0, 0); err != nil {
 			t.Errorf("plan %q rejected: %v", plan, err)
 		}
 	}
 }
 
 func TestComputeEvalExportEmptyStoreIsWellFormed(t *testing.T) {
-	doc, err := computeEvalExport(nil, nil, 0)
+	doc, err := computeEvalExport(nil, nil, 0, 0)
 	if err != nil {
 		t.Fatalf("computeEvalExport: %v", err)
 	}
@@ -111,5 +113,100 @@ func TestComputeEvalExportEmptyStoreIsWellFormed(t *testing.T) {
 	}
 	if doc.MeanJain != 1.0 {
 		t.Fatalf("expected Jain 1.0 with no tenants, got %v", doc.MeanJain)
+	}
+}
+
+// TestComputeEvalExportBuckets pins the time-resolved output WP14 needed and
+// did not have. SK-H3 is frozen on hour-bucketed crud_p95 and SK-H1 on how
+// violation moves around a fault; before this, eval-export emitted only
+// whole-run scalars, so four consecutive 24 h sittings produced one row of
+// numbers between them and attempt 4's buckets had to be rebuilt from Postgres
+// by hand before teardown destroyed the table.
+func TestComputeEvalExportBuckets(t *testing.T) {
+	base := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
+	tenants := []tenant.Tenant{{ID: "alpha", Plan: "standard"}} // crud target 375ms
+	events := map[string][]telemetry.Event{
+		"alpha": {
+			// Bucket 1 (12:00-12:01): all fast, nothing over target.
+			{Timestamp: base, LatencyMS: 10},
+			{Timestamp: base.Add(10 * time.Second), LatencyMS: 20},
+			{Timestamp: base.Add(20 * time.Second), LatencyMS: 30},
+			// Bucket 2 (12:01-12:02): degraded, both over the 375ms target.
+			{Timestamp: base.Add(70 * time.Second), LatencyMS: 400},
+			{Timestamp: base.Add(80 * time.Second), LatencyMS: 500},
+		},
+	}
+
+	doc, err := computeEvalExport(tenants, events, 0, 60)
+	if err != nil {
+		t.Fatalf("computeEvalExport: %v", err)
+	}
+	if len(doc.Buckets) != 2 {
+		t.Fatalf("expected 2 one-minute buckets, got %d", len(doc.Buckets))
+	}
+
+	// Buckets are absolute epoch windows, so boundaries land on wall-clock
+	// minutes regardless of when the run started, and they arrive sorted.
+	if got := doc.Buckets[0].BucketStartUTC; got != "2026-07-12T12:00:00Z" {
+		t.Fatalf("first bucket start = %q", got)
+	}
+	if got := doc.Buckets[1].BucketStartUTC; got != "2026-07-12T12:01:00Z" {
+		t.Fatalf("second bucket start = %q", got)
+	}
+
+	if doc.Buckets[0].NEvents != 3 || doc.Buckets[1].NEvents != 2 {
+		t.Fatalf("bucket sizes = %d/%d, want 3/2",
+			doc.Buckets[0].NEvents, doc.Buckets[1].NEvents)
+	}
+
+	// The whole point: the degradation is visible per window. A run-level
+	// scalar would average these into 0.4 and hide which minute went bad.
+	if doc.Buckets[0].MeanViolation != 0 {
+		t.Fatalf("healthy bucket violation = %v, want 0", doc.Buckets[0].MeanViolation)
+	}
+	if doc.Buckets[1].MeanViolation != 1 {
+		t.Fatalf("degraded bucket violation = %v, want 1", doc.Buckets[1].MeanViolation)
+	}
+
+	// Percentiles must be the SAME nearest-rank order statistic as the
+	// scalars beside them. ceil(0.95*3)-1 = index 2 -> 30; ceil(0.95*2)-1 = 1
+	// -> 500. Interpolation would give 28 and 495, which is exactly the
+	// mismatch that made the hand-rolled Postgres rescue use percentile_disc.
+	if doc.Buckets[0].CrudP95MS != 30 {
+		t.Fatalf("bucket 1 crud p95 = %v, want 30", doc.Buckets[0].CrudP95MS)
+	}
+	if doc.Buckets[1].CrudP95MS != 500 {
+		t.Fatalf("bucket 2 crud p95 = %v, want 500", doc.Buckets[1].CrudP95MS)
+	}
+
+	// Run-level scalars must be untouched by bucketing.
+	if doc.NEvents != 5 || doc.MeanViolation != 0.4 {
+		t.Fatalf("scalars drifted: n=%d violation=%v", doc.NEvents, doc.MeanViolation)
+	}
+}
+
+// TestComputeEvalExportBucketsOffByDefault protects every committed record:
+// with --bucket-seconds unset the field is omitted entirely, so existing
+// consumers and the byte-identity reproduction gate see no change at all.
+func TestComputeEvalExportBucketsOffByDefault(t *testing.T) {
+	base := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
+	tenants := []tenant.Tenant{{ID: "alpha", Plan: "standard"}}
+	events := map[string][]telemetry.Event{
+		"alpha": {{Timestamp: base, LatencyMS: 10}},
+	}
+
+	doc, err := computeEvalExport(tenants, events, 0, 0)
+	if err != nil {
+		t.Fatalf("computeEvalExport: %v", err)
+	}
+	if doc.Buckets != nil {
+		t.Fatalf("buckets must be nil when disabled, got %d", len(doc.Buckets))
+	}
+	blob, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if bytes.Contains(blob, []byte("buckets")) {
+		t.Fatalf("disabled buckets must not appear in the JSON at all:\n%s", blob)
 	}
 }

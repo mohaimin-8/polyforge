@@ -55,6 +55,36 @@ var (
 	evalTierCostUSD = map[string]float64{"none": 0.0, "small": 0.0001, "mid": 0.001, "large": 0.01}
 )
 
+// evalBucket is one time window of the run, scored exactly like the run-level
+// scalars beside it.
+//
+// WP14 needed these and they did not exist. SK-H3 is frozen on *hour-bucketed*
+// crud_p95 and SK-H1 on how violation moves around a fault, but eval-export
+// emitted only whole-run aggregates -- so cluster_backend's
+// `export.get("timeseries", [])` was always empty, live_soak.yaml's
+// `timeseries_reps: 0` left the DuckDB table empty too, and four consecutive
+// 24 h sittings produced exactly one row of numbers between them. Attempt 4's
+// buckets had to be reconstructed from Postgres by hand before
+// `kind delete cluster` destroyed the table, and the hours 17-24 of that run
+// were lost when the extraction lost that race.
+type evalBucket struct {
+	BucketStartUTC     string  `json:"bucket_start_utc"`
+	NEvents            int     `json:"n_events"`
+	CrudP95MS          float64 `json:"crud_p95_ms"`
+	CrudP99MS          float64 `json:"crud_p99_ms"`
+	AIP95MS            float64 `json:"ai_p95_ms"`
+	AIP99MS            float64 `json:"ai_p99_ms"`
+	MeanViolation      float64 `json:"mean_violation"`
+	ViolationStepShare float64 `json:"violation_step_share"`
+}
+
+// evalBucketAcc accumulates one bucket while the events are walked once.
+type evalBucketAcc struct {
+	crud, ai          []float64
+	violations, total int
+	steps             map[int64][2]int
+}
+
 type evalExportDoc struct {
 	TotalCostUSD       float64 `json:"total_cost_usd"`
 	CostTierUSD        float64 `json:"cost_tier_usd"`
@@ -73,6 +103,10 @@ type evalExportDoc struct {
 	// excluded) — the tier histogram the three-knob live plane meters $-cost
 	// from (PREREG_WAVE4_LIVE_PLANE.md §Metrics).
 	TierRequests        map[string]int `json:"tier_requests"`
+	// Buckets is populated only when --bucket-seconds is set, so every
+	// existing consumer and every committed record is byte-identical without
+	// it (omitempty). 3600 for a soak, 60 for a short validation stage.
+	Buckets             []evalBucket   `json:"buckets,omitempty"`
 	NEvents             int            `json:"n_events"`
 	NTenants            int            `json:"n_tenants"`
 	GeneratedAtUTC      string         `json:"generated_at_utc"`
@@ -86,11 +120,17 @@ func evalExport(args []string) int {
 	infraCost := fs.Float64("infra-cost-usd", 0.0,
 		"infra cost component injected by the harness (replica-hours are not visible in-pod)")
 	maxEvents := fs.Int("max-events", 5_000_000, "per-tenant telemetry read ceiling")
+	bucketSeconds := fs.Int("bucket-seconds", 0,
+		"emit per-window buckets alongside the scalars (0 = off; 3600 for a soak, 60 for a short stage)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if *format != "json" || *out == "" {
-		fmt.Fprintln(os.Stderr, "usage: control-plane eval-export --format=json --out=PATH|- [--infra-cost-usd=X]")
+		fmt.Fprintln(os.Stderr, "usage: control-plane eval-export --format=json --out=PATH|- [--infra-cost-usd=X] [--bucket-seconds=N]")
+		return 2
+	}
+	if *bucketSeconds < 0 {
+		fmt.Fprintln(os.Stderr, "eval-export: --bucket-seconds must not be negative")
 		return 2
 	}
 
@@ -103,7 +143,7 @@ func evalExport(args []string) int {
 		return 1
 	}
 
-	doc, err := computeEvalExport(tenants, events, *infraCost)
+	doc, err := computeEvalExport(tenants, events, *infraCost, *bucketSeconds)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
 		return 1
@@ -174,7 +214,7 @@ func evalLoadStore(ctx context.Context, maxEvents int) ([]tenant.Tenant, map[str
 	return tenants, events, nil
 }
 
-func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Event, infraCostUSD float64) (evalExportDoc, error) {
+func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Event, infraCostUSD float64, bucketSeconds int) (evalExportDoc, error) {
 	doc := evalExportDoc{
 		CostInfraUSD:        infraCostUSD,
 		GeneratedAtUTC:      time.Now().UTC().Format(time.RFC3339),
@@ -188,6 +228,7 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 	var cacheHits, aiTotal int
 	attainments := make([]float64, 0, len(tenants))
 	stepViolations := map[int64][2]int{} // step -> {over-target, total}
+	buckets := map[int64]*evalBucketAcc{} // bucket index -> accumulator
 
 	for _, t := range tenants {
 		// An unrecognised plan is a provisioning bug, not a default. Silently
@@ -248,6 +289,27 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 				counts[0]++
 			}
 			stepViolations[step] = counts
+			if bucketSeconds > 0 {
+				key := e.Timestamp.Unix() / int64(bucketSeconds)
+				acc := buckets[key]
+				if acc == nil {
+					acc = &evalBucketAcc{steps: map[int64][2]int{}}
+					buckets[key] = acc
+				}
+				if isAI {
+					acc.ai = append(acc.ai, e.LatencyMS)
+				} else {
+					acc.crud = append(acc.crud, e.LatencyMS)
+				}
+				acc.total++
+				bc := acc.steps[step]
+				bc[1]++
+				if e.LatencyMS > target {
+					acc.violations++
+					bc[0]++
+				}
+				acc.steps[step] = bc
+			}
 		}
 		if tenantTotal > 0 {
 			attainments = append(attainments, 1.0-float64(tenantOver)/float64(tenantTotal))
@@ -286,7 +348,59 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 		}
 	}
 	doc.TotalCostUSD = doc.CostTierUSD + doc.CostInfraUSD
+	doc.Buckets = evalFinishBuckets(buckets, bucketSeconds)
 	return doc, nil
+}
+
+// evalFinishBuckets turns the accumulators into sorted, scored rows.
+//
+// Percentiles go through evalPercentile unchanged, so a bucket's p95 is the
+// same nearest-rank order statistic as the run-level scalar beside it. That
+// matters more than it looks: the hand-rolled Postgres rescue for attempt 4
+// had to use percentile_disc rather than percentile_cont for exactly this
+// reason -- interpolation disagrees with the exporter in the fourth decimal,
+// which is enough to make a bucket and a scalar look like different
+// measurements of different things.
+//
+// Buckets are keyed by absolute epoch window, so a bucket boundary falls at
+// the same wall-clock instant regardless of when the run started, and an
+// empty window simply does not appear rather than appearing as a zero.
+func evalFinishBuckets(accs map[int64]*evalBucketAcc, bucketSeconds int) []evalBucket {
+	if bucketSeconds <= 0 || len(accs) == 0 {
+		return nil
+	}
+	keys := make([]int64, 0, len(accs))
+	for k := range accs {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+
+	out := make([]evalBucket, 0, len(keys))
+	for _, k := range keys {
+		acc := accs[k]
+		b := evalBucket{
+			BucketStartUTC: time.Unix(k*int64(bucketSeconds), 0).UTC().Format(time.RFC3339),
+			NEvents:        acc.total,
+			CrudP95MS:      evalP95(acc.crud),
+			CrudP99MS:      evalPercentile(acc.crud, 0.99),
+			AIP95MS:        evalP95(acc.ai),
+			AIP99MS:        evalPercentile(acc.ai, 0.99),
+		}
+		if acc.total > 0 {
+			b.MeanViolation = float64(acc.violations) / float64(acc.total)
+		}
+		if len(acc.steps) > 0 {
+			missed := 0
+			for _, counts := range acc.steps {
+				if float64(counts[0]) > 0.05*float64(counts[1]) {
+					missed++
+				}
+			}
+			b.ViolationStepShare = float64(missed) / float64(len(acc.steps))
+		}
+		out = append(out, b)
+	}
+	return out
 }
 
 func evalP95(values []float64) float64 { return evalPercentile(values, 0.95) }
