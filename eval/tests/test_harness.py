@@ -1313,3 +1313,35 @@ class TestPlannerFaultActuallyStopsThePlanner:
         body = self._script()
         assert "positive control" in body
         assert "planner unavailable" in body
+
+
+class TestSoakProtocolGuards:
+    """WP14 Phase 5: rules that are enforceable rather than written down.
+
+    Attempt 4 had no rule against local compute during a run. A `go test` on
+    the same laptop compiled the operator package mid-soak and the restart
+    cascade began within two minutes. The reasoning error was treating "does
+    not touch Kubernetes objects" as equivalent to "does not affect the run".
+    """
+
+    def test_guard_script_exists_and_is_executable_shell(self):
+        guard = Path(__file__).resolve().parents[2] / "scripts" / "guard-no-local-compute.sh"
+        assert guard.exists()
+        body = guard.read_text(encoding="utf-8")
+        assert ".soak-running" in body
+        # An override must exist — a guard with no escape hatch gets deleted
+        # the first time someone genuinely needs to build — but it must be
+        # explicit and disclosed rather than silent.
+        assert "POLYFORGE_ALLOW_LOCAL_COMPUTE" in body
+
+    def test_marker_is_gitignored(self):
+        ignore = (Path(__file__).resolve().parents[2] / ".gitignore").read_text(encoding="utf-8")
+        assert ".soak-running" in ignore
+
+    def test_injector_writes_into_the_repo_not_a_temp_path(self):
+        body = (Path(__file__).resolve().parents[2] / "scripts"
+                / "chaos_inject.sh").read_text(encoding="utf-8")
+        # Attempt 4's injector logs lived in %TEMP% and were snapshotted by
+        # hand at hour 17, capturing only 5 of 8 faults.
+        assert "live_soak_evidence" in body
+        assert "EVIDENCE_DIR" in body

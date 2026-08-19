@@ -21,6 +21,15 @@ THROTTLE_OFFSET_S=${THROTTLE_OFFSET_S:-840}   # T=14min
 THROTTLE_DURATION_S=${THROTTLE_DURATION_S:-60}
 ts() { date -u +%H:%M:%S; }
 
+# Injector output goes straight into the repo evidence directory rather than a
+# temp path the operator has to remember to copy. WP14 attempt 4 was snapshotted
+# by hand at hour 17 and captured only 5 of its 8 faults; the record was
+# regenerated later only because the miss was noticed. Writing here removes the
+# step that can be forgotten.
+EVIDENCE_DIR=${EVIDENCE_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/eval/results/live_soak_evidence"}
+mkdir -p "$EVIDENCE_DIR" 2>/dev/null || true
+exec > >(tee -a "$EVIDENCE_DIR/inject_${PLANNER_OFFSET_S}.log") 2>&1
+
 # k6 detection has to work on both hosts this repo runs on. `pgrep` sees only
 # the POSIX process table, so under Git Bash on Windows it cannot see a native
 # k6.exe -- WP14's first soak attempt (session 38) lost all eight faults to

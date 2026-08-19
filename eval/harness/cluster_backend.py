@@ -95,6 +95,14 @@ EVAL_LIVE_AI = os.environ.get("POLYFORGE_EVAL_LIVE_AI") == "1"
 # relationship to have with a teardown race. Default stays delete-on-exit so
 # CI never leaks clusters.
 EVAL_KEEP_CLUSTER = os.environ.get("POLYFORGE_EVAL_KEEP_CLUSTER") == "1"
+# Marker file asserting a load window is open. WP14 attempt 4 had no such
+# rule: a `go test` run on the same laptop compiled the operator package
+# during the soak and triggered the first restart cascade. The soak has no
+# CPU, memory or I/O isolation from the session watching it -- one laptop, one
+# kernel, one disk -- and "does not touch Kubernetes objects" is not the same
+# claim as "does not affect the run". A marker is enforceable where a note in
+# a document is not; scripts/guard-no-local-compute.sh reads it.
+SOAK_MARKER = REPO_ROOT / ".soak-running"
 # Bucket width for eval-export's time-resolved output. SK-H3 is frozen on
 # hour buckets; a short validation stage sets 60 so a 10-minute smoke still
 # produces ten scoreable windows.
@@ -1353,6 +1361,15 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                     sampler.start()
                     loadspread = LoadDistributionSampler()
                     loadspread.start()
+                    try:
+                        SOAK_MARKER.write_text(
+                            f"run_id={run.run_id}\n"
+                            f"started={time.time():.0f}\n"
+                            "No local builds, test runs or heavy queries "
+                            "until this file disappears.\n",
+                            encoding="utf-8")
+                    except OSError:
+                        pass  # never fail a run over its own courtesy marker
                 exporting = "eval-export" in cmd
                 if exporting:
                     cmd = cmd + [f"--infra-cost-usd={infra_cost:.6f}"]
@@ -1413,6 +1430,7 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                 sampler.stop()
             if loadspread is not None:
                 loadspread.stop()
+            SOAK_MARKER.unlink(missing_ok=True)
             # Second attempt at preserving evidence: the first is before the
             # delivery gate (so a rejected run keeps its diagnostics); this one
             # covers every other exit path, including an exception mid-load.

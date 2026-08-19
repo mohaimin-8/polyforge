@@ -53,3 +53,6 @@ research/paper/main.pdf
 artifacts/zap-*.html
 artifacts/zap.yaml
 artifacts/openapi.yaml
+
+# WP14: written by the harness while a load window is open (Phase 5).
+.soak-running
