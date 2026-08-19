@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 //go:embed migrations/*.sql
@@ -69,13 +70,33 @@ func (s *Store) Migrate(ctx context.Context) error {
 			return fmt.Errorf("record migration %s: %w", version, err)
 		}
 	}
+	// Grants run INSIDE the migration transaction, under the advisory lock
+	// taken above. They used to run after Commit, through the pool, which put
+	// them outside the lock -- so every replica issued them concurrently.
+	//
+	// PostgreSQL serialises DDL on a role through its catalog rows, and
+	// concurrent GRANTs on the same objects collide with
+	// "tuple concurrently updated (SQLSTATE XX000)". The losing backend exits
+	// non-zero, so the pod crash-loops. It is a startup race that only appears
+	// with several replicas coming up together: found by WP14 Stage B, where
+	// 16 control-plane replicas started at once and one died on it, dropping
+	// the connection that was provisioning tenants and failing the stage 167
+	// seconds in. A single-replica deployment never sees it.
+	if err := s.grantAppRole(ctx, tx); err != nil {
+		return err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)
 	}
-	return s.grantAppRole(ctx)
+	return nil
 }
 
-func (s *Store) grantAppRole(ctx context.Context) error {
+// grantAppRole issues the application role's grants. It takes the querier so
+// the caller decides the transaction, which is what keeps these under the
+// migration advisory lock rather than racing outside it.
+func (s *Store) grantAppRole(ctx context.Context, q interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+}) error {
 	role := pgx.Identifier{s.appRole}.Sanitize()
 	statements := []string{
 		`GRANT SELECT, INSERT, UPDATE, DELETE ON tenants, projects, api_keys, telemetry_events TO ` + role,
@@ -85,7 +106,7 @@ func (s *Store) grantAppRole(ctx context.Context) error {
 		`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ` + role,
 	}
 	for _, statement := range statements {
-		if _, err := s.admin.Exec(ctx, statement); err != nil {
+		if _, err := q.Exec(ctx, statement); err != nil {
 			return fmt.Errorf("grant application role %s: %w", s.appRole, err)
 		}
 	}
