@@ -58,13 +58,48 @@ wait_until() {
 wait_until "$PLANNER_OFFSET_S"
 echo "[inject] === FAULT 1 planner-crash at $(ts) (T+${PLANNER_OFFSET_S}s) ==="
 kubectl -n "$NS" get pods -o wide 2>&1 | sed 's/^/[inject] /' || true
-pods=$(kubectl -n "$NS" get pods -l app.kubernetes.io/name=polyforge-operator-planner -o name 2>/dev/null)
-[ -z "$pods" ] && pods=$(kubectl -n "$NS" get pods -o name 2>/dev/null | grep -i planner || true)
-if [ -n "$pods" ]; then
-  echo "[inject] deleting planner pod(s): $pods"
-  echo "$pods" | xargs -r kubectl -n "$NS" delete --wait=false 2>&1 | sed 's/^/[inject] /'
+
+# WP14 attempt 5: SCALE TO ZERO, do not delete the pod.
+#
+# Deleting the pod does not stop the planner answering. Across SEVEN
+# planner-crash injections in four attempts, `fallback()` produced zero
+# `planner unavailable, holding last good plan` lines. Attempt 4 measured why:
+# fault 7's endpoint gap was 26 s -- 2.6x the 10 s plan interval, so the plan
+# loop certainly ran inside it -- yet the pod reported **1/1 ready throughout
+# termination**. Kubernetes delists a deleting pod from Endpoints at once but
+# does not close established connections, and the operator reaches the planner
+# over a reused HTTP connection. It kept talking to the dying pod and never
+# saw an outage. The "planner crash" fault was cosmetic for four attempts.
+#
+# Scaling the Deployment to zero is unambiguous: no endpoints AND no process.
+PLANNER_OUTAGE_S=${PLANNER_OUTAGE_S:-60}
+PLANNER_DEPLOY=$(kubectl -n "$NS" get deploy -o name 2>/dev/null | grep -i planner | head -1)
+if [ -n "$PLANNER_DEPLOY" ]; then
+  echo "[inject] scaling $PLANNER_DEPLOY to 0 for ${PLANNER_OUTAGE_S}s"
+  kubectl -n "$NS" scale "$PLANNER_DEPLOY" --replicas=0 2>&1 | sed 's/^/[inject] /'
+  sleep "$PLANNER_OUTAGE_S"
+  kubectl -n "$NS" scale "$PLANNER_DEPLOY" --replicas=1 2>&1 | sed 's/^/[inject] /'
+  echo "[inject] planner restored at $(ts)"
+
+  # POSITIVE CONTROL. A fault that does not perturb the system is not a
+  # fault, and nothing checked this for four attempts. If the operator never
+  # reports holding its last good plan, the injection did nothing and the
+  # hypothesis it feeds is untested -- so say so loudly rather than let a
+  # silent no-op be scored as a survived fault.
+  OP_POD=$(kubectl -n "$NS" get pods -o name 2>/dev/null |
+           grep -i 'operator' | grep -vi 'planner' | head -1)
+  if [ -n "$OP_POD" ]; then
+    FB=$(kubectl -n "$NS" logs "$OP_POD" --since="$((PLANNER_OUTAGE_S + 120))s" 2>/dev/null |
+         grep -c 'planner unavailable' || true)
+    echo "[inject] positive control: $FB fallback line(s) during the outage"
+    if [ "${FB:-0}" -eq 0 ]; then
+      echo "[inject] ERROR: planner outage produced NO fallback -- the fault"
+      echo "[inject] ERROR: did not reach the controller. This is the defect"
+      echo "[inject] ERROR: that made 7 injections across 4 attempts vacuous."
+    fi
+  fi
 else
-  echo "[inject] WARN: no planner pod matched; deployments present:"
+  echo "[inject] WARN: no planner deployment matched; deployments present:"
   kubectl -n "$NS" get deploy 2>&1 | sed 's/^/[inject] /' || true
 fi
 

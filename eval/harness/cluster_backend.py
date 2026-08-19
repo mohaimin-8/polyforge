@@ -68,6 +68,11 @@ ADMIN_SECRET_NAME = "polyforge-admin"  # carries ADMIN_KEY for the operator
 # events. Default off so the SQLite path and the harness tests are unchanged.
 EVAL_SHARED_PG = os.environ.get("POLYFORGE_EVAL_SHARED_PG") == "1"
 PG_MANIFEST = REPO_ROOT / "eval" / "harness" / "manifests" / "postgres-eval.yaml"
+NATS_MANIFEST = REPO_ROOT / "eval" / "harness" / "manifests" / "nats-eval.yaml"
+# Set on the operator so PlanRunner.Audit is non-nil. Without it every
+# audit record is dropped and SK-H2 scores an empty stream against an
+# empty count, which is what it did for four attempts.
+NATS_URL = "nats://nats.polyforge.svc:4222"
 PG_ADMIN_URL = "postgres://polyforge_admin@postgres:5432/polyforge?sslmode=disable"
 PG_APP_URL = "postgres://polyforge_app@postgres:5432/polyforge?sslmode=disable"
 
@@ -521,6 +526,7 @@ def operator_install_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
          "--namespace", "polyforge", "--wait", "--timeout", "300s",
          "--set=fullnameOverride=polyforge-operator",
          "--set=operator.leaderElect=false",
+         f"--set=operator.natsURL={NATS_URL}",
          "--set=operator.image.repository=polyforge/operator",
          "--set=operator.image.tag=dev",
          "--set=planner.image.repository=polyforge/planner",
@@ -607,6 +613,15 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         ["kubectl", "--namespace", "kube-system", "rollout", "status",
          "deployment/metrics-server", "--timeout=180s"],
     ]
+    if live_operator:
+        # The audit backbone, stood up before the operator chart: the operator
+        # calls events.Connect at startup and os.Exit(1)s if the broker is
+        # unreachable, so ordering here is load-bearing rather than tidy.
+        plan += [
+            ["kubectl", "apply", "-f", str(NATS_MANIFEST)],
+            ["kubectl", "--namespace", "polyforge", "rollout", "status",
+             "deployment/nats", "--timeout=180s"],
+        ]
     # Shared Postgres (opt-in): stood up BEFORE the chart so the control-plane
     # connects on startup and every replica writes one telemetry store.
     if EVAL_SHARED_PG:
@@ -732,6 +747,42 @@ def check_load_distribution(sampler: "LoadDistributionSampler",
             f"only {active} of {len(shares)} replicas served any traffic "
             f"(floor {min_active_fraction:.0%}): the load path is not "
             "reaching the whole Deployment")
+
+
+def check_audit_stream(namespace: str = "polyforge") -> int:
+    """Fail the run when the audit backbone carried nothing.
+
+    SK-H2 is scored as "degraded cycles == audit records, exactly". For four
+    WP14 attempts that computed 0 == 0 and returned *true*, because
+    PlanRunner.audit no-ops when Audit is nil and POLYFORGE_NATS_URL was set
+    nowhere. A hypothesis scored against an absent instrument is not a passed
+    hypothesis; it is an unrun one, and nothing in the harness noticed.
+
+    Reads JetStream's own accounting through the NATS monitoring port, which
+    needs no client library on the Python side. Returns the message count so a
+    caller can record it as evidence.
+    """
+    proc = subprocess.run(
+        ["kubectl", "--namespace", namespace, "exec", "deploy/nats", "--",
+         "wget", "-qO-", "http://127.0.0.1:8222/jsz"],
+        capture_output=True, text=True, timeout=60,
+        encoding="utf-8", errors="replace")
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "audit stream unreadable: could not reach the NATS monitoring "
+            f"endpoint ({proc.stderr.strip()[-300:]}). SK-H2 cannot be scored "
+            "against a stream that cannot be counted")
+    try:
+        messages = int(json.loads(proc.stdout).get("messages", 0))
+    except (ValueError, AttributeError) as exc:
+        raise RuntimeError(f"audit stream stats unparseable: {exc}") from exc
+    if messages == 0:
+        raise RuntimeError(
+            "audit stream is EMPTY after the load window: the operator "
+            "published nothing, so SK-H2 would score 0 == 0 and report a pass "
+            "while testing nothing. This is the WP14 attempt-1-to-4 failure "
+            "mode -- check POLYFORGE_NATS_URL reached the operator")
+    return messages
 
 
 def check_sampler_coverage(sampler: "ReplicaSampler", load_duration_s: float) -> None:
@@ -1340,6 +1391,10 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                     check_k6_delivery(workdir / "k6-summary.json")
                     if loadspread is not None:
                         check_load_distribution(loadspread)
+                    if run.system in OPERATOR_SYSTEMS:
+                        audit_messages = check_audit_stream()
+                        print(f"[audit] {audit_messages} record(s) on the "
+                              "backbone", flush=True)
                     if portforward is not None:
                         portforward.stop()
                         portforward = None

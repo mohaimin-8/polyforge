@@ -1225,3 +1225,91 @@ class TestObservabilityAndTeardown:
             [sys.executable, "-c", "print('{\"ok\": true}')"],
             env=None, timeout_s=60, live_log=None)
         assert proc.stdout.strip() == '{"ok": true}'
+
+
+class TestAuditStreamInstrumented:
+    """WP14 Phase 3: SK-H2 must never again score an absent instrument.
+
+    For four attempts it computed 0 == 0 and returned true. PlanRunner.audit
+    no-ops when Audit is nil, Audit is assigned only under POLYFORGE_NATS_URL,
+    and that variable was set nowhere — chart, harness, or live deployment.
+    """
+
+    def test_nats_is_deployed_before_the_operator_chart(self, tmp_path):
+        run = expand(tiny_spec(systems=["jcac"]))[0]
+        plan = cluster_backend.command_plan(run, tmp_path)
+        flat = [" ".join(c) for c in plan]
+        nats = [i for i, c in enumerate(flat) if "nats-eval.yaml" in c]
+        operator = [i for i, c in enumerate(flat) if "polyforge-operator" in c
+                    and c.startswith("helm install")]
+        assert nats, "the audit backbone is never deployed"
+        assert operator, "expected an operator chart install"
+        # Ordering is load-bearing, not tidiness: events.Connect runs at
+        # operator startup and os.Exit(1)s if the broker is unreachable.
+        assert nats[0] < operator[0]
+
+    def test_operator_is_told_where_the_backbone_is(self, tmp_path):
+        run = expand(tiny_spec(systems=["jcac"]))[0]
+        plan = cluster_backend.command_plan(run, tmp_path)
+        install = [c for c in plan
+                   if c[:2] == ["helm", "install"] and "polyforge-operator" in c[2:]]
+        assert install, "no operator install step"
+        assert any("operator.natsURL=" in a for a in install[0]), (
+            "without natsURL the operator's audit publisher is nil and every "
+            "record is silently dropped")
+
+    def test_empty_stream_fails_the_run(self, monkeypatch):
+        import subprocess as _sp
+
+        def fake(*a, **kw):
+            return _sp.CompletedProcess(a[0], 0, stdout='{"messages": 0}', stderr="")
+
+        monkeypatch.setattr(cluster_backend.subprocess, "run", fake)
+        with pytest.raises(RuntimeError, match="EMPTY"):
+            cluster_backend.check_audit_stream()
+
+    def test_populated_stream_returns_its_count(self, monkeypatch):
+        import subprocess as _sp
+
+        def fake(*a, **kw):
+            return _sp.CompletedProcess(a[0], 0, stdout='{"messages": 42}', stderr="")
+
+        monkeypatch.setattr(cluster_backend.subprocess, "run", fake)
+        assert cluster_backend.check_audit_stream() == 42
+
+    def test_unreachable_backbone_fails_rather_than_reading_as_zero(self, monkeypatch):
+        """A broker that cannot be reached must not be indistinguishable from
+        a broker that carried nothing — that conflation is the whole bug."""
+        import subprocess as _sp
+
+        def fake(*a, **kw):
+            return _sp.CompletedProcess(a[0], 1, stdout="", stderr="no such deploy")
+
+        monkeypatch.setattr(cluster_backend.subprocess, "run", fake)
+        with pytest.raises(RuntimeError, match="unreadable"):
+            cluster_backend.check_audit_stream()
+
+
+class TestPlannerFaultActuallyStopsThePlanner:
+    """The planner-crash fault was cosmetic for four attempts.
+
+    Fault 7 measured a 26 s endpoint gap — 2.6x the 10 s plan interval — yet
+    zero fallback lines appeared, because the pod stayed 1/1 ready throughout
+    termination and the operator's reused HTTP connection kept reaching it.
+    """
+
+    def _script(self):
+        return (Path(__file__).resolve().parents[2] / "scripts"
+                / "chaos_inject.sh").read_text(encoding="utf-8")
+
+    def test_planner_is_scaled_to_zero_not_deleted(self):
+        body = self._script()
+        assert "--replicas=0" in body
+        # Deleting the pod delists it from Endpoints while it keeps serving
+        # established connections, which is why seven injections did nothing.
+        assert "delete --wait=false" not in body
+
+    def test_injector_asserts_the_fault_reached_the_controller(self):
+        body = self._script()
+        assert "positive control" in body
+        assert "planner unavailable" in body
