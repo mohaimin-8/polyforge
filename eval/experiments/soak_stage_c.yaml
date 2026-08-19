@@ -1,0 +1,28 @@
+# WP14 Phase 6, Stage C — the 4-hour endurance run.
+#
+# 1440 steps x 10 s = 14400 s. Four hours is chosen deliberately: attempt 3
+# hit its OOM cascade at 12 h 45 m and attempt 4 at ~17 h 30 m, but with load
+# spread across sixteen replicas the per-pod fill rate should be ~16x slower,
+# so any residual leak shows as a TREND within four hours even if it would not
+# reach the limit in that time.
+#
+# Pass criteria:
+#   zero OOMKilled, zero pod restarts
+#   peak per-pod RSS < 60% of the 256 Mi limit
+#   container memory flat after hour 1 (no monotonic climb)
+#   http_req_failed < 0.1%
+#   4 hour-buckets present, p95 stable
+#
+# A fix applied after Stage C passes INVALIDATES Stage C. Nothing changes
+# between C passing and D starting.
+name: soak_stage_c
+backend: cluster
+steps: 1440
+reps: 1
+systems: [jcac]
+workloads: [crud_bursty]
+tenant_mixes: [uniform]
+cluster_sizes: [medium]
+output: eval/results/soak_stage_c.duckdb
+retries: 0
+timeseries_reps: 0

@@ -1,0 +1,29 @@
+# WP14 Phase 6, Stage B — the 60-minute rehearsal with POSITIVE CONTROLS.
+#
+# 360 steps x 10 s = 3600 s. All four fault kinds compressed into an hour.
+#
+# THIS STAGE EXISTS TO PROVE EACH HYPOTHESIS CAN FAIL, not to pass them.
+# Attempt 4's deepest defect was that three of five hypotheses could not fail
+# -- not because the system was good, but because their instruments were
+# absent or saturated. A hypothesis never observed failing is not a test.
+#
+# Must be OBSERVED (docs/WP14_REMEDIATION_ROADMAP.md Phase 6):
+#   planner scale-down  -> >= 1 "planner unavailable" line per injection
+#   audit continuity    -> degraded-cycle count == audit-record count, both > 0
+#   latency fault       -> SK-H1 FAILS, p95 deviation exceeds 20%
+#   apiserver throttle  -> reconciler error rate rises measurably
+#   load distribution   -> holds under fault, no re-pinning
+#
+# If a hypothesis cannot be made to fail here, it is not instrumented and
+# Stage D must not start.
+name: soak_stage_b
+backend: cluster
+steps: 360
+reps: 1
+systems: [jcac]
+workloads: [crud_bursty]
+tenant_mixes: [uniform]
+cluster_sizes: [medium]
+output: eval/results/soak_stage_b.duckdb
+retries: 0
+timeseries_reps: 0
