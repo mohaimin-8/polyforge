@@ -84,6 +84,15 @@ EVAL_LIVE_AI = os.environ.get("POLYFORGE_EVAL_LIVE_AI") == "1"
 TIER_BACKENDS_JSON = os.environ.get("POLYFORGE_EVAL_TIER_BACKENDS", "")
 GATEWAY_IMAGE = "polyforge/ai-gateway:dev"
 GATEWAY_LOCAL_PORT = 18081
+# WP14 attempt 5: the CRUD load path is a NodePort published on a kind host
+# port, NOT `kubectl port-forward`. Attempt 4 lost a full 24 h sitting to the
+# forward, which resolves to ONE pod when it starts and never follows the
+# Service: all ~300 req/s landed on a single replica of sixteen, drove it to
+# its 256 Mi limit, and each OOM kill took the load path down with it -- 282
+# restarts, 4.567% failed requests, run INVALID. A NodePort is balanced by
+# kube-proxy in the kernel across every ready endpoint, so no single replica
+# carries the run and there is no userspace proxy process left to die.
+NODE_PORT = 30080
 AI_KINDS = ("chat", "embed", "agent")  # mirrors AI_KINDS in model.py
 # Per-tenant prompt-pool sizes: the cell's prompt-reuse structure. A finite
 # pool makes the realized hit rate sensitive to the cache-MB knob; classes
@@ -141,9 +150,49 @@ def kind_config(cluster_size: str) -> str:
         "apiVersion: kind.x-k8s.io/v1alpha4",
         "nodes:",
         "  - role: control-plane",
+        # Publishes the NodePort on the host so k6 can drive the Service with
+        # no proxy in between. kind cannot add a port mapping to a running
+        # cluster (kubernetes-sigs/kind#2720), so it has to be here at create
+        # time or not at all.
+        "    extraPortMappings:",
+        f"      - containerPort: {NODE_PORT}",
+        f"        hostPort: {NODE_PORT}",
+        "        protocol: TCP",
     ]
     lines += ["  - role: worker"] * (nodes - 1)
     return "\n".join(lines) + "\n"
+
+
+def nodeport_service() -> str:
+    """A NodePort in front of the control-plane, for the eval load path only.
+
+    Deliberately a separate object from the chart's ClusterIP Service rather
+    than a patch of it: this is evaluation scaffolding and must never ship in
+    the product chart. The selector mirrors `polyforge.selectorLabels` from
+    deploy/helm/polyforge/templates/_helpers.tpl.
+
+    externalTrafficPolicy stays at the default (Cluster), which is what makes
+    this work: traffic entering the one published node is spread by kube-proxy
+    across endpoints on *every* node, not just pods local to the entry point.
+    """
+    return f"""apiVersion: v1
+kind: Service
+metadata:
+  name: polyforge-control-plane-nodeport
+  namespace: polyforge
+  labels:
+    app.kubernetes.io/managed-by: polyforge-eval
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: polyforge-control-plane
+    app.kubernetes.io/instance: polyforge
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: {NODE_PORT}
+"""
 
 
 def kind_mix(buckets, tid) -> list[tuple[str, float]]:
@@ -556,6 +605,9 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         helm_install,
         ["kubectl", "--namespace", "polyforge", "rollout", "status",
          "deployment/polyforge-control-plane", "--timeout=180s"],
+        # The eval load path. Applied after the rollout so the Service has
+        # ready endpoints to select the moment k6 starts.
+        ["kubectl", "apply", "-f", str(workdir / "nodeport.yaml")],
     ]
     if EVAL_LIVE_AI:
         plan += [
@@ -577,7 +629,6 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
 
 
 ADMIN_KEY = "polyforge-kind-admin"  # deploy/helm/polyforge/values.yaml default
-LOCAL_PORT = 18080
 
 # One demand bucket's wall-clock duration. Mirrors CONTROL_INTERVAL_S in
 # research/jcac_sim/model.py — the sim and the live plane must agree on what
@@ -618,6 +669,40 @@ def check_k6_delivery(summary_path: Path) -> None:
             f"k6 dropped {n_dropped} iterations: the generator could not keep "
             "up with its own arrival rate, so the tenants did not receive the "
             "demand this cell specifies")
+
+
+def check_load_distribution(sampler: "LoadDistributionSampler",
+                            max_share: float = 0.25,
+                            min_active_fraction: float = 0.8) -> None:
+    """Fail the run when the load landed on too few replicas.
+
+    With sixteen replicas an even split is 6.25% each, so a 25% ceiling is
+    four times the fair share -- generous enough to absorb kube-proxy's
+    imperfect balancing and the noise in a CPU proxy, while still catching
+    pinning instantly (attempt 4's pinned pod carried effectively 100%).
+
+    This runs in EVERY stage including the 10-minute smoke, which is the
+    point: pinning must never again be discoverable only at hour 24.
+    """
+    shares = sampler.shares()
+    if not shares:
+        raise RuntimeError(
+            f"load distribution unmeasured: {sampler.samples} usable samples, "
+            f"{sampler.failures} failed. The gate that would catch a pinned "
+            "load path is itself blind, so the run cannot be trusted")
+    hottest, share = max(shares.items(), key=lambda kv: kv[1])
+    active = sum(1 for s in shares.values() if s > 0.001)
+    if share > max_share:
+        raise RuntimeError(
+            f"load was pinned: pod {hottest} took {share:.1%} of the work "
+            f"(ceiling {max_share:.0%}, fair share {1 / len(shares):.1%} "
+            f"across {len(shares)} replicas). This is the WP14 attempt-4 "
+            "failure mode -- one replica carrying the run until it OOMs")
+    if active < min_active_fraction * len(shares):
+        raise RuntimeError(
+            f"only {active} of {len(shares)} replicas served any traffic "
+            f"(floor {min_active_fraction:.0%}): the load path is not "
+            "reaching the whole Deployment")
 
 
 def check_sampler_coverage(sampler: "ReplicaSampler", load_duration_s: float) -> None:
@@ -752,6 +837,77 @@ def provision_tenants(base: str, tenant_ids, slo_classes=None) -> dict[str, str]
     return tokens
 
 
+class LoadDistributionSampler(threading.Thread):
+    """Samples per-pod CPU across the control-plane during the load window.
+
+    Exists because of the single most expensive omission in WP14: across four
+    attempts, *nothing ever checked that requests reached more than one pod*.
+    `kubectl port-forward` pinned every request to one replica of sixteen, and
+    every health signal was satisfied by that one replica working -- pods
+    Running, sixteen Service endpoints, /healthz answering 200. The run was
+    only revealed as invalid at hour 24, four times.
+
+    CPU is a **proxy** for request share, not a count of requests. It is used
+    because metrics-server is already deployed for the HPA arm, so this costs
+    no product change, and because the failure it must catch is not subtle: in
+    attempt 4 the pinned pod ran at 1571m while its fifteen siblings sat at
+    8-16m. A proxy that separates those by two orders of magnitude is an
+    adequate gate. If it ever proves too noisy, the rigorous replacement is a
+    pod label on `telemetry_events` written from the Downward API.
+    """
+
+    INTERVAL_S = 30.0
+
+    def __init__(self, namespace: str = "polyforge",
+                 selector: str = "app.kubernetes.io/name=polyforge-control-plane"):
+        super().__init__(daemon=True)
+        self.namespace = namespace
+        self.selector = selector
+        self.cpu_ms: dict[str, float] = {}
+        self.samples = 0
+        self.failures = 0
+        self._stop = threading.Event()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def run(self) -> None:
+        while not self._stop.is_set():
+            self._sample()
+            self._stop.wait(self.INTERVAL_S)
+
+    def _sample(self) -> None:
+        try:
+            proc = subprocess.run(
+                ["kubectl", "--namespace", self.namespace, "top", "pods",
+                 "--selector", self.selector, "--no-headers"],
+                capture_output=True, text=True, timeout=30,
+                encoding="utf-8", errors="replace")
+            if proc.returncode != 0:
+                self.failures += 1
+                return
+            seen = False
+            for line in proc.stdout.splitlines():
+                parts = line.split()
+                if len(parts) < 2 or not parts[1].endswith("m"):
+                    continue
+                pod, cpu = parts[0], float(parts[1][:-1])
+                # Accumulate CPU-milli-seconds, so a pod that is hot for half
+                # the run and idle for the rest is weighted accordingly.
+                self.cpu_ms[pod] = self.cpu_ms.get(pod, 0.0) + cpu * self.INTERVAL_S
+                seen = True
+            if seen:
+                self.samples += 1
+        except Exception:
+            self.failures += 1
+
+    def shares(self) -> dict[str, float]:
+        total = sum(self.cpu_ms.values())
+        if total <= 0:
+            return {}
+        return {pod: cpu / total for pod, cpu in sorted(self.cpu_ms.items())}
+
+
 class ReplicaSampler(threading.Thread):
     """Samples the deployment's ready replica count while k6 drives load;
     replica-seconds price the live run's infra cost (the component
@@ -814,7 +970,8 @@ def evidence_dir_for(run: RunSpec) -> Path:
 
 
 def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
-                       supervisor: "PortForwardSupervisor | None") -> None:
+                       supervisor: "PortForwardSupervisor | None",
+                       loadspread: "LoadDistributionSampler | None" = None) -> None:
     """Copy the run's diagnostics out of the temp workdir. Best-effort and
     never raising: a failure to save evidence must not also fail the run."""
     if evidence_dir is None:
@@ -828,12 +985,32 @@ def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
         if supervisor is not None:
             (evidence_dir / "port_forward_summary.json").write_text(
                 json.dumps(supervisor.summary(), indent=2), encoding="utf-8")
+        if loadspread is not None:
+            # SK-H6's evidence. Written even when the gate rejects the run,
+            # because a pinned distribution IS the finding in that case.
+            (evidence_dir / "load_distribution.json").write_text(
+                json.dumps({"samples": loadspread.samples,
+                            "failures": loadspread.failures,
+                            "cpu_ms": loadspread.cpu_ms,
+                            "shares": loadspread.shares()}, indent=2),
+                encoding="utf-8")
     except Exception:
         pass
 
 
 class PortForwardSupervisor(threading.Thread):
     """Keeps a `kubectl port-forward` alive for the whole load window.
+
+    **No longer on the CRUD load path (WP14 attempt 5).** Supervising this
+    proxy treated a symptom: however reliably the forward is respawned, it
+    still pins every request to ONE pod, and attempt 4 lost its 24 h sitting
+    exactly that way -- 282 supervised restarts, because each OOM kill of the
+    pinned replica killed the forward with it. The load path is now a NodePort
+    (`NODE_PORT`), where kube-proxy balances across all ready endpoints.
+
+    Kept because a single-pod service still sometimes needs forwarding, and
+    because the AI-gateway path below is still an unsupervised `Popen` that
+    should eventually adopt this.
 
     WP14 attempt 2 (session 38) lost a full 24 h soak to this being absent:
     `check_k6_delivery` rejected the run at **36.4% failed requests**, and the
@@ -990,6 +1167,8 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
     with tempfile.TemporaryDirectory(prefix=f"pf-eval-{run.run_id}-") as tmp:
         workdir = Path(tmp)
         (workdir / "kind.yaml").write_text(kind_config(run.cluster_size), encoding="utf-8")
+        (workdir / "nodeport.yaml").write_text(nodeport_service(),
+                                               encoding="utf-8")
         (workdir / "replay.js").write_text(k6_script(run), encoding="utf-8")
         if run.system in OPERATOR_SYSTEMS:
             (workdir / "operator-crs.yaml").write_text(operator_crs(run), encoding="utf-8")
@@ -1013,6 +1192,7 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
         portforward = None
         gw_portforward = None
         sampler = None
+        loadspread = None
         infra_cost = 0.0
         try:
             for cmd in plan:
@@ -1021,16 +1201,15 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                     # The load window: reach the service, mint tenant keys,
                     # meter replicas while k6 replays the demand buckets.
                     #
-                    # WP14: supervised rather than fire-and-forget. An
-                    # unsupervised forward is the leading explanation for
-                    # attempt 2's 36.4% delivery failure over 24 h.
-                    portforward = PortForwardSupervisor(
-                        "polyforge", "polyforge-control-plane", LOCAL_PORT,
-                        evidence_log=evidence_dir / "port_forward.log"
-                        if evidence_dir else None)
-                    endpoints = portforward.start_forward()
-                    portforward.start()
-                    base = f"http://127.0.0.1:{LOCAL_PORT}"
+                    # WP14 attempt 5: no forward at all. Attempts 2-4 tried
+                    # progressively harder to keep a `kubectl port-forward`
+                    # alive -- unsupervised, then supervised with automatic
+                    # respawn -- and attempt 4 still lost the run to it, at
+                    # 282 restarts. Supervising a proxy that pins every
+                    # request to one pod treats the symptom; a NodePort
+                    # removes the proxy, and kube-proxy spreads the load
+                    # across all ready endpoints in the kernel.
+                    base = f"http://127.0.0.1:{NODE_PORT}"
                     _wait_http(base + "/healthz")
                     tokens = provision_tenants(base, tenant_ids, slo_classes)
                     env = dict(os.environ, POLYFORGE_URL=base,
@@ -1056,6 +1235,8 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                                            tokens[tenant_ids[0]], workdir)
                     sampler = ReplicaSampler()
                     sampler.start()
+                    loadspread = LoadDistributionSampler()
+                    loadspread.start()
                 exporting = "eval-export" in cmd
                 if exporting:
                     cmd = cmd + [f"--infra-cost-usd={infra_cost:.6f}"]
@@ -1075,8 +1256,20 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                     # the only artifact carrying the failure timeline — died
                     # with the TemporaryDirectory when the gate rejected the
                     # run, which is why that failure could not be diagnosed.
-                    _preserve_evidence(workdir, evidence_dir, portforward)
+                    if loadspread is not None:
+                        loadspread.stop()
+                        loadspread.join(timeout=60)
+                    _preserve_evidence(workdir, evidence_dir, portforward,
+                                       loadspread)
+                    # Order matters. check_k6_delivery answers "did the
+                    # requests succeed"; check_load_distribution answers "did
+                    # they reach more than one pod". Attempt 4 passed the
+                    # second question for 17 h without anyone asking it, so it
+                    # is asked here on every run, before the delivery verdict
+                    # is trusted to mean anything about the Deployment.
                     check_k6_delivery(workdir / "k6-summary.json")
+                    if loadspread is not None:
+                        check_load_distribution(loadspread)
                     if portforward is not None:
                         portforward.stop()
                         portforward = None
@@ -1093,6 +1286,8 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
         finally:
             if sampler is not None:
                 sampler.stop()
+            if loadspread is not None:
+                loadspread.stop()
             # Second attempt at preserving evidence: the first is before the
             # delivery gate (so a rejected run keeps its diagnostics); this one
             # covers every other exit path, including an exception mid-load.
