@@ -1,0 +1,25 @@
+[inject] waiting for the k6 load window to start...
+[inject] k6 load started at 09:50:27 (T0=1787046627)
+[inject] === FAULT 1 planner-crash at 23:50:27 (T+50400s) ===
+[inject] NAME                                          READY   STATUS    RESTARTS      AGE   IP            NODE                     NOMINATED NODE   READINESS GATES
+[inject] polyforge-control-plane-64554f8d96-757fl      1/1     Running   0             14h   10.244.3.9    polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-7npb8      1/1     Running   1 (14h ago)   14h   10.244.1.13   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-b2bb7      1/1     Running   1 (14h ago)   14h   10.244.1.6    polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-bmp7r      1/1     Running   1 (14h ago)   14h   10.244.2.11   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-dcq2g      1/1     Running   0             14h   10.244.2.12   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-f62jn      1/1     Running   0             14h   10.244.1.11   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-nlftc      1/1     Running   1 (14h ago)   14h   10.244.3.10   polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-nnhp9      1/1     Running   0             14h   10.244.3.8    polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-pkcvf      1/1     Running   0             14h   10.244.1.9    polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-pknl8      1/1     Running   1 (14h ago)   14h   10.244.3.7    polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-pn28g      1/1     Running   1 (14h ago)   14h   10.244.2.13   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-tm8cg      1/1     Running   0             14h   10.244.2.14   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-wrp86      1/1     Running   1 (14h ago)   14h   10.244.3.11   polyforge-eval-worker2   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-xglkn      1/1     Running   0             14h   10.244.1.10   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-xp98k      1/1     Running   0             14h   10.244.2.10   polyforge-eval-worker3   <none>           <none>
+[inject] polyforge-control-plane-64554f8d96-ztrtl      1/1     Running   0             14h   10.244.1.12   polyforge-eval-worker    <none>           <none>
+[inject] polyforge-operator-7889d4586b-cs8bt           1/1     Running   0             14h   10.244.1.8    polyforge-eval-worker    <none>           <none>
+[inject] polyforge-operator-planner-697c74cf95-64lch   1/1     Running   0             6h    10.244.2.16   polyforge-eval-worker3   <none>           <none>
+[inject] postgres-f557b6fb6-dhj5w                      1/1     Running   0             14h   10.244.3.2    polyforge-eval-worker2   <none>           <none>
+[inject] deleting planner pod(s): pod/polyforge-operator-planner-697c74cf95-64lch
+[inject] pod "polyforge-operator-planner-697c74cf95-64lch" deleted from polyforge namespace
