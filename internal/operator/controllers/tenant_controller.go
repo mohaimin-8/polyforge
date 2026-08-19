@@ -152,6 +152,28 @@ func (r *TenantReconciler) ensureNamespace(ctx context.Context, tenant *pfv1alph
 	})
 }
 
+// TenantRoleRules is what every per-tenant Role grants. It is exported and
+// used by ensureRBAC rather than written inline because Kubernetes forbids
+// granting permissions you do not hold yourself: the operator's own
+// ClusterRole must cover every rule here, or the apiserver rejects the Role
+// with "attempting to grant RBAC permissions not currently held" and the
+// tenant silently never gets one.
+//
+// That is not hypothetical. The shipped ClusterRole omitted pods entirely,
+// so every tenant Role creation was denied -- 552 times in 14 h during the
+// WP14 soak -- and no per-tenant Role has ever existed in any deployment.
+// The failure is invisible from outside: ensureRBAC's error is logged and
+// reconciliation continues, so pods stay Running and health checks stay
+// green. TestOperatorClusterRoleCoversTenantRoleRules pins the invariant
+// against both shipped manifests.
+func TenantRoleRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{{
+		APIGroups: []string{""},
+		Resources: []string{"pods", "configmaps"},
+		Verbs:     []string{"get", "list", "watch"},
+	}}
+}
+
 // ensureRBAC grants the tenant's service account read-only access to its own
 // pods and configmaps — enough for self-service debugging, nothing that
 // crosses tenants. Default-deny networking (W24) covers the data plane.
@@ -163,11 +185,7 @@ func (r *TenantReconciler) ensureRBAC(ctx context.Context, tenant *pfv1alpha1.Te
 			Namespace: ns,
 			Labels:    map[string]string{managedByLabel: managedByValue, tenantLabel: tenant.Name},
 		},
-		Rules: []rbacv1.PolicyRule{{
-			APIGroups: []string{""},
-			Resources: []string{"pods", "configmaps"},
-			Verbs:     []string{"get", "list", "watch"},
-		}},
+		Rules: TenantRoleRules(),
 	}
 	if err := r.Create(ctx, role); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err

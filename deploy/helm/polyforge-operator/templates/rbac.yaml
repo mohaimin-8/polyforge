@@ -28,6 +28,13 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
+  # Not used by the operator directly: it is the permission the per-tenant
+  # Roles delegate (TenantRoleRules). Kubernetes refuses to let a subject
+  # grant rights it does not hold, so without this every tenant Role creation
+  # is denied. configmaps above already satisfies the other half of that rule.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["roles", "rolebindings"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
