@@ -1,0 +1,75 @@
+# NATS with JetStream, for the evaluation cluster only.
+#
+# WP14: SK-H2 ("every degraded cycle is audited") computed 0 == 0 for four
+# consecutive attempts, and the reason was structural rather than behavioural.
+# PlanRunner.audit returns immediately when Audit is nil; Audit is assigned in
+# exactly one place, cmd/operator/main.go, and only inside
+# `if natsURL := os.Getenv("POLYFORGE_NATS_URL"); natsURL != ""`. That variable
+# was set nowhere -- not in deploy/helm, not in eval/, not on any live
+# deployment -- so no audit record has ever been published. The Postgres outbox
+# held 16 rows for a 24 h run, all from tenant setup.
+#
+# Ephemeral on purpose: a soak needs the stream to exist and be countable, not
+# to survive a restart. No PVC, no persistence, memory storage.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: polyforge
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats
+  namespace: polyforge
+  labels:
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/managed-by: polyforge-eval
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nats
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nats
+    spec:
+      containers:
+        - name: nats
+          image: nats:2.10-alpine
+          args: ["-js", "-m", "8222"]
+          ports:
+            - name: client
+              containerPort: 4222
+            - name: monitor
+              containerPort: 8222
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: monitor
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  namespace: polyforge
+  labels:
+    app.kubernetes.io/name: nats
+spec:
+  selector:
+    app.kubernetes.io/name: nats
+  ports:
+    - name: client
+      port: 4222
+      targetPort: client
+    - name: monitor
+      port: 8222
+      targetPort: monitor

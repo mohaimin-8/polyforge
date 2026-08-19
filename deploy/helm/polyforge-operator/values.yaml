@@ -9,6 +9,12 @@ operator:
   # OTLP endpoint for reconcile spans, e.g. otel-collector.observability:4318.
   # Empty disables export.
   otlpEndpoint: ""
+  # Audit backbone. Empty disables audit publishing entirely: PlanRunner.audit
+  # no-ops when Audit is nil, and Audit is only assigned when this reaches the
+  # operator as POLYFORGE_NATS_URL. Left empty by default because the product
+  # chart ships no broker; the evaluation cluster sets it so SK-H2 has a stream
+  # to count, which it did not for four WP14 attempts.
+  natsURL: ""
   resources:
     requests:
       cpu: 50m
