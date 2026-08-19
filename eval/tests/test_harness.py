@@ -1052,3 +1052,103 @@ class TestEvidenceDirIsNotTemp:
         parts = [p.lower() for p in path.parts]
         assert "results" in parts and "eval" in parts
         assert "temp" not in parts and "tmp" not in parts
+
+
+class TestNodePortLoadPath:
+    """WP14 attempt 5: the load path is a NodePort, not a port-forward.
+
+    Attempts 2-4 tried progressively harder to keep `kubectl port-forward`
+    alive and attempt 4 still lost its 24 h sitting to it, at 282 restarts and
+    4.567% failed requests. The forward resolves to ONE pod and never follows
+    the Service, so the whole workload landed on one replica of sixteen until
+    it OOMed on its 256 Mi limit. A NodePort is balanced by kube-proxy across
+    every ready endpoint, in the kernel, with no proxy process to die.
+    """
+
+    def test_kind_config_publishes_the_nodeport_on_the_host(self):
+        from harness.cluster_backend import NODE_PORT, kind_config
+
+        cfg = kind_config("medium")
+        assert "extraPortMappings:" in cfg
+        assert f"containerPort: {NODE_PORT}" in cfg
+        assert f"hostPort: {NODE_PORT}" in cfg
+        # kind cannot add a port mapping to a running cluster, so the mapping
+        # has to sit under the control-plane node at create time. If it drifts
+        # onto a worker the host port silently stops reaching kube-proxy.
+        head = cfg.split("- role: worker")[0]
+        assert "extraPortMappings:" in head
+
+    def test_nodeport_service_selects_the_control_plane(self):
+        import yaml  # noqa: F401  (pyyaml ships with the harness deps)
+        from harness.cluster_backend import NODE_PORT, nodeport_service
+
+        doc = yaml.safe_load(nodeport_service())
+        assert doc["spec"]["type"] == "NodePort"
+        assert doc["spec"]["ports"][0]["nodePort"] == NODE_PORT
+        # Must match polyforge.selectorLabels in the chart's _helpers.tpl, or
+        # the Service selects nothing and every request 503s.
+        assert doc["spec"]["selector"] == {
+            "app.kubernetes.io/name": "polyforge-control-plane",
+            "app.kubernetes.io/instance": "polyforge",
+        }
+        # Evaluation scaffolding: it must never look like part of the product.
+        assert doc["metadata"]["name"] != "polyforge-control-plane"
+
+
+class TestLoadDistributionGate:
+    """The check whose absence cost four 24 h sittings.
+
+    Nothing in attempts 1-4 ever verified that requests reached more than one
+    pod. Every health signal was satisfied by the single pinned replica
+    working: pods Running, sixteen Service endpoints, /healthz answering 200.
+    """
+
+    def _sampler(self, cpu_ms, samples=20, failures=0):
+        from harness.cluster_backend import LoadDistributionSampler
+
+        s = LoadDistributionSampler()
+        s.cpu_ms = dict(cpu_ms)
+        s.samples = samples
+        s.failures = failures
+        return s
+
+    def test_even_spread_passes(self):
+        from harness.cluster_backend import check_load_distribution
+
+        check_load_distribution(self._sampler({f"pod-{i}": 100.0 for i in range(16)}))
+
+    def test_attempt4_signature_fails(self):
+        """The real numbers: one pod at 1571m, fifteen siblings at 8-16m."""
+        from harness.cluster_backend import check_load_distribution
+
+        cpu = {"pod-hot": 1571.0 * 30}
+        cpu.update({f"pod-{i}": 12.0 * 30 for i in range(15)})
+        with pytest.raises(RuntimeError, match="load was pinned"):
+            check_load_distribution(self._sampler(cpu))
+
+    def test_idle_replicas_fail_even_when_no_single_pod_dominates(self):
+        """Four pods sharing everything evenly still means twelve are dead
+        weight — the fault tolerance of four replicas, not sixteen."""
+        from harness.cluster_backend import check_load_distribution
+
+        cpu = {f"pod-{i}": 100.0 for i in range(4)}
+        cpu.update({f"pod-idle-{i}": 0.0 for i in range(12)})
+        with pytest.raises(RuntimeError, match="served any traffic"):
+            check_load_distribution(self._sampler(cpu), max_share=0.30)
+
+    def test_a_blind_gate_fails_rather_than_passing_silently(self):
+        """metrics-server down must not read as 'distribution fine'. A gate
+        that cannot see is the failure mode this whole class exists for."""
+        from harness.cluster_backend import check_load_distribution
+
+        with pytest.raises(RuntimeError, match="unmeasured"):
+            check_load_distribution(self._sampler({}, samples=0, failures=40))
+
+    def test_shares_weight_by_time_not_final_reading(self):
+        """A pod hot for half the window and idle after must not read as idle;
+        cpu_ms accumulates CPU-milliseconds, so shares reflect the whole run."""
+        from harness.cluster_backend import LoadDistributionSampler
+
+        s = LoadDistributionSampler()
+        s.cpu_ms = {"a": 300.0, "b": 100.0}
+        assert s.shares() == {"a": 0.75, "b": 0.25}
