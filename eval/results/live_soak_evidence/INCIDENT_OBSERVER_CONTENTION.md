@@ -82,3 +82,57 @@ and the experimental protocol needs a rule — no local builds or heavy queries
 for the duration of a run — that it did not have.
 
 That rule belongs in the next pre-registration.
+
+---
+
+# Correction (10:12 local, T+18 h 22 m): the attribution above is wrong
+
+The section above concluded that observer contention caused the restarts and
+that the run would recover once local work stopped. **The first half is at
+best partial and the second half is false.** Restarts continued after all
+observer compute ceased, reaching 40 by 10:10, and the pattern is not what
+contention produces.
+
+| # | time | reason | gap |
+|---:|---|---|---:|
+| 25 | 09:40:51 | process exited | 169 s |
+| 26 | 09:41:59 | health probe failed | 68 s |
+| 27 | 09:44:41 | health probe failed | 162 s |
+| 28 | 09:46:03 | health probe failed | 82 s |
+| … | | | |
+| 39 | 10:08:54 | process exited | 168 s |
+| 40 | 10:10:01 | health probe failed | 67 s |
+
+The intervals alternate with machine regularity — roughly 70–80 s, then
+150–175 s, repeating without drift for forty minutes. Resource contention
+from a compiler is bursty and stops when the compiler stops. This is a
+**stable oscillation**, and it has been running since ~09:32 while the
+observer did nothing heavier than two `max(id)` index lookups every half
+hour, an activity far too infrequent to explain restarts every two minutes.
+
+What appears to have happened is that the builds *triggered* an initial
+failure — the correlation across two separate windows is still strong, and
+15 h 33 m of prior silence is still unexplained by anything else — but the
+port-forward then entered a self-sustaining failure mode that no longer
+depends on the trigger. `kubectl port-forward` is a userspace proxy carrying
+~300 req/s from k6 through a single pinned pod; the alternation between
+"process exited" and "health probe failed" is consistent with it repeatedly
+saturating and being torn down, not with external CPU starvation.
+
+**Being accurate here matters more than accepting blame.** Over-attributing
+the failure to the observer is as much an error as missing the observer's
+role: it would send the next investigation after a protocol rule about local
+builds when the actual defect is a fragile load path that the harness has
+never stress-tested at this duration. Both belong in the record. Only one of
+them is the thing that will break the next run.
+
+**No intervention.** The supervisor is already doing the only available
+remedy — restarting the forward — roughly every two minutes. Manually
+touching it would add an undisclosed, unregistered action to a live run
+without offering anything the supervisor is not already attempting.
+
+**Expected consequence.** At ~1 restart per 2 minutes with 5.5 h remaining,
+another ~165 restarts are likely. Each drops k6 connections in flight, so
+SK-H4's `http_req_failed < 1%` gate is now the run's most probable failure
+point, and the delivery-path defect the whole of attempt 3 and 4 was meant to
+fix is not fixed — it was merely dormant for 15 hours.
