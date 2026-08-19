@@ -1,0 +1,29 @@
+# WP14 Phase 6, Stage A — the 10-minute smoke.
+#
+# 60 steps x STEP_SECONDS (10 s) = 600 s. Its job is not to measure anything:
+# it is to prove that every instrument the 24 h sitting depends on actually
+# emits, in fifteen minutes rather than at hour 24. Four attempts failed
+# because each fix was validated BY the next 24 h run.
+#
+# Pass criteria (docs/WP14_REMEDIATION_ROADMAP.md Phase 6):
+#   http_req_failed == 0, dropped_iterations == 0   (check_k6_delivery)
+#   no pod > 25% of the work, >= 80% of replicas active (check_load_distribution)
+#   eval-export returns 10 non-empty 60 s buckets
+#   audit stream MessageCount > 0                   (check_audit_stream)
+#   k6-live.log non-empty
+#   zero OOMKilled
+#
+# Run with:
+#   POLYFORGE_EVAL_SHARED_PG=1 POLYFORGE_EVAL_BUCKET_SECONDS=60 \
+#   POLYFORGE_EVAL_KEEP_CLUSTER=1 python run_campaign.py experiments/soak_stage_a.yaml
+name: soak_stage_a
+backend: cluster
+steps: 60
+reps: 1
+systems: [jcac]
+workloads: [crud_bursty]
+tenant_mixes: [uniform]
+cluster_sizes: [medium]
+output: eval/results/soak_stage_a.duckdb
+retries: 0
+timeseries_reps: 0
