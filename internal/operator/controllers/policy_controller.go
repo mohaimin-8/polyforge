@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -111,17 +113,35 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	policy.Status.AppliedReplicas = replicas
-	policy.Status.AppliedCacheSizeMB = cacheMB
-	policy.Status.AppliedModelTier = tier
-	policy.Status.ObservedGeneration = policy.Generation
-	if policy.Status.LastPlanSource == "" {
-		policy.Status.LastPlanSource = pfv1alpha1.PlanSourceManual
-	}
-	r.setApplied(&policy, metav1.ConditionTrue, "Applied",
-		fmt.Sprintf("replicas=%d (target total %d) cacheMB=%d tier=%s",
-			replicas, total, cacheMB, tier))
-	if err := r.Status().Update(ctx, &policy); err != nil {
+	// Retry on conflict rather than surfacing one. The plan runner writes
+	// Status.LastPlanSource/LastPlanTime on its own 10s cadence, so this
+	// reconcile races it constantly: the WP14 soak logged 3,701 "the object
+	// has been modified" errors in 14 h, about one every 13 seconds, each one
+	// a failed reconcile that controller-runtime then requeued. Nothing was
+	// broken by it -- the requeue eventually won -- but it inflated apiserver
+	// load precisely during the windows the throttle fault is meant to
+	// measure, and it buried real errors in noise (4,253 of 4,267 log lines).
+	//
+	// The status here is derived entirely from spec and from cluster state
+	// already read above, so re-deriving it against a fresh copy is safe: no
+	// decision depends on the stale Status we would otherwise overwrite.
+	msg := fmt.Sprintf("replicas=%d (target total %d) cacheMB=%d tier=%s",
+		replicas, total, cacheMB, tier)
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var fresh pfv1alpha1.Policy
+		if err := r.Get(ctx, req.NamespacedName, &fresh); err != nil {
+			return err
+		}
+		fresh.Status.AppliedReplicas = replicas
+		fresh.Status.AppliedCacheSizeMB = cacheMB
+		fresh.Status.AppliedModelTier = tier
+		fresh.Status.ObservedGeneration = fresh.Generation
+		if fresh.Status.LastPlanSource == "" {
+			fresh.Status.LastPlanSource = pfv1alpha1.PlanSourceManual
+		}
+		r.setApplied(&fresh, metav1.ConditionTrue, "Applied", msg)
+		return r.Status().Update(ctx, &fresh)
+	}); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil

@@ -389,7 +389,19 @@ func (p *PlanRunner) fallback(ctx context.Context, inputs []planner.TenantInput,
 		// in the stream that any availability claim is measured from.
 		if policy.Status.LastPlanSource != pfv1alpha1.PlanSourceFallback {
 			policy.Status.LastPlanSource = pfv1alpha1.PlanSourceFallback
-			if err := p.Client.Status().Update(ctx, policy); err != nil && p.Log != nil {
+			// The one status write in this file that did not retry. A
+			// conflict here loses the fallback mark entirely -- the policy
+			// controller reconciles constantly, so a collision is likely
+			// exactly when the planner is down and this matters most.
+			name := types.NamespacedName{Namespace: policy.Namespace, Name: policy.Name}
+			if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				var fresh pfv1alpha1.Policy
+				if err := p.Client.Get(ctx, name, &fresh); err != nil {
+					return err
+				}
+				fresh.Status.LastPlanSource = pfv1alpha1.PlanSourceFallback
+				return p.Client.Status().Update(ctx, &fresh)
+			}); err != nil && p.Log != nil {
 				p.Log.Error("mark fallback", "tenant", input.TenantID, "error", err)
 			}
 		}

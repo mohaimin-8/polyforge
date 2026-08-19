@@ -102,15 +102,15 @@ type evalExportDoc struct {
 	// TierRequests counts backend-serving AI requests per tier (cache hits
 	// excluded) — the tier histogram the three-knob live plane meters $-cost
 	// from (PREREG_WAVE4_LIVE_PLANE.md §Metrics).
-	TierRequests        map[string]int `json:"tier_requests"`
+	TierRequests map[string]int `json:"tier_requests"`
 	// Buckets is populated only when --bucket-seconds is set, so every
 	// existing consumer and every committed record is byte-identical without
 	// it (omitempty). 3600 for a soak, 60 for a short validation stage.
-	Buckets             []evalBucket   `json:"buckets,omitempty"`
-	NEvents             int            `json:"n_events"`
-	NTenants            int            `json:"n_tenants"`
-	GeneratedAtUTC      string         `json:"generated_at_utc"`
-	CostInfraSourceNote string         `json:"cost_infra_source_note"`
+	Buckets             []evalBucket `json:"buckets,omitempty"`
+	NEvents             int          `json:"n_events"`
+	NTenants            int          `json:"n_tenants"`
+	GeneratedAtUTC      string       `json:"generated_at_utc"`
+	CostInfraSourceNote string       `json:"cost_infra_source_note"`
 }
 
 func evalExport(args []string) int {
@@ -227,7 +227,7 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 	var violations, total int
 	var cacheHits, aiTotal int
 	attainments := make([]float64, 0, len(tenants))
-	stepViolations := map[int64][2]int{} // step -> {over-target, total}
+	stepViolations := map[int64][2]int{}  // step -> {over-target, total}
 	buckets := map[int64]*evalBucketAcc{} // bucket index -> accumulator
 
 	for _, t := range tenants {
