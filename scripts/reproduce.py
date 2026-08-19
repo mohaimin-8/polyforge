@@ -106,6 +106,19 @@ CAMPAIGN_RECORDS = [
     # are none, which is the finding. A failure record that cannot be
     # regenerated is a failure record that can quietly drift.
     ("analysis_live_soak.py", [], "RESULTS_LIVE_SOAK.md"),
+    # WP14 attempt 4: the 24 h sitting that completed. Gated for the same
+    # reason as attempt 2, and one more -- its headline is that three of five
+    # frozen hypotheses had no working instrument, two of which compute a
+    # PASSING value while testing nothing. That reading is exactly the kind a
+    # later edit could soften into "SK-H1 PASS, SK-H2 PASS" without anyone
+    # noticing, so it is pinned byte-for-byte like every other record.
+    #
+    # Rebuilds from eval/results/live_soak_evidence/: the hour buckets and
+    # control steps rescued from Postgres before teardown, the injector logs,
+    # and the port-forward summary. Not from campaign metrics -- the DuckDB
+    # timeseries table is empty by config (timeseries_reps: 0) and eval-export
+    # emits no timeseries at all, which is the finding.
+    ("analysis_live_soak_v2.py", [], "RESULTS_LIVE_SOAK_V2.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
