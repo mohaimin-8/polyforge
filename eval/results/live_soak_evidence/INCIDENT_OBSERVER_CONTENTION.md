@@ -136,3 +136,78 @@ another ~165 restarts are likely. Each drops k6 connections in flight, so
 SK-H4's `http_req_failed < 1%` gate is now the run's most probable failure
 point, and the delivery-path defect the whole of attempt 3 and 4 was meant to
 fix is not fixed — it was merely dormant for 15 hours.
+
+---
+
+# Root cause (10:45 local, T+18 h 55 m): OOM kills on the pinned pod
+
+Both sections above are superseded. The oscillation has a mechanism, it is in
+the system under test, and it is the same defect attempt 3 recorded.
+
+```
+16 OOMKilled container terminations
+48 pod restarts across the control-plane deployment
+most recent: 04:29:57Z 04:32:42Z 04:34:01Z 04:36:37Z 04:37:53Z 04:41:25Z
+             (= 10:29-10:41 local, i.e. one every 1-3 minutes, ongoing)
+```
+
+Every one of the 16 control-plane pods now carries 2–4 restarts. At the
+moment of measurement the pod the forward was pinned to held **209 Mi against
+its 256 Mi limit** while the other fifteen sat at 8–16 Mi.
+
+## The cycle
+
+1. `kubectl port-forward service/polyforge-control-plane` resolves to **one
+   pod** when it starts and does not follow the Service.
+2. All of k6's ~300 req/s therefore lands on that single pod. The other
+   fifteen replicas are idle — the deployment provides **no load
+   distribution whatsoever**.
+3. That pod's memory climbs under sustained load until it crosses 256 Mi.
+4. The kubelet OOM-kills it.
+5. The forward's target is gone, so `kubectl port-forward` exits — the
+   "process exited" restarts.
+6. The supervisor restarts the forward, which pins a **fresh** pod, and the
+   cycle repeats.
+
+The alternating 70–80 s / 150–175 s intervals are this loop: the shorter gaps
+are health-probe detections, the longer ones the time a newly pinned pod
+takes to accumulate its way to the limit.
+
+## What this corrects
+
+**"The OOM crash-loop has not reproduced" (reported at T+12 h 45 m) was
+premature.** At that checkpoint attempt 4 showed 7 restarts, all deploy-time
+`Error`, and zero OOMKilled, and that was read as evidence attempt 3's OOM
+finding might not generalise. It generalised. Attempt 3 reached this state at
+12 h 45 m; attempt 4 reached it at roughly 17 h 30 m. The finding was not
+wrong, it was **early** — and a checkpoint that looks clean is not evidence a
+later-onset failure will not happen.
+
+**The observer-contention attribution is demoted to a probable
+accelerant.** Attempt 3 entered the same cycle with no builds running at all,
+which is decisive: the defect does not need an observer. What the builds
+plausibly did is bring forward the moment the pinned pod first crossed its
+limit. That is a real effect and the no-local-builds protocol rule is still
+worth having, but it is not the cause and the next investigation should not
+start there.
+
+## The finding worth reporting
+
+A 16-replica deployment under `kubectl port-forward` has the fault tolerance
+of a **single replica**, because the load path pins to one pod and every
+other replica is dead weight. Under sustained load that pod OOMs on a 256 Mi
+limit, and its death takes the load path with it. Horizontal scaling is
+providing exactly nothing here, and no health check reports a problem: pods
+are `Running`, the Service has 16 endpoints, and `/healthz` answers 200
+between kills.
+
+This is a property of the *evaluation harness's* load path, not of the
+controller. It says nothing about how PolyForge would behave behind a real
+Service or Ingress that load-balances across endpoints. That distinction has
+to be explicit in any write-up, because "PolyForge OOMs under sustained load"
+would be the wrong conclusion to draw from it.
+
+Fixing it means not driving 24 h of production-rate load through
+`kubectl port-forward` — a NodePort, an Ingress, or an in-cluster load
+generator — and revisiting whether 256 Mi is right for a pod expected to
+absorb the whole workload.
