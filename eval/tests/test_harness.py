@@ -1152,3 +1152,76 @@ class TestLoadDistributionGate:
         s = LoadDistributionSampler()
         s.cpu_ms = {"a": 300.0, "b": 100.0}
         assert s.shares() == {"a": 0.75, "b": 0.25}
+
+
+class TestObservabilityAndTeardown:
+    """WP14 Phase 2: the run must be readable while it runs, and its evidence
+    must outlive it.
+
+    Attempt 4 ran blind for 24 h (`capture_output=True` buffers until exit, so
+    the runner log was 0 bytes), then deleted the cluster holding 21M telemetry
+    rows seconds after reading them — losing hours 17-24 permanently when the
+    end-of-run extraction lost that race.
+    """
+
+    def test_eval_export_is_asked_for_time_buckets(self, tmp_path):
+        run = expand(tiny_spec())[0]
+        plan = cluster_backend.command_plan(run, tmp_path)
+        export = [c for c in plan if "eval-export" in c]
+        assert len(export) == 1, "expected exactly one export step"
+        # SK-H3 is frozen on hour-bucketed crud_p95. Without this flag the
+        # exporter emits run-level scalars only and the hypothesis has no
+        # instrument at all — which is what happened four times.
+        assert any(a.startswith("--bucket-seconds=") for a in export[0])
+
+    def test_teardown_runs_by_default_so_ci_never_leaks_clusters(self, tmp_path):
+        run = expand(tiny_spec())[0]
+        plan = cluster_backend.command_plan(run, tmp_path)
+        deletes = [c for c in plan if c[:2] == ["kind", "delete"]]
+        # One pre-clean at the head, one teardown at the tail.
+        assert len(deletes) == 2
+        assert plan[-1][:2] == ["kind", "delete"]
+
+    def test_keep_cluster_preserves_the_evidence_store(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cluster_backend, "EVAL_KEEP_CLUSTER", True)
+        run = expand(tiny_spec())[0]
+        plan = cluster_backend.command_plan(run, tmp_path)
+        deletes = [c for c in plan if c[:2] == ["kind", "delete"]]
+        # The idempotent pre-clean must survive — it is what makes a rerun
+        # possible — but the trailing teardown must not.
+        assert len(deletes) == 1
+        assert plan[0][:2] == ["kind", "delete"]
+        assert plan[-1][:2] != ["kind", "delete"]
+
+    def test_k6_aborts_a_doomed_run_instead_of_finishing_it(self):
+        run = expand(tiny_spec(systems=["hpa"]))[0]
+        script = cluster_backend.k6_script(run)
+        # Attempt 4 spent its last 6.5 h driving load in a state the delivery
+        # gate would reject, because nothing told k6 to stop.
+        assert "abortOnFail" in script
+        # ...but not so eagerly that a cold-start blip kills a healthy run.
+        assert "delayAbortEval" in script
+
+    def test_run_step_streams_to_a_file_and_still_reports_errors(self, tmp_path):
+        log = tmp_path / "k6-live.log"
+        proc = cluster_backend._run_step(
+            [sys.executable, "-c",
+             "import sys; print('progress'); print('boom', file=sys.stderr); "
+             "sys.exit(3)"],
+            env=None, timeout_s=60, live_log=log)
+        # Written as it happens, not buffered until exit.
+        assert log.exists()
+        body = log.read_text(encoding="utf-8")
+        assert "progress" in body and "boom" in body
+        # The caller's existing error path reads proc.stderr; that must keep
+        # working now that the real stream went to a file.
+        assert proc.returncode == 3
+        assert "boom" in proc.stderr
+
+    def test_run_step_without_a_log_still_captures_stdout_as_data(self, tmp_path):
+        """eval-export's JSON arrives on stdout and is parsed. Streaming it to
+        a file would silently empty proc.stdout and break the export."""
+        proc = cluster_backend._run_step(
+            [sys.executable, "-c", "print('{\"ok\": true}')"],
+            env=None, timeout_s=60, live_log=None)
+        assert proc.stdout.strip() == '{"ok": true}'
