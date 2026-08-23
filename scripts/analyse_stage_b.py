@@ -56,10 +56,22 @@ def load_timeline() -> list[tuple[int, str]]:
 
 
 def load_buckets() -> list[dict]:
-    p = EVIDENCE / "eval-export.json"
-    if not p.exists():
-        return []
-    return json.loads(p.read_text(encoding="utf-8")).get("buckets", [])
+    """Prefer the fine-grained export.
+
+    The sitting exports twice: coarse (hour) buckets for SK-H3 and fine (60 s)
+    buckets for SK-H1, because a five-minute recovery cannot be resolved at
+    hour width and percentiles do not aggregate. SK-H1 is scored here, so the
+    fine file is the right input whenever it exists; a stage that ran only one
+    export still works through the fallback.
+    """
+    for name in ("eval-export-fine.json", "eval-export.json"):
+        p = EVIDENCE / name
+        if p.exists():
+            buckets = json.loads(p.read_text(encoding="utf-8")).get("buckets", [])
+            if buckets:
+                print(f"  (buckets read from {name})")
+                return buckets
+    return []
 
 
 def bucket_epoch(row: dict) -> int:
