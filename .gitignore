@@ -59,3 +59,6 @@ artifacts/openapi.yaml
 
 # soak_observer.sh single-instance lock
 .observer.lock
+
+# stage_b_controls.sh single-instance lock
+.controls.lock
