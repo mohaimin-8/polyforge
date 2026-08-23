@@ -1,0 +1,40 @@
+{
+  "samples": 120,
+  "failures": 0,
+  "cpu_ms": {
+    "polyforge-control-plane-64554f8d96-468vt": 282360.0,
+    "polyforge-control-plane-64554f8d96-4fffv": 293970.0,
+    "polyforge-control-plane-64554f8d96-4ffhz": 321030.0,
+    "polyforge-control-plane-64554f8d96-4lm89": 325080.0,
+    "polyforge-control-plane-64554f8d96-5dk29": 290130.0,
+    "polyforge-control-plane-64554f8d96-7f2cn": 295050.0,
+    "polyforge-control-plane-64554f8d96-8krcw": 302370.0,
+    "polyforge-control-plane-64554f8d96-dcz6s": 296100.0,
+    "polyforge-control-plane-64554f8d96-fq7km": 266400.0,
+    "polyforge-control-plane-64554f8d96-h7wgk": 284490.0,
+    "polyforge-control-plane-64554f8d96-kj5bt": 270180.0,
+    "polyforge-control-plane-64554f8d96-mdd98": 308310.0,
+    "polyforge-control-plane-64554f8d96-slc69": 326730.0,
+    "polyforge-control-plane-64554f8d96-vqzpf": 303540.0,
+    "polyforge-control-plane-64554f8d96-zb4cm": 281250.0,
+    "polyforge-control-plane-64554f8d96-zzw2x": 301110.0
+  },
+  "shares": {
+    "polyforge-control-plane-64554f8d96-468vt": 0.05946799772540595,
+    "polyforge-control-plane-64554f8d96-4fffv": 0.061913186327162445,
+    "polyforge-control-plane-64554f8d96-4ffhz": 0.06761230808112718,
+    "polyforge-control-plane-64554f8d96-4lm89": 0.06846528084918178,
+    "polyforge-control-plane-64554f8d96-5dk29": 0.061104441776710684,
+    "polyforge-control-plane-64554f8d96-7f2cn": 0.062140645731977,
+    "polyforge-control-plane-64554f8d96-8krcw": 0.06368231503127567,
+    "polyforge-control-plane-64554f8d96-dcz6s": 0.062361786819991154,
+    "polyforge-control-plane-64554f8d96-fq7km": 0.056106653187590824,
+    "polyforge-control-plane-64554f8d96-h7wgk": 0.05991659821823466,
+    "polyforge-control-plane-64554f8d96-kj5bt": 0.05690276110444178,
+    "polyforge-control-plane-64554f8d96-mdd98": 0.06493334175775574,
+    "polyforge-control-plane-64554f8d96-slc69": 0.06881278827320401,
+    "polyforge-control-plane-64554f8d96-vqzpf": 0.06392872938649144,
+    "polyforge-control-plane-64554f8d96-zb4cm": 0.05923422000379099,
+    "polyforge-control-plane-64554f8d96-zzw2x": 0.06341694572565869
+  }
+}

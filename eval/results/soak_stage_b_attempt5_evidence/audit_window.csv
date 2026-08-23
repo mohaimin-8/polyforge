@@ -1,0 +1,3 @@
+label,degraded_cycles,tenants,msgs_before,msgs_after
+T+5m planner,7,8,168,256
+T+35m planner,7,8,1608,1696
