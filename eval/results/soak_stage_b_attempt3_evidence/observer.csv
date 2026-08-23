@@ -1,0 +1,2 @@
+epoch,iso,nodes_mem_pct,pods_ready,pods_total,restarts_total,max_pod_mem_mi,cp_replicas,pg_ckpt_timed,pg_ckpt_req,pg_ckpt_write_ms,pg_ckpt_sync_ms,pg_rows_ingested,pg_autovacuum,kind_node_mem
+1787505688,2026-08-23T17:21:28Z,7,20,20,0,356,16,1,1,92756,119,29481,0,polyforge-eval-worker=701.9MiB|polyforge-eval-worker2=343.8MiB|polyforge-eval-control-plane=693MiB|polyforge-eval-worker3=334.1MiB
