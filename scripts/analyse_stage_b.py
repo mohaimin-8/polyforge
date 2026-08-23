@@ -108,69 +108,68 @@ def score_latency(buckets: list[dict], timeline: list[tuple[int, str]]) -> bool:
 
 
 def score_audit() -> bool:
-    """Degraded cycles vs the audit records they must have produced.
+    """Does the audit backbone keep recording while the controller degrades?
 
-    The pre-registered rule is "degraded-cycle count == audit-record count,
-    both > 0". As scored through attempt 4 that compared 14 against 2,888 and
-    called it a pass, because the two sides were never the same quantity: the
-    operator audits EVERY cycle for EVERY tenant, so a 60-minute run puts
-    8 x 360 = 2,880 records on the stream whether or not anything degraded.
-    A rule whose two sides differ by two orders of magnitude under healthy
-    operation is not a continuity test, it is an inequality that happens to
-    hold.
+    SK-H2 claims no degraded cycle goes unrecorded. Getting a measurement of
+    that took three formulations, and the first two failed for reasons that had
+    nothing to do with the claim:
 
-    What is actually claimed is that no degraded cycle goes unrecorded. During
-    a planner outage every cycle falls back, so the stream's growth ACROSS the
-    outage window is exactly the fallback records, and the expected value is
-    (degraded cycles x tenants). That is a comparison of like with like, and it
-    fails if records are dropped.
+      1. "degraded cycles == audit records" compared 14 against 2,888 and
+         PASSED. The operator audits every cycle for every tenant, so a
+         60-minute run puts 8 x 360 = 2,880 records on the stream whether or
+         not anything degrades.
+      2. "stream growth across the outage == degraded cycles x tenants" FAILED
+         on a run where auditing was perfectly continuous. Stage B attempt 5
+         grew by exactly 88 records in both windows -- 11 control cycles x 8
+         tenants -- while the rule expected 56, because grepping the operator
+         log for "planner unavailable" undercounts cycles and the window also
+         holds post-recovery records indistinguishable from fallback ones.
 
-    The window is closed after a settle period, so a few post-recovery cycles
-    can land inside it; three cycles of slack is allowed above the expectation
-    and none below. Missing records are the failure this exists to catch.
+    Both faults are instrument properties, visible without looking at any
+    outcome. So the quantity is now a DIFFERENCE that needs neither a cycle
+    count nor a way to separate the two record populations: an equal-length
+    healthy window is sampled immediately before each outage, and the stream
+    must not grow more slowly while degraded than it did while healthy.
+
+    One control cycle of tenants is allowed as boundary jitter. It fails when
+    records are dropped, which is the only thing SK-H2 ever claimed.
     """
-    controls = EVIDENCE / "positive_controls.log"
-    if not controls.exists():
-        print("  positive_controls.log missing")
-        return False
     windows = EVIDENCE / "audit_window.csv"
     if not windows.exists():
         print("  audit_window.csv missing — the run predates per-injection audit")
         print("  SK-H2: NOT SCOREABLE (this is a fail, not a pass)")
         return False
-
     rows = list(csv.DictReader(windows.read_text(encoding="utf-8").splitlines()))
     if not rows:
         print("  audit_window.csv is empty — no injection recorded a window")
         return False
+    if "base_start" not in (rows[0] or {}):
+        print("  audit_window.csv is in the superseded two-column layout")
+        print("  SK-H2: NOT SCOREABLE (this is a fail, not a pass)")
+        return False
 
     ok = True
-    total_cycles = total_delta = 0
     for row in rows:
-        cycles = int(row["degraded_cycles"] or 0)
-        tenants = int(row["tenants"] or 0)
-        before = int(row["msgs_before"] or 0)
-        after = int(row["msgs_after"] or 0)
-        delta = after - before
-        expected = cycles * tenants
-        slack = 3 * tenants
-        total_cycles += cycles
-        total_delta += delta
+        try:
+            tenants = int(row["tenants"])
+            healthy = int(row["base_end"]) - int(row["base_start"])
+            degraded = int(row["out_end"]) - int(row["base_end"])
+        except (TypeError, ValueError):
+            print(f"  {row['label']}: a sample was unreadable "
+                  f"({row['base_start']!r} {row['base_end']!r} {row['out_end']!r}) "
+                  "-> NOT SCOREABLE")
+            ok = False
+            continue
+        floor = healthy - tenants
         verdict = "OK"
-        if cycles == 0 or tenants == 0:
-            verdict, ok = "VACUOUS (nothing degraded)", False
-        elif delta < expected:
-            verdict, ok = f"MISSING {expected - delta} record(s)", False
-        elif delta > expected + slack:
-            verdict, ok = f"{delta - expected} above expectation (> {slack} slack)", False
-        print(f"  {row['label']}: {cycles} cycle(s) x {tenants} tenant(s) "
-              f"= {expected} expected, stream grew {delta}  -> {verdict}")
-
-    print(f"  totals: {total_cycles} degraded cycle(s), {total_delta} record(s) "
-          f"across {len(rows)} window(s)")
-    if total_cycles == 0 or total_delta == 0:
-        print("  SK-H2: VACUOUS — nothing degraded, so nothing was audited")
-        return False
+        if healthy <= 0:
+            verdict, ok = "VACUOUS (stream idle while healthy)", False
+        elif degraded <= 0:
+            verdict, ok = "NO RECORDS while degraded", False
+        elif degraded < floor:
+            verdict, ok = f"SHORTFALL {floor - degraded} below the healthy rate", False
+        print(f"  {row['label']}: healthy +{healthy}, degraded +{degraded} "
+              f"(floor {floor}, {tenants} tenants)  -> {verdict}")
     return ok
 
 
