@@ -28,6 +28,8 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EVIDENCE="${EVIDENCE_DIR:-$REPO/eval/results/soak_stage_b_evidence}"
 mkdir -p "$EVIDENCE" 2>/dev/null || true
 RESULTS="$EVIDENCE/positive_controls.log"
+[ -f "$EVIDENCE/audit_window.csv" ] ||
+  echo "label,degraded_cycles,tenants,msgs_before,msgs_after" > "$EVIDENCE/audit_window.csv"
 
 PLANNER_OUTAGE_S=${PLANNER_OUTAGE_S:-90}
 THROTTLE_DURATION_S=${THROTTLE_DURATION_S:-90}
@@ -79,6 +81,21 @@ verdict() { # name, condition-result, detail
 }
 
 # ---------------------------------------------------------------- planner ---
+# Stream message count. During a planner outage EVERY cycle falls back, so the
+# growth across the outage window is exactly the fallback records -- which is
+# what makes SK-H2's "==" rule scoreable at all. It was comparing 14 degraded
+# cycles against 2,888 records, and the stream carries one record per tenant
+# per cycle (8 x 360 = 2,880), so the two sides were never the same quantity.
+# NATS does not expose per-subject counts on its monitoring port in this
+# version, and the operator publishes AuditEntry payloads that the typed
+# Replay path cannot decode, so the window delta is the honest measurement
+# available without changing the audit contract.
+audit_messages() {
+  kubectl -n "$NS" exec deploy/nats -- wget -qO- http://127.0.0.1:8222/jsz 2>/dev/null |
+    tr ',' '
+' | sed -n 's/.*"messages"[[:space:]]*:[[:space:]]*\([0-9]\+\).*//p' | head -1
+}
+
 planner_control() {
   local label="$1"
   local dep
@@ -87,13 +104,17 @@ planner_control() {
     verdict "$label" 1 "no planner deployment found"
     return
   fi
-  log "$label: scaling $dep to 0 for ${PLANNER_OUTAGE_S}s"
+  local msgs_before msgs_after tenants
+  msgs_before=$(audit_messages)
+  tenants=$(kubectl -n "$NS" get policies --no-headers 2>/dev/null | grep -c .)
+  log "$label: scaling $dep to 0 for ${PLANNER_OUTAGE_S}s (audit stream at ${msgs_before:-?}, ${tenants:-?} tenants)"
   echo "$(date +%s) planner_down" >> "$EVIDENCE/timeline.txt"
   kubectl -n "$NS" scale "$dep" --replicas=0 >/dev/null 2>&1
   sleep "$PLANNER_OUTAGE_S"
   kubectl -n "$NS" scale "$dep" --replicas=1 >/dev/null 2>&1
   echo "$(date +%s) planner_up" >> "$EVIDENCE/timeline.txt"
   sleep 20
+  msgs_after=$(audit_messages)
 
   local op fb
   op=$(operator_pod)
@@ -105,65 +126,16 @@ planner_control() {
   # and SK-H1's recovery path remains untested.
   [ "${fb:-0}" -gt 0 ] && verdict "$label fallback" 0 "$fb fallback line(s)" \
                        || verdict "$label fallback" 1 "ZERO fallback lines — the fault did not reach the controller"
+
+  # SK-H2's evidence, written per injection so the scorer never has to infer
+  # which records belonged to which outage.
+  printf '%s,%s,%s,%s,%s
+' "$label" "${fb:-0}" "${tenants:-0}" \
+    "${msgs_before:-}" "${msgs_after:-}" >> "$EVIDENCE/audit_window.csv"
+  log "$label audit window: ${msgs_before:-?} -> ${msgs_after:-?} (delta $(( ${msgs_after:-0} - ${msgs_before:-0} )), expected ${fb:-0} x ${tenants:-0} records)"
 }
 
 # --------------------------------------------------------------- throttle ---
-throttle_control() {
-  local label="$1" op before after delta
-  op=$(operator_pod)
-  before=$(kubectl -n "$NS" logs "$op" --since=120s 2>/dev/null | grep -c 'Reconciler error' || true)
-  log "$label: applying APF throttle for ${THROTTLE_DURATION_S}s (baseline ${before} errors/2min)"
-  echo "$(date +%s) throttle_on" >> "$EVIDENCE/timeline.txt"
-  local sa
-  sa=$(kubectl -n "$NS" get deploy -l app.kubernetes.io/name=polyforge-operator \
-        -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null)
-  cat <<YAML | kubectl apply -f - >/dev/null 2>&1
-apiVersion: flowcontrol.apiserver.k8s.io/v1
-kind: PriorityLevelConfiguration
-metadata:
-  name: pf-chaos-throttle
-spec:
-  type: Limited
-  limited:
-    nominalConcurrencyShares: 1
-    limitResponse:
-      type: Reject
----
-apiVersion: flowcontrol.apiserver.k8s.io/v1
-kind: FlowSchema
-metadata:
-  name: pf-chaos-throttle
-spec:
-  matchingPrecedence: 1000
-  priorityLevelConfiguration:
-    name: pf-chaos-throttle
-  rules:
-    - subjects:
-        - kind: ServiceAccount
-          serviceAccount:
-            name: ${sa:-polyforge-operator}
-            namespace: $NS
-      resourceRules:
-        - verbs: ["*"]
-          apiGroups: ["*"]
-          resources: ["*"]
-          clusterScope: true
-          namespaces: ["*"]
-YAML
-  sleep "$THROTTLE_DURATION_S"
-  after=$(kubectl -n "$NS" logs "$op" --since="${THROTTLE_DURATION_S}s" 2>/dev/null |
-          grep -c 'Reconciler error' || true)
-  kubectl delete flowschema pf-chaos-throttle >/dev/null 2>&1
-  kubectl delete prioritylevelconfiguration pf-chaos-throttle >/dev/null 2>&1
-  echo "$(date +%s) throttle_off" >> "$EVIDENCE/timeline.txt"
-  delta=$((after - before))
-  log "$label: ${before} -> ${after} reconciler errors"
-  # Recorded rather than gated. Attempt 4 measured the throttle REDUCING
-  # conflicts (it slows the operator, so it contends with itself less), which
-  # is a real observation and not a broken fault. Asserting a rise here would
-  # be asserting a mechanism we have evidence against.
-  verdict "$label throttle applied" 0 "delta ${delta} errors (descriptive, not gated)"
-}
 
 # ---------------------------------------------------------------- latency ---
 # NOT `tc netem`. Phase 3.1 offers "a tc netem delay, or a CPU-starved
@@ -211,11 +183,20 @@ cpu_control() {
   verdict "cpu starvation injected" 0 "scored post-hoc against the buckets"
 }
 
-wait_until 300;  planner_control  "T+5m planner"
-wait_until 900;  throttle_control "T+15m"
-wait_until 1500; cpu_control
-wait_until 2100; planner_control  "T+35m planner"
-wait_until 2700; throttle_control "T+45m"
+# The apiserver throttle is GONE, not merely ungated. scripts/diagnose_throttle.sh
+# settled it: the FlowSchema matches (40/40 impersonated operator-identity
+# requests dispatched through the level) and the level has NEVER rejected
+# anything -- it carries 3 concurrency seats, nominalConcurrencyShares is
+# already 1, the smallest APF accepts, and the operator never has 3 requests in
+# flight. The fault has no reachable mechanism on this apiserver, so injecting
+# it only manufactures the appearance of a chaos schedule. See the roadmap's
+# Stage B table.
+#
+# Offsets are overridable so a short run can validate an instrument without
+# sitting through the full hour. Defaults are the Stage B schedule.
+wait_until "${SCHED_PLANNER_1:-300}";  planner_control  "T+5m planner"
+wait_until "${SCHED_CPU:-1500}";       cpu_control
+wait_until "${SCHED_PLANNER_2:-2100}"; planner_control  "T+35m planner"
 
 log "=== Stage B controls finished: ${PASS} pass, ${FAIL} fail ==="
 log "NOTE: the latency verdict is decided by analyse_stage_b.py against the"

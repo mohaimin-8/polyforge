@@ -355,7 +355,7 @@ hypothesis **can fail**, not to pass them.
 | Positive control | Must be observed |
 |---|---|
 | Planner scale-down | ≥ 1 `planner unavailable` line per injection |
-| Audit continuity | degraded-cycle count == audit-record count, both > 0 |
+| Audit continuity | **Restated (session 39).** The old rule compared 14 degraded cycles against 2,888 records and passed: the operator audits every cycle for every tenant, so a 60-minute run puts 8 x 360 = 2,880 records on the stream whether or not anything degrades. Two sides differing by two orders of magnitude under healthy operation is not a continuity test. Now: during a planner outage every cycle falls back, so the stream's growth ACROSS the outage window must equal **degraded cycles x tenants** (three cycles of slack above, none below), both > 0. Like compared with like, and it fails when records are dropped. |
 | Latency fault (CPU starvation, **not** netem — see 3.1) | **SK-H1 FAILS** — p95 deviation exceeds 20% |
 | Throttle | **RETIRE — cannot bite (session 39).** Measured with `scripts/diagnose_throttle.sh`: the FlowSchema *does* match (40/40 impersonated operator-identity requests dispatched through it), but the level carries **3 concurrency seats** and has **never rejected a single request**. `nominalConcurrencyShares: 1` is already the smallest APF accepts, so the limit cannot be lowered to meet the operator's concurrency, which never approaches 3 in flight. This is not a selector bug and not a threshold to lower: the fault has no reachable mechanism on this apiserver. Any hypothesis scored on it is untested. |
 | Load distribution | holds under fault, no re-pinning |

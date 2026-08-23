@@ -31,6 +31,7 @@ Two verdicts:
 
 from __future__ import annotations
 
+import csv
 import datetime as dt
 import json
 import re
@@ -95,29 +96,70 @@ def score_latency(buckets: list[dict], timeline: list[tuple[int, str]]) -> bool:
 
 
 def score_audit() -> bool:
-    """Degraded cycles vs audit records.
+    """Degraded cycles vs the audit records they must have produced.
 
-    The injector logged one fallback line per degraded cycle per tenant, so the
-    operator log is the count of degraded cycles. The audit stream should carry
-    exactly the same number for those cycles.
+    The pre-registered rule is "degraded-cycle count == audit-record count,
+    both > 0". As scored through attempt 4 that compared 14 against 2,888 and
+    called it a pass, because the two sides were never the same quantity: the
+    operator audits EVERY cycle for EVERY tenant, so a 60-minute run puts
+    8 x 360 = 2,880 records on the stream whether or not anything degraded.
+    A rule whose two sides differ by two orders of magnitude under healthy
+    operation is not a continuity test, it is an inequality that happens to
+    hold.
+
+    What is actually claimed is that no degraded cycle goes unrecorded. During
+    a planner outage every cycle falls back, so the stream's growth ACROSS the
+    outage window is exactly the fallback records, and the expected value is
+    (degraded cycles x tenants). That is a comparison of like with like, and it
+    fails if records are dropped.
+
+    The window is closed after a settle period, so a few post-recovery cycles
+    can land inside it; three cycles of slack is allowed above the expectation
+    and none below. Missing records are the failure this exists to catch.
     """
     controls = EVIDENCE / "positive_controls.log"
     if not controls.exists():
         print("  positive_controls.log missing")
         return False
-    cycles = sum(int(m) for m in re.findall(r"(\d+) fallback line\(s\)",
-                                            controls.read_text(encoding="utf-8")))
-    summary = EVIDENCE / "audit_count.txt"
-    records = int(summary.read_text(encoding="utf-8").strip()) if summary.exists() else None
-    print(f"  degraded cycles observed : {cycles}")
-    print(f"  audit records on stream  : {records if records is not None else 'not captured'}")
-    if not cycles:
-        print("  SK-H2: VACUOUS — zero degraded cycles, nothing to audit")
+    windows = EVIDENCE / "audit_window.csv"
+    if not windows.exists():
+        print("  audit_window.csv missing — the run predates per-injection audit")
+        print("  SK-H2: NOT SCOREABLE (this is a fail, not a pass)")
         return False
-    if records is None:
-        print("  SK-H2: cycles exist and are countable; stream count not captured this run")
-        return True
-    return records >= cycles
+
+    rows = list(csv.DictReader(windows.read_text(encoding="utf-8").splitlines()))
+    if not rows:
+        print("  audit_window.csv is empty — no injection recorded a window")
+        return False
+
+    ok = True
+    total_cycles = total_delta = 0
+    for row in rows:
+        cycles = int(row["degraded_cycles"] or 0)
+        tenants = int(row["tenants"] or 0)
+        before = int(row["msgs_before"] or 0)
+        after = int(row["msgs_after"] or 0)
+        delta = after - before
+        expected = cycles * tenants
+        slack = 3 * tenants
+        total_cycles += cycles
+        total_delta += delta
+        verdict = "OK"
+        if cycles == 0 or tenants == 0:
+            verdict, ok = "VACUOUS (nothing degraded)", False
+        elif delta < expected:
+            verdict, ok = f"MISSING {expected - delta} record(s)", False
+        elif delta > expected + slack:
+            verdict, ok = f"{delta - expected} above expectation (> {slack} slack)", False
+        print(f"  {row['label']}: {cycles} cycle(s) x {tenants} tenant(s) "
+              f"= {expected} expected, stream grew {delta}  -> {verdict}")
+
+    print(f"  totals: {total_cycles} degraded cycle(s), {total_delta} record(s) "
+          f"across {len(rows)} window(s)")
+    if total_cycles == 0 or total_delta == 0:
+        print("  SK-H2: VACUOUS — nothing degraded, so nothing was audited")
+        return False
+    return ok
 
 
 def main() -> int:
