@@ -1262,3 +1262,7 @@ Appended by the runner every progress tick.
 | 2026-08-16 16:47 | live_smoke_pf | 1/1 | 1 | 3 runs/h |
 | 2026-08-16 17:58 | live_smoke_pf | 1/1 | 0 | 3 runs/h |
 | 2026-08-19 09:51 | live_soak | 1/1 | 1 | 0 runs/h |
+| 2026-08-19 13:47 | soak_stage_a | 1/1 | 0 | 4 runs/h |
+| 2026-08-19 14:19 | soak_stage_b | 1/1 | 1 | 22 runs/h |
+| 2026-08-19 15:35 | soak_stage_b | 1/1 | 1 | 1 runs/h |
+| 2026-08-23 16:33 | soak_stage_b | 1/1 | 0 | 1 runs/h |

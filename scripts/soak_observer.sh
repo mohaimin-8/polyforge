@@ -49,7 +49,11 @@ while true; do
 
   pods=$(kubectl --namespace "$NS" get pods --no-headers 2>/dev/null)
   pods_total=$(printf '%s\n' "$pods" | grep -c . )
-  pods_ready=$(printf '%s\n' "$pods" | awk '$2 ~ /^([0-9]+)\/\1$/ && $3 == "Running"' | grep -c .)
+  # split, not a backreference: awk is POSIX ERE and has none, so the old
+  # pattern matched nothing and this column read 0 on a run where all twenty
+  # pods were healthy.
+  pods_ready=$(printf '%s\n' "$pods" |
+    awk '{split($2, a, "/"); if (a[1] == a[2] && a[1] + 0 > 0 && $3 == "Running") n++} END {printf "%d", n+0}')
   # Restart count is the single number that would have settled attempt 4's
   # "did the pods OOM or did the load path die" question on the spot.
   restarts_total=$(printf '%s\n' "$pods" | awk '{s += $4} END {printf "%d", s+0}')
