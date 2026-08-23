@@ -191,9 +191,35 @@ Report `mean_violation` alongside as a secondary, explicitly noting its lack of
 range so the next reader is not misled the way this one was.
 
 **Positive control (mandatory).** In Stage B, inject a deliberate latency
-fault — a `tc netem` delay, or a CPU-starved control-plane pod — sized to push
-p95 past the 20% band. **SK-H1 must be observed FAILING.** If it cannot be
-made to fail, the metric is still vacuous and Phase 3 is not done.
+fault sized to push p95 past the 20% band. **SK-H1 must be observed FAILING.**
+If it cannot be made to fail, the metric is still vacuous and Phase 3 is not
+done.
+
+**The fault must be CPU starvation, NOT `tc netem` (session 39).** This
+paragraph originally offered either. The netem option cannot work, and the
+reason matters beyond this control: `crud_p95_ms` comes from the `latency_ms`
+written in `internal/platform/replay.go`, which starts its clock immediately
+before `burnCPU` and stops it immediately after. Request parse, authorisation,
+queueing ahead of the handler, the telemetry write and the entire network path
+fall OUTSIDE the measured window, so the metric is the duration of a CPU spin.
+Network delay lands in the outside region and cannot move it by construction —
+the control would have reported "does not move" and been misread as the metric
+still being vacuous, when in fact the fault never reached it.
+`internal/platform/replay_latency_semantics_test.go` demonstrates the gap:
+250 ms injected outside the burn, 1 ms recorded. Starvation lands *inside* the
+window because `burnCPU` spins against a wall-clock deadline, and `crud_read`
+is one work unit at 1 ms of CPU, so a few hundred microseconds of scheduling
+delay clears the band. Implemented in `scripts/stage_b_controls.sh` as two
+spinners on one worker — not a node-wide throttle and not every node, because
+the box shares 8 logical CPUs with the Windows-side k6 process and starving the
+generator manufactures dropped iterations.
+
+**Open, and deliberately not decided here.** The same definition means SK-H3's
+hourly gate and every `crud_p95`/`crud_p99` in the committed live records
+measure CPU service time rather than service latency, and attempt 4's
+"server-side 2.23 ms vs k6 1032 ms" gap is partly just that. Widening the
+measured window would change what every committed record means, so it needs its
+own stated reading rather than a quiet edit.
 
 ### 3.2 SK-H2: give the audit stream somewhere to go
 
@@ -314,7 +340,7 @@ that assumption is what produced four failed sittings.
 
 | Check | Pass criterion |
 |---|---|
-| Delivery | `http_req_failed` = 0%, `dropped_iterations` = 0 |
+| Delivery | `http_req_failed` = 0%, `dropped_iterations` = 0 (needs `preAllocatedVUs` >= 400: at 150 the generator itself dropped 26 iterations at t+3161s, session 39) |
 | **Load distribution** | no pod > 25% of requests; ≥ 80% of replicas served traffic |
 | Buckets | `eval-export --bucket-seconds=60` returns 10 non-empty buckets |
 | Audit | `MessageCount` > 0 |
@@ -330,7 +356,7 @@ hypothesis **can fail**, not to pass them.
 |---|---|
 | Planner scale-down | ≥ 1 `planner unavailable` line per injection |
 | Audit continuity | degraded-cycle count == audit-record count, both > 0 |
-| Latency fault (`tc netem`) | **SK-H1 FAILS** — p95 deviation exceeds 20% |
+| Latency fault (CPU starvation, **not** netem — see 3.1) | **SK-H1 FAILS** — p95 deviation exceeds 20% |
 | Throttle | reconciler error rate rises measurably |
 | Load distribution | holds under fault, no re-pinning |
 
