@@ -28,6 +28,20 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EVIDENCE="${EVIDENCE_DIR:-$REPO/eval/results/soak_stage_b_evidence}"
 mkdir -p "$EVIDENCE" 2>/dev/null || true
 RESULTS="$EVIDENCE/positive_controls.log"
+
+# Single instance, enforced. Stage B attempt 4 ran TWO injectors concurrently:
+# a previous launch was killed, its parent died, and its child bash survived to
+# keep the schedule. timeline.txt recorded two T0 lines and two planner_down
+# events three seconds apart, and the run's degraded latency was the harness
+# fighting itself, not the system under test. (Plain `kill` also does not
+# reliably stop these on Git Bash -- `kill -9` does.)
+CONTROL_LOCK="$REPO/.controls.lock"
+if [ -f "$CONTROL_LOCK" ] && kill -0 "$(cat "$CONTROL_LOCK" 2>/dev/null)" 2>/dev/null; then
+  echo "controls already running as PID $(cat "$CONTROL_LOCK"); refusing to start a second" >&2
+  exit 3
+fi
+echo $$ > "$CONTROL_LOCK"
+trap 'rm -f "$CONTROL_LOCK"' EXIT INT TERM
 [ -f "$EVIDENCE/audit_window.csv" ] ||
   echo "label,degraded_cycles,tenants,msgs_before,msgs_after" > "$EVIDENCE/audit_window.csv"
 
@@ -91,9 +105,31 @@ verdict() { # name, condition-result, detail
 # Replay path cannot decode, so the window delta is the honest measurement
 # available without changing the audit contract.
 audit_messages() {
-  kubectl -n "$NS" exec deploy/nats -- wget -qO- http://127.0.0.1:8222/jsz 2>/dev/null |
-    tr ',' '
-' | sed -n 's/.*"messages"[[:space:]]*:[[:space:]]*\([0-9]\+\).*//p' | head -1
+  # Retried, and loud on failure. Attempt 4 recorded EMPTY fields here because
+  # `kubectl exec` failed under a saturated apiserver, and the empty value then
+  # produced "operand expected" in the arithmetic below -- a sampler that
+  # writes nothing and a script that crashes on the nothing. An unreadable
+  # stream must be recorded as unreadable, not as a blank that later looks
+  # like a zero.
+  local out i
+  for i in 1 2 3; do
+    out=$(kubectl -n "$NS" exec deploy/nats -- wget -qO- http://127.0.0.1:8222/jsz 2>/dev/null |
+      tr ',' '\n' | sed -n 's/.*"messages"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' | head -1)
+    case "$out" in
+      ''|*[!0-9]*) sleep 3 ;;
+      *) printf '%s' "$out"; return 0 ;;
+    esac
+  done
+  printf 'UNREADABLE'
+  return 1
+}
+
+# Arithmetic that cannot crash the stage on a non-numeric sample.
+delta_or_na() {
+  case "$1$2" in
+    *[!0-9]*|'') printf 'n/a' ;;
+    *) printf '%s' "$(( $1 - $2 ))" ;;
+  esac
 }
 
 planner_control() {
@@ -132,7 +168,7 @@ planner_control() {
   printf '%s,%s,%s,%s,%s
 ' "$label" "${fb:-0}" "${tenants:-0}" \
     "${msgs_before:-}" "${msgs_after:-}" >> "$EVIDENCE/audit_window.csv"
-  log "$label audit window: ${msgs_before:-?} -> ${msgs_after:-?} (delta $(( ${msgs_after:-0} - ${msgs_before:-0} )), expected ${fb:-0} x ${tenants:-0} records)"
+  log "$label audit window: ${msgs_before:-?} -> ${msgs_after:-?} (delta $(delta_or_na "${msgs_after:-}" "${msgs_before:-}"), expected ${fb:-0} x ${tenants:-0} records)"
 }
 
 # --------------------------------------------------------------- throttle ---

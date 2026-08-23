@@ -1,0 +1,8 @@
+17:24:14 === Stage B positive controls: waiting for the k6 load window ===
+17:27:04 k6 load started (T0=1787506024)
+17:27:07 k6 load started (T0=1787506027)
+17:32:05 T+5m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s (audit stream at , 8 tenants)
+17:32:08 T+5m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s (audit stream at , 8 tenants)
+17:33:56   CONTROL PASS  T+5m planner fallback — 7 fallback line(s)
+17:34:00   CONTROL PASS  T+5m planner fallback — 7 fallback line(s)
+17:48:41 === Stage B positive controls: waiting for the k6 load window ===
