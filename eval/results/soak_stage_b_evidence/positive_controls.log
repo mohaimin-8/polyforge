@@ -1,0 +1,15 @@
+20:04:42 === Stage B positive controls: waiting for the k6 load window ===
+20:07:15 k6 load started (T0=1787515635)
+20:12:16 T+5m planner: baseline audit window opens at 168 (8 tenants)
+20:13:46 T+5m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s (audit stream at 240)
+20:15:38   CONTROL PASS  T+5m planner fallback — 8 fallback line(s)
+20:15:38 T+5m planner audit: healthy window +72, degraded window +80
+20:32:15 cpu: starving polyforge-eval-worker with 2 spinner(s) for 120s
+20:34:21   CONTROL PASS  cpu starvation injected — scored post-hoc against the buckets
+20:42:16 T+35m planner: baseline audit window opens at 1608 (8 tenants)
+20:43:46 T+35m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s (audit stream at 1680)
+20:45:38   CONTROL PASS  T+35m planner fallback — 8 fallback line(s)
+20:45:38 T+35m planner audit: healthy window +72, degraded window +80
+20:45:38 === Stage B controls finished: 3 pass, 0 fail ===
+20:45:38 NOTE: the latency verdict is decided by analyse_stage_b.py against the
+20:45:39       60 s buckets, not here. This script only guarantees it was injected.
