@@ -50,7 +50,34 @@ spec:
           # max_connections lifted well above the default 100: N control-plane
           # replicas each open an admin + app pgxpool, which at default pool
           # sizing can exceed 100 and CrashLoop the deployment.
-          args: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=256MB"]
+          # max_connections lifted for N replicas x 2 pools; the rest is
+          # write-stall tuning, added after Stage B attempt 6 (session 39).
+          #
+          # WHY. That run aborted on 68 dropped iterations from a spontaneous
+          # excursion at T+32m -- 399 VUs on one tenant, max request 5,696 ms --
+          # with NO pod restarts, node memory at 9%, and no autovacuum. What the
+          # observer did catch is telemetry ingestion collapsing about sixfold
+          # immediately before it (~8,000 rows per sample to ~1,350), inside a
+          # checkpoint window. pgdata is an emptyDir on a VHDX under WSL2, which
+          # is the slowest storage in this stack by a wide margin.
+          #
+          # The control plane writes each telemetry event synchronously, so a
+          # storage stall blocks request handlers -- and `latency_ms` cannot see
+          # it, because that clock stops before the write. Server-side crud_p95
+          # stayed at ~2.4 ms while clients waited seconds. Same shape as
+          # attempt 4's 464x server-vs-client gap.
+          #
+          # synchronous_commit=off is correct HERE and would not be on a real
+          # deployment: this store exists to be measured and thrown away, and
+          # the only thing at risk is the last few telemetry rows if the pod
+          # dies. max_wal_size and checkpoint_timeout cut checkpoint frequency
+          # so the remaining fsync bursts are rarer. Disclosed in the prereg.
+          args: ["postgres",
+                 "-c", "max_connections=500",
+                 "-c", "shared_buffers=256MB",
+                 "-c", "synchronous_commit=off",
+                 "-c", "max_wal_size=4GB",
+                 "-c", "checkpoint_timeout=30min"]
           env:
             - name: POSTGRES_DB
               value: polyforge
