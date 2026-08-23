@@ -1168,11 +1168,30 @@ class TestObservabilityAndTeardown:
         run = expand(tiny_spec())[0]
         plan = cluster_backend.command_plan(run, tmp_path)
         export = [c for c in plan if "eval-export" in c]
-        assert len(export) == 1, "expected exactly one export step"
         # SK-H3 is frozen on hour-bucketed crud_p95. Without this flag the
         # exporter emits run-level scalars only and the hypothesis has no
         # instrument at all — which is what happened four times.
-        assert any(a.startswith("--bucket-seconds=") for a in export[0])
+        assert export, "no export step at all"
+        for cmd in export:
+            assert any(a.startswith("--bucket-seconds=") for a in cmd)
+
+    def test_eval_export_runs_at_two_granularities(self, tmp_path):
+        """SK-H1 scores recovery within FIVE MINUTES; SK-H3 scores hour
+        buckets. Percentiles do not aggregate, so an hourly p95 cannot be
+        subdivided after the run — one export cannot serve both hypotheses.
+        """
+        run = expand(tiny_spec())[0]
+        plan = cluster_backend.command_plan(run, tmp_path)
+        widths = [
+            int(a.split("=", 1)[1])
+            for cmd in plan if "eval-export" in cmd
+            for a in cmd if a.startswith("--bucket-seconds=")
+        ]
+        assert len(widths) == 2, f"expected coarse and fine exports, got {widths}"
+        assert len(set(widths)) == 2, "the two exports must differ in width"
+        assert widths[0] == cluster_backend.EVAL_BUCKET_SECONDS, (
+            "the coarse export must run FIRST, so a failure in the fine pass "
+            "cannot cost the run the export every existing consumer reads")
 
     def test_teardown_runs_by_default_so_ci_never_leaks_clusters(self, tmp_path):
         run = expand(tiny_spec())[0]
