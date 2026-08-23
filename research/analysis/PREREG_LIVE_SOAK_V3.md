@@ -108,6 +108,22 @@ is the honest finding, and the response is NOT to relax the threshold", and
 that holds. The finding in that case is about what this machine can host, which
 is exactly the outcome SK-H4's stopping rule below names in advance.
 
+**The host is part of the apparatus, and is prepared before the sitting.**
+Seven Stage B runs in one session degraded this machine measurably. WSL2
+reclaims memory gradually, so each successive cluster teardown left less
+headroom than the last: the passing run started with 6.6 GB free, and the run
+that collapsed within 80 seconds of load -- p90 6,054 ms, 1,773 dropped
+iterations, before any fault -- started with 5.1 GB, alongside a 17.5 GB Docker
+build cache. Its observer shows 20/20 pods ready and zero restarts throughout,
+so nothing in the cluster was broken; it had nowhere to run.
+
+Before Stage D: reclaim the build cache, `wsl --shutdown` (which returned
+7.2 GB immediately, and the images survive it so nothing is rebuilt), and do
+not start below ~6 GB free. This is recorded because a reader is entitled to
+know that a run of this length on a 15.7 GB laptop is sensitive to the state
+the machine was left in by whatever ran before it — and because a failure of
+that kind must never be reported as a property of the controller.
+
 **Stage A and Stage B evidence is a precondition, not a result.** The ladder's
 numbers are reported in the record as gate results. They are not hypotheses and
 nothing in the sitting is scored against them.
