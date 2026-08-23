@@ -357,7 +357,7 @@ hypothesis **can fail**, not to pass them.
 | Planner scale-down | ≥ 1 `planner unavailable` line per injection |
 | Audit continuity | degraded-cycle count == audit-record count, both > 0 |
 | Latency fault (CPU starvation, **not** netem — see 3.1) | **SK-H1 FAILS** — p95 deviation exceeds 20% |
-| Throttle | reconciler error rate rises measurably |
+| Throttle | **RETIRE — cannot bite (session 39).** Measured with `scripts/diagnose_throttle.sh`: the FlowSchema *does* match (40/40 impersonated operator-identity requests dispatched through it), but the level carries **3 concurrency seats** and has **never rejected a single request**. `nominalConcurrencyShares: 1` is already the smallest APF accepts, so the limit cannot be lowered to meet the operator's concurrency, which never approaches 3 in flight. This is not a selector bug and not a threshold to lower: the fault has no reachable mechanism on this apiserver. Any hypothesis scored on it is untested. |
 | Load distribution | holds under fault, no re-pinning |
 
 **If a hypothesis cannot be made to fail here, it is not instrumented, and the

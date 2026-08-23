@@ -1,0 +1,17 @@
+14:39:15 === Stage B positive controls: waiting for the k6 load window ===
+14:42:40 k6 load started (T0=1787150560)
+14:47:41 T+5m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s
+14:49:32   CONTROL PASS  T+5m planner fallback — 7 fallback line(s)
+14:57:41 T+15m: applying APF throttle for 90s (baseline 0 errors/2min)
+14:59:12 T+15m: 0 -> 0 reconciler errors
+14:59:12   CONTROL PASS  T+15m throttle applied — delta 0 errors (descriptive, not gated)
+15:07:40 netem: adding 40ms delay on polyforge-eval-worker for 120s
+15:09:41   CONTROL PASS  netem latency injected — scored post-hoc against the buckets
+15:17:41 T+35m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s
+15:19:32   CONTROL PASS  T+35m planner fallback — 7 fallback line(s)
+15:27:41 T+45m: applying APF throttle for 90s (baseline 0 errors/2min)
+15:29:12 T+45m: 0 -> 0 reconciler errors
+15:29:12   CONTROL PASS  T+45m throttle applied — delta 0 errors (descriptive, not gated)
+15:29:12 === Stage B controls finished: 5 pass, 0 fail ===
+15:29:12 NOTE: the netem verdict is decided by analyse_stage_b.py against the
+15:29:12       60 s buckets, not here. This script only guarantees it was injected.
