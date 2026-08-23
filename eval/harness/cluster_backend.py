@@ -107,6 +107,13 @@ SOAK_MARKER = REPO_ROOT / ".soak-running"
 # hour buckets; a short validation stage sets 60 so a 10-minute smoke still
 # produces ten scoreable windows.
 EVAL_BUCKET_SECONDS = int(os.environ.get("POLYFORGE_EVAL_BUCKET_SECONDS", "3600"))
+# Second, finer export. SK-H3 is frozen on hour buckets, but SK-H1 scores
+# recovery within FIVE MINUTES of an injection -- which hourly buckets cannot
+# resolve, and percentiles do not aggregate, so an hourly p95 cannot be
+# subdivided after the fact. Exporting twice is the only way both hypotheses
+# are measurable from the same run. 0 disables the second pass.
+EVAL_FINE_BUCKET_SECONDS = int(
+    os.environ.get("POLYFORGE_EVAL_FINE_BUCKET_SECONDS", "60"))
 TIER_BACKENDS_JSON = os.environ.get("POLYFORGE_EVAL_TIER_BACKENDS", "")
 GATEWAY_IMAGE = "polyforge/ai-gateway:dev"
 GATEWAY_LOCAL_PORT = 18081
@@ -692,6 +699,14 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
          "/control-plane", "eval-export", "--format=json", "--out=-",
          f"--bucket-seconds={EVAL_BUCKET_SECONDS}"],
     ]
+    # The fine-grained pass runs second so the coarse one -- the export every
+    # existing consumer reads -- is already captured if this one fails.
+    if EVAL_FINE_BUCKET_SECONDS > 0 and EVAL_FINE_BUCKET_SECONDS != EVAL_BUCKET_SECONDS:
+        plan += [
+            ["kubectl", "--namespace", "polyforge", "exec", "deploy/polyforge-control-plane", "--",
+             "/control-plane", "eval-export", "--format=json", "--out=-",
+             f"--bucket-seconds={EVAL_FINE_BUCKET_SECONDS}"],
+        ]
     if not EVAL_KEEP_CLUSTER:
         plan += [["kind", "delete", "cluster", "--name", CLUSTER_NAME]]
     return plan
@@ -1141,7 +1156,7 @@ def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
         return
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)
-        for name in ("k6-summary.json", "eval-export.json"):
+        for name in ("k6-summary.json", "eval-export.json", "eval-export-fine.json"):
             src = workdir / name
             if src.exists():
                 shutil.copy2(src, evidence_dir / name)
@@ -1410,8 +1425,14 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                     except OSError:
                         pass  # never fail a run over its own courtesy marker
                 exporting = "eval-export" in cmd
+                # Two exports differ only by bucket width, so the width names
+                # the file. Without this the second pass would overwrite the
+                # first and the run would silently keep one granularity.
+                export_name = "eval-export.json"
                 if exporting:
                     cmd = cmd + [f"--infra-cost-usd={infra_cost:.6f}"]
+                    if f"--bucket-seconds={EVAL_FINE_BUCKET_SECONDS}" in cmd                             and EVAL_FINE_BUCKET_SECONDS != EVAL_BUCKET_SECONDS:
+                        export_name = "eval-export-fine.json"
                 # Only the load generator streams: every other step's stdout
                 # is consumed as data (eval-export's JSON above all), and a
                 # file handle would take that away.
@@ -1421,7 +1442,7 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                     if (cmd[0] == "k6" and evidence_dir) else None,
                 )
                 if exporting and proc.returncode == 0:
-                    (workdir / "eval-export.json").write_text(proc.stdout, encoding="utf-8")
+                    (workdir / export_name).write_text(proc.stdout, encoding="utf-8")
                 if cmd[0] == "k6":
                     if sampler is not None:
                         sampler.stop()
