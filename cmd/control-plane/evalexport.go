@@ -47,6 +47,20 @@ import (
 
 const evalStepSeconds = 10 // CONTROL_INTERVAL_S in the sim model
 
+// evalExportTimeout bounds the whole export.
+//
+// It was 5 minutes, chosen when the exporter only ever ran against smoke-test
+// volumes. Measured against the soak-volume probe
+// (TestEvalExportPostgresScalesToSoakVolume) the server-side path costs
+// ~11.6 s per million events, so attempt 4's ~25M-event sitting projects to
+// ~289 s -- inside 5 minutes by about four percent. A run slightly hotter than
+// that one, or a slower disk, would have blown the deadline and produced no
+// eval-export.json at all, which is exactly the empty-handed state four
+// sittings have already ended in. There is no reason for a batch export at the
+// end of a 24 h run to be on a tight clock, so the default is generous and
+// --timeout exists for the case this estimate is still wrong.
+const evalExportTimeout = 30 * time.Minute
+
 // Mirrors SLO_BASE_MS and SLO_CLASS_FACTOR in research/jcac_sim/model.py.
 var (
 	evalSLOBaseMS     = map[string]float64{"crud": 150.0, "ai": 2500.0}
@@ -122,11 +136,13 @@ func evalExport(args []string) int {
 	maxEvents := fs.Int("max-events", 5_000_000, "per-tenant telemetry read ceiling")
 	bucketSeconds := fs.Int("bucket-seconds", 0,
 		"emit per-window buckets alongside the scalars (0 = off; 3600 for a soak, 60 for a short stage)")
+	timeout := fs.Duration("timeout", evalExportTimeout,
+		"ceiling on the whole export; a soak-sized store takes minutes to reduce")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if *format != "json" || *out == "" {
-		fmt.Fprintln(os.Stderr, "usage: control-plane eval-export --format=json --out=PATH|- [--infra-cost-usd=X] [--bucket-seconds=N]")
+		fmt.Fprintln(os.Stderr, "usage: control-plane eval-export --format=json --out=PATH|- [--infra-cost-usd=X] [--bucket-seconds=N] [--timeout=D]")
 		return 2
 	}
 	if *bucketSeconds < 0 {
@@ -134,19 +150,30 @@ func evalExport(args []string) int {
 		return 2
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
 
-	tenants, events, err := evalLoadStore(ctx, *maxEvents)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
-		return 1
-	}
-
-	doc, err := computeEvalExport(tenants, events, *infraCost, *bucketSeconds)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
-		return 1
+	var doc evalExportDoc
+	if adminURL := os.Getenv("POLYFORGE_POSTGRES_ADMIN_URL"); adminURL != "" {
+		aggDoc, err := evalAggregatePostgres(ctx, adminURL, *bucketSeconds)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
+			return 1
+		}
+		doc = aggDoc
+		doc.CostInfraUSD = *infraCost
+		doc.TotalCostUSD = doc.CostTierUSD + doc.CostInfraUSD
+	} else {
+		tenants, events, err := evalLoadStore(ctx, *maxEvents)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
+			return 1
+		}
+		doc, err = computeEvalExport(tenants, events, *infraCost, *bucketSeconds)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
+			return 1
+		}
 	}
 	payload, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
@@ -168,6 +195,104 @@ func evalExport(args []string) int {
 	}
 	fmt.Fprintf(os.Stderr, "eval-export: %d events across %d tenants -> %s\n", doc.NEvents, doc.NTenants, *out)
 	return 0
+}
+
+// evalAggregatePostgres scores the run server-side when the store is
+// PostgreSQL. This is the only way a real soak can be exported at all: the
+// in-memory path below reads every row through RecentByTenant and OOM-killed
+// the control-plane pod at ~950k events inside its 256 Mi limit (exit 137).
+// A 24 h run produces ~25M events, twenty-five times more, which is almost
+// certainly why WP14 attempt 4 recorded no eval-export.json and therefore no
+// metrics at all. See internal/storage/postgres/evalagg.go.
+func evalAggregatePostgres(ctx context.Context, adminURL string, bucketSeconds int) (evalExportDoc, error) {
+	var doc evalExportDoc
+	store, err := postgresstore.Open(ctx, postgresstore.Config{
+		AdminURL: adminURL,
+		AppURL:   os.Getenv("POLYFORGE_POSTGRES_APP_URL"),
+	})
+	if err != nil {
+		return doc, err
+	}
+	defer store.Close()
+
+	agg, err := store.EvalAggregate(ctx, postgresstore.EvalAggSpec{
+		CrudTargetBaseMS: evalSLOBaseMS["crud"],
+		AITargetBaseMS:   evalSLOBaseMS["ai"],
+		ClassScale:       evalSLOClassScale,
+		StepSeconds:      evalStepSeconds,
+		BucketSeconds:    bucketSeconds,
+	})
+	if err != nil {
+		return doc, err
+	}
+
+	doc = evalExportDoc{
+		GeneratedAtUTC:      time.Now().UTC().Format(time.RFC3339),
+		CostInfraSourceNote: "infra component injected via --infra-cost-usd; replica-hours are not visible in-pod",
+		MeanJain:            1.0,
+		TierRequests:        map[string]int{},
+		NEvents:             agg.Overall.NEvents,
+		NTenants:            agg.NTenants,
+		CrudP95MS:           agg.Overall.CrudP95,
+		CrudP99MS:           agg.Overall.CrudP99,
+		AIP95MS:             agg.Overall.AIP95,
+		AIP99MS:             agg.Overall.AIP99,
+	}
+	for tier, n := range agg.TierCounts {
+		cost, ok := evalTierCostUSD[tier]
+		if !ok {
+			// Fail closed exactly as the in-memory path does: an unknown tier
+			// would otherwise book AI requests for free and skew cost.
+			return doc, fmt.Errorf("unrecognised model tier %q: cannot price the AI request", tier)
+		}
+		doc.CostTierUSD += cost * float64(n)
+		doc.TierRequests[tier] = n
+	}
+	if agg.Overall.NEvents > 0 {
+		doc.MeanViolation = float64(agg.Overall.Violations) / float64(agg.Overall.NEvents)
+	}
+	if agg.Overall.AITotal > 0 {
+		doc.CacheHitRate = float64(agg.Overall.CacheHits) / float64(agg.Overall.AITotal)
+	}
+	if agg.Overall.StepsTotal > 0 {
+		doc.ViolationStepShare = float64(agg.Overall.StepsMissed) / float64(agg.Overall.StepsTotal)
+	}
+	doc.MeanJain = evalJain(agg.Attainments)
+	for _, w := range agg.Buckets {
+		b := evalBucket{
+			BucketStartUTC: time.Unix(w.StartUnix, 0).UTC().Format(time.RFC3339),
+			NEvents:        w.NEvents,
+			CrudP95MS:      w.CrudP95,
+			CrudP99MS:      w.CrudP99,
+			AIP95MS:        w.AIP95,
+			AIP99MS:        w.AIP99,
+		}
+		if w.NEvents > 0 {
+			b.MeanViolation = float64(w.Violations) / float64(w.NEvents)
+		}
+		if w.StepsTotal > 0 {
+			b.ViolationStepShare = float64(w.StepsMissed) / float64(w.StepsTotal)
+		}
+		doc.Buckets = append(doc.Buckets, b)
+	}
+	return doc, nil
+}
+
+// evalJain is Jain's fairness index over per-tenant attainments, shared by both
+// scoring paths so they cannot drift apart.
+func evalJain(attainments []float64) float64 {
+	if len(attainments) == 0 {
+		return 1.0
+	}
+	var sum, sumSq float64
+	for _, a := range attainments {
+		sum += a
+		sumSq += a * a
+	}
+	if sumSq == 0 {
+		return 1.0
+	}
+	return (sum * sum) / (float64(len(attainments)) * sumSq)
 }
 
 // evalLoadStore opens the same store the serving process uses (same env

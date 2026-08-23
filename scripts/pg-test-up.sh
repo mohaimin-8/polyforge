@@ -100,17 +100,22 @@ done
 
 # Same roles as CI: admin BYPASSRLS (migrations, admin-authenticated reads),
 # app NOBYPASSRLS (every tenant-scoped query, so a missed WHERE cannot leak).
+# CREATEDB is test-only and never granted in the cluster: the eval-export
+# parity test needs a database of its own, because eval-export scores the
+# WHOLE store by definition, so a tenant created by a concurrent test in
+# another package would land inside its aggregates.
 # The store refuses to boot if these two are not distinct and correctly
 # privileged (internal/storage/postgres/store.go).
 docker exec -i "$NAME" psql -U postgres -d polyforge -v ON_ERROR_STOP=1 <<'SQL'
 DO $$ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'polyforge_admin') THEN
-    CREATE ROLE polyforge_admin LOGIN BYPASSRLS;
+    CREATE ROLE polyforge_admin LOGIN BYPASSRLS CREATEDB;
   END IF;
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'polyforge_app') THEN
     CREATE ROLE polyforge_app LOGIN NOBYPASSRLS;
   END IF;
 END $$;
+ALTER ROLE polyforge_admin CREATEDB;
 ALTER DATABASE polyforge OWNER TO polyforge_admin;
 SQL
 

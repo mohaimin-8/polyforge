@@ -37,7 +37,7 @@ jobs:
           # -i is load-bearing: without it docker exec discards the heredoc
           # and psql exits 0 having executed nothing.
           docker exec -i ${{ job.services.postgres.id }} psql -U postgres -d polyforge -v ON_ERROR_STOP=1 <<'SQL'
-          CREATE ROLE polyforge_admin LOGIN BYPASSRLS;
+          CREATE ROLE polyforge_admin LOGIN BYPASSRLS CREATEDB;
           CREATE ROLE polyforge_app LOGIN NOBYPASSRLS;
           ALTER DATABASE polyforge OWNER TO polyforge_admin;
           SQL
