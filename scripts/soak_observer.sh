@@ -29,6 +29,21 @@ INTERVAL=${1:-20}
 mkdir -p "$EVIDENCE" 2>/dev/null || true
 OUT="$EVIDENCE/observer.csv"
 
+# Single instance, enforced. A second observer contaminated Stage B attempt 3:
+# an earlier one was still alive because the kill that was meant to stop it used
+# `pkill`, which does NOT EXIST in Git Bash -- and the error went to /dev/null,
+# so the operator believed it had stopped. Two observers doubled the sampling
+# load on the box running the cluster AND interleaved rows into one CSV, where
+# the older instance's stale readiness column disagreed with the newer one's.
+# Evidence that argues with itself is worse than no evidence.
+LOCK="$REPO/.observer.lock"
+if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK" 2>/dev/null)" 2>/dev/null; then
+  echo "observer already running as PID $(cat "$LOCK"); refusing to start a second" >&2
+  exit 3
+fi
+echo $$ > "$LOCK"
+trap 'rm -f "$LOCK"' EXIT INT TERM
+
 # Cumulative counters, so a spike between two samples is still visible as a
 # delta even though the sample itself missed the moment.
 echo "epoch,iso,nodes_mem_pct,pods_ready,pods_total,restarts_total,max_pod_mem_mi,cp_replicas,pg_ckpt_timed,pg_ckpt_req,pg_ckpt_write_ms,pg_ckpt_sync_ms,pg_rows_ingested,pg_autovacuum,kind_node_mem" > "$OUT"

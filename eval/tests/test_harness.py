@@ -1193,6 +1193,36 @@ class TestObservabilityAndTeardown:
             "the coarse export must run FIRST, so a failure in the fine pass "
             "cannot cost the run the export every existing consumer reads")
 
+    def test_warmup_precedes_the_scored_load_and_cannot_abort_it(self, tmp_path):
+        """Stage B attempt 3 died 60 s in, on ONE dropped iteration, because k6
+        opened at full demand seconds after the deployment reached sixteen
+        replicas with PostgreSQL cold. p90 was 3,063 ms against a steady-state
+        23.89 ms. `dropped_iterations` is cumulative with abortOnFail, so a
+        single cold-start drop poisons a 24 h sitting permanently.
+        """
+        import json
+
+        run = expand(tiny_spec())[0]
+        plan = cluster_backend.command_plan(run, tmp_path)
+        k6_steps = [c for c in plan if c[0] == "k6"]
+        assert len(k6_steps) == 2, f"expected warm-up + scored load, got {k6_steps}"
+        assert k6_steps[0][-1].endswith("warmup.js"), "warm-up must run FIRST"
+        assert k6_steps[1][-1].endswith("replay.js")
+
+        # Only the scored step drives sampling, the soak marker and the gates.
+        assert not cluster_backend._is_scored_load(k6_steps[0])
+        assert cluster_backend._is_scored_load(k6_steps[1])
+
+        # A warm-up carrying thresholds could abort the run it exists to
+        # protect, which would be the same defect wearing a different hat.
+        script = cluster_backend.k6_script(
+            run, warmup_s=cluster_backend.WARMUP_SECONDS)
+        options = json.loads(
+            script.split("export const options = ", 1)[1].split(";\n", 1)[0])
+        assert "thresholds" not in options
+        executors = {sc["executor"] for sc in options["scenarios"].values()}
+        assert executors == {"constant-arrival-rate"}, executors
+
     def test_teardown_runs_by_default_so_ci_never_leaks_clusters(self, tmp_path):
         run = expand(tiny_spec())[0]
         plan = cluster_backend.command_plan(run, tmp_path)

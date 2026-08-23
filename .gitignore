@@ -56,3 +56,6 @@ artifacts/openapi.yaml
 
 # WP14: written by the harness while a load window is open (Phase 5).
 .soak-running
+
+# soak_observer.sh single-instance lock
+.observer.lock
