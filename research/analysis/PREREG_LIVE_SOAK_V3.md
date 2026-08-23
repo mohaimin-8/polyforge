@@ -68,13 +68,45 @@ no reader can mistake one for the other. Attempt 4's "server-side 2.23 ms vs
 k6 1032 ms" gap is partly this definition and partly the pinned load path; the
 record should not attribute all of it to the latter.
 
-**An unexplained multi-second tail.** Stage B recorded a 3.79 s worst-case
-request while p95 was 23.89 ms. The observer rules out pod restarts (0), node
-memory pressure (peak 11%), PostgreSQL checkpoints (12 timed, 306 ms of sync
-time across the hour) and autovacuum (never observed running). The cause is
-**not known**, and this prereg does not pretend otherwise. It is recorded now
-so that if the sitting produces the same tail, it is a known open question
-rather than a fresh discovery shaped to fit whatever else the run says.
+**An intermittent sub-minute write stall, roughly once per hour, NOT solved.**
+Stage B runs record a spontaneous excursion that produces multi-second requests
+while p95 sits near 20 ms: attempt 2 at t+52m (max 3,791 ms), attempt 6 at
+t+32m (399 VUs on one tenant, max 5,696 ms, 68 dropped iterations, run
+aborted). Attempt 5 completed a clean hour and did not hit one, which is why an
+earlier draft of this document claimed the warm-up had eliminated it. **That
+claim was wrong and is withdrawn**: one clean hour is not evidence of
+elimination, and saying so here is cheaper than discovering it at hour nine.
+
+What the observer establishes: it is NOT pod restarts (0), NOT node memory
+pressure (9%), NOT autovacuum (never observed running), and NOT the injected
+faults — the excursion in attempt 6 arrived 5.5 minutes AFTER the CPU fault
+ended, and during the fault itself VU usage never exceeded 7. What it does show
+is telemetry ingestion collapsing about sixfold immediately before the
+excursion (~8,000 rows per sample to ~1,350) inside a checkpoint window.
+
+Working mechanism, stated as a hypothesis and not as a result: `pgdata` is an
+emptyDir on a VHDX under WSL2; the control plane writes each telemetry event
+synchronously inside the request handler; a storage stall therefore blocks
+handlers. `latency_ms` cannot see it because that clock stops before the write,
+which is why server-side `crud_p95` stays at ~2.4 ms while clients wait
+seconds — the same shape as attempt 4's 464x server-versus-client gap, and a
+second reason not to read `crud_p95` as service latency.
+
+**Acted on, and disclosed:** the eval PostgreSQL now runs with
+`synchronous_commit=off`, `max_wal_size=4GB` and `checkpoint_timeout=30min`.
+That is appropriate for a store which exists to be measured and discarded — the
+only thing at risk is the last few telemetry rows if the pod dies — and it
+would not be appropriate in a real deployment. If the stalls persist under this
+configuration, the mechanism above is wrong and the record must say so.
+
+**The consequence for SK-H4, registered now rather than argued later.**
+`dropped_iterations` is absolute, cumulative and carries `abortOnFail`. If a
+stall of this kind recurs roughly hourly and each can drop an iteration, a
+24-hour sitting cannot complete, and **the threshold is still not relaxed** —
+`PREREG_LIVE_SOAK_V2.md` said "if attempt 3 fails on a handful of drops, that
+is the honest finding, and the response is NOT to relax the threshold", and
+that holds. The finding in that case is about what this machine can host, which
+is exactly the outcome SK-H4's stopping rule below names in advance.
 
 **Stage A and Stage B evidence is a precondition, not a result.** The ladder's
 numbers are reported in the record as gate results. They are not hypotheses and
