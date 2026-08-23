@@ -284,24 +284,41 @@ def k6_script(run: RunSpec, interval_s: int = 10) -> str:
             {"target": max(1, round(bucket[tid].total_rps())), "duration": f"{interval_s}s"}
             for bucket in buckets
         ]
-        # VU pool sizing (WP14, session 38). `preAllocatedVUs` was 50, sized
-        # for the AVERAGE request: this cell peaks at ~94 req/s per tenant and
-        # `http_req_duration` averages 23 ms, so Little's law says ~2 VUs.
-        # But the tail reaches 3.4 s, and at peak arrival that demands ~322
-        # VUs for as long as the excursion lasts. k6 then has to allocate VUs
-        # *dynamically*, and drops iterations while it does — 647 of them in
-        # the WP14 smoke run, which `check_k6_delivery`'s zero-drop threshold
-        # correctly rejected.
+        # VU pool sizing (WP14, sessions 38-39). `preAllocatedVUs` was 50,
+        # sized for the AVERAGE request: this cell peaks at ~94 req/s per
+        # tenant and `http_req_duration` averages 23 ms, so Little's law says
+        # ~2 VUs. But the tail reaches seconds, and at peak arrival that
+        # demands hundreds of VUs for as long as the excursion lasts. k6 then
+        # has to allocate VUs *dynamically*, and drops iterations while it
+        # does — 647 of them in the WP14 smoke run, which check_k6_delivery's
+        # zero-drop threshold correctly rejected.
         #
-        # 150 is not tuned to make a gate pass: the smoke run's own pool grew
-        # to 968 VUs across 8 tenants (peak 832 in use), so this pre-allocates
-        # roughly what the load demonstrably needed instead of making k6
-        # discover it mid-excursion. maxVUs keeps generous headroom above it.
+        # 150 fixed that case and was still too small. Stage B ran clean for
+        # 52 minutes at <= 27 VUs in use, then aborted on 26 dropped
+        # iterations at t+3161s — the exact step where the bursty profile
+        # steps a tenant from 9.4 to 93.8 req/s. 94 req/s against 150 VUs
+        # covers a stall of only 1.6 s, and the run's own max
+        # http_req_duration was 2.78 s, so the pool was under the tail it had
+        # already measured. Four of eight scenarios were at their ceiling and
+        # t00 was delivering 85 of its 94 req/s: the GENERATOR was the
+        # bottleneck, not the system under test.
+        #
+        # 400 covers 4.3 s at the peak rate, against a 2.78 s worst observed.
+        # It is affordable because idle VUs are cheap, which was measured
+        # rather than assumed: k6 v2.1.0 on this host costs 0.13 MB per
+        # pre-allocated VU (200 VUs -> 54 MB, 1200 -> 173 MB, 2000 -> 272 MB,
+        # 3200 -> 417 MB), so eight tenants at 400 is ~420 MB of the ~5.7 GB
+        # that lives outside the WSL2 VM.
+        #
+        # None of this touches the gate. A stall in the system under test
+        # still lands in the exported 60 s buckets where it is a measurement;
+        # what changes is that the load generator no longer converts it into
+        # an aborted run.
         scenarios[f"tenant_{tid}"] = {
             "executor": "ramping-arrival-rate",
             "startRate": stages[0]["target"],
             "timeUnit": "1s",
-            "preAllocatedVUs": 150,
+            "preAllocatedVUs": 400,
             "maxVUs": 1000,
             "stages": stages,
             "env": {"TENANT": tid},
@@ -1434,6 +1451,17 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                         audit_messages = check_audit_stream()
                         print(f"[audit] {audit_messages} record(s) on the "
                               "backbone", flush=True)
+                        # SK-H2 is "degraded cycles == audit records", and the
+                        # scorer runs after the cluster is gone. Printing the
+                        # count to a log nobody keeps is how it ended up
+                        # uncounted for four attempts, so it is written as
+                        # evidence here.
+                        if evidence_dir is not None:
+                            try:
+                                (evidence_dir / "audit_count.txt").write_text(
+                                    str(audit_messages), encoding="utf-8")
+                            except OSError:
+                                pass  # evidence is best-effort, never fatal
                     if portforward is not None:
                         portforward.stop()
                         portforward = None
