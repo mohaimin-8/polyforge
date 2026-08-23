@@ -15,7 +15,7 @@
 # Compressed schedule over the 60-minute window:
 #   T+ 5m  planner scale-to-zero   -> MUST produce fallback log lines
 #   T+15m  apiserver throttle      -> MUST raise the reconciler error rate
-#   T+25m  netem latency injection -> MUST push crud_p95 past the 20% band
+#   T+25m  CPU starvation          -> MUST push crud_p95 past the 20% band
 #   T+35m  planner scale-to-zero   -> repeat, confirms it was not a one-off
 #   T+45m  apiserver throttle      -> repeat
 #
@@ -31,8 +31,8 @@ RESULTS="$EVIDENCE/positive_controls.log"
 
 PLANNER_OUTAGE_S=${PLANNER_OUTAGE_S:-90}
 THROTTLE_DURATION_S=${THROTTLE_DURATION_S:-90}
-NETEM_DELAY_MS=${NETEM_DELAY_MS:-40}
-NETEM_DURATION_S=${NETEM_DURATION_S:-120}
+CPU_HOGS=${CPU_HOGS:-2}
+CPU_DURATION_S=${CPU_DURATION_S:-120}
 
 ts() { date -u +%H:%M:%S; }
 log() { printf '%s %s\n' "$(ts)" "$*" | tee -a "$RESULTS"; }
@@ -166,30 +166,58 @@ YAML
 }
 
 # ---------------------------------------------------------------- latency ---
-netem_control() {
+# NOT `tc netem`. Phase 3.1 offers "a tc netem delay, or a CPU-starved
+# control-plane pod"; the netem half cannot work, and the reason is worth
+# stating because it nearly cost a fifth sitting.
+#
+# SK-H1 is scored on eval-export's crud_p95_ms, which comes from the
+# `latency_ms` written by internal/platform/replay.go. That handler starts its
+# clock immediately before burnCPU and stops it immediately after, so the
+# recorded number is the duration of a CPU spin: request parse, queueing, the
+# telemetry write and the network are all outside the measured window. A
+# netem qdisc adds delay in precisely that outside region, so it cannot move
+# the metric by construction -- SK-H1 would have been observed NOT failing and
+# read as "still vacuous", when the truth is the fault never reached it.
+# internal/platform/replay_latency_semantics_test.go demonstrates the gap
+# (250 ms injected outside the burn, 1 ms recorded).
+#
+# CPU starvation does reach it, because burnCPU spins against a wall-clock
+# deadline: descheduled time lands inside the measurement. crud_read is one
+# work unit at 1 ms of CPU, so even a few hundred microseconds of scheduling
+# delay clears the 20% band comfortably.
+#
+# Two spinners on ONE worker, deliberately: the box has 8 logical CPUs shared
+# with the k6 process on the Windows side, and starving the load generator
+# would produce dropped iterations -- a harness failure wearing the costume of
+# a system failure, which is the confusion this whole work package exists to
+# end. One worker of three also leaves two thirds of the requests unaffected,
+# which is the harder test: p95 still has to move.
+cpu_control() {
   local node="polyforge-eval-worker"
-  log "netem: adding ${NETEM_DELAY_MS}ms delay on $node for ${NETEM_DURATION_S}s"
-  echo "$(date +%s) netem_on" >> "$EVIDENCE/timeline.txt"
-  if ! docker exec "$node" tc qdisc add dev eth0 root netem delay "${NETEM_DELAY_MS}ms" 2>/dev/null; then
-    verdict "netem latency" 1 "could not add the qdisc"
+  log "cpu: starving $node with ${CPU_HOGS} spinner(s) for ${CPU_DURATION_S}s"
+  echo "$(date +%s) cpu_on" >> "$EVIDENCE/timeline.txt"
+  # `timeout` inside the node makes the hogs self-terminating: if this script
+  # dies mid-window the node does not stay starved.
+  if ! docker exec -d "$node" bash -c       "for i in \$(seq 1 ${CPU_HOGS}); do timeout ${CPU_DURATION_S} bash -c 'while :; do :; done' & done" 2>/dev/null; then
+    verdict "cpu starvation" 1 "could not start the spinners"
     return
   fi
-  sleep "$NETEM_DURATION_S"
-  docker exec "$node" tc qdisc del dev eth0 root 2>/dev/null
-  echo "$(date +%s) netem_off" >> "$EVIDENCE/timeline.txt"
-  # Scored post-hoc from the 60 s buckets: the window under delay must show
-  # crud_p95 more than 20% above the pre-fault window, which is SK-H1's new
-  # rule failing on demand. analyse_stage_b.py reads timeline.txt for this.
-  verdict "netem latency injected" 0 "scored post-hoc against the buckets"
+  sleep "$CPU_DURATION_S"
+  sleep 5  # let the last spinner's timeout fire before declaring the window shut
+  echo "$(date +%s) cpu_off" >> "$EVIDENCE/timeline.txt"
+  # Scored post-hoc from the 60 s buckets: the window under starvation must
+  # show crud_p95 more than 20% above the pre-fault window, which is SK-H1's
+  # new rule failing on demand. analyse_stage_b.py reads timeline.txt for this.
+  verdict "cpu starvation injected" 0 "scored post-hoc against the buckets"
 }
 
 wait_until 300;  planner_control  "T+5m planner"
 wait_until 900;  throttle_control "T+15m"
-wait_until 1500; netem_control
+wait_until 1500; cpu_control
 wait_until 2100; planner_control  "T+35m planner"
 wait_until 2700; throttle_control "T+45m"
 
 log "=== Stage B controls finished: ${PASS} pass, ${FAIL} fail ==="
-log "NOTE: the netem verdict is decided by analyse_stage_b.py against the"
+log "NOTE: the latency verdict is decided by analyse_stage_b.py against the"
 log "      60 s buckets, not here. This script only guarantees it was injected."
 [ "$FAIL" -eq 0 ] || exit 1
