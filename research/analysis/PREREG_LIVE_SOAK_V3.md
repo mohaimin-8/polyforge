@@ -130,15 +130,43 @@ from 2.215 ms to 3.774 ms, +70.4% against the 20% band — which is the evidence
 that the metric has range. `mean_violation` is reported alongside as secondary,
 explicitly noted as saturated, so no reader mistakes its 0.00 for stability.
 
-**SK-H2 (audit continuity).** For each planner injection, the audit stream's
-message count across the outage window equals **degraded cycles x tenants**,
-with three cycles of slack above (the settle period can admit post-recovery
-cycles) and **none below**. Both sides must exceed zero. Any shortfall fails
-it.
+**SK-H2 (audit continuity).** For each planner injection, an equal-length
+**healthy** window is sampled immediately before the outage. The audit stream
+must not grow more slowly while the controller is degraded than it did while
+healthy: `degraded_growth >= healthy_growth - tenants`, allowing one control
+cycle of boundary jitter, with both growths strictly positive. Scored per
+injection; PASSES only if every injection passes.
 
-Restated from "degraded-cycle count == audit-record count", which compared
-quantities two orders of magnitude apart and therefore passed on a healthy
-system while testing nothing.
+**This is the THIRD formulation, and the revisions are disclosed rather than
+quietly applied.** Both earlier ones failed for reasons unrelated to the claim,
+and both faults were properties of the instrument, visible without reference to
+any outcome:
+
+1. *"degraded cycles == audit records"* compared **14 against 2,888 and
+   passed.* The operator audits every cycle for every tenant, so a 60-minute
+   run puts 8 x 360 = 2,880 records on the stream whether or not anything
+   degrades. Two sides differing by two orders of magnitude under healthy
+   operation is not a continuity test.
+2. *"stream growth across the outage == degraded cycles x tenants"* **failed on
+   a run where auditing was perfectly continuous.** Stage B attempt 5 grew by
+   exactly 88 records in both windows — 11 control cycles x 8 tenants — while
+   the rule expected 56, because grepping the operator log for "planner
+   unavailable" undercounts cycles, and the window also holds post-recovery
+   records that are indistinguishable from fallback ones.
+
+The third needs neither a cycle count nor a way to separate the two record
+populations, which is why it is expected to survive contact with the sitting.
+**It is not a looser rule.** It fails whenever records are dropped, and that
+was verified against synthetic windows rather than asserted: continuous
+auditing passes; a 50% shortfall, total silence while degraded, an idle stream
+while healthy, an unreadable sample, and one bad window among two all FAIL.
+
+A reviewer is entitled to be suspicious of a hypothesis restated twice during
+validation. The defence is the ladder's purpose: Stage B exists to find
+instruments that cannot measure what they claim, BEFORE the sitting rather than
+during scoring. Both revisions happened there, both are recorded here with the
+numbers that motivated them, and the final rule was fixed before any 24 h data
+existed.
 
 **SK-H3 (latency stability).** Every **hour-bucketed** `crud_p95_ms` stays at
 or below the committed **p99** of **8.0072 ms**. A bucket above it fails SK-H3

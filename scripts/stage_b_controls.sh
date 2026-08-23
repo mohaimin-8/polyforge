@@ -43,7 +43,7 @@ fi
 echo $$ > "$CONTROL_LOCK"
 trap 'rm -f "$CONTROL_LOCK"' EXIT INT TERM
 [ -f "$EVIDENCE/audit_window.csv" ] ||
-  echo "label,degraded_cycles,tenants,msgs_before,msgs_after" > "$EVIDENCE/audit_window.csv"
+  echo "label,degraded_cycles,tenants,base_start,base_end,out_end" > "$EVIDENCE/audit_window.csv"
 
 PLANNER_OUTAGE_S=${PLANNER_OUTAGE_S:-90}
 THROTTLE_DURATION_S=${THROTTLE_DURATION_S:-90}
@@ -140,35 +140,55 @@ planner_control() {
     verdict "$label" 1 "no planner deployment found"
     return
   fi
-  local msgs_before msgs_after tenants
-  msgs_before=$(audit_messages)
+  local tenants base_start base_end out_end
   tenants=$(kubectl -n "$NS" get policies --no-headers 2>/dev/null | grep -c .)
-  log "$label: scaling $dep to 0 for ${PLANNER_OUTAGE_S}s (audit stream at ${msgs_before:-?}, ${tenants:-?} tenants)"
+
+  # SK-H2 is a DIFFERENCE, not a count against an expectation.
+  #
+  # The first formulation compared 14 degraded cycles against 2,888 records and
+  # passed while testing nothing. The second compared stream growth against
+  # (log lines x tenants) and FAILED for a reason that had nothing to do with
+  # the claim: Stage B attempt 5 grew by exactly 88 records in both windows,
+  # which is 11 control cycles x 8 tenants -- perfectly continuous auditing --
+  # while the rule expected 56, because grepping "planner unavailable"
+  # UNDERCOUNTS cycles and the window also holds post-recovery records that are
+  # indistinguishable from fallback ones.
+  #
+  # Both faults are properties of the instrument, visible without looking at
+  # any outcome. So the quantity changes to one that needs neither a cycle
+  # count nor a way to tell the two record populations apart: sample an
+  # equal-length window immediately BEFORE the outage, and require that the
+  # audit stream does not grow more slowly during degradation than it did
+  # while healthy. That is exactly "no degraded cycle goes unrecorded", and it
+  # fails precisely when records are dropped.
+  base_start=$(audit_messages)
+  log "$label: baseline audit window opens at ${base_start:-?} (${tenants:-?} tenants)"
+  sleep "$PLANNER_OUTAGE_S"
+  base_end=$(audit_messages)
+
+  log "$label: scaling $dep to 0 for ${PLANNER_OUTAGE_S}s (audit stream at ${base_end:-?})"
   echo "$(date +%s) planner_down" >> "$EVIDENCE/timeline.txt"
   kubectl -n "$NS" scale "$dep" --replicas=0 >/dev/null 2>&1
   sleep "$PLANNER_OUTAGE_S"
   kubectl -n "$NS" scale "$dep" --replicas=1 >/dev/null 2>&1
   echo "$(date +%s) planner_up" >> "$EVIDENCE/timeline.txt"
+  # Sampled AT scale-up, with no settle: the outage window must contain the
+  # outage and nothing else, or the comparison is against a dirty window.
+  out_end=$(audit_messages)
   sleep 20
-  msgs_after=$(audit_messages)
 
   local op fb
   op=$(operator_pod)
   fb=$(kubectl -n "$NS" logs "$op" --since="$((PLANNER_OUTAGE_S + 120))s" 2>/dev/null |
        grep -c 'planner unavailable' || true)
-  # The point of the whole exercise: across SEVEN injections in four attempts
-  # this count was zero, because deleting the pod left it serving established
-  # connections. If it is still zero, the fault does not reach the controller
-  # and SK-H1's recovery path remains untested.
-  [ "${fb:-0}" -gt 0 ] && verdict "$label fallback" 0 "$fb fallback line(s)" \
-                       || verdict "$label fallback" 1 "ZERO fallback lines — the fault did not reach the controller"
+  # Across SEVEN injections in four attempts this was zero, because deleting
+  # the pod left it serving established connections. Kept as the check that the
+  # fault reaches the controller at all -- it is no longer SK-H2's expectation.
+  [ "${fb:-0}" -gt 0 ] && verdict "$label fallback" 0 "$fb fallback line(s)"                        || verdict "$label fallback" 1 "ZERO fallback lines — the fault did not reach the controller"
 
-  # SK-H2's evidence, written per injection so the scorer never has to infer
-  # which records belonged to which outage.
-  printf '%s,%s,%s,%s,%s
-' "$label" "${fb:-0}" "${tenants:-0}" \
-    "${msgs_before:-}" "${msgs_after:-}" >> "$EVIDENCE/audit_window.csv"
-  log "$label audit window: ${msgs_before:-?} -> ${msgs_after:-?} (delta $(delta_or_na "${msgs_after:-}" "${msgs_before:-}"), expected ${fb:-0} x ${tenants:-0} records)"
+  printf '%s,%s,%s,%s,%s,%s\n' "$label" "${fb:-0}" "${tenants:-0}" \
+    "${base_start:-}" "${base_end:-}" "${out_end:-}" >> "$EVIDENCE/audit_window.csv"
+  log "$label audit: healthy window +$(delta_or_na "${base_end:-}" "${base_start:-}"), degraded window +$(delta_or_na "${out_end:-}" "${base_end:-}")"
 }
 
 # --------------------------------------------------------------- throttle ---
