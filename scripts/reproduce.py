@@ -126,6 +126,12 @@ CAMPAIGN_RECORDS = [
     # cluster after the run aborted -- the harness's own export step never ran,
     # because check_k6_delivery raises before it.
     ("analysis_live_soak_v3.py", [], "RESULTS_LIVE_SOAK_V3.md"),
+    #
+    # WP13 step 2. Rebuilds from guarantee.py alone -- no campaign input, no
+    # hand-entered numbers. Slow on purpose: the exact ordered walk over every
+    # offset vector is the whole point, and the cheap shortcut it refuses to
+    # use is what S2 falsifies.
+    ("analysis_separation_mt_v2.py", [], "RESULTS_SEPARATION_MT_V2.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
