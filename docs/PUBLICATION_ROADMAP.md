@@ -207,11 +207,14 @@ of each other; nothing is lost by running them after, and everything is
 gained by learning B1's outcome (and whether the live plane needs a
 follow-up rep — see the §8b note) before investing further desk time:
 
-**WP7 (done) → WP1 (done) → WP2 (done) → WP15 (budget parity, TOP) → WP13 (theory, parallel-safe) →
-WP3 → WP8a (desk-doable since session 36, no GPU — start Docker Desktop
-first) → WP14 (live soak, desk, needs Docker + the laptop kept awake) →
-WP8b (user opens the GPU gate here, NOT last) → WP4 → WP5 → WP6 → WP12 →
-WP9–11.**
+**EVERY agent-executable work package is CLOSED as of session 39
+(2026-08-24).** WP1, WP2, WP3, WP4, WP5, WP6, WP7, WP8a, WP12, WP13, WP14 and
+WP15 are all done — see §6 for each one's outcome, which is NOT uniformly
+"succeeded": WP13 step 1 was falsified, WP14's sitting is invalid, and WP15
+withdrew the comparative cost claim.
+
+**What is left: WP8b (blocked — user opens the GPU gate; agent then runs it)
+and WP9–11 (user-owned writing).** Nothing else is executable by the agent.
 
 WP13 touches only `research/jcac_sim/` and blocks nothing — run it in any
 gap (e.g. while a campaign is in flight). WP14 must come AFTER WP8a: the
@@ -927,19 +930,37 @@ never "the API passed a pen test".
   confound: EVICTION_PARITY + ORDER_PERMUTATION + [WP1/WP3/WP6 records]).
   Sources: MAIN_WORKING_PATH §0b, the V-series records, WP2's MASTER.
 
-  **Venue decision rule (session 37 — decide BEFORE writing a word).**
-  The pitch is selected by `RESULTS_TRACE_PARITY.md` (WP1), not by
-  ambition:
-  - **TP-H1 survives on ≥1 trace** (a real cost advantage against fair
-    comparators on real demand): primary target **TCC or TSC**
-    (Transactions), with WP13's theory bracket and WP14's soak as the
-    supporting weight; FGCS is the resubmission fallback, not the first
-    shot.
-  - **TP-H1 fails on both traces** (parity, as the synthetic EP-H1a
-    result suggests it may): primary target **FGCS (Q1)** with the
-    parity-plus-half-the-overshoot framing and the methodology story as
-    the lead; a Transactions attempt then waits on B1 landing clean AND
-    the WP14 soak, and is a second paper cycle, not this one.
+  **Venue decision rule — RESOLVED session 39. Read this, not the
+  session-37 version it supersedes.**
+
+  The rule was written to key on TP-H1 (`RESULTS_TRACE_PARITY.md`, WP1).
+  **That key is dead.** WP15 found the TP-H1 comparison still carried a
+  confound — only jcac was subject to the per-tenant budget filter — and
+  against comparators carrying the controller's own budget rule,
+  **BP-H1 FAILS on both traces** (`RESULTS_BUDGET_PARITY.md`). The
+  comparative cost claim is withdrawn at every level. Applying the rule to
+  TP-H1 today sends you to the wrong venue; it must be read against BP-H1.
+
+  **Both branches now resolve the same way, so there is nothing left to
+  decide:**
+  - The cost condition **FAILS** (BP-H1, both traces) → the FGCS branch
+    fires. **Primary target: FGCS (Q1)**, with parity-plus-half-the-
+    overshoot and the validity-methodology story as the lead.
+  - The FGCS branch's escape hatch — "a Transactions attempt waits on B1
+    landing clean AND the WP14 soak" — **cannot be satisfied on this
+    hardware.** WP14's sitting is invalid after four attempts and the
+    stopping rule has fired (`RESULTS_LIVE_SOAK_V3.md`). A Transactions
+    cycle would need B1 *and* a soak on different hardware, and is a
+    second paper cycle at the earliest.
+
+  **Open question for the author, which the roadmap does NOT decide.**
+  WP14's ladder produced a clean **4-hour, 4,303,209-request, zero-dropped,
+  zero-restart** run (Stage C). But `PREREG_LIVE_SOAK_V3` calls the ladder
+  results "preconditions, not results … not hypotheses, and nothing in the
+  sitting is scored against them". So Stage C is an **engineering result,
+  not a pre-registered measurement**, and how far the paper may lean on it
+  is a judgement the author must make and state explicitly in WP9 — not
+  something to slide in as though it were the scored soak.
   - Either way: the arXiv preprint (WP11) goes up when the manuscript is
     done and is NOT delayed by venue strategy; the security paper split
     (Computers & Security / PETS) is unaffected by this rule.
