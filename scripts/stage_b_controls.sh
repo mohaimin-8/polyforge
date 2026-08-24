@@ -245,14 +245,27 @@ cpu_control() {
 # anything -- it carries 3 concurrency seats, nominalConcurrencyShares is
 # already 1, the smallest APF accepts, and the operator never has 3 requests in
 # flight. The fault has no reachable mechanism on this apiserver, so injecting
-# it only manufactures the appearance of a chaos schedule. See the roadmap's
-# Stage B table.
+# it only manufactures the appearance of a chaos schedule.
 #
-# Offsets are overridable so a short run can validate an instrument without
-# sitting through the full hour. Defaults are the Stage B schedule.
-wait_until "${SCHED_PLANNER_1:-300}";  planner_control  "T+5m planner"
-wait_until "${SCHED_CPU:-1500}";       cpu_control
-wait_until "${SCHED_PLANNER_2:-2100}"; planner_control  "T+35m planner"
+# SCHEDULE. A list of offset:kind pairs, so the same validated fault MECHANISMS
+# can fire on different timetables without the script changing. Stage B's
+# schedule is the default and is what the validation ladder ran; Stage D needs
+# eight injections across 24 h, which a one-hour stage could not have exercised
+# whatever the code said -- the roadmap specifies a different schedule per
+# stage. Only the firing times differ; planner_control and cpu_control are
+# byte-identical to the ones Stage B validated.
+SCHEDULE=${SCHEDULE:-"300:planner,1500:cpu,2100:planner"}
+
+IFS=, read -ra PF_SLOTS <<< "$SCHEDULE"
+for slot in "${PF_SLOTS[@]}"; do
+  offset=${slot%%:*}
+  kind=${slot##*:}
+  case "$kind" in
+    planner) wait_until "$offset"; planner_control "T+$((offset/60))m planner" ;;
+    cpu)     wait_until "$offset"; cpu_control ;;
+    *)       log "unknown fault kind in SCHEDULE: $kind" ;;
+  esac
+done
 
 log "=== Stage B controls finished: ${PASS} pass, ${FAIL} fail ==="
 log "NOTE: the latency verdict is decided by analyse_stage_b.py against the"
