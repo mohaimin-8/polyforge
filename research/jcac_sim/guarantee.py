@@ -914,3 +914,272 @@ def _product(values: list[int], repeat: int):
     for head in values:
         for rest in _product(values, repeat - 1):
             yield (head,) + rest
+
+
+# ---------------------------------------------------------------------------
+# WP13 step 2 — the corrected coupled floor.
+#
+# Step 1's `coupled_floor` above is FALSIFIED and stays as committed: V2 found
+# `keda` measuring 0.001886 against a derived floor of 0.036487
+# (RESULTS_SEPARATION_MT.md). The cause is `fcfs_allocation`, not the demand
+# model -- the aggregate convolution was checked against
+# `workloads.build('flash_crud', 'uniform', 'small')` and matches.
+#
+# Everything below is a NEW derivation over the allocation the planner actually
+# performs. Nothing above is modified.
+# ---------------------------------------------------------------------------
+
+INCREMENTAL_DELTAS = (-2, -1, 0, 1, 2)  # controller.DELTA_REPLICAS, mirrored
+
+
+def incremental_allocation(needs: list[int], cap: int, held: list[int],
+                           replica_max: int,
+                           deltas: tuple[int, ...] = INCREMENTAL_DELTAS) -> list[int]:
+    """The contention rule the simulator actually runs.
+
+    `fcfs_allocation` hands each tenant `min(need, remaining)` FROM ZERO, so a
+    late tenant under contention is allocated nothing and is scored at one
+    replica. `controller._best_for_tenant` differs in two ways that both
+    matter, and both make the real cluster LESS punitive:
+
+      * a candidate that would exceed the shared cap is REJECTED, not
+        truncated (`if others_replicas + candidate.replicas > limits.replicas:
+        continue`), and `best_state` initialises to `current` -- so a tenant
+        with no admissible candidate KEEPS THE STATE IT ALREADY HOLDS;
+      * every candidate is `base + delta` for `delta in DELTA_REPLICAS`, so a
+        tenant moves at most two replicas per interval, in either direction.
+
+    The tenant takes the smallest reachable allocation that clears its need,
+    and the largest reachable one otherwise. Taking more than the need would
+    not lower its own violation and would starve a neighbour, so a floor must
+    not model it.
+    """
+    chosen = list(held)
+    for i, need in enumerate(needs):
+        others = sum(chosen) - chosen[i]
+        room = cap - others
+        base = held[i]
+        lo = max(1, base - max(deltas))
+        hi = min(replica_max, base + max(deltas))
+        feasible = [r for r in range(lo, hi + 1) if r <= room]
+        if not feasible:
+            continue  # keeps `chosen[i]`, which is `held[i]`
+        meets = [r for r in feasible if r >= need]
+        chosen[i] = min(meets) if meets else max(feasible)
+    return chosen
+
+
+def _violation_table(config: TenantConfig, demands: list[Demand],
+                     needs: tuple[int, ...], replica_max: int
+                     ) -> dict[tuple[int, int], float]:
+    """(need level, replicas held) -> best achievable violation.
+
+    Same construction as `coupled_floor`'s inner cache: positions sharing a
+    need level share a demand shape only up to that level, so the worst of
+    them is taken, which keeps this a floor rather than an average wearing a
+    floor's name.
+    """
+    table: dict[tuple[int, int], float] = {}
+    for level in sorted(set(needs)):
+        for held in range(1, replica_max + 1):
+            worst = 0.0
+            for demand, need in zip(demands, needs):
+                if need != level:
+                    continue
+                local = min(
+                    violation_of(config, TenantState(replicas=held,
+                                                     cache_mb=cache_mb, tier=tier),
+                                 demand)
+                    for cache_mb in CACHE_LEVELS_MB
+                    for tier in TIERS
+                    if config.knob_admits(cache_mb, tier)
+                )
+                worst = max(worst, local)
+            table[(level, held)] = worst
+    return table
+
+
+def ramp_lead(replica_max: int,
+              deltas: tuple[int, ...] = INCREMENTAL_DELTAS) -> int:
+    """Intervals needed to climb from one replica to the ceiling.
+
+    A floor must be what the BEST controller with this actuation authority can
+    do, so the tenant is given exactly enough foresight to pre-ramp and no
+    more. Without it the derivation would score a myopic controller's
+    catch-up cost as unavoidable, which it is not: the published uncoupled
+    floor is 0.000000 precisely because a predictive controller climbs during
+    the trough.
+    """
+    return -(-(replica_max - 1) // max(deltas))
+
+
+def _trajectory_violation(needs: tuple[int, ...], offsets: tuple[int, ...],
+                          cap: int, replica_max: int,
+                          table: dict[tuple[int, int], float],
+                          periods: int, lead: int) -> float:
+    """Mean per-tenant violation on the attractor for one offset vector.
+
+    Phases advance deterministically, so a fixed offset vector makes the whole
+    trajectory deterministic and it settles onto a cycle. Burn-in runs
+    `periods - 1` orbits and the average is taken over the final one.
+
+    Each tenant provisions for the worst need inside its ramp horizon, which
+    is what lets it arrive at a peak already at the ceiling. Violation is
+    scored against the need it ACTUALLY faces, never against the target it
+    provisioned for -- holding capacity early is a cost to neighbours, not a
+    credit to itself, and that asymmetry is the coupling this derivation
+    exists to price.
+    """
+    length = len(needs)
+    held = [1] * len(offsets)
+    total = 0.0
+    for step in range(periods * length):
+        actual = [needs[(off + step) % length] for off in offsets]
+        target = [max(needs[(off + step + k) % length] for k in range(lead + 1))
+                  for off in offsets]
+        held = incremental_allocation(target, cap, held, replica_max)
+        if step >= (periods - 1) * length:
+            total += sum(table[(n, h)] for n, h in zip(actual, held))
+    return total / (length * len(offsets))
+
+
+def _offset_vectors(length: int, tenants: int):
+    """Offset vectors with tenant 0 pinned at phase 0.
+
+    Shifting every offset by k and time by -k leaves the time-average
+    unchanged, so pinning one tenant is an exact reduction by a factor of
+    `length`, not an approximation.
+    """
+    if tenants == 1:
+        yield (0,)
+        return
+    for rest in _product(list(range(length)), tenants - 1):
+        yield (0,) + rest
+
+
+def _offset_multisets(length: int, tenants: int):
+    """Non-decreasing offset vectors, with their multinomial weights.
+
+    Exact ONLY if the mean per-tenant violation is invariant to which tenant
+    holds which offset. That is not obvious -- the sweep is first-come-first-
+    served by tenant id, so order decides who gets starved -- so it is checked
+    rather than assumed: `permutation_invariance_report` compares every
+    permutation against its sorted representative, and the analysis refuses
+    this mode if any disagree.
+    """
+    from math import factorial
+
+    def rec(start: int, left: int, acc: tuple[int, ...]):
+        if left == 0:
+            counts: dict[int, int] = {}
+            for v in acc:
+                counts[v] = counts.get(v, 0) + 1
+            weight = factorial(len(acc))
+            for c in counts.values():
+                weight //= factorial(c)
+            yield acc, weight
+            return
+        for v in range(start, length):
+            yield from rec(v, left - 1, acc + (v,))
+
+    yield from rec(0, tenants, ())
+
+
+def permutation_invariance_report(config: TenantConfig, demands: list[Demand],
+                                  tenants: int, cap: int, *, samples: int = 24,
+                                  periods: int = 4, seed: int = 20260824) -> dict:
+    """Does sweep order change the MEAN per-tenant violation?
+
+    Draws offset multisets, evaluates every distinct permutation of each, and
+    reports the largest spread. Zero spread licenses the multiset enumeration
+    used for tenant counts where the ordered product is too large to walk.
+    """
+    import random
+    from itertools import permutations
+
+    needs = orbit_replica_needs(config, demands)
+    table = _violation_table(config, demands, needs, config.replica_max)
+    rng = random.Random(seed)
+    worst = 0.0
+    checked = 0
+    for _ in range(samples):
+        base = tuple(sorted(rng.randrange(len(needs)) for _ in range(tenants)))
+        lead = ramp_lead(config.replica_max)
+        values = {_trajectory_violation(needs, perm, cap, config.replica_max,
+                                        table, periods, lead)
+                  for perm in set(permutations(base))}
+        worst = max(worst, max(values) - min(values))
+        checked += 1
+    return {"max_spread": worst, "multisets_checked": checked,
+            "invariant": worst == 0.0}
+
+
+def coupled_floor_incremental(config: TenantConfig, demands: list[Demand],
+                              tenants: int, cap: int, *, periods: int = 4,
+                              max_states: int = 1 << 21,
+                              mode: str = "auto") -> dict:
+    """Expected per-tenant violation floor under the cap AND the move clamp.
+
+    Corrects `coupled_floor`, whose `fcfs_allocation` starves a contended
+    tenant to one replica while the simulator lets it keep the state it holds.
+
+    `mode` is "ordered" (exact, walks every offset vector with tenant 0
+    pinned), "multiset" (exact only under permutation invariance -- check it
+    with `permutation_invariance_report`), or "auto", which takes the ordered
+    walk when it fits inside `max_states` and the multiset walk otherwise.
+    """
+    needs = orbit_replica_needs(config, demands)
+    if any(n is None for n in needs):
+        raise ValueError("orbit has an unservable position")
+    length = len(needs)
+    table = _violation_table(config, demands, needs, config.replica_max)
+    lead = ramp_lead(config.replica_max)
+
+    ordered_states = length ** (tenants - 1) if tenants > 1 else 1
+    if mode == "auto":
+        mode = "ordered" if ordered_states <= max_states else "multiset"
+    if mode == "ordered" and ordered_states > max_states:
+        raise ValueError(
+            f"ordered enumeration is {ordered_states} vectors; raise "
+            "max_states deliberately or use mode='multiset'")
+
+    total = 0.0
+    weight_sum = 0
+    if mode == "ordered":
+        for offsets in _offset_vectors(length, tenants):
+            total += _trajectory_violation(needs, offsets, cap,
+                                           config.replica_max, table, periods,
+                                           lead)
+            weight_sum += 1
+    else:
+        for offsets, weight in _offset_multisets(length, tenants):
+            total += weight * _trajectory_violation(
+                needs, offsets, cap, config.replica_max, table, periods, lead)
+            weight_sum += weight
+
+    coupled = total / weight_sum
+    uncoupled = coupled_floor_incremental_uncapped(config, demands, tenants,
+                                                   table, needs, periods, lead)
+    return {
+        "coupled_violation": coupled,
+        "uncoupled_violation": uncoupled,
+        "gap": coupled - uncoupled,
+        "mode": mode,
+        "states_walked": weight_sum,
+        "needs": needs,
+        "cap": cap,
+        "tenants": tenants,
+    }
+
+
+def coupled_floor_incremental_uncapped(config: TenantConfig, demands: list[Demand],
+                                       tenants: int, table, needs,
+                                       periods: int, lead: int) -> float:
+    """The same dynamics with the cap lifted — one tenant's trajectory, which
+    every tenant then shares because nothing couples them."""
+    cap = tenants * config.replica_max
+    total = 0.0
+    for offset in range(len(needs)):
+        total += _trajectory_violation(needs, (offset,), cap,
+                                       config.replica_max, table, periods, lead)
+    return total / len(needs)
