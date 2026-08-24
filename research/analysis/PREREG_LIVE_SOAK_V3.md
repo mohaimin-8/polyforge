@@ -124,9 +124,34 @@ know that a run of this length on a 15.7 GB laptop is sensitive to the state
 the machine was left in by whatever ran before it — and because a failure of
 that kind must never be reported as a property of the controller.
 
-**Stage A and Stage B evidence is a precondition, not a result.** The ladder's
-numbers are reported in the record as gate results. They are not hypotheses and
-nothing in the sitting is scored against them.
+**The ladder passed. These are preconditions, not results** — reported in the
+record as gate outcomes, not scored as hypotheses.
+
+| Stage | Outcome on the sitting's commit |
+|---|---|
+| A (10 min) | PASS, and subsumed by B: A's criteria are a strict subset of B's, satisfied at six times the duration |
+| B (60 min) | PASS. 1,080,158 requests, 0.0000% failed, 0 dropped, 16 pods at 0.055–0.068 share, 0 restarts, both export granularities. **SK-H1 observed FAILING on demand at +189.7%**; **SK-H2 healthy +72 / degraded +80 in both windows** |
+| C (4 h) | PASS on all five endurance criteria. 4,303,209 requests, 0.0000% failed, 0 dropped, **0 restarts**, peak per-pod RSS **15 Mi against a 153.6 Mi ceiling (5.9%)**, hourly crud_p95 2.124 → 2.082 ms (flat, slightly decreasing) |
+
+**The write stall is very probably fixed, and the evidence is now worth
+stating.** Before `synchronous_commit=off`, two of three one-hour runs stalled
+(t+52m and t+32m). After it, **five consecutive clean hours** — one in Stage B
+and four in Stage C — with no VU excursion above 27 in 241 minutes, against
+excursions of 155 and 399 before. At the prior rate that is roughly a 0.4%
+coincidence. It is not proof, and the sitting is the test that matters, but it
+is no longer the one-clean-hour reasoning that misled me earlier in this
+validation.
+
+**The primary remaining risk is PostgreSQL memory, and it is registered here.**
+The eval store has NO memory limit and grew monotonically through Stage C —
+601 Mi at hour 0 to 1,005 Mi at hour 4, roughly 100 Mi per hour beyond an
+initial 600 Mi, tracking a 4.3M-row table. A 24 h sitting is ~25M events. If
+the trend holds, that is roughly 3 GB inside a 10 GB WSL2 VM which also hosts
+four kind nodes, sixteen control-plane replicas and NATS. If the sitting dies
+of VM memory exhaustion, that is the expected failure and it is **not** a
+property of the controller, whose pods sat at 15 Mi against a 256 Mi limit for
+four hours. The observer records node memory every 30 s so the trend is
+recoverable from the evidence either way.
 
 ## Design (frozen)
 
