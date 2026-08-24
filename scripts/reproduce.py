@@ -119,6 +119,13 @@ CAMPAIGN_RECORDS = [
     # timeseries table is empty by config (timeseries_reps: 0) and eval-export
     # emits no timeseries at all, which is the finding.
     ("analysis_live_soak_v2.py", [], "RESULTS_LIVE_SOAK_V2.md"),
+    #
+    # Attempt 5 (WP14). Rebuilds from eval/results/live_soak_evidence/ plus the
+    # validation ladder's Stage B and Stage C evidence, which the record quotes
+    # as preconditions. The eval-export files were extracted from the live
+    # cluster after the run aborted -- the harness's own export step never ran,
+    # because check_k6_delivery raises before it.
+    ("analysis_live_soak_v3.py", [], "RESULTS_LIVE_SOAK_V3.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
