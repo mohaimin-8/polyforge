@@ -8,9 +8,24 @@
 # so every control-plane replica writes one Postgres and eval-export sees the
 # whole run rather than one pod's slice.
 #
-# Faults come from scripts/chaos_inject.sh — B2's proven injectors, not new
-# code — launched alongside on the frozen schedule: planner crash at T+2/8/
-# 14/20 h, apiserver throttle at T+5/11/17/23 h.
+# ATTEMPT 5 (PREREG_LIVE_SOAK_V3.md, session 39). Faults come from
+# scripts/stage_b_controls.sh -- the mechanisms the validation ladder proved,
+# not new code -- launched alongside with
+#   SCHEDULE=7200:planner,18000:cpu,28800:planner,39600:cpu,#            50400:planner,61200:cpu,72000:planner,82800:cpu
+# i.e. planner scale-to-zero at T+2/8/14/20 h and CPU starvation at
+# T+5/11/17/23 h.
+#
+# The apiserver throttle that occupied half of V2's schedule is RETIRED: its
+# FlowSchema matches (40/40 impersonated operator-identity requests dispatched)
+# but the level has never rejected a request -- 3 concurrency seats,
+# nominalConcurrencyShares already at the minimum 1, and the operator never has
+# 3 requests in flight. It has no reachable mechanism, so the sitting injects
+# fewer real faults rather than more cosmetic ones.
+#
+# Also required for this attempt:
+#   POLYFORGE_EVAL_BUCKET_SECONDS=3600      SK-H3, hour buckets
+#   POLYFORGE_EVAL_FINE_BUCKET_SECONDS=60   SK-H1, 5-minute recovery
+# Percentiles do not aggregate, so one export width cannot serve both.
 #
 # `medium` per the prereg; drop to `small` and disclose if Docker cannot hold
 # it, because duration outranks width for this work package.
