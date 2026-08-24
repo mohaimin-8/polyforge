@@ -54,3 +54,5 @@ epoch,iso,nodes_mem_pct,pods_ready,pods_total,restarts_total,max_pod_mem_mi,cp_r
 1787538254,2026-08-24T02:24:14Z,8,20,20,0,366,16,1,1,1150707,104,604380,0,polyforge-eval-control-plane=856.5MiB|polyforge-eval-worker2=452.1MiB|polyforge-eval-worker=353.2MiB|polyforge-eval-worker3=742.7MiB
 1787538318,2026-08-24T02:25:18Z,8,20,20,0,366,16,1,1,1150707,104,604380,0,polyforge-eval-control-plane=857.7MiB|polyforge-eval-worker2=455MiB|polyforge-eval-worker=354.3MiB|polyforge-eval-worker3=745.2MiB
 1787538383,2026-08-24T02:26:23Z,8,20,20,0,366,16,1,1,1150707,104,604380,0,polyforge-eval-control-plane=858.3MiB|polyforge-eval-worker2=454.6MiB|polyforge-eval-worker=353.1MiB|polyforge-eval-worker3=743.4MiB
+1787538448,2026-08-24T02:27:28Z,8,20,20,0,366,16,1,1,1150707,104,604380,0,polyforge-eval-control-plane=855MiB|polyforge-eval-worker2=455.8MiB|polyforge-eval-worker=354MiB|polyforge-eval-worker3=744.4MiB
+1787538511,2026-08-24T02:28:31Z,8,20,20,0,366,16,1,1,1150707,104,604380,0,polyforge-eval-control-plane=855.5MiB|polyforge-eval-worker2=454.6MiB|polyforge-eval-worker=356.7MiB|polyforge-eval-worker3=745.2MiB
