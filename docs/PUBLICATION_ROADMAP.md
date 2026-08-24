@@ -967,9 +967,48 @@ never "the API passed a pen test".
 | WP8b B1 scored | WAITING ON USER (GPU gate) | prereqs landed session 35; cluster half now runnable locally |
 | WP12 authenticated ZAP | **DONE (session 38)** — found the scan was measuring the rate limiter, then found a **Medium** defect once it wasn't | `./scripts/zap-baseline.sh --auth`; first run 2079/3800 responses were 429; un-throttled re-run reached handlers (167×200/132×201/127×202) and found NUL→PostgreSQL→500 on two paths; fixed at the edge, re-scan 0 FAIL / 1 accepted WARN / 118 PASS; `docs/SECURITY.md` updated |
 | **WP13 MT separation** | **step 1 DONE; the derivation itself is FALSIFIED and reported as such** | `RESULTS_SEPARATION_MT.md`: the coupling is exactly computable (cap binds **21.7%** of steps, convolution not inequality) and V1 soundness PASSES — but the pre-stated **V2 FAILED** (`keda` measured 0.001886 against a derived floor of 0.036487). Cause: `fcfs_allocation` starves from zero while the planner *retains previous state*. NOT patched; the corrected construction needs its own stated reading |
-| **WP14 attempt 5 remediation** | **PLAN WRITTEN, NOT STARTED** — `docs/WP14_REMEDIATION_ROADMAP.md` | Fixes all 17 problems attempt 4 surfaced, in 7 phases. Core insight: every previous fix was validated *by the next 24 h run*, which is why four problems were found serially over four days. The plan replaces that with a **validation ladder** (10 min → 60 min → 4 h → 24 h) where each stage has explicit pass gates, plus **positive controls** — every hypothesis must be observed FAILING on demand before the sitting starts, which is the gate that would have caught SK-H1/H2/H5 being vacuous before any attempt. Headline changes: NodePort via kind `extraPortMappings` replaces `kubectl port-forward` (kills problem #1); `check_load_distribution` fails any run where one pod takes >25% of traffic; `eval-export --bucket-seconds` emits the buckets that never existed; NATS deployed so SK-H2 has a stream; planner fault becomes `scale --replicas=0` so `fallback()` actually runs; SK-H1 re-scored on p95 deviation (has range) instead of violation (saturated); SK-H5 retired for SK-H6 load distribution. ~2 days engineering + 1 day laddered validation, then the run. |
-| **WP14 live CRUD soak** | **CLOSED — attempt 4 completed 24 h and is INVALID (3rd SK-H4 FAIL). The retry loop stops here per the prereg's own stopping rule.** | Attempt 1 voided (`pgrep` blind to Windows k6). Attempt 2: 36.4% failed requests. Attempt 4 ran the full 86,705 s and fired 8/8 faults, but `http_req_failed` was **4.567%** (1,167,884 of 25.6M) and `dropped_iterations` **236,566**; `ok:false`, 0 metrics rows. **Mechanism now established**: server-side p95 was 2.23 ms while k6 measured 1032 ms client-side (464x) — `kubectl port-forward` pins to 1 pod of 16, that pod OOMs on its 256 Mi limit under the whole workload, and each kill takes the load path down (282 forward restarts). A 16-replica deployment behind a port-forward has the fault tolerance of one replica and **no health signal reports it**. This is the harness's load path, NOT the controller — do not write "PolyForge OOMs under load". Scored: SK-H3 **PASS** (17 hour buckets, 2.03–3.62 ms vs 8.0072 ms); SK-H4 **FAIL**; SK-H1 and SK-H2 **VACUOUS** (unfailable rules — violation has 375 ms target against 8 ms p99, and no audit stream exists since `POLYFORGE_NATS_URL` is set nowhere); SK-H5 **contaminated**. `fallback()` has never executed in 7 planner kills across 4 attempts. Record: `RESULTS_LIVE_SOAK_V2.md` (in the R4 gate, 27/27). Evidence + three incident write-ups under `eval/results/live_soak_evidence/`. **A 5th sitting needs a non-port-forward load path (NodePort/Ingress/in-cluster generator), a violation metric with dynamic range, an audit sink or no SK-H2, `--grace-period=0` planner kills, bucketed `eval-export`, and a no-local-builds rule — see the record's Disposition.** |
+| **WP14 attempt 5** | **DONE — apparatus rebuilt, ladder PASSED, sitting INVALID. Retry loop stopped per the pre-registered rule.** | `PREREG_LIVE_SOAK_V3.md` (pushed before the run) and `RESULTS_LIVE_SOAK_V3.md` (gate 28/28). See below. |
 | WP9–11 | user-owned; **WP9 waits on WP1's record (venue decision rule, §5)** | — |
+
+### WP14's outcome (session 39) — what the live plane can and cannot claim
+
+**The 24 h target is not achievable on this machine, and that is now a
+pre-registered finding rather than a failure to explain away.** Attempt 5
+delivered 604,349 requests at **0.0000% failed** with a client p95 of 11.98 ms,
+then a single sub-minute stall produced **310 dropped iterations** against an
+absolute zero-drop gate. Fourth SK-H4 failure; `PREREG_LIVE_SOAK_V3`'s stopping
+rule fires and the threshold is **not** relaxed.
+
+**What the paper can claim from the live plane.** The validation ladder is the
+substantive result, and it is strong:
+
+| stage | duration | requests | failed | dropped | restarts |
+|---|---:|---:|---:|---:|---:|
+| B | 60 min | 1,080,158 | 0.0000% | 0 | 0 |
+| C | **4 h** | **4,303,209** | **0.0000%** | **0** | **0** |
+
+Stage C also held peak per-pod RSS at **15 Mi against a 256 Mi limit** with
+hourly `crud_p95` of 2.124 → 2.082 ms (flat, slightly decreasing), and Stage B
+observed both repaired instruments **failing on demand** — SK-H1 +189.7% under
+CPU starvation against a 20% band, SK-H2 +72 healthy / +80 degraded audit
+records in both windows.
+
+**Two mechanisms fixed, one still open.** The port-forward pinning that
+invalidated attempts 3 and 4 is gone (NodePort, load distribution gated on
+every run), and a second independent blocker no post-mortem had identified was
+fixed with it: `eval-export` could not have exported a 24 h run at all,
+OOM-killing the pod at ~952k events against a sitting's ~25M. Still open is an
+intermittent sub-minute stall whose cause is unidentified; `synchronous_commit=off`
+reduced its frequency (two stalls in three hours before, one in ~5.5 hours
+after) without removing it. Every observation points at the host's storage, not
+the controller.
+
+**A claim the thesis must not make.** `crud_p95`/`crud_p99` in every live
+record measure **CPU service time, not service latency** — the handler's clock
+stops before the telemetry write. Attempt 5 demonstrates this quantitatively:
+per-minute server-side p95 stayed at 2.02–2.38 ms *through the minute the
+client saw 4,365 ms*. Disclosed in the prereg before the run, and pinned by
+`internal/platform/replay_latency_semantics_test.go`.
 
 ### WP1's verdict and what the venue rule now says (session 37)
 
