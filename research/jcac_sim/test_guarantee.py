@@ -606,3 +606,99 @@ class CouplingBracketTests(unittest.TestCase):
         r = guarantee.price_of_reaction(cfg, self._flash_orbit())
         self.assertIsNone(r["reactive_cost_floor"])
         self.assertIsNone(r["predictive_cycle_cost"])
+
+
+class IncrementalAllocationTests(unittest.TestCase):
+    """WP13 step 2 — the corrected contention rule.
+
+    Step 1's `fcfs_allocation` starved a contended tenant to one replica and
+    its floor was falsified by the arms it was meant to bound. These pin the
+    two behaviours the simulator actually has, because getting either wrong
+    silently produces a floor for a different system.
+    """
+
+    @staticmethod
+    def _flash_orbit():
+        return [Demand(rps={"crud_read": 60.0 * f, "crud_write": 10.0 * f},
+                       crud_base_ms=40.0)
+                for f in ([6.0] * 5 + [0.5] * 11)]
+
+    def test_a_starved_tenant_keeps_its_state_instead_of_collapsing(self):
+        """`_best_for_tenant` REJECTS an over-cap candidate and leaves
+        `best_state` at `current`. `fcfs_allocation` truncates to whatever is
+        left, which is a different and strictly harsher cluster."""
+        needs, held, cap = [6, 6], [6, 5], 6
+        self.assertEqual(guarantee.fcfs_allocation(needs, cap), [6, 0])
+        got = guarantee.incremental_allocation(needs, cap, held, replica_max=6)
+        self.assertEqual(got[1], 5, "the contended tenant must keep its state")
+
+    def test_no_tenant_moves_further_than_the_clamp(self):
+        """Every candidate is `base + delta` for delta in DELTA_REPLICAS, so a
+        tenant climbs at most two replicas per interval however large the
+        need or the headroom."""
+        got = guarantee.incremental_allocation([6], cap=99, held=[1],
+                                               replica_max=6)
+        self.assertEqual(got, [3])
+
+    def test_a_tenant_takes_no_more_than_it_needs(self):
+        """Taking spare capacity beyond the need cannot lower the holder's own
+        violation and would starve a neighbour, so a floor must not model it."""
+        got = guarantee.incremental_allocation([1, 6], cap=24, held=[6, 6],
+                                               replica_max=6)
+        self.assertEqual(got[0], 4, "should shed toward the need, not hoard")
+
+    def test_one_tenant_reduces_to_the_published_single_tenant_floor(self):
+        """S1's degenerate case. The published derivation reports 0.000000 for
+        this cell, and a coupled floor that cannot reproduce it when nothing is
+        coupled is wrong rather than merely weak."""
+        cfg = TenantConfig(tenant_id="t", slo_class="standard", replica_max=6)
+        r = guarantee.coupled_floor_incremental(cfg, self._flash_orbit(), 1, 24)
+        self.assertEqual(r["coupled_violation"], 0.0)
+        self.assertEqual(r["uncoupled_violation"], 0.0)
+
+    def test_the_ramp_horizon_is_what_makes_the_floor_a_floor(self):
+        """A floor is what the BEST controller with this authority achieves.
+        The ramp from one replica to six at two per interval is three
+        intervals; that is derived from the clamp, not chosen."""
+        self.assertEqual(guarantee.ramp_lead(6), 3)
+        self.assertEqual(guarantee.ramp_lead(1), 0)
+
+    def test_the_multiset_shortcut_is_not_exact(self):
+        """S2, made executable, and it FAILS -- which is the finding.
+
+        The multiset walk is what would have made the published eight-tenant
+        cell affordable, and it is exact only if sweep order cannot change the
+        mean per-tenant violation. It can: the sweep is first-come-first-served
+        by tenant id, so an earlier tenant claims contended capacity first.
+
+        This is pinned as a counterexample rather than an aspiration because
+        the first version of the invariance check PASSED -- it was run at four
+        tenants against a cap of 24 with a ceiling of 6, where 4 x 6 = 24 and
+        contention is impossible, so every permutation trivially agreed. If
+        anyone reinstates the shortcut, this test is what stops them.
+        """
+        cfg = TenantConfig(tenant_id="t", slo_class="standard", replica_max=6)
+        orbit = self._flash_orbit()
+        ordered = guarantee.coupled_floor_incremental(cfg, orbit, 3, 12,
+                                                      mode="ordered")
+        multiset = guarantee.coupled_floor_incremental(cfg, orbit, 3, 12,
+                                                       mode="multiset")
+        self.assertNotAlmostEqual(ordered["coupled_violation"],
+                                  multiset["coupled_violation"], places=6)
+        self.assertAlmostEqual(ordered["coupled_violation"], 0.119629, places=6)
+        self.assertAlmostEqual(multiset["coupled_violation"], 0.135803, places=6)
+
+    def test_the_invariance_check_refuses_to_pass_vacuously(self):
+        """Below the point where the cap can bind, every permutation agrees for
+        a reason that has nothing to do with the property being tested. The
+        report must say VACUOUS rather than True."""
+        cfg = TenantConfig(tenant_id="t", slo_class="standard", replica_max=6)
+        orbit = self._flash_orbit()
+        vacuous = guarantee.permutation_invariance_report(cfg, orbit, 4, 24,
+                                                          samples=2)
+        self.assertTrue(vacuous["vacuous"])
+        self.assertIsNone(vacuous["invariant"])
+        real = guarantee.permutation_invariance_report(cfg, orbit, 3, 12,
+                                                       samples=4)
+        self.assertFalse(real["vacuous"])
+        self.assertFalse(real["invariant"])

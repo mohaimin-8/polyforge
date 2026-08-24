@@ -1087,7 +1087,8 @@ def _offset_multisets(length: int, tenants: int):
 
 def permutation_invariance_report(config: TenantConfig, demands: list[Demand],
                                   tenants: int, cap: int, *, samples: int = 24,
-                                  periods: int = 4, seed: int = 20260824) -> dict:
+                                  periods: int = 4, seed: int = 20260824,
+                                  max_perms: int = 240) -> dict:
     """Does sweep order change the MEAN per-tenant violation?
 
     Draws offset multisets, evaluates every distinct permutation of each, and
@@ -1097,6 +1098,18 @@ def permutation_invariance_report(config: TenantConfig, demands: list[Demand],
     import random
     from itertools import permutations
 
+    # A check that cannot fail is not a check. Below the point where the cap
+    # can bind, every permutation trivially agrees, so this reports VACUOUS
+    # rather than True -- the first version of it was run at four tenants
+    # against a cap of 24 with a per-tenant ceiling of 6, where 4 x 6 = 24
+    # exactly, and it passed while testing nothing.
+    if tenants * config.replica_max <= cap:
+        return {"max_spread": 0.0, "multisets_checked": 0, "invariant": None,
+                "vacuous": True, "reason":
+                f"{tenants} tenants x ceiling {config.replica_max} <= cap "
+                f"{cap}: contention is impossible, so sweep order cannot "
+                "matter and the check would pass without testing anything"}
+
     needs = orbit_replica_needs(config, demands)
     table = _violation_table(config, demands, needs, config.replica_max)
     rng = random.Random(seed)
@@ -1105,13 +1118,16 @@ def permutation_invariance_report(config: TenantConfig, demands: list[Demand],
     for _ in range(samples):
         base = tuple(sorted(rng.randrange(len(needs)) for _ in range(tenants)))
         lead = ramp_lead(config.replica_max)
+        perms = list(set(permutations(base)))
+        if len(perms) > max_perms:
+            perms = rng.sample(perms, max_perms)
         values = {_trajectory_violation(needs, perm, cap, config.replica_max,
                                         table, periods, lead)
-                  for perm in set(permutations(base))}
+                  for perm in perms}
         worst = max(worst, max(values) - min(values))
         checked += 1
     return {"max_spread": worst, "multisets_checked": checked,
-            "invariant": worst == 0.0}
+            "invariant": worst == 0.0, "vacuous": False, "reason": ""}
 
 
 def coupled_floor_incremental(config: TenantConfig, demands: list[Demand],
