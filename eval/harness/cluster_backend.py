@@ -325,7 +325,19 @@ def k6_script(run: RunSpec, interval_s: int = 10, warmup_s: int = 0) -> str:
         # t00 was delivering 85 of its 94 req/s: the GENERATOR was the
         # bottleneck, not the system under test.
         #
-        # 400 covers 4.3 s at the peak rate, against a 2.78 s worst observed.
+        # 400 was still not enough, and by a humiliating margin. WP14 attempt
+        # 5 -- the 24 h sitting -- died at T+34m with tenant_t07 pinned at
+        # 401/401 VUs: 94 req/s against a 4.365 s worst request needs 410 VUs,
+        # so the pool missed by TEN. Sizing it at 1.02x the tail it had already
+        # measured is the same defect as sizing it at 150, one order down.
+        #
+        # 1200 covers 12.8 s at the peak rate, three times the worst stall ever
+        # observed on this stack, and costs 1.22 GB across eight tenants at the
+        # measured 0.13 MB per pre-allocated VU. The zero-drop gate is NOT
+        # relaxed: what changes is that the generator stops being the thing
+        # that fails.
+        #
+        # (Superseded: 400 covered 4.3 s against a 2.78 s worst observed.)
         # It is affordable because idle VUs are cheap, which was measured
         # rather than assumed: k6 v2.1.0 on this host costs 0.13 MB per
         # pre-allocated VU (200 VUs -> 54 MB, 1200 -> 173 MB, 2000 -> 272 MB,
@@ -355,8 +367,8 @@ def k6_script(run: RunSpec, interval_s: int = 10, warmup_s: int = 0) -> str:
             "executor": "ramping-arrival-rate",
             "startRate": stages[0]["target"],
             "timeUnit": "1s",
-            "preAllocatedVUs": 400,
-            "maxVUs": 1000,
+            "preAllocatedVUs": 1200,
+            "maxVUs": 2000,
             "stages": stages,
             "env": {"TENANT": tid},
         }
