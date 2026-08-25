@@ -1,2 +1,14 @@
-01:27:16 === Stage B positive controls: waiting for the k6 load window ===
-01:29:43 k6 load started (T0=1787534983)
+06:47:48 === Stage B positive controls: waiting for the k6 load window ===
+06:50:05 k6 load started (T0=1787640604)
+08:50:05 T+120m planner: baseline audit window opens at 5474 (8 tenants)
+08:51:36 T+120m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s (audit stream at 5546)
+08:53:29   CONTROL PASS  T+120m planner fallback — 8 fallback line(s)
+08:53:30 T+120m planner audit: healthy window +72, degraded window +72
+11:50:04 cpu: starving polyforge-eval-worker with 2 spinner(s) for 120s
+11:52:10   CONTROL PASS  cpu starvation injected — scored post-hoc against the buckets
+14:50:05 T+480m planner: baseline audit window opens at 22752 (8 tenants)
+14:51:35 T+480m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s (audit stream at 22824)
+14:53:28   CONTROL PASS  T+480m planner fallback — 8 fallback line(s)
+14:53:28 T+480m planner audit: healthy window +72, degraded window +72
+17:50:04 cpu: starving polyforge-eval-worker with 2 spinner(s) for 120s
+17:52:10   CONTROL PASS  cpu starvation injected — scored post-hoc against the buckets
