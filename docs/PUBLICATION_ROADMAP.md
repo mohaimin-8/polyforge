@@ -988,17 +988,28 @@ never "the API passed a pen test".
 | WP8b B1 scored | WAITING ON USER (GPU gate) | prereqs landed session 35; cluster half now runnable locally |
 | WP12 authenticated ZAP | **DONE (session 38)** — found the scan was measuring the rate limiter, then found a **Medium** defect once it wasn't | `./scripts/zap-baseline.sh --auth`; first run 2079/3800 responses were 429; un-throttled re-run reached handlers (167×200/132×201/127×202) and found NUL→PostgreSQL→500 on two paths; fixed at the edge, re-scan 0 FAIL / 1 accepted WARN / 118 PASS; `docs/SECURITY.md` updated |
 | **WP13 MT separation** | **steps 0-2 DONE. Step 1 was WRONG (falsified); step 2 is SOUND AND UNAFFORDABLE at the published scale.** | `RESULTS_SEPARATION_MT_V2.md` (gate 29/29): S1 PASS (reduces to 0.000000 where the cap cannot bind), **S2 FAIL** (permutation spread 0.171875 -- sweep order changes the answer, so the cheap enumeration is invalid; the earlier PASS was vacuous, run where contention was impossible), S3 **NOT EVALUABLE** (the 8-tenant cell needs 268,435,456 offset vectors). Exact ordered walk: 0.000000 for 1-4 tenants, cap first binds at 5 (**0.016514**), 6 gives **0.049058**. Theorem stays single-tenant scope. |
-| **WP14 attempt 5** | **DONE — apparatus rebuilt, ladder PASSED, sitting INVALID. Retry loop stopped per the pre-registered rule.** | `PREREG_LIVE_SOAK_V3.md` (pushed before the run) and `RESULTS_LIVE_SOAK_V3.md` (gate 28/28). See below. |
+| **WP14 attempts 5-6** | **CLOSED. Apparatus rebuilt, ladder PASSED, both sittings INVALID — but attempt 6 is the first ever SCORED.** | `RESULTS_LIVE_SOAK_V4.md` (gate): 11,529,271 requests over **10 h 44 m** at **0.0018% failed**, **zero pod restarts**, ended by 10 dropped iterations from a single **19.5 s** stall. **SK-H2 PASS** (+72/+72 audit windows, six hours apart), **SK-H3 PASS** (all 12 hour-buckets <= 8.0072 ms, margin 0.003 ms — disclosed), **SK-H1 FAIL** (2 of 3, fails on recovery not under fault), **SK-H4 FAIL**. Causes eliminated one by one: not the load path, exporter, instruments, generator, memory or controller. Remaining obstacle is host storage; per the V4 stopping rule the next step is different hardware, not a seventh sitting. |
 | WP9–11 | user-owned; **WP9 waits on WP1's record (venue decision rule, §5)** | — |
 
 ### WP14's outcome (session 39) — what the live plane can and cannot claim
 
-**The 24 h target is not achievable on this machine, and that is now a
-pre-registered finding rather than a failure to explain away.** Attempt 5
-delivered 604,349 requests at **0.0000% failed** with a client p95 of 11.98 ms,
-then a single sub-minute stall produced **310 dropped iterations** against an
-absolute zero-drop gate. Fourth SK-H4 failure; `PREREG_LIVE_SOAK_V3`'s stopping
-rule fires and the threshold is **not** relaxed.
+**UPDATED after attempt 6 (session 39, 2026-08-26).** The 24 h target is still
+not reached, but the live-plane claim is now materially stronger and, for the
+first time, **scored**. Attempt 6 delivered **11,529,271 requests over 10 h
+44 m at 0.0018% failed with zero pod restarts**, and produced verdicts on four
+pre-registered hypotheses — SK-H2 and SK-H3 PASS, SK-H1 and SK-H4 FAIL. No
+earlier sitting scored a single one.
+
+**The failure is isolated to one thing.** Across six attempts the causes were
+eliminated in turn: the pinned load path (NodePort, now gated every run), the
+exporter that could not export a sitting at all (11.5M events now reduce in
+78 s), three vacuous instruments, the undersized load generator (9,601 VUs
+held, 4,876 used), host memory (zero restarts) and the controller itself. What
+remains is a **19.5-second storage stall** against an absolute zero-drop gate —
+`pgdata` is an `emptyDir` on a VHDX under WSL2 and the control plane writes
+telemetry synchronously inside the request handler. Per the V4 stopping rule
+the next step is **different hardware, not a seventh sitting**; a modest cloud
+VM with real block storage would settle it in a day.
 
 **What the paper can claim from the live plane.** The validation ladder is the
 substantive result, and it is strong:
