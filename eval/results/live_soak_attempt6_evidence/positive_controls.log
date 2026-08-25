@@ -12,3 +12,7 @@
 14:53:28 T+480m planner audit: healthy window +72, degraded window +72
 17:50:04 cpu: starving polyforge-eval-worker with 2 spinner(s) for 120s
 17:52:10   CONTROL PASS  cpu starvation injected — scored post-hoc against the buckets
+20:50:04 T+840m planner: baseline audit window opens at 30846 (8 tenants)
+20:51:34 T+840m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s (audit stream at 30846)
+20:53:25   CONTROL FAIL  T+840m planner fallback — ZERO fallback lines — the fault did not reach the controller
+20:53:25 T+840m planner audit: healthy window +0, degraded window +0
