@@ -1276,3 +1276,6 @@ Appended by the runner every progress tick.
 | 2026-08-23 21:09 | soak_stage_b | 1/1 | 0 | 1 runs/h |
 | 2026-08-24 01:18 | soak_stage_c | 1/1 | 0 | 0 runs/h |
 | 2026-08-24 02:06 | live_soak | 1/1 | 1 | 1 runs/h |
+| 2026-08-24 19:27 | soak_stage_b | 1/1 | 1 | 1 runs/h |
+| 2026-08-24 19:58 | soak_stage_b | 1/1 | 1 | 2 runs/h |
+| 2026-08-25 06:45 | soak_stage_b | 1/1 | 0 | 1 runs/h |
