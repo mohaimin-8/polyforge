@@ -132,6 +132,13 @@ CAMPAIGN_RECORDS = [
     # offset vector is the whole point, and the cheap shortcut it refuses to
     # use is what S2 falsifies.
     ("analysis_separation_mt_v2.py", [], "RESULTS_SEPARATION_MT_V2.md"),
+    #
+    # Attempt 6 (WP14). The first sitting to survive long enough to SCORE
+    # hypotheses: 11.5M requests over 10 h 44 m, ended by a 19.5 s stall.
+    # Rebuilds from eval/results/live_soak_evidence/ -- the exports were taken
+    # from the live cluster after the abort, because check_k6_delivery raises
+    # before the harness reaches its own export step.
+    ("analysis_live_soak_v4.py", [], "RESULTS_LIVE_SOAK_V4.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
