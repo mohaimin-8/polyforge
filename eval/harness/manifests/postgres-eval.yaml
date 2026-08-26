@@ -77,7 +77,23 @@ spec:
                  "-c", "shared_buffers=256MB",
                  "-c", "synchronous_commit=off",
                  "-c", "max_wal_size=4GB",
-                 "-c", "checkpoint_timeout=30min"]
+                 "-c", "checkpoint_timeout=30min",
+                 # WP14 attempt 7. synchronous_commit=off stops COMMITS waiting
+                 # on the WAL, but checkpoints still fsync the data files, and a
+                 # checkpoint fsync on a VHDX under WSL2 is precisely the
+                 # multi-second stall that ended attempt 6 at 10 h 44 m with a
+                 # 19.5 s worst request. fsync=off removes every fsync in the
+                 # engine, which is the only remaining lever on this host that
+                 # targets the measured mechanism rather than a symptom.
+                 #
+                 # Correct HERE and nowhere else: this store exists to be
+                 # measured and then deleted with the cluster. The cost is that
+                 # an unclean pod stop corrupts the database -- and a run whose
+                 # PostgreSQL died is already void, so nothing measurable is at
+                 # risk. full_page_writes=off cuts WAL volume for the same
+                 # reason. Both are disclosed in PREREG_LIVE_SOAK_V5.md.
+                 "-c", "fsync=off",
+                 "-c", "full_page_writes=off"]
           env:
             - name: POSTGRES_DB
               value: polyforge
