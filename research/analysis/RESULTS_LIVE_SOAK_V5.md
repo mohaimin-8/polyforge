@@ -106,6 +106,12 @@ A gradual resource decline does not restart thirteen pods simultaneously while n
 
 **Established.** The failure causes have moved every attempt and are now exhausted one by one: not the load path (NodePort, gated), not the exporter (11.5M events in 78 s), not the instruments (three of four scored), not the generator (4,876 VUs used of 9,601), not memory (zero restarts), and not the controller.
 
+### Independent corroboration from outside the harness
+
+The host's own Windows System event log recorded **Volsnap event 36 — "the shadow copies of volume C: were aborted because the shadow copy storage could not grow in time"** — at 2026-08-26 23:08:27, which is **T+3 h of this sitting**, and again on 2026-08-25 during the previous attempt's window. The SSD reports Healthy with 265 GB free, so this is not a failing device: it is the I/O subsystem unable to keep up with sustained write pressure.
+
+That matters because it is evidence from a source with no connection to PolyForge, its harness or its instrumentation. Windows independently observed the host's storage failing to keep pace during the same run whose telemetry showed a multi-second stall — and the machine did not reboot at any point, with 154 hours of continuous uptime spanning every sitting discussed here.
+
 **FALSIFIED.** The storage hypothesis. `RESULTS_LIVE_SOAK_V4.md` inferred that the stall was PostgreSQL durability against a VHDX. This run disabled `fsync`, `full_page_writes` and `synchronous_commit` together, and the worst stall grew from 19.5 s to **51.4 s**. Storage durability is eliminated. The cause returns to unknown, which is where the pre-registration said it must go rather than to the next convenient explanation.
 
 **NOT established.** A complete 24 h run, or even the design's 12 h minimum — this reached 11.79 h and missed it by 13 minutes.
