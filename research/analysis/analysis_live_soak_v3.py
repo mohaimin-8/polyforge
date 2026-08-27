@@ -45,7 +45,11 @@ REPO = Path(__file__).resolve().parents[2]
 # each sitting now gets its own directory and every generator points at the one
 # it actually reports.
 EV = REPO / "eval" / "results" / "live_soak_attempt5_evidence"
-STAGE_B = REPO / "eval" / "results" / "soak_stage_b_evidence"
+# Frozen snapshot of the ladder run THIS record quotes. soak_stage_b_evidence/
+# is reused by every later Stage B, so pointing a frozen record at it makes
+# the record rebuild with whichever run happened last -- which is exactly the
+# drift the R4 gate caught.
+STAGE_B = REPO / "eval" / "results" / "ladder_for_v3_evidence"
 STAGE_C = REPO / "eval" / "results" / "soak_stage_c_evidence"
 
 VU_LINE = re.compile(
