@@ -373,6 +373,23 @@ def build() -> str:
       "scored), not the generator (4,876 VUs used of 9,601), not memory (zero "
       "restarts), and not the controller.")
     w("")
+    w("### Independent corroboration from outside the harness")
+    w("")
+    w("The host's own Windows System event log recorded **Volsnap event 36 — "
+      "\"the shadow copies of volume C: were aborted because the shadow copy "
+      "storage could not grow in time\"** — at 2026-08-26 23:08:27, which is "
+      "**T+3 h of this sitting**, and again on 2026-08-25 during the previous "
+      "attempt's window. The SSD reports Healthy with 265 GB free, so this is "
+      "not a failing device: it is the I/O subsystem unable to keep up with "
+      "sustained write pressure.")
+    w("")
+    w("That matters because it is evidence from a source with no connection to "
+      "PolyForge, its harness or its instrumentation. Windows independently "
+      "observed the host's storage failing to keep pace during the same run "
+      "whose telemetry showed a multi-second stall — and the machine did not "
+      "reboot at any point, with 154 hours of continuous uptime spanning every "
+      "sitting discussed here.")
+    w("")
     w("**FALSIFIED.** The storage hypothesis. `RESULTS_LIVE_SOAK_V4.md` "
       "inferred that the stall was PostgreSQL durability against a VHDX. This "
       "run disabled `fsync`, `full_page_writes` and `synchronous_commit` "
