@@ -139,6 +139,11 @@ CAMPAIGN_RECORDS = [
     # from the live cluster after the abort, because check_k6_delivery raises
     # before the harness reaches its own export step.
     ("analysis_live_soak_v4.py", [], "RESULTS_LIVE_SOAK_V4.md"),
+    #
+    # Attempt 7 (WP14). The sitting that falsified the storage hypothesis:
+    # fsync, full_page_writes and synchronous_commit all disabled, and the
+    # worst stall grew from 19.5 s to 51.4 s.
+    ("analysis_live_soak_v5.py", [], "RESULTS_LIVE_SOAK_V5.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
