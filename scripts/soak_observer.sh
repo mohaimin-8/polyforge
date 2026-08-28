@@ -28,6 +28,12 @@ EVIDENCE="${EVIDENCE_DIR:-$REPO/eval/results/soak_stage_b_evidence}"
 INTERVAL=${1:-20}
 mkdir -p "$EVIDENCE" 2>/dev/null || true
 OUT="$EVIDENCE/observer.csv"
+# Host-side freeze probe target. Deliberately OUTSIDE the evidence tree so a
+# scratch file never lands in committed evidence, and on the Windows volume
+# rather than inside WSL2 -- C: is where the VHDX lives and what a VSS /
+# Volsnap freeze actually blocks.
+PROBE="${TMPDIR:-/tmp}/.polyforge_host_probe"
+prev_epoch=""
 
 # Single instance, enforced. A second observer contaminated Stage B attempt 3:
 # an earlier one was still alive because the kill that was meant to stop it used
@@ -46,7 +52,7 @@ trap 'rm -f "$LOCK"' EXIT INT TERM
 
 # Cumulative counters, so a spike between two samples is still visible as a
 # delta even though the sample itself missed the moment.
-echo "epoch,iso,nodes_mem_pct,pods_ready,pods_total,restarts_total,max_pod_mem_mi,cp_replicas,pg_ckpt_timed,pg_ckpt_req,pg_ckpt_write_ms,pg_ckpt_sync_ms,pg_rows_ingested,pg_autovacuum,kind_node_mem" > "$OUT"
+echo "epoch,iso,nodes_mem_pct,pods_ready,pods_total,restarts_total,max_pod_mem_mi,cp_replicas,pg_ckpt_timed,pg_ckpt_req,pg_ckpt_write_ms,pg_ckpt_sync_ms,pg_rows_ingested,pg_autovacuum,kind_node_mem,sample_gap_s,host_write_ms" > "$OUT"
 
 psql_scalar() { # SQL -> single value, empty on any failure
   kubectl --namespace "$NS" exec deploy/postgres -- \
@@ -99,11 +105,39 @@ while true; do
   kind_node_mem=$(docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' 2>/dev/null |
     awk '/control-plane|worker/ {print $1"="$2}' | paste -sd'|' -)
 
-  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+  # HOST FREEZE PROBE (attempt 8 / PREREG_LIVE_SOAK_V6).
+  # Attempt 7's multi-second stall was INFERRED -- from telemetry ingestion
+  # collapsing, checkpoints spanning the stall windows, and a Windows Volsnap
+  # event 36 found in the host log afterwards. Nothing MEASURED it, and V5 said
+  # so in writing: "the stall's cause is still not proven". These two columns
+  # measure it directly. Both are host-side, so they still record a freeze in
+  # the case where kubectl is itself the thing that is blocked:
+  #
+  #   sample_gap_s  - wall-clock seconds since the previous sample. The loop
+  #                   sleeps $INTERVAL, so a gap materially above the interval
+  #                   means this process was not scheduled at all. Attempt 7's
+  #                   51.4 s stall would appear here as a ~51 s excess.
+  #   host_write_ms - latency of one small write to the Windows volume, which a
+  #                   VSS/Volsnap freeze blocks and CPU-bound work does not.
+  #
+  # Neither touches the cluster. This is added measurement, not a change to
+  # what is being measured.
+  t0=$(date +%s%N 2>/dev/null || echo 0)
+  echo "$epoch" > "$PROBE" 2>/dev/null
+  t1=$(date +%s%N 2>/dev/null || echo 0)
+  if [ "$t0" != "0" ] && [ "$t1" != "0" ]; then
+    host_write_ms=$(( (t1 - t0) / 1000000 ))
+  else
+    host_write_ms=""
+  fi
+  if [ -n "$prev_epoch" ]; then sample_gap_s=$(( epoch - prev_epoch )); else sample_gap_s=""; fi
+  prev_epoch=$epoch
+
+  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
     "$epoch" "$iso" "$nodes_mem_pct" "$pods_ready" "$pods_total" \
     "$restarts_total" "$max_pod_mem_mi" "$cp_replicas" \
     "$pg_ckpt_timed" "$pg_ckpt_req" "$pg_ckpt_write_ms" "$pg_ckpt_sync_ms" \
-    "$pg_rows_ingested" "$pg_autovacuum" "$kind_node_mem" >> "$OUT"
+    "$pg_rows_ingested" "$pg_autovacuum" "$kind_node_mem" "$sample_gap_s" "$host_write_ms" >> "$OUT"
 
   sleep "$INTERVAL"
 done
