@@ -1,0 +1,4 @@
+T0=2026-08-28T15:22:13Z epoch=1787930533
+commit=e77c346fe09b0725b6e13cd2effc1ca6533def1e
+observer pid=7309
+controls pid=7313

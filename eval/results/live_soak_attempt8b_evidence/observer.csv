@@ -1,0 +1,13 @@
+epoch,iso,nodes_mem_pct,pods_ready,pods_total,restarts_total,max_pod_mem_mi,cp_replicas,pg_ckpt_timed,pg_ckpt_req,pg_ckpt_write_ms,pg_ckpt_sync_ms,pg_rows_ingested,pg_autovacuum,kind_node_mem,sample_gap_s,host_write_ms
+1787930534,2026-08-28T15:22:14Z,0,0,0,0,0,,,,,,,,,,163
+1787930556,2026-08-28T15:22:36Z,0,0,0,0,0,,,,,,,,polyforge-eval-worker3=33.52MiB|polyforge-eval-worker=34.03MiB|polyforge-eval-control-plane=355.1MiB|polyforge-eval-worker2=32.84MiB,22,42
+1787930580,2026-08-28T15:23:00Z,0,0,0,0,0,,,,,,,,polyforge-eval-worker3=166.9MiB|polyforge-eval-worker=162.1MiB|polyforge-eval-control-plane=567.2MiB|polyforge-eval-worker2=167.3MiB,24,266
+1787930608,2026-08-28T15:23:29Z,0,0,0,0,0,,,,,,,,polyforge-eval-worker3=156.5MiB|polyforge-eval-worker=149.6MiB|polyforge-eval-control-plane=597MiB|polyforge-eval-worker2=150.6MiB,28,41
+1787930644,2026-08-28T15:24:04Z,0,0,0,0,0,,,,,,,,polyforge-eval-worker3=184.5MiB|polyforge-eval-worker=180.4MiB|polyforge-eval-control-plane=596.9MiB|polyforge-eval-worker2=151.5MiB,36,125
+1787930670,2026-08-28T15:24:30Z,6,0,1,0,0,,,,,,,,polyforge-eval-worker3=188.5MiB|polyforge-eval-worker=181.8MiB|polyforge-eval-control-plane=603.9MiB|polyforge-eval-worker2=154.6MiB,26,53
+1787930699,2026-08-28T15:24:59Z,6,1,2,0,2,,,,,,,0,polyforge-eval-worker3=188MiB|polyforge-eval-worker=173.8MiB|polyforge-eval-control-plane=609.1MiB|polyforge-eval-worker2=253.4MiB,29,40
+1787930724,2026-08-28T15:25:24Z,6,18,20,0,50,16,0,1,15,1,0,0,polyforge-eval-worker3=261.8MiB|polyforge-eval-worker=276.1MiB|polyforge-eval-control-plane=632.8MiB|polyforge-eval-worker2=374.5MiB,25,45
+1787930749,2026-08-28T15:25:49Z,6,20,20,0,59,16,0,1,15,1,0,0,polyforge-eval-worker3=276.1MiB|polyforge-eval-worker=309.2MiB|polyforge-eval-control-plane=663.9MiB|polyforge-eval-worker2=408.9MiB,25,39
+1787930774,2026-08-28T15:26:14Z,6,20,20,0,112,16,0,1,15,1,0,0,polyforge-eval-worker3=277.7MiB|polyforge-eval-worker=314.2MiB|polyforge-eval-control-plane=665.1MiB|polyforge-eval-worker2=413.7MiB,25,45
+1787930799,2026-08-28T15:26:39Z,6,0,0,0,0,,,,,,,,,25,41
+1787930825,2026-08-28T15:27:05Z,0,0,0,0,0,,,,,,,,,26,38
