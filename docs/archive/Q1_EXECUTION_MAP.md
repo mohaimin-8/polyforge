@@ -10,7 +10,7 @@
 
 Purpose: every remaining weakness, as executable steps. Written so any agent
 can follow it without re-deriving context. Rationale lives in
-`docs/Q1_ROADMAP.md` (v2); this file is the *what to do*. No submission is
+`docs/archive/Q1_ROADMAP.md` (v2); this file is the *what to do*. No submission is
 guaranteed acceptance; completing ALL tasks (incl. Phase 4) before
 submitting to FGCS/TCC/TSC (formal Q1 / Transactions) maximizes the probability.
 

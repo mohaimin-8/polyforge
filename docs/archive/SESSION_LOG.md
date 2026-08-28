@@ -2294,7 +2294,7 @@ decision, not four half-features (ADR 0005).
   because the generator sheds tokens during transient scheduler stalls;
   the committed run targets 5,300 so delivered throughput clears the gate
   with margin. Server headroom, not saturation: p50 under 3 ms.)
-- `docs/SERVICE_TEMPLATE.md` records the 14-point cross-cutting checklist
+- `docs/archive/SERVICE_TEMPLATE.md` records the 14-point cross-cutting checklist
   every future service is reviewed against, each row tied to its proving
   test.
 
@@ -2408,7 +2408,7 @@ artifacts, none of which can be executed on this machine.
   ingress `/api`. `deploy/helm/polyforge/`: chart templating image tag,
   replicas, resources, admin-key Secret, rate limits. Schema-reviewed only;
   `helm install` and the rollout-restart gate need a kind cluster.
-- `docs/SLO.md`: 99.9% availability / p99 < 200ms objectives against the
+- `docs/archive/SLO.md`: 99.9% availability / p99 < 200ms objectives against the
   real metric names, error budget (43.2 min/30d), and the 14.4×/6× burn-rate
   alert expressions. Alerts are not loaded into Prometheus yet.
 - OpenAPI 0.5.0: four auth paths, `BearerToken` scheme offered on all
@@ -2434,7 +2434,7 @@ first push is the earliest environment that can prove any of it.
   property.
 - Why refresh-token rotation must consume the token even on the success
   path, and what replay window exists if it doesn't.
-- Why 429 is excluded from the availability SLI in `docs/SLO.md`.
+- Why 429 is excluded from the availability SLI in `docs/archive/SLO.md`.
 
 ### Immediate next tasks
 

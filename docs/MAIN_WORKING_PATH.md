@@ -4,7 +4,7 @@ Last updated 2026-08-05. **Start here.** This is the top-level route that
 reconciles every open work item into one dependency-ordered path. It sits
 *above* two existing files and does not replace them:
 
-- `docs/Q1_EXECUTION_MAP.md` — the terse per-task runbook (T0–T18, DO / VERIFY
+- `docs/archive/Q1_EXECUTION_MAP.md` — the terse per-task runbook (T0–T18, DO / VERIFY
   / DONE-WHEN). When this file and the map disagree on **order**, this file
   wins; when they disagree on a task's **steps**, the map wins.
 - `docs/REMAINING_WORK.md` — the owner-split ledger (buckets A/B/C).

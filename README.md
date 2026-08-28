@@ -4,7 +4,7 @@ PolyForge is a thesis-grade platform engineering research project for adaptive m
 
 The target research contribution is a workload-aware controller that observes tenant traffic, classifies workload behavior, and recommends joint control actions across replicas, cache budget, and model routing.
 
-**Start here**: [ARCHITECTURE.md](ARCHITECTURE.md) (system tour) · [research/analysis/RESULTS_MASTER.md](research/analysis/RESULTS_MASTER.md) (every measured result, one page) · [eval/README.md](eval/README.md) (evaluation + results) · [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/adr/](docs/adr/) (design decisions)
+**Start here**: [docs/INDEX.md](docs/INDEX.md) (documentation map) · [ARCHITECTURE.md](ARCHITECTURE.md) (system tour) · [research/analysis/RESULTS_MASTER.md](research/analysis/RESULTS_MASTER.md) (every measured result, one page) · [eval/README.md](eval/README.md) (evaluation + results) · [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/adr/](docs/adr/) (design decisions)
 
 ## Install the operator (Helm)
 
