@@ -22,7 +22,7 @@
 #                                trycloudflare URL — docs/WAVE4_FREE_ROUTE.md)
 # Run the WL-H2 knob-liveness preflight (eval/scripts/knob_preflight.py) and,
 # on the split-host route, tunnel_preflight.py, BEFORE scoring — an inert knob
-# VOIDS WL-H1 (do not fake it; report). See docs/Q1_EXECUTION_MAP.md T4.
+# VOIDS WL-H1 (do not fake it; report). See docs/archive/Q1_EXECUTION_MAP.md T4.
 name: wave4_live_plane
 backend: cluster
 steps: 30

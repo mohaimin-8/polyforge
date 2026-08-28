@@ -30,6 +30,6 @@ Amendment (declared pre-run, see script docstring): reservoir sample of 200000 u
 | 64000 | 0.260 |
 | 100000 | 0.296 |
 
-**Saturating fit h(K) = hmax·K/(K+K_half): hmax = 0.285, K_half = 6569 entries.** The sim's h(c) uses the same form over MB (CACHE_HIT_MAX=0.85, CACHE_HALF_MB=256); at ~3 KB per entry (384-d float32 embedding + prompt text + metadata), K_half ≈ 19 MB equivalent. Adopting empirical constants in model.py would be a new pre-registered experiment; the committed matrices stay bit-reproducible (see session 16b precedent in docs/SESSION_LOG.md).
+**Saturating fit h(K) = hmax·K/(K+K_half): hmax = 0.285, K_half = 6569 entries.** The sim's h(c) uses the same form over MB (CACHE_HIT_MAX=0.85, CACHE_HALF_MB=256); at ~3 KB per entry (384-d float32 embedding + prompt text + metadata), K_half ≈ 19 MB equivalent. Adopting empirical constants in model.py would be a new pre-registered experiment; the committed matrices stay bit-reproducible (see session 16b precedent in docs/archive/SESSION_LOG.md).
 
 Reproduce: `python semantic_cache_eval.py` (synthetic+fallback) or `--conversations lmsys-chat-1m/*.parquet` with sentence-transformers installed. The LMSYS ETL that normalizes the same dataset for demand replay is `research/traces/etl_lmsys_chat1m.py`.

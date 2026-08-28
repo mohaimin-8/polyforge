@@ -7,7 +7,7 @@
 # -- not because the system was good, but because their instruments were
 # absent or saturated. A hypothesis never observed failing is not a test.
 #
-# Must be OBSERVED (docs/WP14_REMEDIATION_ROADMAP.md Phase 6):
+# Must be OBSERVED (docs/archive/WP14_REMEDIATION_ROADMAP.md Phase 6):
 #   planner scale-down  -> >= 1 "planner unavailable" line per injection
 #   audit continuity    -> degraded-cycle count == audit-record count, both > 0
 #   latency fault       -> SK-H1 FAILS, p95 deviation exceeds 20%

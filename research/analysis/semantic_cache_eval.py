@@ -326,7 +326,7 @@ def main() -> None:
           f"K_half ≈ {khalf * 3 / 1024:.0f} MB equivalent. Adopting empirical "
           "constants in model.py would be a new pre-registered experiment; "
           "the committed matrices stay bit-reproducible (see session 16b "
-          "precedent in docs/SESSION_LOG.md).")
+          "precedent in docs/archive/SESSION_LOG.md).")
     except Exception as exc:  # fit is reporting, not gating
         w(f"(saturating fit did not converge: {exc})")
     w("")

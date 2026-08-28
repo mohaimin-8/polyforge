@@ -18,7 +18,7 @@ review pass. What changed and why:
 3. **Cell-sharding scope trimmed** to the smallest implementation that
    makes the shipped claim honest (Phase 3.3).
 
-**Terse machine-followable runbook: `docs/Q1_EXECUTION_MAP.md`** — tasks
+**Terse machine-followable runbook: `docs/archive/Q1_EXECUTION_MAP.md`** — tasks
 T0–T16 with per-task DO/VERIFY/DONE-WHEN and the safety rules R1–R8; use it
 to execute, use this file for the why.
 

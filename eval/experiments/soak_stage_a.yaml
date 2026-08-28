@@ -5,7 +5,7 @@
 # emits, in fifteen minutes rather than at hour 24. Four attempts failed
 # because each fix was validated BY the next 24 h run.
 #
-# Pass criteria (docs/WP14_REMEDIATION_ROADMAP.md Phase 6):
+# Pass criteria (docs/archive/WP14_REMEDIATION_ROADMAP.md Phase 6):
 #   http_req_failed == 0, dropped_iterations == 0   (check_k6_delivery)
 #   no pod > 25% of the work, >= 80% of replicas active (check_load_distribution)
 #   eval-export returns 10 non-empty 60 s buckets
