@@ -1,0 +1,5 @@
+T0=2026-08-28T06:27:54Z epoch=1787898474
+commit=e77c346fe09b0725b6e13cd2effc1ca6533def1e
+observer pid=883
+controls pid=888
+RUNNER_EXIT=1 at 2026-08-28T15:18:30Z
