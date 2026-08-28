@@ -30,8 +30,14 @@ $ErrorActionPreference = 'Continue'
 # attributed to VSS.
 $ProviderPattern = 'volsnap|VSS|^disk$|Ntfs|volmgr|storahci|stornvme|Kernel-Power|Kernel-Boot|EventLog'
 
+# UTF-8 with NO byte-order mark. Windows PowerShell 5.1's `-Encoding utf8`
+# always emits a BOM, and a BOM on the header line makes Python's
+# csv.DictReader read the first column as "﻿iso_utc" -- the record that
+# scores this sitting would then fail to find `iso_utc` at all, silently.
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 if (-not (Test-Path $OutFile)) {
-  Set-Content -Path $OutFile -Value 'iso_utc,epoch,record_id,provider,event_id,level,message' -Encoding utf8
+  [System.IO.File]::WriteAllText(
+    $OutFile, "iso_utc,epoch,record_id,provider,event_id,level,message`r`n", $Utf8NoBom)
 }
 
 # Seed from whatever the file already holds, so a restarted tail does not
@@ -67,7 +73,7 @@ while ($true) {
         $utc.ToString('yyyy-MM-ddTHH:mm:ssZ'),
         [int64]([DateTimeOffset]$e.TimeCreated).ToUnixTimeSeconds(),
         $e.RecordId, $e.ProviderName, $e.Id, $e.LevelDisplayName, $msg
-      Add-Content -Path $OutFile -Value $row -Encoding utf8
+      [System.IO.File]::AppendAllText($OutFile, $row + "`r`n", $Utf8NoBom)
     }
 
     # Bound the dedup set on a 24 h sitting rather than growing it forever.
