@@ -50,6 +50,33 @@ fi
 echo $$ > "$LOCK"
 trap 'rm -f "$LOCK"' EXIT INT TERM
 
+# HOST EVENT TAIL (attempt 9 / PREREG_LIVE_SOAK_V7).
+# V6 made the freeze measurable; it did not make it NAMEABLE. attempt 8's 54 s
+# scheduling gap and 1412 ms host write prove the host stopped scheduling this
+# loop, but a gap looks the same whether VSS froze the volume, the disk stack
+# reset, or the box suspended. The tail runs for the life of the observer and
+# writes named Windows System-log events into the same evidence directory, so
+# a stall row in observer.csv can be joined to its cause by timestamp.
+#
+# Started HERE, by the observer, rather than left to the operator: every
+# instrument this harness lost was one a human had to remember to launch.
+HOST_EVT_PID=""
+if command -v powershell.exe >/dev/null 2>&1; then
+  # MSYS_NO_PATHCONV: Git Bash rewrites these arguments into Windows paths
+  # halfway and hands PowerShell something that does not exist. This cost four
+  # separate sessions before it was written down.
+  MSYS_NO_PATHCONV=1 powershell.exe -NoProfile -ExecutionPolicy Bypass \
+    -File "$(cygpath -w "$REPO/scripts/host_event_tail.ps1")" \
+    -OutFile "$(cygpath -w "$EVIDENCE/host_events.csv")" \
+    -IntervalSeconds 60 >> "$EVIDENCE/host_events.log" 2>&1 &
+  HOST_EVT_PID=$!
+  echo "host event tail started as PID $HOST_EVT_PID" >&2
+else
+  echo "WARNING: powershell.exe not on PATH -- host events will NOT be recorded" >&2
+fi
+# kill -9, not kill: plain kill does not reliably stop these under Git Bash.
+trap 'rm -f "$LOCK"; [ -n "$HOST_EVT_PID" ] && kill -9 "$HOST_EVT_PID" 2>/dev/null' EXIT INT TERM
+
 # Cumulative counters, so a spike between two samples is still visible as a
 # delta even though the sample itself missed the moment.
 echo "epoch,iso,nodes_mem_pct,pods_ready,pods_total,restarts_total,max_pod_mem_mi,cp_replicas,pg_ckpt_timed,pg_ckpt_req,pg_ckpt_write_ms,pg_ckpt_sync_ms,pg_rows_ingested,pg_autovacuum,kind_node_mem,sample_gap_s,host_write_ms" > "$OUT"
