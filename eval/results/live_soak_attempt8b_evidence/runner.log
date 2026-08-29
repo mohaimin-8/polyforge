@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\DARKR\Documents\Thesis Project\polyforge\eval\harness\runner.py", line 192, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\DARKR\Documents\Thesis Project\polyforge\eval\harness\runner.py", line 173, in main
+    report = run_experiment(spec, workers=args.workers, limit=args.limit)
+  File "C:\Users\DARKR\Documents\Thesis Project\polyforge\eval\harness\runner.py", line 99, in run_experiment
+    con = connect(db_path)
+  File "C:\Users\DARKR\Documents\Thesis Project\polyforge\eval\harness\results.py", line 86, in connect
+    con = duckdb.connect(str(path))
+_duckdb.IOException: IO Error: Cannot open file "C:\Users\DARKR\Documents\Thesis Project\polyforge\eval\results\live_soak.duckdb": The process cannot access the file because it is being used by another process.
+
+File is already open in 
+C:\Users\DARKR\AppData\Local\Programs\Python\Python313\python.exe (PID 628)
