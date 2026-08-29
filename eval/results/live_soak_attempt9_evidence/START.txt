@@ -1,0 +1,6 @@
+T0=2026-08-28T15:46:09Z epoch=1787931969
+commit=f27604e3644d73b3adfe89fdd98954170fd6dad7
+prereg=research/analysis/PREREG_LIVE_SOAK_V7.md pushed=2026-08-28T15:41:38Z
+observer pid=9146
+controls pid=9210
+schedule=7200:planner,18000:cpu,28800:planner,39600:cpu,50400:planner,61200:cpu,72000:planner,82800:cpu
