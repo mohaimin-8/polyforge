@@ -1,0 +1,4 @@
+label,degraded_cycles,tenants,base_start,base_end,out_end
+T+120m planner,7,8,5496,5568,5640
+T+480m planner,8,8,22776,22848,22920
+T+840m planner,8,8,40055,40127,40207
