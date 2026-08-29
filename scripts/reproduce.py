@@ -144,6 +144,15 @@ CAMPAIGN_RECORDS = [
     # fsync, full_page_writes and synchronous_commit all disabled, and the
     # worst stall grew from 19.5 s to 51.4 s.
     ("analysis_live_soak_v5.py", [], "RESULTS_LIVE_SOAK_V5.md"),
+    #
+    # Attempt 9 (WP14). Rebuilds from eval/results/live_soak_attempt9_evidence/
+    # only -- no eval-export exists, because the delivery gate rejected the run
+    # before the harness reached its export step, so SK-H1/H2/H3 are reported
+    # UNSCOREABLE rather than approximated. The sitting that named the stall:
+    # the V7 host-event tail caught five Kernel-Power transitions and zero
+    # storage events across 14 h 33 m, and it is the first to clear the
+    # design's 12 h minimum.
+    ("analysis_live_soak_v7.py", [], "RESULTS_LIVE_SOAK_V7.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
