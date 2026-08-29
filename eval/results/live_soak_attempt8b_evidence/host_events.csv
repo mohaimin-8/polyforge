@@ -1,0 +1,7 @@
+iso_utc,epoch,record_id,provider,event_id,level,message
+2026-08-29T06:00:00Z,1787983200,317761,EventLog,6013,Information,The system uptime is 689638 seconds.
+2026-08-29T06:13:17Z,1787983997,317774,Microsoft-Windows-Kernel-Power,105,Information,Power source change.
+2026-08-29T06:13:16Z,1787983996,317773,Microsoft-Windows-Kernel-Power,105,Information,Power source change.
+2026-08-29T06:12:58Z,1787983978,317772,Microsoft-Windows-Kernel-Power,105,Information,Power source change.
+2026-08-29T06:12:56Z,1787983976,317771,Microsoft-Windows-Kernel-Power,105,Information,Power source change.
+2026-08-29T06:27:12Z,1787984832,317830,Microsoft-Windows-Kernel-Power,105,Information,Power source change.

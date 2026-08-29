@@ -42,6 +42,29 @@ prev_epoch=""
 # load on the box running the cluster AND interleaved rows into one CSV, where
 # the older instance's stale readiness column disagreed with the newer one's.
 # Evidence that argues with itself is worse than no evidence.
+# LIVENESS HEARTBEAT -- deliberately NOT the lock file, and deliberately not
+# named like one.
+#
+# Attempt 9 was contaminated because a launcher ran `rm -f .observer.lock
+# .controls.lock` before starting, which disarmed this guard completely: a
+# second observer and a second fault injector ran against the live cluster for
+# 13.7 h and applied four faults no pre-registration describes. The lock logic
+# below was correct and never got to run. A guard a launcher can delete is not
+# a guard, so the real check is a file the launcher does not know about,
+# refreshed every loop, and read by whoever starts next.
+HEARTBEAT="$REPO/.observer.heartbeat"
+HEARTBEAT_STALE_S=${HEARTBEAT_STALE_S:-120}
+beat() { date +%s > "$HEARTBEAT" 2>/dev/null || true; }
+if [ -f "$HEARTBEAT" ]; then
+  last=$(cat "$HEARTBEAT" 2>/dev/null || echo 0)
+  age=$(( $(date +%s) - ${last:-0} ))
+  if [ "$age" -lt "$HEARTBEAT_STALE_S" ]; then
+    echo "another observer beat ${age}s ago; refusing to start a second" >&2
+    exit 3
+  fi
+fi
+beat
+
 LOCK="$REPO/.observer.lock"
 if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK" 2>/dev/null)" 2>/dev/null; then
   echo "observer already running as PID $(cat "$LOCK"); refusing to start a second" >&2
@@ -166,5 +189,6 @@ while true; do
     "$pg_ckpt_timed" "$pg_ckpt_req" "$pg_ckpt_write_ms" "$pg_ckpt_sync_ms" \
     "$pg_rows_ingested" "$pg_autovacuum" "$kind_node_mem" "$sample_gap_s" "$host_write_ms" >> "$OUT"
 
+  beat
   sleep "$INTERVAL"
 done

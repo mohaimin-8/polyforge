@@ -35,6 +35,27 @@ RESULTS="$EVIDENCE/positive_controls.log"
 # events three seconds apart, and the run's degraded latency was the harness
 # fighting itself, not the system under test. (Plain `kill` also does not
 # reliably stop these on Git Bash -- `kill -9` does.)
+# LIVENESS HEARTBEAT -- see the same block in scripts/soak_observer.sh.
+#
+# This is the guard that actually matters here: attempt 9's cluster received
+# NINE fault injections instead of five, because a launcher deleted the lock
+# files below and a second copy of THIS script ran the full 24 h schedule
+# alongside the registered one. Unregistered planner outages and CPU starvation
+# on a sitting under measurement is the worst failure this harness can have --
+# it silently changes the system under test.
+HEARTBEAT="$REPO/.controls.heartbeat"
+HEARTBEAT_STALE_S=${HEARTBEAT_STALE_S:-120}
+beat() { date +%s > "$HEARTBEAT" 2>/dev/null || true; }
+if [ -f "$HEARTBEAT" ]; then
+  last=$(cat "$HEARTBEAT" 2>/dev/null || echo 0)
+  age=$(( $(date +%s) - ${last:-0} ))
+  if [ "$age" -lt "$HEARTBEAT_STALE_S" ]; then
+    echo "another controls instance beat ${age}s ago; refusing to start a second" >&2
+    exit 3
+  fi
+fi
+beat
+
 CONTROL_LOCK="$REPO/.controls.lock"
 if [ -f "$CONTROL_LOCK" ] && kill -0 "$(cat "$CONTROL_LOCK" 2>/dev/null)" 2>/dev/null; then
   echo "controls already running as PID $(cat "$CONTROL_LOCK"); refusing to start a second" >&2
@@ -66,7 +87,7 @@ operator_pod() {
 }
 
 log "=== Stage B positive controls: waiting for the k6 load window ==="
-for _ in $(seq 1 240); do k6_running && break; sleep 5; done
+for _ in $(seq 1 240); do k6_running && break; beat; sleep 5; done
 if ! k6_running; then
   log "ABORT: k6 never started"
   exit 1
@@ -76,9 +97,15 @@ log "k6 load started (T0=$T0)"
 echo "T0=$T0" >> "$EVIDENCE/timeline.txt"
 
 wait_until() {
+  # Chunked, so the heartbeat keeps ticking through a three-hour wait. A single
+  # long sleep would let the file go stale and a second injector start.
   local tgt=$((T0 + $1)) now d
-  now=$(date +%s); d=$((tgt - now))
-  [ "$d" -gt 0 ] && sleep "$d"
+  while :; do
+    now=$(date +%s); d=$((tgt - now))
+    [ "$d" -le 0 ] && break
+    beat
+    if [ "$d" -gt 15 ]; then sleep 15; else sleep "$d"; fi
+  done
   return 0
 }
 
