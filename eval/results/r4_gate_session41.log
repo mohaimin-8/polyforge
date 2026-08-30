@@ -1,0 +1,68 @@
+wrote C:\Users\DARKR\Documents\Thesis Project\polyforge\reproduce_out\RESULTS.md
+full matrix: 1800 runs; ablations: 500 runs
+  wrote fig01_cost_by_system (.png 600dpi, .pdf vector)
+  wrote fig02_violation_by_system (.png 600dpi, .pdf vector)
+  wrote fig03_pareto_cost_violation (.png 600dpi, .pdf vector)
+  wrote fig04_jain_by_tenant_mix (.png 600dpi, .pdf vector)
+  wrote fig05_cache_hit_by_workload (.png 600dpi, .pdf vector)
+  wrote fig06_cost_by_cluster_size (.png 600dpi, .pdf vector)
+  wrote fig07_violation_by_workload (.png 600dpi, .pdf vector)
+  wrote fig08_ablation_deltas (.png 600dpi, .pdf vector)
+  wrote fig09_adaptation_trace (.png 600dpi, .pdf vector)
+  wrote fig10_latency_p95 (.png 600dpi, .pdf vector)
+  wrote fig11_violation_step_share (.png 600dpi, .pdf vector)
+  wrote fig12_composite_objective (.png 600dpi, .pdf vector)
+12 figures + FIGURES.md in C:\Users\DARKR\Documents\Thesis Project\polyforge\reproduce_out\figures
+  wrote fig13_forecast_ablation (.png 600dpi, .pdf vector)
+  wrote fig14_realism_pareto (.png 600dpi, .pdf vector)
+  wrote fig15_adaptive_under_realism (.png 600dpi, .pdf vector)
+  wrote fig16_cache_side_channel (.png 600dpi, .pdf vector)
+  wrote fig17_defense_frontier (.png 600dpi, .pdf vector)
+wrote C:\Users\DARKR\Documents\Thesis Project\polyforge\reproduce_out\ADVANCED.md
+appended advanced figure captions to C:\Users\DARKR\Documents\Thesis Project\polyforge\reproduce_out\figures\FIGURES.md
+wrote C:\Users\DARKR\Documents\Thesis Project\polyforge\reproduce_out\RESULTS_V2.md
+wrote C:\Users\DARKR\Documents\Thesis Project\polyforge\reproduce_out\FAIRNESS_V2.md
+wrote C:\Users\DARKR\Documents\Thesis Project\polyforge\reproduce_out\RESULTS_V3.md
+tier: archive
+cleared 73 artifact(s) from the previous run
+rebuilding into C:\Users\DARKR\Documents\Thesis Project\polyforge\reproduce_out ...
+
+=== reproduction report ===
+  RESULTS.md                   MATCH (byte-identical)
+  ADVANCED.md                  MATCH (byte-identical)
+  RESULTS_V2.md                MATCH (byte-identical)
+  FAIRNESS_V2.md               MATCH (byte-identical)
+  RESULTS_V3.md                MATCH (byte-identical)
+  RESULTS_CONCURRENCY.md       MATCH (byte-identical)
+  RESULTS_LEARNED.md           MATCH (byte-identical)
+  RESULTS_RISK.md              MATCH (byte-identical)
+  RESULTS_RISK_BUDGET.md       MATCH (byte-identical)
+  RESULTS_TENANT_SCALE.md      MATCH (byte-identical)
+  RESULTS_CHAOS_SIM.md         MATCH (byte-identical)
+  RESULTS_TIER_RATIO.md        MATCH (byte-identical)
+  RESULTS_HK_ADOPTION.md       MATCH (byte-identical)
+  RESULTS_LM_ADOPTION.md       MATCH (byte-identical)
+  RESULTS_MIXTURE_P95.md       MATCH (byte-identical)
+  RESULTS_TIER_WU.md           MATCH (byte-identical)
+  RESULTS_EVICTION_PARITY.md   MATCH (byte-identical)
+  RESULTS_ORDER_PERMUTATION.md MATCH (byte-identical)
+  PHASE7_ORDINAL.md            MATCH (byte-identical)
+  RESULTS_SEPARATION.md        MATCH (byte-identical)
+  RESULTS_TRACE_PARITY.md      MATCH (byte-identical)
+  RESULTS_BUDGET_PARITY.md     MATCH (byte-identical)
+  RESULTS_LAYERED_FIX.md       MATCH (byte-identical)
+  RESULTS_SEPARATION_MT.md     MATCH (byte-identical)
+  RESULTS_MODEL_MISMATCH.md    MATCH (byte-identical)
+  RESULTS_LIVE_SOAK.md         MATCH (byte-identical)
+  RESULTS_LIVE_SOAK_V2.md      MATCH (byte-identical)
+  RESULTS_LIVE_SOAK_V3.md      MATCH (byte-identical)
+  RESULTS_SEPARATION_MT_V2.md  MATCH (byte-identical)
+  RESULTS_LIVE_SOAK_V4.md      MATCH (byte-identical)
+  RESULTS_LIVE_SOAK_V5.md      MATCH (byte-identical)
+  RESULTS_LIVE_SOAK_V7.md      MATCH (byte-identical)
+  RESULTS_LIVE_SOAK_V8.md      MATCH (byte-identical)
+  RESULTS_WAVE4_LIVE_PLANE.md  MATCH (byte-identical)
+  records                      34/34 byte-identical
+  figures                      19/19 rebuilt as vector PDF + 600-DPI PNG
+committed records and figures were not modified.
+R4_EXIT=0
