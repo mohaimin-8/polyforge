@@ -15,7 +15,7 @@ All sixteen work packages have run and returned a verdict. The R4 gate passes
 
 | track | item | blocked on |
 |---|---|---|
-| **A** | B1 is VOID — WL-H1 unscored | a routing defect in the gateway |
+| **A** | B1 unscored — **WL-H2 now PASSES**; the knobs are live | substrate THROUGHPUT (a free P100 serialises generation) |
 | **B** | Reproducibility + comparator gaps for a Q1 venue | mostly accounts, one open design question |
 
 Track A is engineering and is fully agent-executable up to the re-sit.
@@ -98,41 +98,58 @@ Regression test added. `go test ./internal/ai/gateway/` is green.
 committed with its VOID. Re-scoring requires a fresh sitting on real tiers
 under a new pre-registration — A3 onward.
 
-### A3. Re-run the gate on real tiers (agent, ~30 min + GPU)
+### A3. Re-run the gate on real tiers — **DONE (session 41). WL-H2 PASSES.**
 
-Stand the Kaggle route back up (`docs/WAVE4_FREE_ROUTE.md`; the mechanics are
-now automated — see A6) and run `--limit 1` **only**, to reach the gate.
+Re-ran with the reconciler paused, on a fresh Kaggle kernel and real models:
 
-**Two outcomes, decided now:**
+```
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob:  small 1453.9 ms vs mid 2133.0 ms (delta 679.1 ms),
+            routing moved: True                                  -> LIVE
+verdict: WL-H2 PASS (both knobs live)
+```
 
-- **Gate passes** → proceed to A4.
-- **Gate still fails** → report SUBSTRATE INADEQUATE again, amend
-  `RESULTS_WAVE4_LIVE_PLANE.md` with the second reading, and **stop**. Do not
-  iterate against the gate until it passes; that is fitting the substrate to
-  the test.
+`tiers_seen` is `['small']` and `['mid']` — exclusive in **both** directions.
+The gate that voided the first sitting is passed. The inert-knob reading is
+withdrawn in `RESULTS_WAVE4_LIVE_PLANE.md`.
 
-### A4. Freeze a new pre-registration (agent, ~30 min)
+### A4/A5. The matrix — **BLOCKED on substrate throughput, not on the gate**
 
-The existing `PREREG_WAVE4_LIVE_PLANE` is frozen and its sitting is void. A
-re-sit needs its own registration, committed **and pushed** before the run
-(R1/R2), stating: the one changed factor (the gateway fix), that hypotheses,
-cells, arms and margins carry over unchanged, and that the previous VOID stands
-as recorded.
+The A3 run continued past the gate into load and failed there:
 
-### A5. Run the matrix (agent, ~3 h wall-clock + GPU)
+```
+48.3% of requests failed (2,880 of 5,963)
+iteration duration: median 58 ms, max 60 s     <- a timeout tail
+aborted by http_req_failed rate<0.01 at 20% of the load window
+```
 
-4 arms × 4 cells, `--workers 1`, one execution, per the prereg's stopping rule.
+A free Kaggle P100 **serialises generation**. The frozen cell drives ~218
+concurrent virtual users; they queue behind one GPU until the 60 s timeout.
+The median stays fast because those are cache hits and CRUD, so aggregate
+latency looks healthy right until the tail swallows the run.
 
-**Real timings, measured this session — the "2–4 GPU-hours" estimate in
-`WAVE4_FREE_ROUTE.md` is about right but the shape matters:** each run deletes
-and recreates the kind cluster and reloads four images. A failing run takes
-~4 min; a full 30-step run should take ~10. So budget **~2.5–3 h**, and note
-the Kaggle kernel serves 5 h per push, so one session is enough **only if
-nothing goes wrong**. The runner resumes (`already-valid=N pending=M`), so a
-lost tunnel costs the in-flight run, not the matrix.
+**`tunnel_preflight.py` cannot detect this** — it issues eight *sequential*
+probes per tier and measures round-trip latency, so it never creates queueing.
+It returned TUNNEL OK on this same route minutes earlier.
+`docs/WAVE4_FREE_ROUTE.md` §0a now states the limitation.
 
-**Done when:** `valid_runs: 16`, then export → `analysis_wave4_live_plane.py`
-extended to score WL-H1 → register → R4 gate green.
+**So the free split-host route is adequate for the WL-H2 gate and the tier
+bench, and NOT for the scored matrix.** Three ways forward, in order of
+honesty-per-effort:
+
+1. **A rented GPU with enough throughput** (~$20–60 for the run, or a cloud
+   credit). The cell stays frozen; only the substrate changes. This is the
+   clean path and needs no new pre-registration.
+2. **Batched serving on the free pool.** Cheap to try, unlikely to close the
+   gap: the cell wants ~100 req/s and a P100 doing 48 greedy tokens serves
+   roughly 0.5 req/s. Two orders of magnitude is not a batching problem.
+3. **A smaller frozen cell under a NEW pre-registration.** Legitimate, but it
+   is a *different experiment* — the current cell is frozen and must not be
+   shrunk to fit the hardware after seeing it fail.
+
+**Do not** reduce the cell's concurrency under the existing prereg, and do not
+relax the delivery threshold. Either would convert a substrate limit into a
+false pass.
 
 ### A6. Already built this session — reuse, do not rebuild
 
