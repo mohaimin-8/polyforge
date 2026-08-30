@@ -47,59 +47,56 @@ fix; decide that only after A1, because a routing leak inflates cache-hit
 measurements too (a request served by the wrong tier is still a miss that got
 answered).
 
-### A1. Diagnose the leak (agent, ~1–2 h, no GPU needed)
+### A1. Diagnose the leak — **DONE (session 41). Root cause found.**
 
-The relevant code is `internal/ai/gateway/server.go: pickProvider()`, which
-honours the pin **only if `s.tierProviders[tier]` exists** and otherwise falls
-through to the router.
+**It is not the gateway. It is a race with the operator.**
 
-**Two hypotheses are already eliminated — do not re-test them:**
+`PolicyReconciler.Reconcile` pushes each Policy's cache and tier levers to the
+AI gateway's admin endpoint — `internal/operator/controllers/gateway_knobs.go`
+line 49, `PUT /admin/tenants/{id}/knobs`, called from `policy_controller.go`
+line 106. **That is the same endpoint, and the same tenant, the WL-H2 probe
+drives.** The failing arm was `jcac`, which is in `OPERATOR_SYSTEMS`, so the
+reconciler was live throughout the probe.
 
-- *Multi-replica knob-store split.* `knobStore` is an in-memory `map` per
-  process, so a PUT to one replica would not reach others. But the harness does
-  **not** override `gateway.replicaCount`, so the chart default of **1** is
-  used. Single replica; not this.
-- *Cache-hit path.* A cache hit never sets `X-PolyForge-Tier` at all, so a hit
-  would surface as `""` in the probe, not `"small"`. Not this either.
+Probe and operator therefore fought over one knob. The probe pins `mid`; the
+next reconcile writes the Policy's tier back; the probe observes both tiers.
+One mechanism explains both "inert" knobs:
 
-**Remaining candidates, in the order worth testing:**
+- **tier** — pinned `mid`, served `['mid','small']`. Asymmetric because the
+  reconciler's own value wins, so pinning *that* tier looks exclusive and
+  pinning the other leaks.
+- **cache** — the probe sets `cache_size_mb=0`, the reconciler writes the
+  Policy's size back, so the hit rate at "0 MB" was 0.71 and the delta 0.29
+  rather than the ~1.0 a genuinely disabled cache gives.
 
-1. **`tierProviders` is missing the `mid` key.** If the map is built from
-   `POLYFORGE_EVAL_TIER_BACKENDS` under a different key spelling, every `mid`
-   request falls through to the router — which would then have to be picking
-   small *sometimes*, so this alone does not explain intermittency. Check how
-   `tierProviders` is populated and log its keys at startup.
-2. **Provider-level fallback on error or timeout.** The 3B tier answers in
-   ~1.5–2.0 s through the tunnel. If a slow or failed `mid` call falls back to
-   another provider, the leak would be intermittent and load-dependent —
-   which matches the observation. Look for retry/fallback in
-   `internal/ai/gateway/openai.go` and the router.
-3. **The router overriding the pin for some requests.** `Route()` matches on
-   `plan` and `promptChars`; confirm the pinned branch really does return
-   before any rule evaluation on every path.
+**So SUBSTRATE INADEQUATE was very likely a FALSE NEGATIVE.**
 
-**Reproduce without burning a GPU hour:** `kaggle_tier_server.py --mock`
-serves both tiers with tier-shaped delays and no GPU. Point
-`POLYFORGE_EVAL_TIER_BACKENDS` at it and run `knob_preflight.py` directly
-against a locally-run gateway. That is a minutes-long loop, not a 6-minute
-cluster rebuild.
+The gateway's own logic is correct:
+`TestTierPinIsExclusiveAcrossManyRequests` pins each tier, sends the same eight
+requests the probe does, and asserts the pin holds for every one. It passes.
+The pre-existing `TestTierKnobMovesRoutingAndTelemetry` sends **one** request
+per tier, which is why an intermittent leak survived it for so long.
 
-**Done when:** a failing test reproduces the leak deterministically, in
-`internal/ai/gateway/*_test.go`, without a cluster.
+**Eliminated on the way — do not re-test:** multi-replica knob-store split (the
+harness does not override `gateway.replicaCount`; chart default is 1);
+cache-hit path (a hit never sets `X-PolyForge-Tier`, so it would surface as
+`""`); provider fallback or retry in `openai.go` (there is none); the circuit
+breaker (wired to `CanaryProvider`, not the chat path).
 
-### A2. Fix it (agent, ~1 h)
+### A2. Fix it — **DONE (session 41).**
 
-Fix the cause A1 identifies. Two rules, both from this project's own history:
+WL-H2 measures the **substrate**, not the arm's controller, so the reconciler
+is paused for the probe and restored immediately after (`_operator_paused` in
+`cluster_backend.py`). The pause waits for the operator pod to actually be
+gone, because a probe racing a terminating reconciler is the same bug in a
+smaller window. The probe runs before the load window, so this changes no
+scored behaviour — the operator reconciles again before k6 sends a request.
 
-- **Do not touch WL-H2's margins.** The gate failing is the finding; widening
-  it converts a defect into a false pass. `PREREG_WAVE4_LIVE_PLANE` forbids it
-  explicitly.
-- **The test comes first and must fail before the fix.** Four defects in this
-  path existed only because it had never executed; a regression test is the
-  only thing that stops the fifth.
+Regression test added. `go test ./internal/ai/gateway/` is green.
 
-**Done when:** the new test passes, `go test ./internal/ai/...` is green, and
-`knob_preflight.py` against the mock reports `routing_moved: true`.
+**This does NOT re-open WL-H1.** `RESULTS_WAVE4_LIVE_PLANE.md` stands as
+committed with its VOID. Re-scoring requires a fresh sitting on real tiers
+under a new pre-registration — A3 onward.
 
 ### A3. Re-run the gate on real tiers (agent, ~30 min + GPU)
 
