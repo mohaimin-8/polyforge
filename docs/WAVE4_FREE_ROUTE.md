@@ -13,6 +13,39 @@ RESULTS file must carry.
 
 ---
 
+## 0a. What this route CANNOT do (session 41, measured)
+
+**A sequential preflight passing does not license a concurrent matrix.**
+
+`tunnel_preflight.py` issues eight sequential probes per tier and measures
+round-trip latency. It never creates queueing, so it cannot observe it. On
+2026-08-31 it returned TUNNEL OK — tier gap 551.8 ms against a 482.1 ms
+threshold — and the matrix run behind it then failed:
+
+```
+48.3% of requests failed (2,880 of 5,963)
+iteration duration: median 58 ms, max 60 s   <- a timeout tail, not slow service
+aborted by http_req_failed rate<0.01 at 20% of the load window
+```
+
+A free Kaggle P100 **serialises generation**. The frozen `wave4_live_plane`
+cell drives roughly 218 concurrent virtual users, which queue behind one GPU
+until they hit the 60 s timeout. The median request stays fast — those are
+cache hits and CRUD — so aggregate latency looks healthy right up until the
+tail swallows the run.
+
+**Consequence:** this route is adequate for the WL-H2 knob-liveness gate, which
+is sequential, and for the tier bench. It is **not** adequate for the scored
+4x4 matrix at the cell's frozen concurrency. Scoring B1 needs a substrate that
+serves that concurrency — a rented GPU, batched serving on the free pool, or a
+smaller cell under a NEW pre-registration (the current cell is frozen, so that
+is a different experiment, not an adjustment).
+
+The quota table below discusses GPU-hours and round-trip latency. Neither is
+the binding constraint; **throughput under concurrency is**.
+
+---
+
 ## 0. Does the route apply to you?
 
 | | rented GPU host | this route |

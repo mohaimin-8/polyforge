@@ -1,0 +1,50 @@
+{
+  "tiers": [
+    "small",
+    "mid"
+  ],
+  "probes": 8,
+  "rel_margin": 0.25,
+  "abs_margin_ms": 20.0,
+  "small": {
+    "tier": "small",
+    "model": "qwen2.5-0.5b-instruct",
+    "base_url": "https://distribution-detector-align-manga.trycloudflare.com/v1",
+    "n": 8,
+    "mean_ms": 1928.3554124995135,
+    "median_ms": 1818.612849980127,
+    "min_ms": 1687.264300067909,
+    "max_ms": 2326.9753999775276,
+    "stdev_ms": 240.6685351248264,
+    "served_models": [
+      "qwen2.5-0.5b-instruct"
+    ],
+    "echoes_requested_model": true
+  },
+  "mid": {
+    "tier": "mid",
+    "model": "qwen2.5-3b-instruct",
+    "base_url": "https://distribution-detector-align-manga.trycloudflare.com/v1",
+    "n": 8,
+    "mean_ms": 2480.1319999824045,
+    "median_ms": 2462.225449969992,
+    "min_ms": 2332.9463999252766,
+    "max_ms": 2788.472600048408,
+    "stdev_ms": 141.06157918094448,
+    "served_models": [
+      "qwen2.5-3b-instruct"
+    ],
+    "echoes_requested_model": true
+  },
+  "delta_ms": 551.776587482891,
+  "threshold_ms": 482.08885312487837,
+  "latency_moved": true,
+  "models_echoed": true,
+  "ordering_correct": true,
+  "extra_rtt_tolerance_ms": 278.7509374320507,
+  "ai_slo_premium_ms": 2500.0,
+  "slowest_tier_mean_ms": 2480.1319999824045,
+  "slo_headroom_ms": 19.868000017595477,
+  "slowest_tier_within_premium_slo": true,
+  "verdict": "TUNNEL OK (tier gap survives the round-trip)"
+}
