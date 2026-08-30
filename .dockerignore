@@ -1,9 +1,42 @@
+# Build context hygiene for Dockerfile / Dockerfile.gateway / Dockerfile.operator.
+#
+# Each image does `COPY . .` to get the Go tree, which without this file ships
+# the WHOLE repository -- 4.9 GB, of which research/ alone is 4.4 GB of
+# measurement artifacts and eval/results/ is 426 MB of soak evidence. The
+# gateway build spent over a minute transferring context before compiling a
+# line. None of it is needed: the builder wants go.mod, go.sum and the Go
+# sources, nothing else.
+#
+# Dockerfile.gateway carried the note "NOT VERIFIED LOCALLY: Docker is not
+# installed on the development machine", which is how a 4.9 GB context went
+# unnoticed -- the image had never actually been built here until now.
+
+# Version control and tooling
 .git
 .github
-artifacts
-data
-deploy
-docs
-*.md
-Dockerfile
-compose.yaml
+.gitignore
+**/__pycache__
+**/*.pyc
+
+# Measurement artifacts and generated records -- never inputs to a build
+research/
+eval/results/
+reproduce_out/
+benchmarks/
+artifacts/
+data/
+thesis/
+docs/
+
+# Local build outputs and databases
+*.exe
+*.duckdb
+*.duckdb.wal
+*.csv.gz
+*.log
+
+# Python/eval side of the repo: not part of any Go image
+eval/
+scripts/
+infra/
+deploy/
