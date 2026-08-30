@@ -1,0 +1,33 @@
+{
+  "gateway": "http://127.0.0.1:18081",
+  "tenant": "t00",
+  "generated_at": "2026-08-30T11:07:14Z",
+  "cache": {
+    "hit_rate_budgeted": 1.0,
+    "hit_rate_zero": 1.0,
+    "delta": 0.0,
+    "margin": 0.5,
+    "live": false
+  },
+  "tier": {
+    "tier_a": "mid",
+    "mean_ms_a": 1605.1508500240743,
+    "tiers_seen_a": [
+      "mid",
+      "small"
+    ],
+    "tier_b": "small",
+    "mean_ms_b": 1337.9560249935214,
+    "tiers_seen_b": [
+      "small"
+    ],
+    "delta_ms": 267.1948250305529,
+    "rel_margin": 0.25,
+    "abs_margin_ms": 20.0,
+    "routing_moved": false,
+    "latency_moved": false,
+    "ordering_correct": false,
+    "live": false
+  },
+  "verdict": "SUBSTRATE INADEQUATE \u2014 WL-H1 is void (inert knob)"
+}
