@@ -162,6 +162,15 @@ CAMPAIGN_RECORDS = [
     # no headroom against a near-constant metric, and both are reported as
     # failures rather than repaired after the fact.
     ("analysis_live_soak_v8.py", [], "RESULTS_LIVE_SOAK_V8.md"),
+    #
+    # WP8b (B1, the three-knob live plane). Rebuilds from
+    # eval/results/wave4_live_plane_evidence/ and wp8b_substrate_evidence/.
+    # There are no run metrics because there are no valid runs: WL-H2's
+    # knob-liveness gate returned SUBSTRATE INADEQUATE and WL-H1 is void, which
+    # is the outcome PREREG_WAVE4_LIVE_PLANE registers for an inert knob. The
+    # record is built from the gate's own report plus the tunnel preflight that
+    # rules out the free split-host route as the cause.
+    ("analysis_wave4_live_plane.py", [], "RESULTS_WAVE4_LIVE_PLANE.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
