@@ -1,33 +1,32 @@
 {
   "gateway": "http://127.0.0.1:18081",
   "tenant": "t00",
-  "generated_at": "2026-08-30T11:16:41Z",
+  "generated_at": "2026-08-30T18:05:25Z",
   "cache": {
     "hit_rate_budgeted": 1.0,
-    "hit_rate_zero": 0.7083333333333334,
-    "delta": 0.29166666666666663,
+    "hit_rate_zero": 0.0,
+    "delta": 1.0,
     "margin": 0.5,
-    "live": false
+    "live": true
   },
   "tier": {
     "tier_a": "small",
-    "mean_ms_a": 1290.4720833175816,
+    "mean_ms_a": 1453.8602666580118,
     "tiers_seen_a": [
       "small"
     ],
     "tier_b": "mid",
-    "mean_ms_b": 1557.253925013356,
+    "mean_ms_b": 2132.997891671645,
     "tiers_seen_b": [
-      "mid",
-      "small"
+      "mid"
     ],
-    "delta_ms": 266.78184169577435,
+    "delta_ms": 679.1376250136332,
     "rel_margin": 0.25,
     "abs_margin_ms": 20.0,
-    "routing_moved": false,
-    "latency_moved": false,
+    "routing_moved": true,
+    "latency_moved": true,
     "ordering_correct": true,
-    "live": false
+    "live": true
   },
-  "verdict": "SUBSTRATE INADEQUATE \u2014 WL-H1 is void (inert knob)"
+  "verdict": "WL-H2 PASS (both knobs live)"
 }
