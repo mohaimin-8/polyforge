@@ -2823,3 +2823,8 @@ epoch,iso,nodes_mem_pct,pods_ready,pods_total,restarts_total,max_pod_mem_mi,cp_r
 1788077851,2026-08-30T08:17:32Z,39,20,20,0,3402,16,48,1,63150982,50,25806045,0,polyforge-eval-worker=496.6MiB|polyforge-eval-control-plane=1.097GiB|polyforge-eval-worker3=645MiB|polyforge-eval-worker2=3.8GiB,28,70
 1788077881,2026-08-30T08:18:01Z,40,20,20,0,3377,16,48,1,63150982,50,25806045,0,polyforge-eval-worker=488.3MiB|polyforge-eval-control-plane=1.08GiB|polyforge-eval-worker3=631.9MiB|polyforge-eval-worker2=4.977GiB,30,105
 1788077908,2026-08-30T08:18:28Z,51,20,20,0,4604,16,48,1,63150982,50,25806045,0,polyforge-eval-worker=488.6MiB|polyforge-eval-control-plane=1.082GiB|polyforge-eval-worker3=633.6MiB|polyforge-eval-worker2=3.782GiB,27,358
+1788077935,2026-08-30T08:18:55Z,39,20,20,0,3368,16,48,1,63150982,50,25806045,0,polyforge-eval-worker=488.1MiB|polyforge-eval-control-plane=1.082GiB|polyforge-eval-worker3=632.4MiB|polyforge-eval-worker2=3.788GiB,27,83
+1788077962,2026-08-30T08:19:22Z,39,20,20,0,3379,16,48,1,63150982,50,25806045,0,polyforge-eval-worker=492.9MiB|polyforge-eval-control-plane=1.082GiB|polyforge-eval-worker3=633.4MiB|polyforge-eval-worker2=3.746GiB,27,96
+1788077991,2026-08-30T08:19:51Z,38,20,20,0,3363,16,48,1,63150982,50,25806045,0,polyforge-eval-worker=492.8MiB|polyforge-eval-control-plane=1.082GiB|polyforge-eval-worker3=635.3MiB|polyforge-eval-worker2=3.797GiB,29,96
+1788078021,2026-08-30T08:20:21Z,39,20,20,0,3378,16,48,1,63150982,50,25806045,0,polyforge-eval-worker=491MiB|polyforge-eval-control-plane=1.078GiB|polyforge-eval-worker3=633.9MiB|polyforge-eval-worker2=3.758GiB,30,96
+1788078049,2026-08-30T08:20:49Z,0,0,0,0,0,,,,,,,,,28,456

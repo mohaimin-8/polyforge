@@ -1285,3 +1285,4 @@ Appended by the runner every progress tick.
 | 2026-08-27 01:59 | live_soak | 1/1 | 1 | 0 runs/h |
 | 2026-08-28 15:18 | live_soak | 1/1 | 1 | 0 runs/h |
 | 2026-08-29 06:28 | live_soak | 1/1 | 1 | 0 runs/h |
+| 2026-08-30 08:20 | live_soak | 1/1 | 0 | 0 runs/h |
