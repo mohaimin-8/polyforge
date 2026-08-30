@@ -947,11 +947,28 @@ never "the API passed a pen test".
     fires. **Primary target: FGCS (Q1)**, with parity-plus-half-the-
     overshoot and the validity-methodology story as the lead.
   - The FGCS branch's escape hatch — "a Transactions attempt waits on B1
-    landing clean AND the WP14 soak" — **cannot be satisfied on this
-    hardware.** WP14's sitting is invalid after four attempts and the
-    stopping rule has fired (`RESULTS_LIVE_SOAK_V3.md`). A Transactions
-    cycle would need B1 *and* a soak on different hardware, and is a
-    second paper cycle at the earliest.
+    landing clean AND the WP14 soak". **HALF OF THIS CONDITION IS NOW MET
+    (session 41, 2026-08-30), and the text below it was written when it was
+    not.** The superseded reading said the hatch "cannot be satisfied on this
+    hardware" because "WP14's sitting is invalid after four attempts"
+    (`RESULTS_LIVE_SOAK_V3.md`). **That is no longer true.** Attempt 10 ran
+    the full **24 h 00 m 11 s**, delivered **25,806,353 requests with ZERO
+    dropped iterations and ZERO pod restarts**, and the harness returned
+    `valid_runs: 1, ok: true` (`RESULTS_LIVE_SOAK_V8.md`). The soak landed,
+    on this hardware.
+
+    So the hatch now rests on **B1 alone — WP8b**, which is user-gated on a
+    GPU whose free substrate is already documented
+    (`docs/WAVE4_FREE_ROUTE.md`: Kaggle P100, 30 GPU-h/wk).
+
+    **The roadmap does NOT decide the venue, and this correction does not
+    decide it either.** It only records that the factual premise the rule
+    keyed on has changed. Two things the author must weigh, neither of which
+    an agent should settle: the cost condition still **FAILS** (BP-H1, both
+    traces), which is what sent the rule to FGCS in the first place and is
+    untouched by the soak; and attempt 10 scored **SK-H1 FAIL and SK-H3
+    FAIL** alongside its SK-H2/SK-H4 passes, so "the soak landed" means the
+    sitting is valid and complete, not that every hypothesis passed.
 
   **Open question for the author, which the roadmap does NOT decide.**
   WP14's ladder produced a clean **4-hour, 4,303,209-request, zero-dropped,
