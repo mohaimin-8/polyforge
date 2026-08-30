@@ -25,6 +25,7 @@ from datetime import date
 from pathlib import Path
 
 EVAL_DIR = Path(__file__).resolve().parents[1]
+REPO_DIR = EVAL_DIR.parent
 sys.path.insert(0, str(EVAL_DIR))
 
 # Globs are supported. results/*.duckdb picks up every campaign database
@@ -71,6 +72,21 @@ INCLUDE = [
     "SMOKE_BUGS.md",
 ]
 
+# Paths relative to the repository root, not eval/. The scored records and the
+# pre-registrations live in research/analysis/, one level ABOVE EVAL_DIR, so no
+# eval-relative glob can reach them -- the 2026-08-31 bundle carried 326 files
+# and zero of either. Without them the deposit cannot deliver its own
+# description: reproduce.py establishes a record by re-deriving it and diffing
+# against the committed copy, so a reviewer who restores only the deposit has
+# nothing to diff against, and the pre-registrations that make every PASS/FAIL
+# auditable are absent entirely. Same class of omission as the live-evidence
+# one above, one directory level up.
+REPO_INCLUDE = [
+    "research/analysis/RESULTS_*.md",
+    "research/analysis/PREREG_*.md",
+    "docs/REPRODUCE.md",
+]
+
 DEPOSIT_METADATA = {
     "metadata": {
         "title": "PolyForge evaluation artifact: pre-registered controller-"
@@ -86,11 +102,16 @@ DEPOSIT_METADATA = {
             "the Wave-5 structural-form reruns, tenant-scale, concurrency, "
             "phase-7 live reference), the live-campaign and trace-replay "
             "CSVs, the security study data, and the Terraform IaC for the "
-            "experiment cluster. Restoring the DuckDB files into "
-            "eval/results/ of the PolyForge repository enables the archive "
-            "tier of docs/REPRODUCE.md: scripts/reproduce.py then re-derives "
-            "every published record byte-identically. See eval/README.md for "
-            "the schema and replay instructions."
+            "experiment cluster. It also carries every frozen "
+            "pre-registration and every scored analysis record "
+            "(research/analysis/PREREG_*.md and RESULTS_*.md), so each "
+            "PASS/FAIL verdict can be audited against the hypothesis that was "
+            "committed before its campaign ran. Restoring the DuckDB files "
+            "into eval/results/ of the PolyForge repository enables the "
+            "archive tier of docs/REPRODUCE.md (included): scripts/reproduce.py "
+            "then re-derives every published record and diffs it against the "
+            "committed copy in this deposit, byte for byte. See eval/README.md "
+            "for the schema and replay instructions."
         ),
         "creators": [{"name": "PolyForge author"}],  # fill in before upload
         "keywords": ["kubernetes", "autoscaling", "multi-tenancy", "LLM serving",
@@ -109,6 +130,29 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def collect(root: Path, includes: list[str]) -> tuple[list[Path], list[str]]:
+    """Resolve an include list against one root. Returns (files, missing globs)."""
+    files: list[Path] = []
+    missing: list[str] = []
+    for rel in includes:
+        if "*" in rel or "?" in rel:
+            matches = [p for p in sorted(root.glob(rel)) if p.is_file()]
+            if matches:
+                files.extend(matches)
+            else:
+                missing.append(rel)
+            continue
+        path = root / rel
+        if path.is_dir():
+            files.extend(p for p in sorted(path.rglob("*")) if p.is_file()
+                         and ".terraform" not in p.parts and not p.name.endswith(".tfstate"))
+        elif path.exists():
+            files.append(path)
+        else:
+            missing.append(rel)
+    return files, missing
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="results/zenodo")
@@ -117,24 +161,15 @@ def main() -> None:
     out_dir = EVAL_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    files: list[Path] = []
-    missing: list[str] = []
-    for rel in INCLUDE:
-        if "*" in rel or "?" in rel:
-            matches = [p for p in sorted(EVAL_DIR.glob(rel)) if p.is_file()]
-            if matches:
-                files.extend(matches)
-            else:
-                missing.append(rel)
-            continue
-        path = EVAL_DIR / rel
-        if path.is_dir():
-            files.extend(p for p in sorted(path.rglob("*")) if p.is_file()
-                         and ".terraform" not in p.parts and not p.name.endswith(".tfstate"))
-        elif path.exists():
-            files.append(path)
-        else:
-            missing.append(rel)
+    eval_files, missing = collect(EVAL_DIR, INCLUDE)
+    repo_files, repo_missing = collect(REPO_DIR, REPO_INCLUDE)
+    missing.extend(repo_missing)
+
+    # Archive names stay relative to the root each group was collected from, so
+    # eval/ files keep the results/... layout docs/REPRODUCE.md tells the
+    # reviewer to restore, and repo files carry their repo-relative path.
+    entries = [(p, str(p.relative_to(EVAL_DIR)).replace("\\", "/")) for p in eval_files]
+    entries += [(p, str(p.relative_to(REPO_DIR)).replace("\\", "/")) for p in repo_files]
 
     if missing:
         print("refusing to build an incomplete archive; missing:")
@@ -142,21 +177,21 @@ def main() -> None:
             print("  " + m)
         raise SystemExit(1)
 
-    manifest = {str(p.relative_to(EVAL_DIR)).replace("\\", "/"): sha256(p) for p in files}
+    manifest = {arc: sha256(p) for p, arc in entries}
     manifest_path = out_dir / "MANIFEST.sha256.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     bundle = out_dir / f"polyforge-eval-artifact-{date.today()}.zip"
     with zipfile.ZipFile(bundle, "w", zipfile.ZIP_DEFLATED) as z:
-        for p in files:
-            z.write(p, arcname=str(p.relative_to(EVAL_DIR)).replace("\\", "/"))
+        for p, arc in entries:
+            z.write(p, arcname=arc)
         z.write(manifest_path, arcname="MANIFEST.sha256.json")
 
     (out_dir / "deposit.json").write_text(
         json.dumps(DEPOSIT_METADATA, indent=2), encoding="utf-8"
     )
 
-    print(f"bundle:   {bundle}  ({bundle.stat().st_size / 1e6:.1f} MB, {len(files)} files)")
+    print(f"bundle:   {bundle}  ({bundle.stat().st_size / 1e6:.1f} MB, {len(entries)} files)")
     print(f"manifest: {manifest_path}")
     print(f"metadata: {out_dir / 'deposit.json'}")
     print("next (human): create Zenodo deposit, attach the zip, paste deposit.json "
