@@ -195,14 +195,34 @@ Once named, the work is ordinary: a `SystemSpec` in `systems.py`, an arm in the
 relevant experiment, a prereg if it changes any scored comparison, then the
 usual record → register → R4 loop.
 
-### B4. Azure replay — **needs scoping**
+### B4. Azure replay — **SCOPED (session 41). Mostly already satisfied.**
 
-WP1 and WP15 already score against Azure and BurstGPT traces
-(`RESULTS_TRACE_PARITY.md`, `RESULTS_BUDGET_PARITY.md`). Before treating
-"Azure replay" as an open gap, **read those two records and state precisely
-what is missing** — a longer window, a different trace slice, or the live
-plane rather than the simulator. Writing that sentence is the first task; it
-may turn out to be already satisfied, in which case the gap closes for free.
+Checked rather than assumed. `RESULTS_TRACE_PARITY.md` already carries **Azure
+LLM 2024, 72 x 3 h windows**, 360 per-window rows, with the published arms
+replicating **bit-for-bit** (worst relative deviation 0.00e+00 on every column)
+and the hypotheses scored. `RESULTS_BUDGET_PARITY.md` scores BP-H1/BP-H2 on the
+same trace. So "we have not replayed Azure" is **false** and should not be
+conceded to a reviewer.
+
+**What is actually missing, stated precisely:** trace replay is
+**simulator-only**. The trace campaigns are driven by
+`research/analysis/trace_matrix{,2,_azure}.py` over `research/jcac_sim`. Every
+experiment with `backend: cluster` — `live_soak`, `wave4_live_plane`, the
+`phase7_*` set — drives **synthetic cells** (`crud_bursty`, `ai_cacheable`,
+`tier_mixed`, `joint_stress`), never a real trace. **No real trace has ever
+been replayed against the live plane.**
+
+**Whether to close it is a judgement, not a task.** Closing it means driving the
+cluster from trace-derived demand instead of the synthetic cells — new load
+generation, a new prereg, and a live sitting. That is comparable in size to
+WP14. The cheaper and defensible alternative is to state the split plainly in
+the paper: traces are replayed in simulation with bit-for-bit replication, and
+the live plane demonstrates duration and fault behaviour under synthetic load.
+Reviewers object to unstated gaps far more than to stated ones.
+
+**Recommendation:** do not open this before B3 and the B1 re-sit. It is the
+most expensive of the remaining items and the least likely to change a
+conclusion.
 
 ---
 
