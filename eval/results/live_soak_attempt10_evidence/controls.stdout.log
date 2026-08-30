@@ -1,0 +1,29 @@
+08:04:09 === Stage B positive controls: waiting for the k6 load window ===
+08:08:14 k6 load started (T0=1787990894)
+10:08:18 T+120m planner: baseline audit window opens at 5478 (8 tenants)
+10:09:49 T+120m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s (audit stream at 5550)
+10:11:42   CONTROL PASS  T+120m planner fallback — 7 fallback line(s)
+10:11:42 T+120m planner audit: healthy window +72, degraded window +72
+13:08:14 cpu: starving polyforge-eval-worker with 2 spinner(s) for 120s
+13:10:21   CONTROL PASS  cpu starvation injected — scored post-hoc against the buckets
+16:08:17 T+480m planner: baseline audit window opens at 22721 (8 tenants)
+16:09:52 T+480m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s (audit stream at 22793)
+16:11:50   CONTROL PASS  T+480m planner fallback — 8 fallback line(s)
+16:11:50 T+480m planner audit: healthy window +72, degraded window +80
+19:08:15 cpu: starving polyforge-eval-worker with 2 spinner(s) for 120s
+19:10:21   CONTROL PASS  cpu starvation injected — scored post-hoc against the buckets
+22:08:22 T+840m planner: baseline audit window opens at 39976 (8 tenants)
+22:09:53 T+840m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s (audit stream at 40048)
+22:11:51   CONTROL PASS  T+840m planner fallback — 8 fallback line(s)
+22:11:52 T+840m planner audit: healthy window +72, degraded window +72
+01:08:14 cpu: starving polyforge-eval-worker with 2 spinner(s) for 120s
+01:10:23   CONTROL PASS  cpu starvation injected — scored post-hoc against the buckets
+04:08:18 T+1200m planner: baseline audit window opens at 57220 (8 tenants)
+04:09:50 T+1200m planner: scaling deployment.apps/polyforge-operator-planner to 0 for 90s (audit stream at 57292)
+04:11:44   CONTROL PASS  T+1200m planner fallback — 7 fallback line(s)
+04:11:45 T+1200m planner audit: healthy window +72, degraded window +72
+07:08:15 cpu: starving polyforge-eval-worker with 2 spinner(s) for 120s
+07:10:22   CONTROL PASS  cpu starvation injected — scored post-hoc against the buckets
+07:10:22 === Stage B controls finished: 8 pass, 0 fail ===
+07:10:22 NOTE: the latency verdict is decided by analyse_stage_b.py against the
+07:10:22       60 s buckets, not here. This script only guarantees it was injected.
