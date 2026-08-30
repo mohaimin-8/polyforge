@@ -1,0 +1,9 @@
+iso_utc,epoch,record_id,provider,event_id,level,message
+2026-08-29T08:06:33Z,1787990793,318244,Microsoft-Windows-Kernel-Power,105,Information,Power source change.
+2026-08-29T08:07:10Z,1787990830,318259,Microsoft-Windows-Kernel-Power,105,Information,Power source change.
+2026-08-29T10:23:15Z,1787998995,318352,Microsoft-Windows-Kernel-Power,105,Information,Power source change.
+2026-08-29T10:23:14Z,1787998994,318351,Microsoft-Windows-Kernel-Power,105,Information,Power source change.
+2026-08-29T14:35:52Z,1788014152,318489,Volsnap,36,Error,The shadow copies of volume C: were aborted because the shadow copy storage could not grow due to a user imposed limit.
+2026-08-29T19:01:33Z,1788030093,320052,Microsoft-Windows-Kernel-Power,105,Information,Power source change.
+2026-08-29T19:01:31Z,1788030091,320051,Microsoft-Windows-Kernel-Power,105,Information,Power source change.
+2026-08-30T06:00:00Z,1788069600,323092,EventLog,6013,Information,The system uptime is 776037 seconds.
