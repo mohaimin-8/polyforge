@@ -153,6 +153,15 @@ CAMPAIGN_RECORDS = [
     # storage events across 14 h 33 m, and it is the first to clear the
     # design's 12 h minimum.
     ("analysis_live_soak_v7.py", [], "RESULTS_LIVE_SOAK_V7.md"),
+    #
+    # Attempt 10 (WP14). The first COMPLETED and first VALID sitting:
+    # valid_runs 1, 24 h 00 m 11 s, 25,806,353 requests, zero dropped
+    # iterations, zero pod restarts, 8 of 8 faults. Because the delivery gate
+    # accepted it, eval-export ran and SK-H1/H2/H3 are scored rather than lost.
+    # SK-H2 and SK-H4 pass; SK-H1 and SK-H3 fail, both on rules specified with
+    # no headroom against a near-constant metric, and both are reported as
+    # failures rather than repaired after the fact.
+    ("analysis_live_soak_v8.py", [], "RESULTS_LIVE_SOAK_V8.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
