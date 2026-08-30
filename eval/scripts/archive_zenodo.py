@@ -40,6 +40,29 @@ INCLUDE = [
     "results/DAILY.md",
     "results/security",
     "results/figures",
+    # Live-run evidence directories. Without these the deposit CANNOT deliver
+    # what its own description promises -- "reproduce.py then re-derives every
+    # published record byte-identically" -- because the live records are built
+    # from these trees, not from the DuckDB files. RESULTS_LIVE_SOAK_V2..V8 and
+    # RESULTS_WAVE4_LIVE_PLANE all read *_evidence/, and `results/*.duckdb` is
+    # a top-level glob that never descends into them. Found by checking the
+    # 2026-08-30 bundle against the records it claims to support: none of the
+    # attempt evidence was in it.
+    "results/live_soak_evidence",
+    "results/live_soak_attempt5_evidence",
+    "results/live_soak_attempt6_evidence",
+    "results/live_soak_attempt7_evidence",
+    "results/live_soak_attempt8_evidence",
+    "results/live_soak_attempt8b_evidence",
+    "results/live_soak_attempt9_evidence",
+    "results/live_soak_attempt10_evidence",
+    "results/wave4_live_plane_evidence",
+    "results/wp8b_substrate_evidence",
+    "results/ladder_for_v3_evidence",
+    "results/ladder_for_v45_evidence",
+    "results/soak_stage_a_evidence",
+    "results/soak_stage_b_evidence",
+    "results/wp14_attempt2",
     "experiments",
     "baselines/tuned.yaml",
     "baselines/TUNING.md",
