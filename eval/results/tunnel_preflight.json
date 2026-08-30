@@ -1,0 +1,50 @@
+{
+  "tiers": [
+    "small",
+    "mid"
+  ],
+  "probes": 8,
+  "rel_margin": 0.25,
+  "abs_margin_ms": 20.0,
+  "small": {
+    "tier": "small",
+    "model": "qwen2.5-0.5b-instruct",
+    "base_url": "https://brook-graduates-quizzes-encyclopedia.trycloudflare.com/v1",
+    "n": 8,
+    "mean_ms": 1367.1109000133583,
+    "median_ms": 1373.068350018002,
+    "min_ms": 1320.841700071469,
+    "max_ms": 1430.6840000208467,
+    "stdev_ms": 34.60275114636637,
+    "served_models": [
+      "qwen2.5-0.5b-instruct"
+    ],
+    "echoes_requested_model": true
+  },
+  "mid": {
+    "tier": "mid",
+    "model": "qwen2.5-3b-instruct",
+    "base_url": "https://brook-graduates-quizzes-encyclopedia.trycloudflare.com/v1",
+    "n": 8,
+    "mean_ms": 2028.0579249811126,
+    "median_ms": 1985.2923999424092,
+    "min_ms": 1947.0800999552011,
+    "max_ms": 2264.106799964793,
+    "stdev_ms": 101.26039008500442,
+    "served_models": [
+      "qwen2.5-3b-instruct"
+    ],
+    "echoes_requested_model": true
+  },
+  "delta_ms": 660.9470249677543,
+  "threshold_ms": 341.7777250033396,
+  "latency_moved": true,
+  "models_echoed": true,
+  "ordering_correct": true,
+  "extra_rtt_tolerance_ms": 1276.6771998576587,
+  "ai_slo_premium_ms": 2500.0,
+  "slowest_tier_mean_ms": 2028.0579249811126,
+  "slo_headroom_ms": 471.9420750188874,
+  "slowest_tier_within_premium_slo": true,
+  "verdict": "TUNNEL OK (tier gap survives the round-trip)"
+}

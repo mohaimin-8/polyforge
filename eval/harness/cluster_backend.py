@@ -948,11 +948,23 @@ def run_knob_preflight(gateway_base: str, tenant_id: str, api_key: str,
          "--tiers", ",".join(tiers), "--report", str(report)],
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
     )
-    print(proc.stdout, end="")
+    # The subprocess is decoded with errors="replace", which injects U+FFFD for
+    # any byte it could not decode. Printing that straight to a Windows console
+    # or a redirected file -- both cp1252 by default -- raises
+    # UnicodeEncodeError and kills the run at the very gate that was supposed to
+    # protect it. Re-encode through the destination's own codec so the gate's
+    # output can never be the thing that fails it.
+    enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+    sys.stdout.write(proc.stdout.encode(enc, "replace").decode(enc, "replace"))
+    sys.stdout.flush()
     if proc.returncode != 0:
+        # Same hazard as the print above: this text is re-emitted by the runner
+        # and must not itself raise on an undecodable byte.
+        detail = (proc.stderr.strip() or proc.stdout.strip())
+        detail = detail.encode("ascii", "replace").decode("ascii")
         raise RuntimeError(
             "WL-H2 knob-liveness preflight FAILED — WL-H1 is void on this "
-            f"substrate, so the run is not scored: {proc.stderr.strip() or proc.stdout.strip()}")
+            f"substrate, so the run is not scored: {detail}")
 
 
 def push_default_knobs(gateway_base: str, tenant_ids) -> None:
@@ -1221,7 +1233,14 @@ def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
         return
     try:
         evidence_dir.mkdir(parents=True, exist_ok=True)
-        for name in ("k6-summary.json", "eval-export.json", "eval-export-fine.json"):
+        # knob_preflight.json is WL-H2's own report. It was written into the
+        # TemporaryDirectory and never copied out, so the first run that ever
+        # reached the gate returned SUBSTRATE INADEQUATE and its machine-readable
+        # evidence self-deleted with the workdir -- the same loss that took
+        # attempt 2's k6 summary. The verdict that VOIDS a run is exactly the
+        # evidence a reader will want to check.
+        for name in ("k6-summary.json", "eval-export.json", "eval-export-fine.json",
+                     "knob_preflight.json"):
             src = workdir / name
             if src.exists():
                 shutil.copy2(src, evidence_dir / name)
