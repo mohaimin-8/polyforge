@@ -34,7 +34,7 @@ import threading
 import time
 from pathlib import Path
 
-from model import TenantState  # research/jcac_sim via harness sys.path
+from model import TenantState, TIERS as MODEL_TIERS  # research/jcac_sim via harness sys.path
 
 from .config import RunSpec
 from . import workloads
@@ -935,7 +935,18 @@ def run_knob_preflight(gateway_base: str, tenant_id: str, api_key: str,
     The verdict JSON is written into the run's workdir so the artifact carries
     the evidence that the gate ran, not just the assertion that it did.
     """
-    tiers = sorted(json.loads(TIER_BACKENDS_JSON))[:2] if TIER_BACKENDS_JSON else []
+    # Order by CAPABILITY, not alphabet. knob_preflight's tier probe documents
+    # "tiers are named in ascending capability, so tier_b runs the larger model
+    # and must be the slower one", and tests `mean_b > mean_a` on that basis.
+    # sorted() gives ["mid", "small"] -- alphabetical -- which hands the probe
+    # the 3B as tier_a and the 0.5B as tier_b, so `ordering_correct` then asks
+    # whether the SMALL model is slower than the MID one. It is not, so the
+    # criterion failed on every run as an artefact of this line rather than as
+    # a property of the substrate. model.TIERS is the canonical ladder.
+    _ladder = {t: i for i, t in enumerate(MODEL_TIERS)}
+    tiers = (sorted(json.loads(TIER_BACKENDS_JSON),
+                    key=lambda t: (_ladder.get(t, len(_ladder)), t))[:2]
+             if TIER_BACKENDS_JSON else [])
     if len(tiers) < 2:
         raise RuntimeError(
             "knob preflight needs two configured tiers in "
