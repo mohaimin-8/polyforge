@@ -38,6 +38,12 @@ from model import TenantState  # research/jcac_sim via harness sys.path
 
 from .config import RunSpec
 from . import workloads
+# EVAL_DIR is defined once in harness/__init__.py; isocost.py and runner.py
+# import it the same way. run_knob_preflight() USED it without importing it, so
+# WL-H2 raised NameError on every run of the live-AI plane. The line had never
+# executed, because POLYFORGE_EVAL_LIVE_AI=1 had never been run — WP8b was
+# gated on a GPU the project did not have until the free Kaggle route.
+from . import EVAL_DIR
 
 REQUIRED_TOOLS = ("docker", "kind", "kubectl", "helm", "k6")
 CLUSTER_NAME = "polyforge-eval"  # fixed: teardown is idempotent by name
