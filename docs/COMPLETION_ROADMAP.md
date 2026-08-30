@@ -193,21 +193,41 @@ account and tokens.
 **Done when:** `helm install polyforge-operator polyforge/polyforge-operator`
 works from a clean machine.
 
-### B3. Modern baseline — **needs a decision before any work**
+### B3. Modern baseline — **SCOPED (session 41). Largely already addressed.**
 
-`eval/harness/systems.py` already carries `gptcache` and `gptcache_v2` arms.
-"Add a modern baseline" is not actionable until it names one.
+Checked rather than assumed, as with B4. The comparator set in
+`eval/harness/systems.py` is already broad: **hpa / hpa_fair / hpa_budget**
+(reactive replica), **keda / keda_fair / keda_budget** (event-driven),
+**gptcache / gptcache_v2** (semantic cache), **vtc_replica** (token-fair
+water-filling), **firm**, **learned_online / learned_trained**, **static**,
+**concurrency**, plus the jcac ablation family.
 
-**The open question, which the roadmap does NOT decide:** *which* comparator,
-and on what grounds it is the fair one. A reviewer's objection is not "you have
-no baseline" but "you did not compare against X". Pick X deliberately — from
-the related-work set in `docs/RELATED_WORK.md` — and record the reasoning
-before implementing, so the choice is not read as chosen for a favourable
-result.
+More importantly, `docs/RELATED_WORK.md` §3 already maintains a gap table
+against the literature, and it is honest about each row:
 
-Once named, the work is ordinary: a `SystemSpec` in `systems.py`, an arm in the
-relevant experiment, a prereg if it changes any scored comparison, then the
-usual record → register → R4 loop.
+- *"No VTC-style empirical baseline"* — **closing**, via `vtc_replica`, tuned
+  per `TUNING.md` and pre-registered.
+- *"Real-LMSYS cache headline"* — **CLOSED** (session 16c), measured on the
+  gated dataset.
+- *"Production scale (SageServe's 10M served requests)"* — **conceded**, with
+  the 10.63M demand-side replay named as the honest analog.
+- *"Locality/prefix-cache scheduling (D²LPM)"* — **not claimed**, different
+  layer, recorded as future work.
+
+**So "add a modern baseline" is not an open gap in the abstract.** If a
+specific reviewer objection is anticipated, name the system and add a row to
+§3's table; that is the mechanism the project already uses. Adding an
+unmotivated arm now would not answer any stated objection and would cost a
+prereg.
+
+**Recommendation:** treat this as closed unless a named comparator is
+identified. If one is, the work is ordinary — a `SystemSpec`, an arm in the
+relevant experiment, a prereg if it changes a scored comparison, then
+record → register → R4.
+
+**Still the author's call, deliberately.** Choosing a comparator *after*
+seeing which one flatters the result is how a baseline becomes a confound, so
+the roadmap does not pick one.
 
 ### B4. Azure replay — **SCOPED (session 41). Mostly already satisfied.**
 
