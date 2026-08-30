@@ -25,6 +25,7 @@ clutter — superseded planning documents — now lives in [archive/](archive/).
 |---|---|
 | [PUBLICATION_ROADMAP.md](PUBLICATION_ROADMAP.md) | **Source of truth.** Work packages, execute order (§2), progress table (§6) |
 | [MAIN_WORKING_PATH.md](MAIN_WORKING_PATH.md) | Milestone narrative. Context, not scheduling — the roadmap governs order |
+| [COMPLETION_ROADMAP.md](COMPLETION_ROADMAP.md) | **What is left that is not the thesis.** Track A: fix the gateway tier pin and re-sit B1. Track B: Zenodo, images, baseline, Azure scoping |
 | [REMAINING_WORK.md](REMAINING_WORK.md) | Open items and known gaps |
 | [WP14_SOAK_RESTORE.md](WP14_SOAK_RESTORE.md) | How to restore the live-soak apparatus |
 
