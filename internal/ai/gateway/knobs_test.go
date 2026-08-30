@@ -9,6 +9,7 @@ package gateway_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -233,5 +234,43 @@ func TestBuildTierProviders(t *testing.T) {
 	}
 	if providers, err := gateway.BuildTierProviders(""); err != nil || providers != nil {
 		t.Fatalf("empty input must be a valid no-tier deployment, got %v/%v", providers, err)
+	}
+}
+
+// TestTierPinIsExclusiveAcrossManyRequests is the regression test for WP8b's
+// SUBSTRATE INADEQUATE verdict. The WL-H2 preflight found the tier pin
+// ASYMMETRIC on a live cluster: pinning "small" served only ["small"], but
+// pinning "mid" served ["mid","small"] across its eight probe requests, so
+// routing_moved was false and WL-H1 was voided.
+//
+// TestTierKnobMovesRoutingAndTelemetry above sends ONE request per tier and
+// passes, which is exactly why the leak survived: a single request cannot see
+// an intermittent one. This sends the same number the probe does and asserts
+// the pin holds for every one of them.
+func TestTierPinIsExclusiveAcrossManyRequests(t *testing.T) {
+	small := &scriptedProvider{response: gateway.ChatResponse{Model: "small-model", Message: gateway.Message{Role: "assistant", Content: "small answer"}}}
+	mid := &scriptedProvider{response: gateway.ChatResponse{Model: "mid-model", Message: gateway.Message{Role: "assistant", Content: "mid answer"}}}
+	ts, key, _ := newKnobsServer(t, map[string]gateway.Provider{"small": small, "mid": mid})
+
+	const probes = 8
+	for _, tier := range []string{"small", "mid"} {
+		if resp := putKnobs(t, ts.URL, testAdminKey, "acme",
+			gateway.TenantKnobs{ModelTier: tier, CacheSizeMB: 0}); resp.StatusCode != http.StatusOK {
+			t.Fatalf("put %s knobs: %d", tier, resp.StatusCode)
+		}
+		seen := map[string]int{}
+		for i := 0; i < probes; i++ {
+			// Distinct prompts, mirroring the probe: a cache hit would
+			// short-circuit routing and prove nothing either way.
+			resp := postJSON(t, ts.URL+"/v1/tenants/acme/ai/chat", key.Secret, map[string]any{
+				"messages": []map[string]string{{"role": "user", "content": fmt.Sprintf("tier:%s:%d", tier, i)}},
+			})
+			seen[resp.Header.Get("X-PolyForge-Tier")]++
+			_ = resp.Body.Close()
+		}
+		if len(seen) != 1 || seen[tier] != probes {
+			t.Fatalf("pinned to %q but served %v across %d requests; "+
+				"the pin must be exclusive or WL-H2 voids the run", tier, seen, probes)
+		}
 	}
 }

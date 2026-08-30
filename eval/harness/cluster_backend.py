@@ -24,6 +24,7 @@ cluster session should execute.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
@@ -1235,6 +1236,49 @@ def _run_step(cmd: list[str], *, env, timeout_s: float,
                                        stdout=tail, stderr=tail)
 
 
+@contextlib.contextmanager
+def _operator_paused(run: RunSpec):
+    """Stop the Policy reconciler for the duration of the WL-H2 probe.
+
+    WL-H2 measures the SUBSTRATE -- can the cache and tier knobs move the data
+    plane at all -- not the arm's controller. But on operator arms the Policy
+    reconciler pushes each Policy's cache/tier levers to the SAME admin
+    endpoint the probe drives (`internal/operator/controllers/gateway_knobs.go`
+    -> PUT /admin/tenants/{id}/knobs, called from PolicyReconciler.Reconcile).
+    Probe and operator then fight over one knob: the probe pins `mid`, the next
+    reconcile writes the Policy's tier back, and the probe observes BOTH tiers.
+
+    That race is what voided WP8b's first sitting. The gate reported SUBSTRATE
+    INADEQUATE with `tiers_seen` = ['mid','small'] when pinned to mid, and a
+    cache delta of 0.29 instead of ~1.0 -- both explained by the reconciler
+    overwriting the probe's writes, not by a dead substrate. The gateway's own
+    pin logic is exclusive: see TestTierPinIsExclusiveAcrossManyRequests.
+
+    The probe runs BEFORE the load window, so pausing the reconciler here
+    changes no scored behaviour: it is restored, and reconciles again, before
+    k6 sends a single request.
+    """
+    live = EVAL_LIVE_AI and run.system in OPERATOR_SYSTEMS
+    if not live:
+        yield
+        return
+    scale = ["kubectl", "--namespace", "polyforge", "scale",
+             "deploy/polyforge-operator", "--replicas"]
+    subprocess.run(scale + ["0"], capture_output=True, timeout=120)
+    # Wait for the reconciler to actually be gone; scaling is asynchronous and
+    # a probe racing a terminating pod is the bug this exists to remove.
+    subprocess.run(["kubectl", "--namespace", "polyforge", "wait", "--for=delete",
+                    "pod", "-l", "app.kubernetes.io/name=polyforge-operator",
+                    "--timeout=120s"], capture_output=True, timeout=180)
+    try:
+        yield
+    finally:
+        subprocess.run(scale + ["1"], capture_output=True, timeout=120)
+        subprocess.run(["kubectl", "--namespace", "polyforge", "rollout", "status",
+                        "deploy/polyforge-operator", "--timeout=180s"],
+                       capture_output=True, timeout=240)
+
+
 def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
                        supervisor: "PortForwardSupervisor | None",
                        loadspread: "LoadDistributionSampler | None" = None) -> None:
@@ -1507,8 +1551,9 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                         # prose, callable from no code path, which meant a
                         # four-arm campaign could complete with both knobs dead
                         # and every row looking valid.
-                        run_knob_preflight(gw_base, tenant_ids[0],
-                                           tokens[tenant_ids[0]], workdir)
+                        with _operator_paused(run):
+                            run_knob_preflight(gw_base, tenant_ids[0],
+                                               tokens[tenant_ids[0]], workdir)
                     sampler = ReplicaSampler()
                     sampler.start()
                     loadspread = LoadDistributionSampler()
