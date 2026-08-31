@@ -28,6 +28,22 @@ EVIDENCE="${EVIDENCE_DIR:-$REPO/eval/results/soak_stage_b_evidence}"
 INTERVAL=${1:-20}
 mkdir -p "$EVIDENCE" 2>/dev/null || true
 OUT="$EVIDENCE/observer.csv"
+# TRUE SERVICE LATENCY (W5). `internal/platform/replay.go` stops its clock
+# before the telemetry write, so `LatencyMS` -- and every `crud_p95` derived
+# from it -- is CPU service time, not service latency. The end-to-end number
+# already exists: `server.go`'s middleware times the whole handler, telemetry
+# write included, and exports it as
+# `polyforge_http_request_duration_seconds{method,route}`. Nothing ever
+# scraped it, so no sitting through attempt 10 can be re-read against it.
+# This captures it from here on.
+#
+# Scraped over the NodePort the load already uses, NOT a port-forward: a
+# port-forward is what pinned every request to one pod of sixteen in attempt 4.
+# `/metrics` bypasses the rate limiter (server.go rateLimit), so the scrape
+# cannot consume a tenant's budget.
+NODE_PORT=${NODE_PORT:-30080}
+METRICS_URL="${METRICS_URL:-http://localhost:$NODE_PORT/metrics}"
+METRICS_OUT="$EVIDENCE/metrics_http_duration.csv"
 # Host-side freeze probe target. Deliberately OUTSIDE the evidence tree so a
 # scratch file never lands in committed evidence, and on the Windows volume
 # rather than inside WSL2 -- C: is where the VHDX lives and what a VSS /
@@ -102,7 +118,11 @@ trap 'rm -f "$LOCK"; [ -n "$HOST_EVT_PID" ] && kill -9 "$HOST_EVT_PID" 2>/dev/nu
 
 # Cumulative counters, so a spike between two samples is still visible as a
 # delta even though the sample itself missed the moment.
-echo "epoch,iso,nodes_mem_pct,pods_ready,pods_total,restarts_total,max_pod_mem_mi,cp_replicas,pg_ckpt_timed,pg_ckpt_req,pg_ckpt_write_ms,pg_ckpt_sync_ms,pg_rows_ingested,pg_autovacuum,kind_node_mem,sample_gap_s,host_write_ms" > "$OUT"
+echo "epoch,iso,nodes_mem_pct,pods_ready,pods_total,restarts_total,max_pod_mem_mi,cp_replicas,pg_ckpt_timed,pg_ckpt_req,pg_ckpt_write_ms,pg_ckpt_sync_ms,pg_rows_ingested,pg_autovacuum,kind_node_mem,sample_gap_s,host_write_ms,http_dur_sum_s,http_dur_count" > "$OUT"
+# Full histogram fidelity goes to its own file: the bucket rows are what a p95
+# needs, and folding eleven buckets into observer.csv would bury the columns
+# that already earn their place there.
+echo "epoch,metric" > "$METRICS_OUT"
 
 psql_scalar() { # SQL -> single value, empty on any failure
   kubectl --namespace "$NS" exec deploy/postgres -- \
@@ -183,11 +203,28 @@ while true; do
   if [ -n "$prev_epoch" ]; then sample_gap_s=$(( epoch - prev_epoch )); else sample_gap_s=""; fi
   prev_epoch=$epoch
 
-  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+  # True service latency. Fails to empty like every other field here: a
+  # metrics scrape must never be the reason a 24 h sitting stops.
+  http_dur_sum_s=""
+  http_dur_count=""
+  metrics=$(curl -fsS --max-time 5 "$METRICS_URL" 2>/dev/null |
+    grep '^polyforge_http_request_duration_seconds' | grep 'replay' || true)
+  if [ -n "$metrics" ]; then
+    printf '%s\n' "$metrics" | awk -v e="$epoch" '{print e "," $0}' >> "$METRICS_OUT"
+    # Cumulative counters, so consecutive samples give an interval mean even
+    # though the histogram buckets are what a percentile needs.
+    http_dur_sum_s=$(printf '%s\n' "$metrics" |
+      awk '/_sum/ {s += $NF} END {if (s > 0) printf "%.6f", s}')
+    http_dur_count=$(printf '%s\n' "$metrics" |
+      awk '/_count/ {c += $NF} END {if (c > 0) printf "%d", c}')
+  fi
+
+  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
     "$epoch" "$iso" "$nodes_mem_pct" "$pods_ready" "$pods_total" \
     "$restarts_total" "$max_pod_mem_mi" "$cp_replicas" \
     "$pg_ckpt_timed" "$pg_ckpt_req" "$pg_ckpt_write_ms" "$pg_ckpt_sync_ms" \
-    "$pg_rows_ingested" "$pg_autovacuum" "$kind_node_mem" "$sample_gap_s" "$host_write_ms" >> "$OUT"
+    "$pg_rows_ingested" "$pg_autovacuum" "$kind_node_mem" "$sample_gap_s" "$host_write_ms" \
+    "$http_dur_sum_s" "$http_dur_count" >> "$OUT"
 
   beat
   sleep "$INTERVAL"

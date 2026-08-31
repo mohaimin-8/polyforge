@@ -26,8 +26,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import tunnel_preflight as tp  # noqa: E402
 
 
-def make_stub(delays_ms: dict[str, float]):
-    """An OpenAI-compatible stub whose per-model latency we choose."""
+def make_stub(delays_ms: dict[str, float], serialize: bool = False):
+    """An OpenAI-compatible stub whose per-model latency we choose.
+
+    `serialize=True` reproduces the substrate that killed the 2026-08-31 run:
+    kaggle_tier_server.py holds a per-tier lock around `generate`, so requests
+    queue instead of overlapping. A sequential probe cannot tell the two apart.
+    """
+    gate = threading.Lock()
+
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
@@ -39,7 +46,13 @@ def make_stub(delays_ms: dict[str, float]):
             payload = json.loads(self.rfile.read(length) or b"{}")
             model = payload.get("model", "")
             import time
-            time.sleep(delays_ms.get(model, 0.0) / 1000.0)
+            if serialize:
+                gate.acquire()
+            try:
+                time.sleep(delays_ms.get(model, 0.0) / 1000.0)
+            finally:
+                if serialize:
+                    gate.release()
             body = json.dumps({
                 "model": model,
                 "choices": [{"index": 0, "finish_reason": "stop",
@@ -59,8 +72,9 @@ def make_stub(delays_ms: dict[str, float]):
 def stub():
     servers = []
 
-    def start(delays_ms: dict[str, float]):
-        server = ThreadingHTTPServer(("127.0.0.1", 0), make_stub(delays_ms))
+    def start(delays_ms: dict[str, float], serialize: bool = False):
+        server = ThreadingHTTPServer(("127.0.0.1", 0),
+                                     make_stub(delays_ms, serialize))
         threading.Thread(target=server.serve_forever, daemon=True).start()
         servers.append(server)
         return f"http://127.0.0.1:{server.server_address[1]}/v1"
@@ -75,10 +89,13 @@ def backends(base: str) -> dict:
             "mid": {"kind": "openai", "base_url": base, "model": "mid-model"}}
 
 
-def run(monkeypatch, tmp_path, base, probes=3, extra=()):
+def run(monkeypatch, tmp_path, base, probes=3, extra=(), concurrent=False):
+    """Sequential-stage only by default -- the tests above this line pin the
+    materiality gate, and the concurrent stage is exercised explicitly below."""
     report = tmp_path / "tunnel_preflight.json"
     argv = ["tunnel_preflight.py", "--backends", json.dumps(backends(base)),
-            "--probes", str(probes), "--report", str(report), *extra]
+            "--probes", str(probes), "--report", str(report),
+            *(() if concurrent else ("--skip-concurrent",)), *extra]
     monkeypatch.setattr(sys, "argv", argv)
     code = tp.main()
     return code, json.loads(report.read_text(encoding="utf-8"))
@@ -226,3 +243,62 @@ def test_ordering_check_matches_the_real_gate():
     text = gate.read_text(encoding="utf-8")
     assert "ordering_correct" in text, "the real gate lacks the ordering check"
     assert "material and ordered" in text, "the gate's verdict ignores ordering"
+
+
+# --- the concurrent stage (docs/ZERO_COST_ROADMAP.md Phase 1) --------------
+#
+# These exist because the sequential stage returned TUNNEL OK on 2026-08-31 and
+# the matrix behind it died at 48.3% failed requests. A preflight that cannot
+# fail on the run that already failed has not been fixed, so the first test
+# here is the one that must never be deleted.
+
+FAST = ("--concurrent-rps", "40", "--concurrent-seconds", "2",
+        "--concurrent-timeout", "1", "--max-inflight", "16")
+
+
+def test_serialising_substrate_fails_the_concurrent_stage(monkeypatch, tmp_path, stub):
+    """The regression that motivated the stage: a server that serves one
+    request at a time passes the sequential probe and cannot serve the cell."""
+    base = stub({"small-model": 60.0, "mid-model": 200.0}, serialize=True)
+    code, report = run(monkeypatch, tmp_path, base, concurrent=True, extra=FAST)
+    assert code == 1
+    assert report["latency_moved"], "the sequential gate still passes -- that is the point"
+    assert report["concurrent"]["delivers"] is False
+    assert report["concurrent"]["failure_rate"] > tp.MAX_FAILURE_RATE
+    assert "INADEQUATE" in report["verdict"]
+
+
+def test_concurrent_substrate_delivers(monkeypatch, tmp_path, stub):
+    """The other direction: a substrate that does overlap requests must not be
+    failed by the new stage, or it would block the run it exists to protect."""
+    base = stub({"small-model": 30.0, "mid-model": 90.0})
+    code, report = run(monkeypatch, tmp_path, base, concurrent=True, extra=FAST)
+    assert code == 0
+    assert report["concurrent"]["delivers"] is True
+    assert report["concurrent"]["failure_rate"] <= tp.MAX_FAILURE_RATE
+    assert "delivers under load" in report["verdict"]
+
+
+def test_p95_over_premium_slo_fails_even_with_clean_delivery(monkeypatch, tmp_path, stub):
+    """Amendment clause 3, measured where it binds. Zero failures is not
+    enough: a substrate that answers every request slower than the premium AI
+    SLO flattens the dimension the arms are separated on."""
+    over = tp.AI_SLO_PREMIUM_MS + 200.0
+    base = stub({"small-model": 100.0, "mid-model": over})
+    code, report = run(monkeypatch, tmp_path, base, concurrent=True,
+                       extra=("--concurrent-rps", "4", "--concurrent-seconds", "2",
+                              "--concurrent-timeout", "10", "--max-inflight", "32"))
+    assert code == 1
+    assert report["concurrent"]["failed"] == 0, "delivery is clean; the SLO is not"
+    assert report["concurrent"]["slowest_p95_ms"] > tp.AI_SLO_PREMIUM_MS
+    assert report["concurrent"]["delivers"] is False
+
+
+def test_skip_concurrent_is_recorded_and_warned(monkeypatch, tmp_path, stub, capsys):
+    """Skipping is legitimate for the tier bench and a WL-H2-only sitting, and
+    must be visible in the artifact so a scored matrix cannot rest on one."""
+    base = stub({"small-model": 120.0, "mid-model": 400.0})
+    code, report = run(monkeypatch, tmp_path, base)
+    assert code == 0
+    assert report["concurrent"] == {"skipped": True}
+    assert "does NOT license the scored matrix" in capsys.readouterr().err

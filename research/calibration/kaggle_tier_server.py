@@ -41,11 +41,13 @@ import argparse
 import hmac
 import json
 import os
+import queue
 import subprocess
 import sys
 import threading
 import urllib.request
 import time
+from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MAX_NEW_TOKENS = 48
@@ -57,6 +59,15 @@ TIERS = {
 # the same *shape* the WL-H2 tier probe looks for (a material small/mid gap)
 # without a GPU. They are not measurements and never enter a record.
 MOCK_DELAY_S = {"small": 1.24, "mid": 1.88}
+
+# Micro-batching (docs/ZERO_COST_ROADMAP.md Phase 2). Frozen at whatever
+# TIER_BENCH_BATCHED.md certifies before the scored run; these are the
+# starting values, not measured ones. The window is the latency a single
+# request pays to make batching possible, and Amendment clause 3 leaves
+# 619 ms of headroom over the `mid` tier, so 50 ms is well inside it --
+# but it is re-measured under load, never assumed.
+BATCH_MAX = 64
+BATCH_WINDOW_MS = 50.0
 
 
 def _ensure_torch_kernels() -> None:
@@ -83,65 +94,181 @@ def _ensure_torch_kernels() -> None:
     os.execv(sys.executable, [sys.executable, *sys.argv])
 
 
-class TierModels:
-    """Both tiers resident. HF `generate` is not thread-safe, so each tier
-    holds a lock: concurrent gateway requests queue per tier rather than
-    corrupting a decode. That serializes per tier, which is the honest
-    behaviour of a single card — and the sim's own tier model is
-    single-stream (TIER_BENCH.md measured single-stream latency)."""
+@dataclass
+class _Job:
+    """One in-flight request waiting for its batch to decode."""
+    messages: list
+    event: threading.Event = field(default_factory=threading.Event)
+    result: tuple | None = None
+    error: BaseException | None = None
 
-    def __init__(self, mock: bool = False):
+
+def pad_batch(tok, texts: list[str]):
+    """Tokenise a batch with LEFT padding.
+
+    Decoder-only generation continues from the LAST position, so a right-padded
+    row would continue from PAD instead of from the end of its prompt and come
+    back fluent and wrong -- a silent corruption, not an error. Left padding
+    plus the attention mask is what makes a batched decode token-identical to
+    the serial one, and `test_batched_generation_matches_serial_exactly` is the
+    assertion that keeps it that way.
+    """
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
+    previous = tok.padding_side
+    tok.padding_side = "left"
+    try:
+        return tok(texts, return_tensors="pt", padding=True)
+    finally:
+        tok.padding_side = previous
+
+
+class TierModels:
+    """Both tiers resident, each served by a micro-batching worker.
+
+    **Why this is not a per-tier lock any more.** It was, and the lock was
+    defended as "the honest behaviour of a single card". Measured on the free
+    route that gave **0.5 req/s**, while the `wave4_live_plane` cell needs ~64
+    AI rps at base (8 tenants x 8 AI rps) and ~110 at burst peak -- so the
+    scored matrix died at 48.3% failed requests (docs/WAVE4_FREE_ROUTE.md 0a).
+    That 0.5 req/s is a batch-size-1 SOFTWARE limit, not a P100 limit: decode
+    is memory-bandwidth-bound, Qwen2.5-3B in fp16 is ~6 GB against 549-732
+    GB/s, so 48 tokens should cost ~400-530 ms and TIER_BENCH.md measured
+    1881 ms. A batched step reads those weights ONCE for the whole batch.
+
+    **Why batching is safe here specifically.** `min_new_tokens ==
+    max_new_tokens == 48` with `do_sample=False`, so every request decodes
+    exactly 48 greedy steps: no EOS variance, no ragged tail, nothing to stall
+    the batch on its slowest member. That constraint was already in place for
+    an unrelated reason (stopping the prompt from setting the measurement).
+
+    Substrate character changes, and is disclosed: docs/ZERO_COST_ROADMAP.md
+    section 4. The prereg's Amendment clause 2 already forbids quoting live
+    absolutes from this route as tier latencies, and clause 3 (slowest tier
+    inside the 2500 ms premium AI SLO) is re-measured under load before
+    anything is scored.
+    """
+
+    def __init__(self, mock: bool = False, batch_max: int = BATCH_MAX,
+                 batch_window_ms: float = BATCH_WINDOW_MS):
         self.mock = mock
         self.models: dict[str, tuple] = {}
-        self.locks = {tier: threading.Lock() for tier, _ in TIERS.values()}
+        self.batch_max = max(1, batch_max)
+        self.batch_window_s = max(0.0, batch_window_ms) / 1000.0
+        self.queues: dict[str, queue.Queue] = {
+            tier: queue.Queue() for tier, _ in TIERS.values()}
+        self._stop = threading.Event()
+        self.workers: dict[str, threading.Thread] = {}
         if mock:
             print("mock mode: no models loaded", flush=True)
-            return
-        _ensure_torch_kernels()
-        import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        else:
+            _ensure_torch_kernels()
+            import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer
 
-        for alias, (tier, repo) in TIERS.items():
-            print(f"loading {tier} <- {repo} ...", flush=True)
-            tok = AutoTokenizer.from_pretrained(repo)
-            model = AutoModelForCausalLM.from_pretrained(
-                repo, torch_dtype=torch.float16, device_map="cuda:0")
-            model.eval()
-            self.models[tier] = (tok, model)
-            print(f"  {tier} ready", flush=True)
+            for alias, (tier, repo) in TIERS.items():
+                print(f"loading {tier} <- {repo} ...", flush=True)
+                tok = AutoTokenizer.from_pretrained(repo)
+                model = AutoModelForCausalLM.from_pretrained(
+                    repo, torch_dtype=torch.float16, device_map="cuda:0")
+                model.eval()
+                self.models[tier] = (tok, model)
+                print(f"  {tier} ready", flush=True)
+        for tier in self.queues:
+            worker = threading.Thread(target=self._serve_tier, args=(tier,),
+                                      daemon=True, name=f"batch-{tier}")
+            worker.start()
+            self.workers[tier] = worker
+
+    def close(self) -> None:
+        self._stop.set()
 
     def generate(self, tier: str, messages: list[dict]) -> tuple[str, int, int]:
+        """Blocking, exactly as before. The caller cannot tell it was batched."""
+        job = _Job(messages=messages)
+        self.queues[tier].put(job)
+        job.event.wait()
+        if job.error is not None:
+            raise job.error
+        return job.result
+
+    def _serve_tier(self, tier: str) -> None:
+        """Collect up to `batch_max` jobs or wait `batch_window_s`, then decode.
+
+        The window is measured from the arrival of the FIRST job and is not
+        reset by later arrivals, so a steady stream cannot starve the batch
+        that is already waiting.
+        """
+        q = self.queues[tier]
+        while not self._stop.is_set():
+            try:
+                batch = [q.get(timeout=0.1)]
+            except queue.Empty:
+                continue
+            deadline = time.monotonic() + self.batch_window_s
+            while len(batch) < self.batch_max:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                try:
+                    batch.append(q.get(timeout=remaining))
+                except queue.Empty:
+                    break
+            try:
+                results = self._generate_batch(tier, [j.messages for j in batch])
+            except BaseException as err:  # noqa: BLE001 -- every waiter must wake
+                for job in batch:
+                    job.error = err
+                    job.event.set()
+                continue
+            for job, result in zip(batch, results):
+                job.result = result
+                job.event.set()
+
+    def _generate_batch(self, tier: str,
+                        batch: list[list[dict]]) -> list[tuple[str, int, int]]:
+        """One padded `generate` for the whole batch."""
         if self.mock:
+            # One sleep for the batch, not one per request: the mock has to
+            # have the throughput SHAPE of the real batched server, or the
+            # queue semantics above would be tested against a substrate that
+            # cannot exhibit them.
             time.sleep(MOCK_DELAY_S.get(tier, 1.0))
-            return f"[mock {tier} reply]", 16, MAX_NEW_TOKENS
+            return [(f"[mock {tier} reply]", 16, MAX_NEW_TOKENS) for _ in batch]
         import torch
 
         tok, model = self.models[tier]
-        text = tok.apply_chat_template(messages, tokenize=False,
-                                       add_generation_prompt=True)
-        with self.locks[tier]:
-            inputs = tok([text], return_tensors="pt").to(model.device)
-            with torch.no_grad():
-                # min == max: every request decodes exactly MAX_NEW_TOKENS,
-                # ignoring EOS. TIER_BENCH.md timed "a fixed 48-token
-                # completion", and matching that is what makes per-tier
-                # latency comparable to the committed table.
-                #
-                # It also stops the *prompt* from setting the measurement.
-                # Left free to stop early, a prompt like "reply with the word
-                # ok" ends after ~3 tokens on both tiers, and the small/mid
-                # gap collapses from ~660 ms to ~18 ms — which reads exactly
-                # like an inert tier knob and would fail WL-H2 for a reason
-                # that is an artifact of the prompt, not the substrate.
-                out = model.generate(**inputs,
-                                     max_new_tokens=MAX_NEW_TOKENS,
-                                     min_new_tokens=MAX_NEW_TOKENS,
-                                     do_sample=False,
-                                     pad_token_id=tok.eos_token_id)
-            prompt_tokens = int(inputs.input_ids.shape[1])
-            new_tokens = out[0][prompt_tokens:]
-            reply = tok.decode(new_tokens, skip_special_tokens=True)
-        return reply, prompt_tokens, int(new_tokens.shape[0])
+        texts = [tok.apply_chat_template(m, tokenize=False,
+                                         add_generation_prompt=True)
+                 for m in batch]
+        inputs = pad_batch(tok, texts).to(model.device)
+        with torch.no_grad():
+            # min == max: every request decodes exactly MAX_NEW_TOKENS,
+            # ignoring EOS. TIER_BENCH.md timed "a fixed 48-token completion",
+            # and matching that is what makes per-tier latency comparable to
+            # the committed table. It is also what makes the batch uniform.
+            #
+            # It also stops the *prompt* from setting the measurement. Left
+            # free to stop early, a prompt like "reply with the word ok" ends
+            # after ~3 tokens on both tiers, and the small/mid gap collapses
+            # from ~660 ms to ~18 ms -- which reads exactly like an inert tier
+            # knob and would fail WL-H2 for a reason that is an artifact of the
+            # prompt, not the substrate.
+            out = model.generate(**inputs,
+                                 max_new_tokens=MAX_NEW_TOKENS,
+                                 min_new_tokens=MAX_NEW_TOKENS,
+                                 do_sample=False,
+                                 pad_token_id=tok.pad_token_id or tok.eos_token_id)
+        width = int(inputs["input_ids"].shape[1])
+        results = []
+        for i in range(len(batch)):
+            # The real prompt length is the unmasked part; `width` includes
+            # this row's left padding and would over-report every short prompt.
+            prompt_tokens = int(inputs["attention_mask"][i].sum())
+            new_tokens = out[i][width:]
+            results.append((tok.decode(new_tokens, skip_special_tokens=True),
+                            prompt_tokens, int(new_tokens.shape[0])))
+        return results
 
 
 def make_handler(models: TierModels, auth_token: str | None = None):

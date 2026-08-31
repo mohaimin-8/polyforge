@@ -17,8 +17,14 @@ RESULTS file must carry.
 
 **A sequential preflight passing does not license a concurrent matrix.**
 
-`tunnel_preflight.py` issues eight sequential probes per tier and measures
-round-trip latency. It never creates queueing, so it cannot observe it. On
+`tunnel_preflight.py` issued eight sequential probes per tier and measured
+round-trip latency. It never created queueing, so it could not observe it.
+**Fixed session 42** — the probe now runs a second, *open-loop* concurrent
+stage at the cell's arrival rate and fails on k6's own `rate<0.01` threshold
+or on a p95 past the premium AI SLO; `--skip-concurrent` restores the old
+sequential-only behaviour and is recorded in the report so a scored matrix
+cannot rest on one. The paragraph below is kept as the record of what the
+sequential-only probe let through. On
 2026-08-31 it returned TUNNEL OK — tier gap 551.8 ms against a 482.1 ms
 threshold — and the matrix run behind it then failed:
 
@@ -36,7 +42,10 @@ tail swallows the run.
 
 **Consequence:** this route is adequate for the WL-H2 knob-liveness gate, which
 is sequential, and for the tier bench. It is **not** adequate for the scored
-4x4 matrix at the cell's frozen concurrency. Scoring B1 needs a substrate that
+4x4 matrix at the cell's frozen concurrency **as the tier server is written
+today** — see `docs/ZERO_COST_ROADMAP.md`, which finds the 0.5 req/s ceiling
+is `kaggle_tier_server.py`'s batch-1 lock rather than the P100, and phases the
+$0 fix. Scoring B1 needs a substrate that
 serves that concurrency — a rented GPU, batched serving on the free pool, or a
 smaller cell under a NEW pre-registration (the current cell is frozen, so that
 is a different experiment, not an adjustment).
