@@ -66,10 +66,15 @@ jobs:
       - name: Coverage gate
         # Ratchet: raise toward the 80% target as packages gain tests.
         # First green CI run (2026-07-09) measured 66.5% with the PostgreSQL suite.
+        # Session 42 re-measured 68.8% after the postgres store's CRUD, outbox and
+        # saga paths gained tests (that package went 32.7% -> 63.2%). The gate moved
+        # 60 -> 65 to hold the gain, kept below the measurement so ordinary drift
+        # does not redden CI. NOTE: this total counts generated deepcopy and cmd/
+        # main() wiring; on business logic alone it is 79.5%.
         run: |
           total=$(go tool cover -func=coverage.out | tail -1 | awk '{gsub("%","",$3); print $3}')
           echo "total statement coverage: ${total}%"
-          awk -v t="$total" 'BEGIN { exit !(t >= 60.0) }' || { echo "FAIL: coverage ${total}% is below the 60% gate"; exit 1; }
+          awk -v t="$total" 'BEGIN { exit !(t >= 65.0) }' || { echo "FAIL: coverage ${total}% is below the 65% gate"; exit 1; }
       - name: Lint OpenAPI
         run: npx --yes @redocly/cli lint api/openapi.yaml
       # Reachability-aware CVE gate. govulncheck fails only on
