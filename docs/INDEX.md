@@ -26,6 +26,8 @@ clutter — superseded planning documents — now lives in [archive/](archive/).
 | [PUBLICATION_ROADMAP.md](PUBLICATION_ROADMAP.md) | **Source of truth.** Work packages, execute order (§2), progress table (§6) |
 | [MAIN_WORKING_PATH.md](MAIN_WORKING_PATH.md) | Milestone narrative. Context, not scheduling — the roadmap governs order |
 | [COMPLETION_ROADMAP.md](COMPLETION_ROADMAP.md) | **What is left that is not the thesis.** Track A: fix the gateway tier pin and re-sit B1. Track B: Zenodo, images, baseline, Azure scoping |
+| [FINAL_ROADMAP.md](FINAL_ROADMAP.md) | **100% of what is left that is not writing.** Absorbs ZERO_COST + COMPLETION Track A/B; adds theory (T1 S3 exact walk), real-trace live sitting, latency semantics, p99/TTFT, cache embedder. Writing held in §9 |
+| [ZERO_COST_ROADMAP.md](ZERO_COST_ROADMAP.md) | **The $0 route to a scored B1.** Why the free-route block is our batch-1 tier server, not the P100; phased plan (preflight fix -> batched server -> re-bench -> score); writing HELD until the author says |
 | [REMAINING_WORK.md](REMAINING_WORK.md) | Open items and known gaps |
 | [WP14_SOAK_RESTORE.md](WP14_SOAK_RESTORE.md) | How to restore the live-soak apparatus |
 
@@ -35,11 +37,11 @@ clutter — superseded planning documents — now lives in [archive/](archive/).
 
 The methodological core. Two file families, both load-bearing:
 
-**`PREREG_*.md` (38)** — pre-registrations. Each was committed **and pushed
+**`PREREG_*.md` (41)** — pre-registrations. Each was committed **and pushed
 before** its run; the push event is the timestamp anchor. They are what makes
 the results pre-registered rather than post-hoc. Never edit one after its run.
 
-**`RESULTS_*.md` (34)** — generated records. **31 are in the reproduction gate**
+**`RESULTS_*.md` (40)** — generated records. **36 are in the reproduction gate**
 and must regenerate byte-identically. They are written by their generator
 scripts, never by hand.
 
@@ -55,9 +57,24 @@ Supporting analyses in the same directory (not all gated): `THEORY_V2.md`,
 `VTC_FAIRNESS.md`, `EFFECT_SIZES.md`, `SENSITIVITY_J.md`, `COORD_GAP*.md`,
 `FORECAST_*.md`, `PLANNER_*.md`, `SEMANTIC_CACHE.md`, `OSF_REGISTRATION.md`.
 
-> `SEMANTIC_CACHE.md` is **not** in the gate: its generator needs the LMSYS-Chat-1M
-> dataset, which is not vendored. Do not run `semantic_cache_eval.py` expecting
-> to reproduce the committed file.
+> `SEMANTIC_CACHE.md`, `CACHE_PRECISION.md` and `RESULTS_CACHE_CEILING.md` are
+> **not** in the gate: their generators need the LMSYS-Chat-1M dataset, which is
+> not vendored. Do not run `semantic_cache_eval.py`, `cache_hit_precision.py` or
+> `analysis_cache_ceiling.py` expecting to reproduce the committed file on a
+> clean clone.
+
+**Session-42 additions.** `RESULTS_SEPARATION_MT_V3.md` (the eight-tenant
+coupled floor, computed at last — S3 FAIL); `RESULTS_WINDOW_CHARACTER.md`
+(M3+M2: the cost win and the SLO penalty are the same 45 windows);
+`RESULTS_CACHE_CEILING.md` (retrieval contributes only +0.047 to cache
+precision — the ceiling is response stochasticity).
+
+> **`RESULTS_SEPARATION_MT_V3.md` reads a committed artifact.** The exact
+> ordered walk over 268,435,456 offset vectors takes ~2 h, which cannot sit in
+> the gate, so it lives in `separation_mt_v3_walk.json` and the record
+> **re-derives rows 1-6 at gate time and diffs them** (S5). A stale or edited
+> artifact fails the gate rather than replaying quietly. Regenerate it with
+> `python separation_mt_v3_walk.py`.
 
 ## 4. Reference
 
