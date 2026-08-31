@@ -44,8 +44,22 @@ Two consequences beyond B1:
 
 1. **`GPU T4 x2`** -- Turing, sm_75, in the supported arch list. This is the
    clean fix and it also gives two cards. It is **NOT selectable from
-   `kaggle kernels push`** (TIER_BENCH.md section on the script API); only the
-   notebook UI's accelerator picker sets it. So an agent cannot do it.
+   `kaggle kernels push`**, and that was RE-TESTED in session 42 rather than
+   taken from the old note, because the CLI has since grown an
+   `--accelerator` flag that looks like it should work:
+
+   | requested via `--accelerator` | server stored as |
+   |---|---|
+   | `gpu-t4x2` | `Gpu` |
+   | `GpuT4x2` | `Gpu` |
+   | `gpu-t4-x2` | `Gpu` |
+   | `TPU_OR_GPU_T4X2` | `Gpu` |
+
+   Every spelling normalises to the generic `Gpu` (`machine_shape` in the
+   server-side metadata, confirmed with `kaggle kernels pull -m`), and a run
+   pushed with `gpu-t4x2` still reported `device count: 1` and a P100. The flag
+   exists; the allocation does not follow it. **Only the notebook UI's
+   accelerator picker sets T4 x2, so an agent cannot do it.**
 2. **Pin an older torch in the kernel** (`pip install 'torch<2.7'`, the last
    line that shipped sm_60). Cheap to try, but it is a ~2.5 GB install into an
    image built around a newer CUDA, and it would make the substrate differ from
