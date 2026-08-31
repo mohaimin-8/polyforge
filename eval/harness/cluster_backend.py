@@ -123,6 +123,13 @@ SOAK_MARKER = REPO_ROOT / ".soak-running"
 # and is not being relaxed; what changes is that the measured window no longer
 # starts on a cold system. Standard benchmarking practice, and disclosed.
 WARMUP_SECONDS = int(os.environ.get("POLYFORGE_EVAL_WARMUP_SECONDS", "90"))
+
+# L5 (PREREG_TRACE_LIVE.md): drive the live plane from a real trace instead of
+# a synthetic workload class. Env-gated like every other live feature here, so
+# an unset variable leaves every committed cell encoding exactly as before.
+# The value is the replay window index; the run's own `steps` decides how much
+# of that window is used, and the prereg freezes both.
+TRACE_WINDOW = os.environ.get("POLYFORGE_EVAL_TRACE_WINDOW")
 WARMUP_RATE_PER_TENANT = 10
 
 # Bucket width for eval-export's time-resolved output. SK-H3 is frozen on
@@ -293,6 +300,30 @@ def prompt_pools(run: RunSpec, tenant_ids) -> dict:
             prompts.append(" ".join(tokens))
         pools[tid] = prompts
     return pools
+
+
+def trace_override(run: RunSpec):
+    """Trace-derived demand for this run, or (None, None) when ungated.
+
+    Sliced to `run.steps + 1` buckets because `workloads.build` returns one
+    extra -- the engine scores against the NEXT bucket, so the last is never
+    scored -- and a trace-driven run has to line up with that contract or every
+    step would be scored against the wrong demand.
+    """
+    if TRACE_WINDOW is None:
+        return None, None
+    from . import trace_demand
+
+    tenant_ids, buckets, meta = trace_demand.trace_window(int(TRACE_WINDOW))
+    needed = run.steps + 1
+    if len(buckets) < needed:
+        raise BackendUnavailable(
+            f"trace window {TRACE_WINDOW} has {len(buckets)} buckets; "
+            f"run.steps={run.steps} needs {needed}")
+    print(f"[trace] window {meta['window_index']} start_s={meta['window_start_s']} "
+          f"k={meta['scale_factor']:.4f} using {needed}/{len(buckets)} buckets "
+          f"peak={trace_demand.peak_total_rps(buckets[:needed]):.3f} rps", flush=True)
+    return tenant_ids, buckets[:needed]
 
 
 def _stage_target(rps: float, unit_s: int, floor_rate: bool) -> int:
@@ -1522,10 +1553,21 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
         (workdir / "kind.yaml").write_text(kind_config(run.cluster_size), encoding="utf-8")
         (workdir / "nodeport.yaml").write_text(nodeport_service(),
                                                encoding="utf-8")
-        (workdir / "replay.js").write_text(k6_script(run), encoding="utf-8")
+        trace_ids, trace_buckets = trace_override(run)
+        k6_kwargs = {}
+        if trace_buckets is not None:
+            # timeUnit 1m and no floor: at the "1s" default every trace bucket
+            # rounds to 0, is floored to 1, and the run drives 25x the trace's
+            # demand perfectly flat. See test_trace_demand.py.
+            k6_kwargs = {"buckets_override": trace_buckets,
+                         "tenant_ids_override": trace_ids,
+                         "time_unit": TRACE_TIME_UNIT, "floor_rate": False}
+        (workdir / "replay.js").write_text(k6_script(run, **k6_kwargs),
+                                           encoding="utf-8")
         if WARMUP_SECONDS > 0:
             (workdir / "warmup.js").write_text(
-                k6_script(run, warmup_s=WARMUP_SECONDS), encoding="utf-8")
+                k6_script(run, warmup_s=WARMUP_SECONDS, **k6_kwargs),
+                encoding="utf-8")
         if run.system in OPERATOR_SYSTEMS:
             (workdir / "operator-crs.yaml").write_text(operator_crs(run), encoding="utf-8")
         if EVAL_SHARED_PG:
