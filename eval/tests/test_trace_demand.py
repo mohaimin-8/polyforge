@@ -173,3 +173,49 @@ def test_trace_encoding_preserves_shape_idleness_and_volume(window):
     actual_total = sum(sum(b[t].total_rps() for t in tenant_ids) for b in buckets)
     # Volume: within a few percent, the residual being 1/60 rps rounding.
     assert encoded_total == pytest.approx(actual_total, rel=0.05)
+
+
+# --- the load-distribution ceiling, which failed a healthy 2 h run ----------
+
+class _Sampler:
+    def __init__(self, shares):
+        self._shares, self.samples, self.failures = shares, 10, 0
+
+    def shares(self):
+        return self._shares
+
+
+def test_pinning_is_still_detected_at_sixteen_replicas():
+    """The ceiling exists for WP14 attempt 4, where kubectl port-forward put
+    every request on one pod of sixteen until it OOMed. That detection must be
+    exactly as sensitive as before."""
+    from harness.cluster_backend import check_load_distribution
+    pinned = {f"p{i}": (1.0 if i == 0 else 0.0) for i in range(16)}
+    with pytest.raises(RuntimeError, match="load was pinned"):
+        check_load_distribution(_Sampler(pinned))
+
+
+def test_even_split_at_sixteen_replicas_passes():
+    from harness.cluster_backend import check_load_distribution
+    check_load_distribution(_Sampler({f"p{i}": 1 / 16 for i in range(16)}))
+
+
+def test_single_replica_is_not_pinning():
+    """The defect this fixes. `max_share` of 0.25 is 'four times the fair
+    share' only at sixteen replicas; at one replica the fair share IS 100%, so
+    the ceiling could not be satisfied by any run. L5's trace-driven sitting
+    peaks at 1.377 rps, HPA correctly held one replica, and a complete two-hour
+    run was thrown away for having nowhere to spread load to."""
+    from harness.cluster_backend import check_load_distribution
+    check_load_distribution(_Sampler({"only-pod": 1.0}))
+
+
+def test_ceiling_tracks_the_fair_share_between_those_extremes():
+    """Four replicas: fair share 25%, so the ceiling is 100% and no split can
+    be called pinned. Eight: fair share 12.5%, ceiling 50%, so 60% on one pod
+    still is."""
+    from harness.cluster_backend import check_load_distribution
+    check_load_distribution(_Sampler({f"p{i}": 0.25 for i in range(4)}))
+    hot = {"p0": 0.6, **{f"p{i}": 0.4 / 7 for i in range(1, 8)}}
+    with pytest.raises(RuntimeError, match="load was pinned"):
+        check_load_distribution(_Sampler(hot))
