@@ -2,7 +2,7 @@
 
 operator:
   image:
-    repository: ghcr.io/mohaimin-8/polyforge-operator
+    repository: ghcr.io/mohaimin-8/polyforge/operator
     tag: ""            # defaults to .Chart.appVersion
     pullPolicy: IfNotPresent
   leaderElect: true
@@ -40,7 +40,7 @@ features:
 planner:
   enabled: true
   image:
-    repository: ghcr.io/mohaimin-8/polyforge-planner
+    repository: ghcr.io/mohaimin-8/polyforge/planner
     tag: ""            # defaults to .Chart.appVersion
     pullPolicy: IfNotPresent
   port: 8090

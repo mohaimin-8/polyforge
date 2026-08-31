@@ -1,13 +1,24 @@
 name: release
 
-# W24 supply chain: on a version tag, build and push the image to GHCR,
-# generate its CycloneDX SBOM, and sign both with cosign keyless (Sigstore
-# OIDC — the signature is bound to this workflow's identity, no key to
-# leak). Verify with:
+# W24 supply chain: on a version tag, build and push every deployable image to
+# GHCR, generate each one's CycloneDX SBOM, and sign both with cosign keyless
+# (Sigstore OIDC — the signature is bound to this workflow's identity, no key
+# to leak). Verify any of them with:
 #
-#   cosign verify ghcr.io/mohaimin-8/polyforge/control-plane:<tag> \
+#   cosign verify ghcr.io/mohaimin-8/polyforge/<component>:<tag> \
 #     --certificate-identity-regexp 'github.com/mohaimin-8/polyforge' \
 #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
+#
+# Session 42: this built ONLY control-plane. The repository ships four
+# deployable images, and `helm install polyforge-operator` pulls the operator
+# and planner — so an install from a clean machine could never have worked,
+# with or without a token, because two of the three images it needs were never
+# published. The charts were also linted on every CI run and published nowhere.
+# Both are fixed here.
+#
+# Naming is `ghcr.io/<owner>/<repo>/<component>`, which keeps the already
+# published control-plane path unchanged (the cosign line above is quoted in
+# docs/SECURITY.md) and gives the other three a consistent home.
 
 on:
   push:
@@ -21,6 +32,22 @@ permissions:
 jobs:
   image:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: control-plane
+            dockerfile: Dockerfile
+          - component: ai-gateway
+            dockerfile: Dockerfile.gateway
+          - component: operator
+            dockerfile: Dockerfile.operator
+          # Repo root, not services/planner: that Dockerfile COPYs
+          # `research/jcac_sim/` because planner.py imports the shared
+          # simulator model over a repo-relative path, so a narrower context
+          # fails the build.
+          - component: planner
+            dockerfile: services/planner/Dockerfile
     steps:
       - uses: actions/checkout@v6
       - uses: docker/login-action@v3
@@ -33,19 +60,49 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ${{ matrix.dockerfile }}
           push: true
-          tags: ghcr.io/${{ github.repository }}/control-plane:${{ github.ref_name }}
+          tags: ghcr.io/${{ github.repository }}/${{ matrix.component }}:${{ github.ref_name }}
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
       - name: Sign the image (keyless)
-        run: cosign sign --yes ghcr.io/${{ github.repository }}/control-plane@${{ steps.push.outputs.digest }}
+        run: |
+          cosign sign --yes \
+            ghcr.io/${{ github.repository }}/${{ matrix.component }}@${{ steps.push.outputs.digest }}
       - name: Generate image SBOM (CycloneDX)
         uses: anchore/sbom-action@v0
         with:
-          image: ghcr.io/${{ github.repository }}/control-plane@${{ steps.push.outputs.digest }}
+          image: ghcr.io/${{ github.repository }}/${{ matrix.component }}@${{ steps.push.outputs.digest }}
           format: cyclonedx-json
           output-file: sbom.cdx.json
       - name: Attest the SBOM to the image
         run: |
           cosign attest --yes --type cyclonedx --predicate sbom.cdx.json \
-            ghcr.io/${{ github.repository }}/control-plane@${{ steps.push.outputs.digest }}
+            ghcr.io/${{ github.repository }}/${{ matrix.component }}@${{ steps.push.outputs.digest }}
+
+  charts:
+    # Runs after the images so a published chart never points at a tag that
+    # does not exist yet. `helm install` from a clean machine is the artifact
+    # reviewers actually try, and it needs the chart to be fetchable — linting
+    # it in CI proves it parses, not that anyone can get it.
+    needs: image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" |
+            helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Package and push charts
+        run: |
+          set -euo pipefail
+          # Chart versions are SemVer and carry no leading "v"; the app version
+          # keeps the tag as written.
+          version="${GITHUB_REF_NAME#v}"
+          for chart in deploy/helm/polyforge deploy/helm/polyforge-operator; do
+            helm package "$chart" --version "$version" --app-version "$GITHUB_REF_NAME"
+          done
+          for pkg in ./*-"$version".tgz; do
+            helm push "$pkg" "oci://ghcr.io/${{ github.repository }}/charts"
+          done
