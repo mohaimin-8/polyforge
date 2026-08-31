@@ -35,9 +35,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import concurrent.futures
 import json
 import os
 import statistics
+import threading
 import sys
 import time
 import urllib.error
@@ -55,6 +57,10 @@ ABS_MARGIN_MS = 20.0
 # latency crosses it, that tier violates for premium tenants and the live SLO
 # landscape stops resembling the one the controller was tuned against.
 AI_SLO_PREMIUM_MS = 2500.0
+# The concurrent stage's own gate. k6 aborts the matrix on
+# `http_req_failed rate<0.01`, so the preflight fails on the same threshold --
+# a preflight with a laxer bar than the run it protects protects nothing.
+MAX_FAILURE_RATE = 0.01
 
 
 def _prompt(tag: str, i: int) -> str:
@@ -84,6 +90,100 @@ def chat(base_url: str, model: str, prompt: str, timeout: float,
     if not payload.get("choices"):
         raise RuntimeError(f"{model}: response carried no choices")
     return elapsed_ms, served
+
+
+def measure_concurrent(specs: dict[str, dict], rps: float, seconds: float,
+                       timeout: float, max_inflight: int) -> dict:
+    """Drive the tiers open-loop at a fixed arrival rate and report what queues.
+
+    This stage exists because the sequential one cannot fail the way the real
+    run failed. On 2026-08-31 `measure_interleaved` returned TUNNEL OK -- tier
+    gap 551.8 ms against a 482.1 ms threshold -- and the matrix behind it died
+    with 48.3% of requests failed (2,880 of 5,963), aborted at 20% of the load
+    window. Eight sequential probes never create queueing, so a substrate that
+    serialises generation looks healthy right until concurrent demand arrives
+    (docs/WAVE4_FREE_ROUTE.md 0a).
+
+    **Open-loop on purpose.** Requests are issued on a fixed schedule whether
+    or not the previous ones have finished. A closed-loop pool of N workers
+    self-throttles to whatever the server can absorb and would report a happy
+    substrate at the wrong throughput -- the same blindness in a new costume.
+    A request that cannot even be dispatched because `max_inflight` is already
+    saturated counts as a failure, because that is what it is: demand the
+    substrate did not serve.
+    """
+    tiers = list(specs)
+    lat: dict[str, list[float]] = {t: [] for t in tiers}
+    failed: dict[str, int] = {t: 0 for t in tiers}
+    sent: dict[str, int] = {t: 0 for t in tiers}
+    lock = threading.Lock()
+    inflight = threading.Semaphore(max_inflight)
+
+    def one(tier: str, i: int) -> None:
+        spec = specs[tier]
+        try:
+            ms, _ = chat(spec["base_url"], spec["model"], _prompt(tier, i),
+                         timeout, spec.get("api_key", ""))
+            with lock:
+                lat[tier].append(ms)
+        except Exception:  # noqa: BLE001 -- any failure is a failed request
+            with lock:
+                failed[tier] += 1
+        finally:
+            inflight.release()
+
+    interval = 1.0 / rps if rps > 0 else 0.0
+    started = time.perf_counter()
+    deadline = started + seconds
+    i = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_inflight) as pool:
+        while time.perf_counter() < deadline:
+            tier = tiers[i % len(tiers)]
+            with lock:
+                sent[tier] += 1
+            if inflight.acquire(blocking=False):
+                pool.submit(one, tier, i)
+            else:
+                with lock:
+                    failed[tier] += 1
+            i += 1
+            target = started + i * interval
+            slack = target - time.perf_counter()
+            if slack > 0:
+                time.sleep(slack)
+    elapsed = time.perf_counter() - started
+
+    out: dict = {"target_rps": rps, "seconds": seconds,
+                 "max_inflight": max_inflight, "elapsed_s": elapsed,
+                 "timeout_s": timeout, "tiers": {}}
+    total_sent = total_failed = 0
+    for tier in tiers:
+        vals = sorted(lat[tier])
+        n_ok, n_bad = len(vals), failed[tier]
+        total_sent += sent[tier]
+        total_failed += n_bad
+        out["tiers"][tier] = {
+            "tier": tier, "sent": sent[tier], "ok": n_ok, "failed": n_bad,
+            "failure_rate": (n_bad / sent[tier]) if sent[tier] else 1.0,
+            "sustained_rps": n_ok / elapsed if elapsed > 0 else 0.0,
+            "p50_ms": vals[len(vals) // 2] if vals else None,
+            "p95_ms": vals[min(len(vals) - 1, int(0.95 * len(vals)))] if vals else None,
+            "max_ms": vals[-1] if vals else None,
+        }
+    out["sent"] = total_sent
+    out["failed"] = total_failed
+    out["failure_rate"] = (total_failed / total_sent) if total_sent else 1.0
+    p95s = [r["p95_ms"] for r in out["tiers"].values() if r["p95_ms"] is not None]
+    out["slowest_p95_ms"] = max(p95s) if p95s else None
+    out["slo_headroom_ms"] = (AI_SLO_PREMIUM_MS - out["slowest_p95_ms"]
+                              if p95s else None)
+    # Both conditions are vetoes, and neither is negotiable at run time: the
+    # failure rate is k6's own abort threshold, and the p95 gate is Amendment
+    # clause 3 (PREREG_WAVE4_LIVE_PLANE.md) measured where it actually binds --
+    # under load -- rather than inferred from a sequential mean.
+    out["delivers"] = (out["failure_rate"] <= MAX_FAILURE_RATE
+                       and p95s and out["slowest_p95_ms"] <= AI_SLO_PREMIUM_MS)
+    return out
 
 
 def measure_interleaved(specs: dict[str, dict], n: int, warmups: int,
@@ -134,6 +234,23 @@ def main() -> int:
                          "enough on a cold GPU and the shortfall lands "
                          "entirely on whichever tier is sampled first")
     ap.add_argument("--timeout", type=float, default=180.0)
+    # Concurrent stage. Defaults come from the frozen cell, not from taste:
+    # joint_stress is 8 AI rps/tenant x 8 tenants = 64 at scale 1.0, and the
+    # observed k6 burst peak (~218 VUs) puts it near 110. 60 s is long enough
+    # for a serialising substrate to build the queue that killed the 2026-08-31
+    # run inside 20% of its window.
+    ap.add_argument("--concurrent-rps", type=float, default=110.0,
+                    help="open-loop arrival rate for the concurrent stage")
+    ap.add_argument("--concurrent-seconds", type=float, default=60.0)
+    ap.add_argument("--concurrent-timeout", type=float, default=60.0,
+                    help="per-request timeout for the concurrent stage; "
+                         "matches the k6 timeout whose tail aborted the run")
+    ap.add_argument("--max-inflight", type=int, default=256,
+                    help="dispatch ceiling; requests past it count as failed, "
+                         "because unserved demand is unserved demand")
+    ap.add_argument("--skip-concurrent", action="store_true",
+                    help="sequential stage only -- valid for the tier bench "
+                         "and a WL-H2-only sitting, NEVER for the scored matrix")
     ap.add_argument("--report", type=Path, default=DEFAULT_REPORT)
     args = ap.parse_args()
 
@@ -201,8 +318,31 @@ def main() -> int:
                    "slo_headroom_ms": slo_headroom_ms,
                    "slowest_tier_within_premium_slo": slo_headroom_ms > 0.0})
     ok = material and routed and ordered
-    report["verdict"] = ("TUNNEL OK (tier gap survives the round-trip)" if ok else
-                         "SUBSTRATE INADEQUATE (do not start the run)")
+
+    # Stage 2. The sequential fields above are left exactly as they were so a
+    # report stays comparable with the ones already committed; the concurrent
+    # verdict is additive and lands in its own block.
+    conc = None
+    if not args.skip_concurrent and ok:
+        try:
+            conc = measure_concurrent(
+                {tier_a: backends[tier_a], tier_b: backends[tier_b]},
+                args.concurrent_rps, args.concurrent_seconds,
+                args.concurrent_timeout, args.max_inflight)
+        except (urllib.error.URLError, TimeoutError, RuntimeError, KeyError) as err:
+            conc = {"error": f"{type(err).__name__}: {err}", "delivers": False}
+        report["concurrent"] = conc
+    elif args.skip_concurrent:
+        report["concurrent"] = {"skipped": True}
+
+    delivers = True if args.skip_concurrent else bool(conc and conc.get("delivers"))
+    ok = ok and delivers
+    report["verdict"] = (
+        "TUNNEL OK (tier gap survives the round-trip)"
+        if ok and args.skip_concurrent else
+        "TUNNEL OK (tier gap survives the round-trip; substrate delivers under load)"
+        if ok else
+        "SUBSTRATE INADEQUATE (do not start the run)")
 
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -236,6 +376,29 @@ def main() -> int:
               "separated on. Reduce round-trip, or record this prominently "
               "and read WL-H1 (cost at iso-fairness) knowing the fairness "
               "side is saturated.", file=sys.stderr)
+    if args.skip_concurrent:
+        print("  concurrent stage SKIPPED -- this report does NOT license the "
+              "scored matrix (docs/WAVE4_FREE_ROUTE.md 0a)", file=sys.stderr)
+    elif conc and "error" in conc:
+        print(f"  concurrent stage FAILED to run: {conc['error']}", file=sys.stderr)
+    elif conc:
+        print(f"  under load ({conc['target_rps']:.0f} rps open-loop for "
+              f"{conc['seconds']:.0f} s, max {conc['max_inflight']} in flight):")
+        for row in conc["tiers"].values():
+            p95 = "n/a" if row["p95_ms"] is None else f"{row['p95_ms']:.0f} ms"
+            print(f"    {row['tier']:>6}: {row['sustained_rps']:6.1f} rps  "
+                  f"failed {row['failure_rate'] * 100:5.1f}%  p95 {p95}")
+        print(f"    overall failed {conc['failure_rate'] * 100:.1f}% "
+              f"vs {MAX_FAILURE_RATE * 100:.0f}% gate; slowest p95 "
+              f"{conc['slowest_p95_ms'] or float('nan'):.0f} ms vs "
+              f"{AI_SLO_PREMIUM_MS:.0f} ms -> "
+              f"{'DELIVERS' if conc['delivers'] else 'DOES NOT DELIVER'}")
+        if not conc["delivers"]:
+            print("  the substrate serves the sequential probe but not the "
+                  "cell's concurrency. Batch the tier server, move to a "
+                  "substrate that serves it, or re-register a smaller cell -- "
+                  "do NOT start the matrix (docs/ZERO_COST_ROADMAP.md)",
+                  file=sys.stderr)
     print(f"verdict: {report['verdict']}  (report: {args.report})")
     return 0 if ok else 1
 
