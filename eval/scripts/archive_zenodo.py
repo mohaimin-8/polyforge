@@ -85,6 +85,11 @@ REPO_INCLUDE = [
     "research/analysis/RESULTS_*.md",
     "research/analysis/PREREG_*.md",
     "docs/REPRODUCE.md",
+    # RESULTS_SEPARATION_MT_V3.md reads its expensive rows from this artifact
+    # (the 268,435,456-vector walk is ~2 h and cannot live in the gate). Ship it
+    # or the deposit carries a record nobody can regenerate -- the same defect
+    # this INCLUDE list was extended to fix, one level down.
+    "research/analysis/separation_mt_v3_walk.json",
 ]
 
 DEPOSIT_METADATA = {
