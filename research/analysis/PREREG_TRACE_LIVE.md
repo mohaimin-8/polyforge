@@ -118,3 +118,31 @@ cluster ranked these two arms as the simulator did.* It does **not** license
 "the simulator is validated", does not transfer to arms not run, and does not
 make the tier latencies real. The claim is deliberately narrow because the
 substrate is honestly narrow.
+
+## Amendment 1 (2026-09-01, before any run — arm correction)
+
+**`hpa_fair` cannot be run on the live plane and the frozen design above was
+wrong to name it.** It is absent from `cluster_backend.HELM_VALUES_BY_SYSTEM`
+entirely; that table's own comment states only the `hpa` and `jcac` rows are
+live-wired, and an unwired name "deploys a plain pod under a baseline's name".
+The run would have produced a scored comparison against something that is not
+an HPA at all — the failure mode WP8a found when `replica-only` rendered CRs
+byte-identical to `jcac`'s.
+
+Caught by checking the wiring before launching, not after scoring. Nothing has
+been run under this pre-registration.
+
+**Corrected arms: `jcac` and `hpa`.**
+
+* `hpa` is live-wired (`autoscaling.hpa.enabled=true`, a real HPA).
+* The **sim side changes to match**: TL-H1/TL-H2 compare live `hpa` against sim
+  `hpa`, not against `hpa_fair`. The two arms must be the same arm on both
+  substrates or the ordinal comparison is meaningless.
+* Consequence, stated plainly: the comparator is the **published** HPA posture,
+  not the fair-cache one. `RESULTS_BUDGET_PARITY.md`'s BP-H1 was scored against
+  `hpa_fair`, so **this campaign's sim side is a fresh run, not that record**,
+  and no number here may be quoted against BP-H1's. That was already true — the
+  slice differs — and this makes it true of the arm as well.
+
+Nothing else changes: demand, slice, substrate, hypotheses, falsifiers and the
+stopping rule are as frozen above.
