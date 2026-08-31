@@ -202,7 +202,50 @@ special?" is a figure, not a paragraph. Desk-only, no prereg (descriptive).
 See `docs/ZERO_COST_ROADMAP.md` for L1–L4 in full, including the pre-committed
 decision points and the P100-vs-T4x2 fallback.
 
-### L5. Drive the live plane from a real trace (**closes W4**)
+### L5 — demand half **DONE (session 42)**, and it needs no GPU
+
+`eval/harness/trace_demand.py` + 9 tests. It **calls the sim's own
+`trace_matrix.window_buckets`** rather than reimplementing it, so "the live
+plane saw the demand the simulator replayed" is true *by construction* — one
+projection, not two that agree today. `trace_matrix.py` is untouched, so
+`RESULTS_TRACE_PARITY.md` and `RESULTS_BUDGET_PARITY.md` still replay
+byte-identically.
+
+**The finding that reorders this roadmap.** Measured on window 0 of the
+committed BurstGPT trace:
+
+| quantity | value |
+|---|---:|
+| peak aggregate arrival rate | **1.377 rps** |
+| mean aggregate | 0.316 rps |
+| max single tenant | 0.501 rps |
+| buckets (6 h at 10 s) | 2160, 1320 non-zero |
+| kinds | **chat only** |
+
+`scale_factor` targets **work units** — mean per-tenant demand equals one
+replica's capacity — not requests/second, and chat is expensive per request. So
+the trace-driven cell needs **~1.4 rps, roughly 80x below the synthetic
+`joint_stress` cell's ~110 AI rps**.
+
+**Therefore L5 does not need the GPU throughput B1 is blocked on.** The
+calibrated mock (`kaggle_tier_server.py --mock`, tier latencies straight from
+`TIER_BENCH.md`) serves 1.4 rps trivially on this machine, and Docker is up.
+**L5 is executable now while L3/L4 wait on Kaggle's UI-gated accelerator** —
+the reverse of the priority order this document was written with. Pinned by
+`test_the_windows_arrival_rate_is_modest`, which fails loudly if the projection
+ever rescales and voids that conclusion.
+
+**Disclose, do not paper over:** the trace is chat-only, so this cell exercises
+the AI path and NOT the CRUD path — the opposite bias to every synthetic cell
+used so far. Mixing in synthetic CRUD to look balanced would forfeit the point.
+
+**Still needed:** a NEW pre-registration (new scored comparison — folding it
+into `PREREG_WAVE4_LIVE_PLANE` would widen a frozen prereg after seeing
+results), the cluster-backend wiring, and the sitting itself.
+
+*Original plan:*
+
+### L5-original. Drive the live plane from a real trace (**closes W4**)
 
 The sharpest un-conceded objection: traces are replayed in *simulation*
 (bit-for-bit), and the live plane drives *synthetic* cells (`crud_bursty`,
