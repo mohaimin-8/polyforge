@@ -1,0 +1,108 @@
+{
+  "generated_by": "separation_mt_v3_walk.py",
+  "mode": "ordered-batched",
+  "cell": {
+    "workload": "flash_crud",
+    "cluster_size": "small",
+    "tenant_mix": "uniform"
+  },
+  "cap": 24,
+  "replica_max": 6,
+  "orbit_length": 16,
+  "needs": [
+    6,
+    6,
+    6,
+    6,
+    6,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "ramp_lead": 3,
+  "tenants_walked_to": 8,
+  "python": "3.13.5",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "rows": [
+    {
+      "tenants": 1,
+      "vectors": 1,
+      "coupled_violation": 0.0,
+      "uncoupled_violation": 0.0,
+      "gap": 0.0,
+      "cap_can_bind": false,
+      "seconds": 0.022348642349243164
+    },
+    {
+      "tenants": 2,
+      "vectors": 16,
+      "coupled_violation": 0.0,
+      "uncoupled_violation": 0.0,
+      "gap": 0.0,
+      "cap_can_bind": false,
+      "seconds": 0.021991729736328125
+    },
+    {
+      "tenants": 3,
+      "vectors": 256,
+      "coupled_violation": 0.0,
+      "uncoupled_violation": 0.0,
+      "gap": 0.0,
+      "cap_can_bind": false,
+      "seconds": 0.024286270141601562
+    },
+    {
+      "tenants": 4,
+      "vectors": 4096,
+      "coupled_violation": 0.0,
+      "uncoupled_violation": 0.0,
+      "gap": 0.0,
+      "cap_can_bind": false,
+      "seconds": 0.04959607124328613
+    },
+    {
+      "tenants": 5,
+      "vectors": 65536,
+      "coupled_violation": 0.016513824462890625,
+      "uncoupled_violation": 0.0,
+      "gap": 0.016513824462890625,
+      "cap_can_bind": true,
+      "seconds": 0.6708593368530273
+    },
+    {
+      "tenants": 6,
+      "vectors": 1048576,
+      "coupled_violation": 0.0490575432777405,
+      "uncoupled_violation": 0.0,
+      "gap": 0.0490575432777405,
+      "cap_can_bind": true,
+      "seconds": 18.966563940048218
+    },
+    {
+      "tenants": 7,
+      "vectors": 16777216,
+      "coupled_violation": 0.09010214731097221,
+      "uncoupled_violation": 0.0,
+      "gap": 0.09010214731097221,
+      "cap_can_bind": true,
+      "seconds": 391.4908490180969
+    },
+    {
+      "tenants": 8,
+      "vectors": 268435456,
+      "coupled_violation": 0.12618859019130468,
+      "uncoupled_violation": 0.0,
+      "gap": 0.12618859019130468,
+      "cap_can_bind": true,
+      "seconds": 7191.277647018433
+    }
+  ]
+}

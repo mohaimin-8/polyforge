@@ -1133,7 +1133,9 @@ def permutation_invariance_report(config: TenantConfig, demands: list[Demand],
 def coupled_floor_incremental(config: TenantConfig, demands: list[Demand],
                               tenants: int, cap: int, *, periods: int = 4,
                               max_states: int = 1 << 21,
-                              mode: str = "auto") -> dict:
+                              mode: str = "auto",
+                              engine: str = "scalar",
+                              chunk: int = 1 << 20) -> dict:
     """Expected per-tenant violation floor under the cap AND the move clamp.
 
     Corrects `coupled_floor`, whose `fcfs_allocation` starves a contended
@@ -1161,7 +1163,22 @@ def coupled_floor_incremental(config: TenantConfig, demands: list[Demand],
 
     total = 0.0
     weight_sum = 0
-    if mode == "ordered":
+    if mode == "ordered" and engine == "batched":
+        # Same enumeration, same arithmetic; only the offset-vector axis is
+        # vectorised (WP13 step 3). DEFAULT OFF: the scalar loop below stays
+        # the reference implementation, every committed record was produced by
+        # it, and `engine="batched"` is opted into per call site only after the
+        # record it feeds has been shown byte-identical.
+        walked = length ** (tenants - 1) if tenants > 1 else 1
+        done = 0
+        while done < walked:
+            count = min(chunk, walked - done)
+            total += float(trajectory_violation_batch(
+                needs, _offset_block(length, tenants, done, count), cap,
+                config.replica_max, table, periods, lead).sum())
+            done += count
+        weight_sum = walked
+    elif mode == "ordered":
         for offsets in _offset_vectors(length, tenants):
             total += _trajectory_violation(needs, offsets, cap,
                                            config.replica_max, table, periods,
@@ -1182,6 +1199,160 @@ def coupled_floor_incremental(config: TenantConfig, demands: list[Demand],
         "gap": coupled - uncoupled,
         "mode": mode,
         "states_walked": weight_sum,
+        "needs": needs,
+        "cap": cap,
+        "tenants": tenants,
+    }
+
+
+# ---------------------------------------------------------------------------
+# WP13 step 3 (session 42) -- the ordered walk, vectorised.
+#
+# RESULTS_SEPARATION_MT_V2.md reported S3 NOT EVALUABLE because the published
+# eight-tenant cell needs 16^7 = 268,435,456 offset vectors and "that is beyond
+# what this analysis will spend". That is a statement about the LOOP, not about
+# the problem: `_trajectory_violation` runs a fixed number of branch-free steps
+# per offset vector, so every trajectory can be advanced in lockstep.
+#
+# What is vectorised is the OFFSET-VECTOR axis. The tenant sweep inside
+# `incremental_allocation` stays sequential, because `others = sum(chosen) -
+# chosen[i]` is a real order dependency -- the same one S2 proved is not
+# permutation-invariant. So this is the ORDERED walk, exactly: not the multiset
+# shortcut S2 falsified, and not sampling.
+#
+# numpy is imported lazily inside the functions. Nothing in `research/jcac_sim/`
+# imports numpy at module level and this block does not change that.
+# ---------------------------------------------------------------------------
+
+
+def _offset_block(length: int, tenants: int, start: int, count: int):
+    """Offset vectors [start, start+count) of the enumeration `_offset_vectors`
+    yields, as an (count, tenants) array with tenant 0 pinned to phase 0.
+
+    `_product` yields with the last position varying fastest, so the global
+    index is a base-`length` numeral whose least significant digit is the last
+    tenant. Pinned by `test_offset_block_matches_the_generator`.
+    """
+    import numpy as np
+
+    out = np.zeros((count, tenants), dtype=np.int16)
+    if tenants == 1:
+        return out
+    rem = np.arange(start, start + count, dtype=np.int64)
+    for pos in range(tenants - 1, 0, -1):
+        out[:, pos] = (rem % length).astype(np.int16)
+        rem //= length
+    return out
+
+
+def trajectory_violation_batch(needs: tuple[int, ...], offsets_block,
+                               cap: int, replica_max: int,
+                               table: dict[tuple[int, int], float],
+                               periods: int, lead: int,
+                               deltas: tuple[int, ...] = INCREMENTAL_DELTAS):
+    """`_trajectory_violation` for a whole block of offset vectors at once.
+
+    Float accumulation order is kept identical to the scalar version on
+    purpose: within a step the per-tenant violations are summed left to right
+    into a subtotal, and the subtotal is then added to the running total,
+    exactly as `total += sum(...)` does. Anything else would differ in the last
+    bits and the equivalence test would be measuring numpy's reduction tree
+    instead of this derivation.
+    """
+    import numpy as np
+
+    length = len(needs)
+    n_vectors, tenants = offsets_block.shape
+    needs_arr = np.asarray(needs, dtype=np.int32)
+    target_lookup = np.array(
+        [max(needs[(phase + k) % length] for k in range(lead + 1))
+         for phase in range(length)], dtype=np.int32)
+
+    span = int(max(int(needs_arr.max()), int(target_lookup.max())))
+    violation = np.zeros((span + 1, replica_max + 1), dtype=np.float64)
+    for (level, held_replicas), value in table.items():
+        violation[level, held_replicas] = value
+
+    dmax = max(deltas)
+    offs = offsets_block.astype(np.int32)
+    held = np.ones((n_vectors, tenants), dtype=np.int32)
+    chosen = np.empty_like(held)
+    total = np.zeros(n_vectors, dtype=np.float64)
+    subtotal = np.empty(n_vectors, dtype=np.float64)
+
+    for step in range(periods * length):
+        phase = (offs + step) % length
+        actual = needs_arr[phase]
+        target = target_lookup[phase]
+
+        np.copyto(chosen, held)
+        running = chosen.sum(axis=1)
+        for i in range(tenants):
+            base = held[:, i]
+            room = cap - (running - base)
+            lo = np.maximum(1, base - dmax)
+            hi_eff = np.minimum(np.minimum(replica_max, base + dmax), room)
+            want = np.maximum(lo, target[:, i])
+            # min(meets) when a reachable candidate clears the need, else
+            # max(feasible); and when nothing is feasible the tenant keeps the
+            # state it already holds -- `base`, which is what `continue` leaves
+            # `chosen[i]` at in the scalar sweep.
+            picked = np.where(want <= hi_eff, want, hi_eff)
+            picked = np.where(hi_eff >= lo, picked, base)
+            running += picked - chosen[:, i]
+            chosen[:, i] = picked
+        held, chosen = chosen, held
+
+        if step >= (periods - 1) * length:
+            subtotal[:] = violation[actual[:, 0], held[:, 0]]
+            for i in range(1, tenants):
+                subtotal += violation[actual[:, i], held[:, i]]
+            total += subtotal
+
+    return total / (length * tenants)
+
+
+def coupled_floor_incremental_batched(config: TenantConfig,
+                                      demands: list[Demand], tenants: int,
+                                      cap: int, *, periods: int = 4,
+                                      chunk: int = 1 << 20,
+                                      progress=None) -> dict:
+    """`coupled_floor_incremental(mode="ordered")` over the vectorised walk.
+
+    Same enumeration, same arithmetic, no `max_states` ceiling. The aggregate
+    is a chunked sum, so it can differ from the scalar walk's strictly
+    sequential sum in the last bits of a float64; the PER-VECTOR values are
+    bit-identical and that is what the equivalence test pins.
+    """
+    needs = orbit_replica_needs(config, demands)
+    if any(n is None for n in needs):
+        raise ValueError("orbit has an unservable position")
+    length = len(needs)
+    table = _violation_table(config, demands, needs, config.replica_max)
+    lead = ramp_lead(config.replica_max)
+
+    walked = length ** (tenants - 1) if tenants > 1 else 1
+    total = 0.0
+    done = 0
+    while done < walked:
+        count = min(chunk, walked - done)
+        block = _offset_block(length, tenants, done, count)
+        total += float(trajectory_violation_batch(
+            needs, block, cap, config.replica_max, table, periods,
+            lead).sum())
+        done += count
+        if progress is not None:
+            progress(done, walked)
+
+    coupled = total / walked
+    uncoupled = coupled_floor_incremental_uncapped(config, demands, tenants,
+                                                   table, needs, periods, lead)
+    return {
+        "coupled_violation": coupled,
+        "uncoupled_violation": uncoupled,
+        "gap": coupled - uncoupled,
+        "mode": "ordered-batched",
+        "states_walked": walked,
         "needs": needs,
         "cap": cap,
         "tenants": tenants,
