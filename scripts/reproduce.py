@@ -133,6 +133,30 @@ CAMPAIGN_RECORDS = [
     # use is what S2 falsifies.
     ("analysis_separation_mt_v2.py", [], "RESULTS_SEPARATION_MT_V2.md"),
     #
+    # WP13 step 3. v2 reported the eight-tenant floor NOT EVALUABLE at
+    # 268,435,456 offset vectors; the vectorised ordered walk computes it in
+    # ~2 h. That is affordable once and NOT affordable here, so the expensive
+    # rows come from the committed `separation_mt_v3_walk.json` and this script
+    # RE-DERIVES rows 1..6 at gate time and compares them (S5). A stale or
+    # edited artifact therefore fails the gate rather than replaying quietly.
+    # Regenerate the artifact with `python separation_mt_v3_walk.py`.
+    ("analysis_separation_mt_v3.py", [], "RESULTS_SEPARATION_MT_V3.md"),
+    #
+    # M3. EXPLORATORY, and the record says so in its own header: the window
+    # features were chosen after seeing the data, so nothing in it may be
+    # quoted as a confirmed result. It is gated here anyway because it reads
+    # committed per-window CSVs and must keep reproducing -- and because its
+    # W1 self-check re-derives the published TP-H1 headline, so a drift in
+    # either the CSVs or the record surfaces as a gate failure.
+    ("analysis_window_character.py", [], "RESULTS_WINDOW_CHARACTER.md"),
+    #
+    # T3. Weight-free dominance over the headline matrix. Rebuilds from the
+    # committed metrics_full.csv.gz, so a clean clone gets it. Gated because
+    # its D1 self-check re-asserts the matrix shape (1800 runs / 6 arms /
+    # 60 cells): if that export ever drifts, this fails rather than quietly
+    # reporting dominance over a different experiment.
+    ("analysis_dominance.py", [], "RESULTS_DOMINANCE.md"),
+    #
     # Attempt 6 (WP14). The first sitting to survive long enough to SCORE
     # hypotheses: 11.5M requests over 10 h 44 m, ended by a 19.5 s stall.
     # Rebuilds from eval/results/live_soak_evidence/ -- the exports were taken

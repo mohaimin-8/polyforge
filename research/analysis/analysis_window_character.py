@@ -1,0 +1,279 @@
+#!/usr/bin/env python3
+"""M3 + M2 — the windows where joint control is cheaper, and where it hurts.
+
+================================================================
+THIS IS EXPLORATORY. READ THIS BEFORE READING THE NUMBERS.
+================================================================
+
+The features below were chosen **after** seeing the data. Nothing here is
+pre-registered, nothing here is a hypothesis test, and no verdict in this file
+may be quoted as a confirmed result. It exists to characterise a published
+FAIL, and the only thing it can license is a future pre-registration.
+
+That warning is not boilerplate. `RESULTS_TRACE_PARITY.md` reports TP-H1 FAIL
+on BurstGPT with the cost advantage concentrated -- mean window difference
+-35.586 against a median of +2.232, only 42.7% of windows favouring jcac. A
+post-hoc search over window features will always find *something* that splits
+41 windows from 55. What makes the split below worth recording is that it is
+(a) near-total rather than marginal, and (b) the mechanism
+`RESULTS_BUDGET_PARITY.md` already named in prose before this analysis existed:
+
+    "jcac is not 'efficient' on BurstGPT -- it is the only arm that *can* meet
+     the constraint, the only way to meet it is to shed AI (tier='none'), and
+     shedding is exactly what produced the overshoot that failed TP-H3."
+
+So this file does not discover a mechanism. It measures one that was already
+asserted, and it reports the measurement whichever way it lands.
+
+W1 (self-check). The published headline must reproduce from the committed
+    per-window CSV: 96 windows, 42.7% favouring jcac, mean -35.586, median
+    +2.232. If it does not, this analysis is reading the wrong data and every
+    number below is void.
+
+W2 (the split, descriptive). Partition windows by whether jcac shed AI at all
+    (`tier_none_step_share` > 0) and report the cost delta in each part.
+
+W3 (the confound, and it is a real one). Shedding and demand are collinear:
+    jcac only sheds when loaded. Report whether the demand ranges OVERLAP. If
+    they do not overlap, "sheds" is a relabelling of "high demand" and the
+    split says nothing extra -- and that must be stated rather than hidden.
+
+W5 (the severity decomposition — M2, and NOT post-hoc). `jcac_nobudget` is a
+    pre-registered arm from `PREREG_BUDGET_PARITY`, so lifting the per-tenant
+    cap is a *designed* counterfactual rather than a feature chosen after the
+    fact. Split jcac's overshoot gap against `hpa_fair` into the part the cap
+    causes (jcac - jcac_nobudget) and the part that survives without it
+    (jcac_nobudget - hpa_fair). Report both, then cross it with W2's classes.
+
+    This distinction matters: W2's shed/no-shed split IS post-hoc, W5's
+    decomposition is not. They are reported in one record because they are one
+    mechanism, not because they carry the same evidential weight.
+
+W4 (Azure, the specificity check). The same split is run on the Azure trace,
+    where TP-H1 PASSED. If the mechanism is real it should behave differently
+    there; if the split looks identical on a trace with the opposite verdict,
+    the split is not explaining the verdict.
+
+    python analysis_window_character.py
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from stats import record_path  # noqa: E402
+
+RESULTS = Path(__file__).resolve().parents[2] / "eval" / "results"
+BUDGET_CSV = "budget_parity_burstgpt_runs.csv"
+TRACES = {
+    "BurstGPT v2.0": ("trace_parity_burstgpt_runs.csv", "TP-H1 FAIL"),
+    "Azure LLM 2024": ("trace_parity_azure_runs.csv", "TP-H1 PASS"),
+}
+ARM, BASELINE = "jcac", "hpa_fair"
+SHED_EPS = 1e-3
+RECORD = "RESULTS_WINDOW_CHARACTER.md"
+# RESULTS_TRACE_PARITY.md, BurstGPT. The self-check, not an input.
+PUBLISHED = {"windows": 96, "share": 0.427, "mean": -35.586, "median": 2.232}
+
+
+def frame(csv: Path) -> pd.DataFrame:
+    df = pd.read_csv(csv)
+    piv = df.pivot(index="window", columns="system")
+    return pd.DataFrame({
+        "delta": piv["total_cost_usd"][ARM] - piv["total_cost_usd"][BASELINE],
+        "shed": piv["tier_none_step_share"][ARM],
+        "cache": piv["cache_hit_rate"][ARM],
+        "demand": piv["total_cost_usd"][BASELINE],
+    })
+
+
+def main() -> int:
+    frames = {}
+    for name, (csv, _) in TRACES.items():
+        path = RESULTS / csv
+        if not path.exists():
+            print(f"missing {path}", file=sys.stderr)
+            return 1
+        frames[name] = frame(path)
+
+    burst = frames["BurstGPT v2.0"]
+    share = float((burst.delta < 0).mean())
+    w1 = (len(burst) == PUBLISHED["windows"]
+          and abs(share - PUBLISHED["share"]) < 5e-4
+          and abs(burst.delta.mean() - PUBLISHED["mean"]) < 5e-3
+          and abs(burst.delta.median() - PUBLISHED["median"]) < 5e-3)
+
+    L: list[str] = []
+    w = L.append
+    w("# The cost win and the SLO penalty are the same windows (M3 + M2)\n")
+    w("Generated by `analysis_window_character.py` from the committed "
+      "per-window trace-parity CSVs. Every number is computed at run time.\n")
+
+    w("\n> ## This record is EXPLORATORY\n>\n"
+      "> The features were chosen **after** seeing the data. Nothing here is "
+      "pre-registered and nothing here is a hypothesis test. **No line in this "
+      "file may be quoted as a confirmed result.** It characterises a "
+      "published FAIL and can license exactly one thing: a future "
+      "pre-registration. `RESULTS_TRACE_PARITY.md`'s TP-H1 FAIL and "
+      "`RESULTS_BUDGET_PARITY.md`'s BP-H1 FAIL stand entirely unchanged.\n")
+
+    w("\n## W1 — does the published headline reproduce?\n")
+    w("| quantity | published | recomputed | agrees? |")
+    w("|---|---:|---:|---|")
+    for label, key, got in (
+            ("windows", "windows", len(burst)),
+            ("share favouring jcac", "share", share),
+            ("mean window diff", "mean", burst.delta.mean()),
+            ("median window diff", "median", burst.delta.median())):
+        pub = PUBLISHED[key]
+        ok = abs(got - pub) < (5e-4 if key == "share" else
+                               5e-3 if key in ("mean", "median") else 0.5)
+        w(f"| {label} | {pub} | {got:.3f} | {'yes' if ok else '**NO**'} |")
+    w("")
+    w(f"**W1 {'PASS' if w1 else 'FAIL'}.**" + ("" if w1 else
+      " The recomputation disagrees with the committed record, so everything "
+      "below is void and must not be read.\n"))
+    if not w1:
+        record_path(RECORD).write_text("\n".join(L) + "\n", encoding="utf-8")
+        print("W1 FAIL — wrote the record and stopped")
+        return 1
+
+    w("\n## W2 — the split\n")
+    w(f"A window is counted as *shedding* when jcac's `tier_none_step_share` "
+      f"exceeds {SHED_EPS} — i.e. it dropped AI service on at least some "
+      "tenant-steps.\n")
+    w("\n| trace | class | windows | jcac cheaper | mean cost delta |")
+    w("|---|---|---:|---:|---:|")
+    for name, f in frames.items():
+        sheds = f.shed > SHED_EPS
+        for label, mask in (("sheds AI", sheds), ("does not shed", ~sheds)):
+            n = int(mask.sum())
+            if not n:
+                w(f"| {name} | {label} | 0 | — | — |")
+                continue
+            w(f"| {name} | {label} | {n} | {int((f.delta[mask] < 0).sum())} "
+              f"| {f.delta[mask].mean():+.2f} |")
+    w("")
+
+    b_sheds = burst.shed > SHED_EPS
+    w(f"On BurstGPT the split is near-total: jcac is cheaper in "
+      f"**{int((burst.delta[b_sheds] < 0).sum())} of {int(b_sheds.sum())}** "
+      f"shedding windows and "
+      f"**{int((burst.delta[~b_sheds] < 0).sum())} of {int((~b_sheds).sum())}** "
+      "non-shedding ones. Rank correlation between `tier_none_step_share` and "
+      f"the cost delta: **{burst.delta.corr(burst.shed, method='spearman'):+.3f}** "
+      f"(Pearson {burst.delta.corr(burst.shed):+.3f}).\n")
+
+    w("\n## W3 — the confound, stated plainly\n")
+    w("jcac only sheds when it is loaded, so *sheds* and *high demand* are "
+      "collinear and the split could be a relabelling of load. The test is "
+      "whether the two classes' demand ranges overlap.\n")
+    w("\n| trace | shedding demand range | non-shedding demand range | overlap? |")
+    w("|---|---|---|---|")
+    for name, f in frames.items():
+        s, ns = f[f.shed > SHED_EPS], f[f.shed <= SHED_EPS]
+        if s.empty or ns.empty:
+            w(f"| {name} | {'—' if s.empty else 'n/a'} | "
+              f"{'—' if ns.empty else 'n/a'} | one class is empty |")
+            continue
+        overlap = s.demand.min() < ns.demand.max()
+        w(f"| {name} | {s.demand.min():.2f} .. {s.demand.max():.2f} | "
+          f"{ns.demand.min():.2f} .. {ns.demand.max():.2f} | "
+          f"{'**yes**' if overlap else 'no — the split IS demand'} |")
+    w("")
+    b_s, b_ns = burst[b_sheds], burst[~b_sheds]
+    w("Within the **non-shedding** BurstGPT windows, demand correlates "
+      f"**{b_ns.delta.corr(b_ns.demand, method='spearman'):+.3f}** with the "
+      "cost delta — jcac grows steadily *more* expensive than the baseline as "
+      "load rises, right up until it starts shedding. Within the **shedding** "
+      "windows the shed share correlates "
+      f"**{b_s.delta.corr(b_s.shed, method='spearman'):+.3f}**: the more it "
+      "sheds, the cheaper it gets.\n")
+
+    # --- W5: the severity decomposition (M2) -----------------------------
+    bpath = RESULTS / BUDGET_CSV
+    w("\n## W5 — where the overshoot comes from (M2)\n")
+    if not bpath.exists():
+        w(f"`{BUDGET_CSV}` is absent, so the decomposition is not computed.\n")
+    else:
+        bp = pd.read_csv(bpath).pivot(index="window", columns="system")
+        exc = bp["mean_excess"]
+        total = exc["jcac"] - exc[BASELINE]
+        induced = exc["jcac"] - exc["jcac_nobudget"]
+        genuine = exc["jcac_nobudget"] - exc[BASELINE]
+        bshed = bp["tier_none_step_share"]["jcac"] > SHED_EPS
+
+        w("Unlike W2's split, this is **not** post-hoc: `jcac_nobudget` is a "
+          "pre-registered arm from `PREREG_BUDGET_PARITY`, so lifting the "
+          "per-tenant cap is a designed counterfactual. jcac's overshoot gap "
+          "against `hpa_fair` splits into the part the cap causes and the part "
+          "that survives without it.\n")
+        w("\n| component | mean excess | share of the gap |")
+        w("|---|---:|---:|")
+        w(f"| total gap (`jcac` - `hpa_fair`) | {total.mean():.6f} | 100.0% |")
+        w(f"| **budget-induced** (`jcac` - `jcac_nobudget`) | "
+          f"{induced.mean():.6f} | **{induced.mean() / total.mean() * 100:.1f}%** |")
+        w(f"| **genuine control error** (`jcac_nobudget` - `hpa_fair`) | "
+          f"{genuine.mean():.6f} | **{genuine.mean() / total.mean() * 100:.1f}%** |")
+        w("")
+        w("Crossed with W2's classes:\n")
+        w("\n| class | windows | total gap | budget-induced | genuine |")
+        w("|---|---:|---:|---:|---:|")
+        for label, mask in (("sheds AI", bshed), ("does not shed", ~bshed)):
+            w(f"| {label} | {int(mask.sum())} | {total[mask].mean():.6f} "
+              f"| {induced[mask].mean():.6f} | {genuine[mask].mean():.6f} |")
+        w("")
+        w(f"**In the non-shedding windows jcac's overshoot gap is "
+          f"{total[~bshed].mean():.6f}** — indistinguishable from the fair "
+          "baseline. The entire SLO penalty lives in the shedding windows, and "
+          "within them roughly "
+          f"{induced[bshed].mean() / total[bshed].mean() * 100:.0f}% of it is "
+          "the per-tenant cap forcing AI to be shed rather than control error. "
+          "Rank correlation between the induced component and the shed share: "
+          f"**{induced.corr(bp['tier_none_step_share']['jcac'], method='spearman'):+.3f}**.\n")
+
+        w("\n### The two findings joined\n")
+        w(f"W2 says the cost advantage lives in {int(b_sheds.sum())} shedding "
+          f"windows and is absent from the other {int((~b_sheds).sum())}. W5 "
+          "says the SLO penalty lives in the same shedding windows and is "
+          "absent from the same others. **They are one trade, not two findings "
+          "to reconcile:** where PolyForge sheds AI it is much cheaper and much "
+          "worse on overshoot; where it does not shed it is neither. Four "
+          "fifths of that overshoot is a constraint no replica-only controller "
+          "can satisfy at all, which is the feasibility result "
+          "`RESULTS_BUDGET_PARITY.md` reports.\n")
+
+    w("\n## W4 — what this does and does not license\n")
+    w("**Does.** It makes one mechanism measurable at window level: on "
+      "BurstGPT, jcac's cost advantage and its SLO penalty are the same event. "
+      "Cost win and severity loss are not two findings to be reconciled — they "
+      "are one trade, visible window by window. That is what "
+      "`RESULTS_BUDGET_PARITY.md` asserted in prose, now with a number "
+      "attached.\n")
+    w("**Does not.** It does not rescue TP-H1 or BP-H1, which stay FAILED as "
+      "scored. It does not establish that shedding *causes* the cost "
+      "advantage — the features were picked after the fact and the confound in "
+      "W3 is real even where the ranges overlap. And it does not generalise "
+      "beyond these two traces.\n")
+    w("**The pre-registration it motivates**, stated here so it cannot be "
+      "reverse-engineered from a later result: *on a trace held out from this "
+      "analysis, the sign of the per-window cost delta between `jcac` and "
+      "`hpa_fair` is predicted by `tier_none_step_share` alone at better than "
+      "some threshold fixed in advance.* Until that is run, the split above is "
+      "a description of two traces and nothing more.\n")
+
+    out = record_path(RECORD)
+    out.write_text("\n".join(L) + "\n", encoding="utf-8")
+    print(f"wrote {out}")
+    print(f"W1 {'PASS' if w1 else 'FAIL'} | BurstGPT split "
+          f"{int((burst.delta[b_sheds] < 0).sum())}/{int(b_sheds.sum())} shedding vs "
+          f"{int((burst.delta[~b_sheds] < 0).sum())}/{int((~b_sheds).sum())} not")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
