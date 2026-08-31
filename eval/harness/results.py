@@ -121,7 +121,8 @@ def valid_run_ids(con: duckdb.DuckDBPyConnection, experiment: str,
 
 
 def check_metrics(metrics: dict, expected_steps: int,
-                  expects_ai: bool = False) -> str | None:
+                  expects_ai: bool = False,
+                  expects_crud: bool = True) -> str | None:
     """Sanity contract for a run's aggregates; a violation makes the run
     `invalid` (recorded, excluded, retried). Returns the reason or None.
 
@@ -151,9 +152,22 @@ def check_metrics(metrics: dict, expected_steps: int,
     n_events = metrics.get("n_events")
     if n_events is not None and n_events <= 0:
         return "no telemetry events observed: the run measured nothing"
-    if metrics["crud_p95_ms"] <= 0.0:
+    # `expects_crud` mirrors `expects_ai`. It defaults True because every
+    # synthetic workload class carries CRUD, so an unconditional check was
+    # correct until L5: a trace-driven cell replays BurstGPT, which records LLM
+    # arrivals and nothing else, so its demand is chat-only and a zero
+    # crud_p95 is the CORRECT reading rather than a dead exporter. Guarding it
+    # unconditionally would have failed every trace-driven run for being what
+    # its pre-registration says it is.
+    if expects_crud and metrics["crud_p95_ms"] <= 0.0:
         return (f"crud_p95_ms is {metrics['crud_p95_ms']} — a served request "
                 "cannot have a zero p95; telemetry did not reach the exporter")
+    # An AI-only run still has to have measured SOMETHING, or the guard above
+    # has merely been switched off: with no CRUD expected, the AI path becomes
+    # the one that must be non-zero.
+    if not expects_crud and not expects_ai:
+        return ("neither CRUD nor AI telemetry is expected; this run could not "
+                "have measured anything")
     if expects_ai and metrics["ai_p95_ms"] <= 0.0:
         return (f"ai_p95_ms is {metrics['ai_p95_ms']} on an AI-bearing "
                 "workload; the AI path produced no telemetry")
