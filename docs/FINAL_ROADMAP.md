@@ -1,0 +1,539 @@
+# The final roadmap — 100% of what is left that is not writing
+
+Written 2026-08-31 (session 42). Supersedes nothing; it **absorbs**
+`docs/ZERO_COST_ROADMAP.md` (as workstream L) and `docs/COMPLETION_ROADMAP.md`
+Track A/B, and adds the items neither covers.
+
+**Scope rule, from the author, standing:** every workstream below is
+engineering, measurement or packaging. **No writing.** WP9/WP10/WP11, the
+thesis fill-ins and the paper reframe are listed once, in §9, and are not
+started until the author says so.
+
+**Cost rule:** nothing here requires a rented GPU, a paid API, or a cloud
+credit. Where a paid option would be faster it is named and declined.
+
+> Execute cold. `PUBLICATION_ROADMAP.md` §0.1 gate battery before and after
+> every item. R4 (`scripts/reproduce.py` byte-identical) after any change to
+> `research/jcac_sim/`, `eval/harness/`, or an analysis script. One item =
+> one prereg where it measures something = one commit series.
+
+---
+
+## §0 What "100%" means here
+
+The project has sixteen work packages done and a **35/35** R4 gate (36 records once T1 landed; see WP13 step 3). What remains
+is not "unfinished features" — it is **five named weaknesses a Transactions
+reviewer will raise**, plus packaging. Everything below is traceable to one:
+
+| id | weakness | closed by |
+|---|---|---|
+| **W1** | No cost advantage (BP-H1 FAIL both traces) | **M2+M3 DONE session 42.** Still not closable — the FAILs stand — but the mechanism is now measured: the cost win and the SLO penalty are the **same 45 windows**, and 79.5% of the overshoot is the budget cap, not control error. `RESULTS_WINDOW_CHARACTER.md` |
+| **W2** | Two live FAILs (SK-H1 rule artifact, SK-H3 by 0.001–0.21 ms) | **L6** removes the confound for any future sitting; the scored FAILs stand |
+| **W3** | Theorem is single-tenant; MT extension falsified (S2 FAIL, S3 not evaluable) | **T1 — DONE session 42.** Floor computed (0.126189); S3 **FAIL**. Scope unchanged, reason now measured |
+| **W4** | No real trace has ever driven a real cluster | **L5** |
+| **W5** | Live latency is CPU service time, not service latency | **L6** |
+| **W6** | Stage C is a precondition, not a scored result | L5 supersedes it with a scored one |
+| **W7** | Single machine, single cluster | **L7** (partial — multi-node, not multi-host) |
+| **W8** | Cache precision 0.313 at τ=0.85 | **C1 — DONE session 42.** Closed *with evidence*: retrieval contributes only +0.047; the ceiling is response stochasticity |
+| **W9** | Coverage 60% vs 80% target | **R1** |
+
+---
+
+## §1 Workstream T — restore the formal contribution (**start here**)
+
+### T1. Make S3 exactly evaluable — **DONE (session 42)**
+
+**Outcome.** The walk ran: **268,435,456 offset vectors in 119.9 minutes**, and
+the eight-tenant floor is **0.126189** (`RESULTS_SEPARATION_MT_V3.md`,
+artifact `separation_mt_v3_walk.json`). Verdicts: **S1 PASS, S2 FAIL (carried
+forward), S3 FAIL, S5 PASS**. The exact series is 0.000000 (n≤4) → 0.016514 →
+0.049058 → 0.090102 → **0.126189**.
+
+**S3 FAIL was predicted in the script's docstring before the walk finished**
+and landed as predicted. Two arms sit below the floor, and *not in the same
+way*: `hpa` at 0.126042 misses by **0.12%** (essentially on the floor) while
+`keda` at 0.001886 misses by **67x**. A floor a reactive replica autoscaler
+meets to a fraction of a percent and an event-driven one misses by two orders
+of magnitude is pricing a contention `keda` does not pay. Naming that mechanism
+is future work; the record reports the falsification and does not repair it.
+
+**What it bought.** v2's limitation sentence — *"the eight-tenant floor is not
+computed"* — is now **wrong and must not be repeated**. The theorem's scope is
+unchanged (single tenant); the reason moved from a compute budget to a
+measurement. That is the difference between "they ran out of steam" and "they
+tested their own extension and published the failure."
+
+*Original plan, kept for the record:*
+
+`RESULTS_SEPARATION_MT_V2.md` reports S3 **NOT EVALUABLE**: the eight-tenant
+floor needs an ordered walk over **268,435,456 offset vectors** (16^7, tenant 0
+already pinned) and "that is beyond what this analysis will spend."
+
+**That is a statement about the loop, not about the problem.**
+`guarantee._trajectory_violation` is *deterministic* given an offset vector:
+
+```python
+for step in range(periods * length):
+    actual = [needs[(off + step) % length] for off in offsets]
+    target = [max(needs[(off + step + k) % length] for k in range(lead + 1)) ...]
+    held   = incremental_allocation(target, cap, held, replica_max)
+```
+
+Every offset vector runs the *same* fixed number of steps through the *same*
+branch-free arithmetic. **So all 268M trajectories can be advanced in
+lockstep**: `held` becomes an array of shape `(chunk, tenants)`, and each step
+is a handful of vectorised operations over the chunk.
+
+**What must NOT be vectorised away:** `incremental_allocation` sweeps tenants
+**in index order** and each tenant sees `others = sum(chosen) - chosen[i]`.
+That sequential dependency is the coupling S2 proved is real. So the tenant
+loop stays sequential (8 iterations) and the **offset-vector axis** is the one
+that goes wide. This is the *ordered* walk, exactly — not the multiset
+shortcut S2 falsified, and not a sampling approximation.
+
+**Work:**
+1. `guarantee.trajectory_violation_batch(needs, offsets_block, ...)` — numpy,
+   `int8`/`int16` state, chunked so peak RSS stays bounded (a chunk of 4M
+   vectors x 8 tenants x int8 = 32 MB).
+2. **The equivalence gate, which is the whole basis for trusting it:** for
+   `tenants` in 1..6 the scalar ordered walk is affordable (1 … 1,048,576
+   vectors). The batch implementation must return **bit-identical** floors on
+   every one. `test_batched_walk_matches_ordered_walk_exactly`.
+3. Calibrate cost on n=6 and n=7 (16.7M), **publish the extrapolation before
+   running n=8**, then run n=8.
+4. `analysis_separation_mt_v3.py` -> `RESULTS_SEPARATION_MT_V3.md`, registered
+   in `reproduce.py`, R4 green.
+
+**Pre-committed reading, before any number exists.** S3 asks whether the
+measured arms sit above the floor. **A floor the arms violate is a FAILED
+derivation, not a failed controller** — report it as such and do not tune the
+model to fit. If the extrapolation says n=8 costs more than ~12 h on this
+machine, report the measured cost curve and stop; that is still a strictly
+better record than "not evaluable."
+
+**Why this is first:** W3 is the one weakness I would call disqualifying for
+TPDS and seriously damaging at TCC/TSC — the paper's only theorem does not
+cover the paper's own setting, and the cap first binds at **5 tenants** while
+the published cell has **8**. It needs no GPU, no money, and no user action.
+
+### T2. ~~Re-open the M3 mechanism row under the corrected model~~ — **PREMISE WITHDRAWN (session 42)**
+
+**Second premise error of this roadmap; kept on record like C1's.** The plan
+below assumed the corrected allocation model could reach the retracted -5.9%
+row. It cannot: that row is a **single-tenant** orbit-construction claim, while
+`incremental_allocation` is the **multi-tenant contention rule**. Different
+layer, no contact.
+
+`RESULTS_SEPARATION.md` also already records ~20 attempted reconstructions
+across four families (epsilon-de-aliasing on `crud_base_ms` and on `rps` at
+five magnitudes x three periods, deduplication, de-aliased `flash`, monotone
+ramps), and replaced the row with a runnable de-aliasing test. There is no
+engineering left here — the retraction is complete and documented. **Do not
+re-open it.**
+
+*Original, withdrawn:*
+
+### T2-withdrawn. Re-open the M3 mechanism row under the corrected model
+
+`RESULTS_SEPARATION.md` replaced the non-reproducible −5.9% all-distinct row
+with a de-aliasing test. The corrected allocation model (`incremental_allocation`,
+WP13 step 2) did not exist when that was written. Re-derive the row under the
+corrected model. If it reproduces, the retraction is narrowed to "wrong under
+the step-1 model"; if not, it stays retracted with a second independent reason.
+
+### T3 — **DONE (session 42), and stronger than planned.**
+
+`RESULTS_DOMINANCE.md`. The original plan was a Pareto frontier over
+(alpha, beta, gamma). That would still have been a statement about a *weighted*
+objective, which is the thing being objected to. **Weight-free dominance
+answers it outright:** an arm no other arm beats on every raw objective cannot
+be beaten by ANY weighting, including ones nobody has proposed.
+
+| arm | non-dominated cells (of 60) | share |
+|---|---:|---:|
+| **`jcac`** | **48** | **80.0%** |
+| `gptcache` | 32 | 53.3% |
+| `static` / `keda` | 30 | 50.0% |
+| `hpa` | 19 | 31.7% |
+| `firm` | 3 | 5.0% |
+
+**In 48 of 60 cells the choice of weights is not load-bearing at all** — no
+weighting of cost, violation and fairness can put a baseline ahead of jcac.
+That is a materially stronger answer to "your weights are self-chosen" than
+`SENSITIVITY_J.md`'s 25-cell sweep, and it has **no free parameters** to tune.
+
+**The 12 exceptions are reported in full and are structured:**
+
+| workload | AI rps | shape | jcac dominated |
+|---|---:|---|---:|
+| `agentic` / `ai_cacheable` / `ai_uncacheable` | 2.7 / 7.0 / 3.2 | bursty / wave / sawtooth | 0/12 each |
+| `crud_bursty` | 0.0 | bursty | **0/12** |
+| `crud_steady` | 0.0 | steady | **12/12** |
+
+Always by the same pair (`gptcache`, `hpa`). The obvious reading — "no AI, so
+the knobs are inert" — is **incomplete, and `crud_bursty` is the control that
+says so**: equally CRUD-only, and jcac is non-dominated in all 12. The loss is
+specific to demand that is *both* AI-free *and* variation-free — the one regime
+where neither the AI knobs nor the forecaster has anything to do, so the joint
+controller is pure overhead. Where either has something to act on, jcac is
+non-dominated.
+
+Registered in `reproduce.py`; R4 **37/37**.
+
+*Original plan:*
+
+### T3-original. Weight-regime Pareto analysis
+
+`SENSITIVITY_J.md` has 425 perturbed cells and direction never flips. Add the
+Pareto frontier over (α, β, γ) so the answer to "is your operating point
+special?" is a figure, not a paragraph. Desk-only, no prereg (descriptive).
+
+---
+
+## §2 Workstream L — live evidence (absorbs ZERO_COST_ROADMAP)
+
+| id | item | state |
+|---|---|---|
+| **L1** | Concurrent `tunnel_preflight` stage | **DONE session 42** — 16 tests green |
+| **L2** | Micro-batching tier server + batched-equals-serial exactness test | **DONE session 42** — per-tier lock replaced by a batching queue; mock-measured **22.57s -> 1.94s for 12 concurrent (11.6x)**; 11 tests pass, the real-model exactness check is gated on `POLYFORGE_TIER_TEST_MODEL` for the Kaggle smoke |
+| **L3** | Re-bench tiers under batching -> `TIER_BENCH_BATCHED.md`. **Also bench at 2+ output lengths** (M1 re-scoped): one length cannot separate prefill from per-token decode, two can, and it costs nothing extra in the same session | ~30 min GPU |
+| **L4** | Score B1 (frozen 4x4 matrix, WL-H1/H2/H3) | 2–4 h GPU |
+
+See `docs/ZERO_COST_ROADMAP.md` for L1–L4 in full, including the pre-committed
+decision points and the P100-vs-T4x2 fallback.
+
+### L5. Drive the live plane from a real trace (**closes W4**)
+
+The sharpest un-conceded objection: traces are replayed in *simulation*
+(bit-for-bit), and the live plane drives *synthetic* cells (`crud_bursty`,
+`ai_cacheable`, `tier_mixed`, `joint_stress`). **No real trace has ever driven
+a real cluster.**
+
+**Work:** a trace-derived demand source for `cluster_backend.k6_script` — take
+BurstGPT window demand, project it onto the per-tenant `Demand` shape the
+harness already emits, and drive k6 from that instead of a `WorkloadClass`.
+The plumbing exists; what is new is the trace->bucket projection and a prereg.
+
+**Cost control:** this needs the AI path live. Two honest substrates:
+- the batched Kaggle server from L2 (free, real generation), or
+- the **calibrated mock** (`MOCK_DELAY_S = {"small": 1.24, "mid": 1.88}`,
+  which *is* `TIER_BENCH.md`), disclosed as "tier latency injected from the
+  committed bench rather than generated." Weaker, free, and still the first
+  real-trace live sitting the project has.
+
+**Needs a NEW pre-registration** — it is a new scored comparison. Do not fold
+it into `PREREG_WAVE4_LIVE_PLANE`.
+
+### L6 — **PARTLY DONE (session 42). The instrument already existed.**
+
+**What I found.** W5 is not missing instrumentation. `server.go`'s middleware
+already times the whole handler — telemetry write and response included — and
+exports it as **`polyforge_http_request_duration_seconds{method,route}`**.
+`replay.go` computes its own `latencyMS` *before* the telemetry write
+(line 76 vs the write at line 94), and that narrower number is what lands in
+the telemetry table and therefore in every `crud_p95`.
+
+So the fix is not "measure it" but "capture it": **nothing ever scraped
+`/metrics`.** No file in `live_soak_attempt10_evidence/` contains it, and no
+`eval/scripts` entry fetches it.
+
+**Consequence, stated plainly: attempt 10 cannot be re-read against the correct
+metric.** The histogram lived in the pods and went with the cluster. SK-H3's
+FAIL stands as scored on the CPU-time metric, and no retrospective analysis can
+change that.
+
+**Done:** `scripts/soak_observer.sh` now scrapes it every sample —
+`observer.csv` gains `http_dur_sum_s` / `http_dur_count` (cumulative, so
+consecutive samples give an interval mean) and full bucket rows go to
+`metrics_http_duration.csv`, which is what a p95 actually needs. Scraped over
+the **NodePort the load already uses, not a port-forward** — a port-forward is
+what pinned every request to one pod of sixteen in attempt 4 — and `/metrics`
+bypasses the rate limiter, so the scrape cannot consume a tenant's budget. It
+fails to empty like every other field in that script.
+
+**Verified offline:** `bash -n` clean, and the awk extraction checked against a
+realistic exposition payload (filters the replay route, excludes `/healthz`,
+87.5 s / 12,000 -> 7.29 ms mean). **Not verified against a live cluster** —
+that happens at the next sitting, and until then the scrape is unproven.
+
+**Still open:** deciding which metric the live records should quote. That is an
+L5 decision, not this one, and it must be stated rather than silently switched.
+
+*Original plan:*
+
+### L6-original. Fix the live latency semantics (**closes W5, and W2's confound**)
+
+`internal/platform/replay.go` stops its clock before the telemetry write, so
+`crud_p95`/`crud_p99` in **every** live record measure CPU service time, not
+service latency. Pinned by `replay_latency_semantics_test.go`, disclosed
+pre-run — but it is a caveat that follows every live number in the paper.
+
+**Work:** emit *both* — keep the existing metric under its current name so
+committed records stay comparable, and add a true end-to-end
+`crud_service_p95`/`p99` measured to response completion. Then SK-H3's
+0.001–0.21 ms exceedances can be read against a metric that means what its
+name says.
+
+**This does not re-open attempt 10.** V8 pre-committed it as the last sitting
+on this machine and SK-H1/SK-H3 stand as scored. L6 is for L5's sitting.
+
+### L7. Multi-node kind topology (**partial W7**)
+
+`cluster_backend.NODES_BY_SIZE` is already `{"small": 2, "medium": 4,
+"large": 6}` — multi-node is *already available locally* and the soak ran on
+`small`. Run L5's sitting on `medium` (4 nodes) so the record is not
+single-node. This does not buy multi-*host* or multi-zone; say so.
+
+---
+
+## §3 Workstream M — close the measurement gaps
+
+### M1. ~~p99 and token-level latency~~ — **WITHDRAWN / RE-SCOPED (session 42)**
+
+**Third premise error in this document.** The plan below proposed adding a p99
+estimator to `model.py`. That would have **violated a frozen pre-registration**.
+`PREREG_LIVE_CHAOS_P99.md` Part B says the opposite, and says it deliberately:
+
+> the *sim* is a p95 estimator by construction (`P95_FACTOR`), so p99 is a
+> **live-only** number and is reported only for the live cluster, **never
+> back-fitted into the sim tables**.
+
+`RESULTS_MASTER.md` ground rule 5 repeats it. And the live half is **already
+implemented**: `cmd/control-plane/evalexport.go` emits `CrudP99MS` / `AIP99MS`
+by the same order-statistic path as p95, with the prereg cited at line 112.
+
+**So there is no p99 work.** The p95-not-p99 item is not an open gap; it is a
+stated, pre-registered modelling boundary with the live number already exported.
+
+**What survives, re-scoped to a GPU task.** TTFT/TPOT cannot be derived from the
+committed bench: `TIER_BENCH.md`'s protocol is *"fixed 48-token completions"* —
+a single output length, and separating prefill from per-token decode needs at
+least two. **Folded into L3**, which is already a GPU session: bench at 2+
+output lengths and the decomposition falls out at no extra sitting cost.
+
+*Original, withdrawn:*
+
+### M1-withdrawn. p99 and token-level latency
+
+The roadmap promised p99; the model produces p95 via `P95_FACTOR`, and latency
+is request-level with no TTFT/TPOT. For an LLM-serving paper at Transactions
+this is the most substantive modelling gap left.
+
+**Work:** add a p99 estimator alongside `P95_FACTOR`, and decompose AI latency
+into prefill (TTFT) and decode (TPOT) using the tier bench's own token counts
+(`MAX_NEW_TOKENS = 48` is already fixed, so TPOT is directly derivable).
+**Default OFF**, so every published arm replays byte-identically (R4).
+
+### M2 — **DONE (session 42), folded into `RESULTS_WINDOW_CHARACTER.md`**
+
+`jcac_nobudget` is a pre-registered arm, so lifting the per-tenant cap is a
+*designed* counterfactual rather than a post-hoc feature. jcac's overshoot gap
+against `hpa_fair` decomposes as:
+
+| component | mean excess | share |
+|---|---:|---:|
+| total gap | 0.504588 | 100% |
+| **budget-induced** (cap forces AI shed) | 0.400933 | **79.5%** |
+| **genuine control error** | 0.103656 | **20.5%** |
+
+Crossed with M3's classes, the result is sharper than either alone:
+
+| class | windows | total gap |
+|---|---:|---:|
+| sheds AI | 45 | 1.076453 |
+| does not shed | 51 | **0.000002** |
+
+**In the 51 non-shedding windows the overshoot gap is 2e-6** — jcac is
+indistinguishable from the fair baseline. The entire SLO penalty lives in the
+same 45 windows that carry the entire cost advantage. Induced component vs shed
+share: Spearman **+0.986**.
+
+So A4 (severity reverses on real demand) and A5 (cost concentrated, not
+pervasive) are **not two weaknesses**. They are one trade, measured: where
+PolyForge sheds AI it is much cheaper and much worse on overshoot; where it
+does not shed it is neither. Four fifths of that overshoot is a constraint no
+replica-only controller can satisfy at all — which is exactly the feasibility
+result.
+
+*Original plan:*
+
+### M2-original. Decompose the severity reversal (**explains W1 and A4**)
+
+BP-H2 established the overshoot is *partly* constraint-induced: lifting the
+budget takes jcac's excess 4.83 -> 3.15, against `hpa_fair`'s 0.19. So some is
+genuine. **Quantify the split** — a shed-attribution pass over the BurstGPT
+windows separating (a) violation caused by `tier="none"` shedding under the
+budget filter from (b) violation from control error. Descriptive, desk-only.
+
+This is the analysis that turns "the severity claim reverses on real demand"
+from an embarrassment into the paper's mechanism section.
+
+### M3. Characterise *when* joint control pays (**closes A5**)
+
+Only 42.7% of BurstGPT windows favour jcac; the mean is −35.586 and the median
++2.232. Rather than concede "concentrated in outliers", **classify the
+windows**: fit window features (burstiness, cache reuse, tier mix, cap binding)
+against the sign of the cost delta. If the favourable windows are the ones
+where cache and tier are load-bearing — which is the paper's own claim — that
+is a *prediction confirmed*, not a caveat.
+
+Descriptive, no prereg, desk-only. Potentially the strongest positive result
+still available at zero cost.
+
+---
+
+## §4 Workstream C — the semantic cache (**closes W8**)
+
+### C1 — **DONE (session 42). Retrieval is not the binding constraint.**
+
+`RESULTS_CACHE_CEILING.md`. On **exactly duplicated prompt text** retrieval is
+perfect by construction, so any surviving disagreement is the model answering
+the same question differently. 120,000 sampled pairs, 4,008 duplicate groups,
+10,441 scored pairs (capped at 20 per group so `"hi"` cannot become the
+estimate).
+
+| stratum | pairs | mean | median | precision @0.70 |
+|---|---:|---:|---:|---:|
+| all duplicate pairs | 10,441 | 0.5075 | 0.5302 | **0.3324** |
+| **same-model** (cleanest) | 3,193 | 0.6089 | 0.6891 | **0.4898** |
+| cross-model | 7,248 | 0.4628 | 0.4677 | 0.2631 |
+
+**Verdict against a threshold fixed on disk before the number was read**
+(> 0.60 would mean retrieval binds): **0.4898 -> retrieval is NOT binding.**
+
+Decomposition of the published 0.313:
+
+- **retrieval error: +0.047** — all that perfect retrieval recovers (same-model
+  0.443 -> 0.4898). Overall it is +0.019 (0.313 -> 0.3324).
+- **cross-model style divergence: ~0.227** (0.4898 vs 0.2631) — roughly **5x
+  the entire retrieval component**.
+- **irreducible response stochasticity:** even at identical prompt AND identical
+  model the responses disagree **51.0%** of the time at rho=0.70.
+
+Both of `CACHE_PRECISION.md`'s declared readings are now confirmed by
+measurement rather than asserted, and the embedder-swap idea is retired on
+evidence. **Not registered in `reproduce.py`** — LMSYS is gated, and
+`cache_hit_precision.py` is not gated either; the record carries its reproduce
+command instead. `cache_hit_precision.py` is untouched.
+
+*The original C1 was based on a misreading and is kept below so the error is on
+record:*
+
+### C1-withdrawn. ~~Replace the lexical embedder~~ — **PREMISE WITHDRAWN**
+
+**The original C1 below was wrong and is kept only so the error is on record.**
+It claimed the 0.313 precision was caused by a lexical embedder. It is not:
+`CACHE_PRECISION.md` states its protocol used **MiniLM-L6-v2 on both sides**,
+i.e. a real sentence embedder. The "deployed lexical embedder" I took that from
+is `internal/ai/embed.Local` (hashed character trigrams), which
+`cluster_backend.py` uses *deliberately* for the live-plane prompt pool so that
+distinct pool prompts never collide — a controlled hit rate is exactly what the
+cache-SIZE knob needs. It is documented as lexical in the package docstring.
+Swapping it would corrupt the knob, not improve it.
+
+**The real question, which the record asserts but does not measure.**
+`CACHE_PRECISION.md` declares that low agreement is response stochasticity
+rather than a retrieval failure. That is testable with an oracle: on **exactly
+duplicated prompt text**, retrieval is perfect by construction, so any
+remaining disagreement is purely the model answering the same question
+differently. If oracle precision is near the published 0.313, no embedder can
+raise it and the "relative readings only" caveat is *proven* rather than
+claimed. If oracle precision is far higher, retrieval IS the binding constraint
+and the caveat is understated.
+
+Either outcome is publishable and neither needs a GPU. New record, default-OFF,
+`cache_hit_precision.py` is frozen and is not edited.
+
+*Original, withdrawn:*
+
+### C1-withdrawn. Replace the lexical embedder
+
+Response-agreement precision is **0.313** at τ=0.85, and near-duplicate prompts
+agree only 33.8%. `cluster_backend.py` states the deployed embedder is
+**lexical** ("Pool prompts are high-entropy token strings so distinct prompts
+never collide under the deployed lexical embedder"). A lexical embedder is a
+sufficient explanation for low semantic precision.
+
+**Work:** swap in a real sentence embedder (MiniLM-class, CPU-fast, free),
+re-run the precision study, and report the delta. **Default OFF** behind a
+config flag so committed cache records replay unchanged; the new number is a
+new record, not an edit.
+
+If precision does not improve materially, that is also a result — it would mean
+the ceiling is response stochasticity, exactly as currently claimed, and the
+claim gets evidence instead of an assertion.
+
+---
+
+## §5 Workstream R — engineering debt
+
+| id | item | closes |
+|---|---|---|
+| **R1** | **DONE session 42.** The audit's framing was wrong twice. (a) Coverage was **not** 60% — CI measures **with** a `postgres:18` service and read 66.5%; my first local run showed 64.0% only because I had no database. (b) The gap was **not** in `internal/operator/controllers`, which is at **90.9%**. The real hole was `internal/storage/postgres` — the **production** backend — at **32.7%**, with tenant/project/API-key CRUD, the outbox and saga state completely untested, while `internal/storage/sqlite` (not used in production) sat at 97.3%. Added 10 integration tests; that package is now **63.2%**. Totals: **66.4% -> 68.8%** overall, **76.7% -> 79.5%** on business logic (excluding generated deepcopy and `cmd/` main() wiring, which is what the 80% target actually means). CI gate raised **60% -> 65%** to hold the gain. One test I wrote FAILED and the code was right: `RecentByTenant` deliberately returns the newest N in *chronological* order, and sqlite does the identical reversal — the test now pins both halves. | W9 |
+| **R2** | **DONE session 42.** Premise CONFIRMED: `cmd/control-plane/main.go` built the client straight from `redis.ParseURL`, which leaves the timeout fields zero, so `redis.NewClient` filled them with go-redis defaults — **5 s dial, 3 s read/write, 3 retries**. `server.go`'s fallback to the local bucket is correct but is only reached *after* that budget, so an outage became a multi-second stall on every request. `applyRedisTimeouts` now fills **only the fields the URL left unset** (200 ms dial/IO, 1 retry, env-overridable), so an explicit setting still wins. 6 tests. | E3 |
+| **R3** | Premise checked: the detector IS implemented (`internal/operator/fairness/fairness.go`, `Sample` mirrors per-pod eBPF fields) and only the feed is missing — the audit's E4 reading is correct. Pixie/Hubble adapter — everything downstream of the sample is implemented and tested; only the production feed is missing | E4 |
+| **R4s** | **DONE session 42 — v2's walk: ~36 min CPU -> 33 s, record byte-identical.** Original note: `analysis_separation_mt_v2.py` burns **~36 min of CPU** per gate run on the *scalar* ordered walk, and T1's `coupled_floor_incremental_batched` computes the same thing 20-50x faster. `BatchedOrderedWalkTests` already proves per-vector bit-identity at exactly the tenant counts v2 uses (n<=6). Switch v2's internals and **verify the record is byte-identical before committing** — the aggregate is a chunked sum, so last-bit float drift is the one real risk, and at 6dp it should not surface. Do NOT change v2's record. | gate cost |
+
+---
+
+## §6 Workstream D — distribution
+
+| id | item | owner |
+|---|---|---|
+| **D1** | Zenodo deposit — bundle **built and verified session 42** (404 files, 41 preregs, all records) | user publishes -> DOI |
+| **D2** | **DONE session 42 (agent half).** The roadmap said "agent builds, user pushes" — wrong on both counts. `release.yml` already builds, signs (cosign keyless) and SBOM-attests on a version tag, so no agent build is needed; but it covered **only `control-plane`** of the repo's **four** deployable images, and `helm install polyforge-operator` pulls the operator AND planner. **An install from a clean machine could never have worked, token or not.** The charts were also linted on every CI run and published nowhere. Now: a 4-way matrix (control-plane / ai-gateway / operator / planner), each signed + attested, plus a `charts` job that packages both charts and `helm push`es them to `oci://ghcr.io/<repo>/charts` after the images land. Operator chart defaults corrected from `polyforge-operator` to `polyforge/operator` so they match what is actually published; **verified the eval harness still overrides them** (`--set=operator.image.repository=polyforge/operator`), so B1 is unaffected. Caught while writing it: the planner Dockerfile `COPY`s `research/jcac_sim/`, so it needs the repo root as context, not `services/planner` — a narrower context would have failed the first release. **User action: push a `v*` tag.** | user tags |
+| **D3** | GitHub Pages supplement (figures, records, reproduce instructions) — a site build, not prose | agent |
+
+---
+
+## §7 Execute order
+
+```
+T1  S3 exact walk          desk, no GPU   <- START. Restores the theorem.
+L2  batched tier server    desk, no GPU
+M2  severity decomposition desk, no GPU
+M3  window characterisation desk, no GPU
+C1  real embedder          desk, no GPU
+L3  re-bench (~30 min GPU) ----------------- decision point
+L4  score B1 (2-4 h GPU)
+L6  latency semantics      desk
+M1  p99 + TTFT/TPOT        desk
+L5  trace-driven live sitting (NEW PREREG) + L7 multi-node
+T2  T3  R1  R2  R3  D2  D3
+-------------------------------------------------------------
+§9  writing                HELD
+```
+
+Rationale: the four desk items at the top need no external resource and two of
+them (T1, M3) can produce *positive* results. L3 is the cheapest thing that
+resolves the biggest uncertainty, so it sits right after the desk work that
+does not depend on it.
+
+---
+
+## §8 What stays open at 100% — the honest residue
+
+Finishing everything above does **not** produce:
+
+1. **A cost advantage.** BP-H1 stays FAIL on both traces. Nothing here targets
+   it, and nothing should: the feasibility result is the finding.
+2. **Multi-host or multi-zone evidence.** L7 buys multi-node on one machine.
+3. **Production scale.** SageServe's 10M served requests remains conceded; the
+   10.63M-request demand-side replay is the analog.
+4. **Three model tiers**, on the free route. `large` needs VRAM the free pool
+   does not have.
+5. **Attempt 10's SK-H1/SK-H3 FAILs.** Scored, closed, reported as measured.
+
+That residue is the paper's limitations section, and it is short and defensible.
+
+---
+
+## §9 Writing — HELD
+
+WP9 (reframe around feasibility), WP10 (RB-H1 family declaration in the stats
+section), WP11 (OSF DOIs, Zenodo DOI into §Reproducibility, title-page macros,
+proofread, arXiv, submission), thesis author/supervisor/roll fill-ins,
+`references.bib` placeholders.
+
+**Not started until the author says to start.** Listed so the sequence is
+complete, not so it gets picked up.
