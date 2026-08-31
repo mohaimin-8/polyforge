@@ -1,0 +1,31 @@
+# L5 — a real trace driving a real cluster (PREREG_TRACE_LIVE.md).
+#
+# Every other `backend: cluster` experiment here drives a SYNTHETIC cell. This
+# one replays BurstGPT window 0 through the simulator's own projection
+# (trace_matrix.window_buckets, via eval/harness/trace_demand.py), so the live
+# plane sees the demand the simulator replayed by construction rather than by
+# a test that could drift.
+#
+# REQUIRES, or it silently measures something else:
+#   POLYFORGE_EVAL_TRACE_WINDOW=0   demand comes from the trace, not `workload`
+#   POLYFORGE_EVAL_LIVE_AI=1        AI kinds drive the real gateway
+#   POLYFORGE_EVAL_SHARED_PG=1      (R5) or every AI metric reads zero
+#   POLYFORGE_EVAL_TIER_BACKENDS    the mock tier server (TIER_BENCH.md means)
+#
+# `workloads:` is inert for demand under the trace gate -- it survives only
+# because RunSpec requires a name and the prompt-pool structure is keyed off
+# it. `ai_cacheable` is chosen for that reason: the trace is chat-only.
+#
+# Arms are jcac and hpa per Amendment 1: hpa_fair is NOT live-wired and would
+# have deployed a plain pod under a baseline's name.
+name: trace_live
+backend: cluster
+steps: 720
+reps: 1
+systems: [jcac, hpa]
+workloads: [ai_cacheable]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/trace_live.duckdb
+retries: 0
+timeseries_reps: 0

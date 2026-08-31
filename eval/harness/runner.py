@@ -51,8 +51,19 @@ def _attempt(run: RunSpec, retries: int) -> tuple[str, int, dict | None, str | N
         except Exception:
             error = traceback.format_exc(limit=8)
             continue
+        # A trace-driven cell replays BurstGPT, which records LLM arrivals and
+        # nothing else, so its demand is chat-only (PREREG_TRACE_LIVE.md) and a
+        # zero crud_p95 is the correct reading rather than a dead exporter.
+        # Read through cluster_backend rather than re-reading the environment,
+        # so the gate has exactly one definition.
+        trace_driven = False
+        if run.backend == "cluster":
+            from . import cluster_backend
+
+            trace_driven = cluster_backend.TRACE_WINDOW is not None
         reason = check_metrics(outcome["metrics"], run.steps,
-                               expects_ai=workload_has_ai(run.workload))
+                               expects_ai=workload_has_ai(run.workload) or trace_driven,
+                               expects_crud=not trace_driven)
         if reason is None:
             return "valid", attempt, outcome, None
         error = reason  # completed but broke the contract: retry, then mark
