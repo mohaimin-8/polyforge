@@ -112,7 +112,8 @@ def exact_series(cfg, orbit, cap, length, max_states):
             return rows, n, states
         r = guarantee.coupled_floor_incremental(cfg, orbit, n, cap,
                                                 mode="ordered",
-                                                max_states=max_states)
+                                                max_states=max_states,
+                                                engine="batched")
         rows.append((n, states, r["coupled_violation"],
                      n * cfg.replica_max > cap))
         n += 1
@@ -129,10 +130,12 @@ def main() -> None:
 
     started = time.time()
     single = guarantee.coupled_floor_incremental(cfg, orbit, 1, cap,
-                                                 mode="ordered")
+                                                 mode="ordered",
+                                                 engine="batched")
     slack = guarantee.coupled_floor_incremental(cfg, orbit, 3,
                                                 3 * cfg.replica_max,
-                                                mode="ordered")
+                                                mode="ordered",
+                                                engine="batched")
     invariance = guarantee.permutation_invariance_report(cfg, orbit, tenants,
                                                          cap, samples=6)
     rows, stopped_at, stopped_cost = exact_series(cfg, orbit, cap, length,

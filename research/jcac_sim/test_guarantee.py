@@ -702,3 +702,125 @@ class IncrementalAllocationTests(unittest.TestCase):
                                                        samples=4)
         self.assertFalse(real["vacuous"])
         self.assertFalse(real["invariant"])
+
+
+class BatchedOrderedWalkTests(unittest.TestCase):
+    """WP13 step 3 — the vectorised ordered walk.
+
+    RESULTS_SEPARATION_MT_V2.md reported S3 NOT EVALUABLE at 268,435,456 offset
+    vectors. The batched walk is the SAME enumeration with the offset-vector
+    axis vectorised, so it is only worth anything if it agrees with the scalar
+    walk exactly. These pin that, including where the cap binds — a batched
+    walk that agrees only in the uncontended regime would agree for the same
+    vacuous reason S2's first version passed.
+    """
+
+    @staticmethod
+    def _cell():
+        cfg = TenantConfig(tenant_id="t", slo_class="standard", replica_max=6)
+        orbit = [Demand(rps={"crud_read": 60.0 * f, "crud_write": 10.0 * f},
+                        crud_base_ms=40.0)
+                 for f in ([6.0] * 5 + [0.5] * 11)]
+        return cfg, orbit
+
+    def _pieces(self, cfg, orbit):
+        needs = guarantee.orbit_replica_needs(cfg, orbit)
+        table = guarantee._violation_table(cfg, orbit, needs, cfg.replica_max)
+        return needs, table, guarantee.ramp_lead(cfg.replica_max)
+
+    def test_offset_block_matches_the_generator(self):
+        """The block is indexed arithmetic over the same base-`length` numeral
+        `_product` walks. If the digit order were reversed every downstream
+        number would still look plausible and be a different enumeration."""
+        cfg, orbit = self._cell()
+        needs, _, _ = self._pieces(cfg, orbit)
+        length = len(needs)
+        for tenants in (1, 2, 3):
+            expected = list(guarantee._offset_vectors(length, tenants))
+            block = guarantee._offset_block(length, tenants, 0, len(expected))
+            self.assertEqual([tuple(int(v) for v in row) for row in block],
+                             expected, f"{tenants} tenants")
+
+    def test_batched_walk_matches_the_ordered_walk_per_vector_exactly(self):
+        """Per-vector equality, not aggregate equality: the aggregate could
+        agree by cancellation. Run at a cap that BINDS so the sequential tenant
+        sweep — the part deliberately left unvectorised — is exercised."""
+        cfg, orbit = self._cell()
+        needs, table, lead = self._pieces(cfg, orbit)
+        length = len(needs)
+        for tenants, cap in ((2, 24), (3, 12), (4, 12), (3, 24)):
+            expected = [
+                guarantee._trajectory_violation(needs, offsets, cap,
+                                                cfg.replica_max, table, 4, lead)
+                for offsets in guarantee._offset_vectors(length, tenants)
+            ]
+            block = guarantee._offset_block(length, tenants, 0, len(expected))
+            got = guarantee.trajectory_violation_batch(
+                needs, block, cap, cfg.replica_max, table, 4, lead)
+            self.assertEqual([float(v) for v in got], expected,
+                             f"{tenants} tenants at cap {cap}")
+
+    def test_batched_block_is_position_independent(self):
+        """Chunking must not change a value. A block starting mid-enumeration
+        has to give what the same vectors give when walked from zero."""
+        cfg, orbit = self._cell()
+        needs, table, lead = self._pieces(cfg, orbit)
+        length, tenants, cap = len(needs), 3, 12
+        whole = guarantee.trajectory_violation_batch(
+            needs, guarantee._offset_block(length, tenants, 0, 256),
+            cap, cfg.replica_max, table, 4, lead)
+        tail = guarantee.trajectory_violation_batch(
+            needs, guarantee._offset_block(length, tenants, 100, 56),
+            cap, cfg.replica_max, table, 4, lead)
+        self.assertEqual([float(v) for v in tail],
+                         [float(v) for v in whole[100:156]])
+
+    def test_batched_floor_reproduces_the_published_contended_series(self):
+        """S4's exact series is committed in RESULTS_SEPARATION_MT_V2.md: the
+        cap first binds at five tenants, at 0.016514. The batched walk must
+        land on the published cell's own numbers, not merely on itself."""
+        cfg, orbit = self._cell()
+        cap = 24
+        for tenants, published in ((4, 0.0), (5, 0.016514)):
+            got = guarantee.coupled_floor_incremental_batched(
+                cfg, orbit, tenants, cap, chunk=1 << 14)
+            self.assertEqual(got["mode"], "ordered-batched")
+            self.assertEqual(got["states_walked"], 16 ** (tenants - 1))
+            self.assertAlmostEqual(got["coupled_violation"], published,
+                                   places=6, msg=f"{tenants} tenants")
+
+    def test_batched_engine_renders_identically_to_the_scalar_engine(self):
+        """`analysis_separation_mt_v2.py` now calls `coupled_floor_incremental`
+        with `engine="batched"`, and its record is FROZEN. So the invariant the
+        record depends on is pinned here: the two engines must agree to the
+        6 decimal places the record prints.
+
+        Run where the cap BINDS. At the published cap of 24 every floor below
+        five tenants is exactly 0.000000, so a comparison there would pass even
+        if the batched engine were completely broken for non-zero values --
+        the same vacuous-check trap S2's first version fell into. Three tenants
+        against a cap of 12 contends (3 x 6 > 12) and yields a non-zero floor,
+        which the assertion below requires explicitly.
+        """
+        cfg, orbit = self._cell()
+        scalar = guarantee.coupled_floor_incremental(
+            cfg, orbit, 3, 12, mode="ordered")["coupled_violation"]
+        batched = guarantee.coupled_floor_incremental(
+            cfg, orbit, 3, 12, mode="ordered", engine="batched")["coupled_violation"]
+        self.assertGreater(scalar, 0.0,
+                           "the cap must bind here or this test is vacuous")
+        self.assertEqual(f"{scalar:.6f}", f"{batched:.6f}")
+
+    def test_the_scalar_engine_is_still_the_default(self):
+        """`engine` is opt-in. Every committed record except v2's was produced
+        by the scalar loop, and a default flip would re-derive all of them
+        through a different summation order without anyone asking for it."""
+        cfg, orbit = self._cell()
+        default = guarantee.coupled_floor_incremental(cfg, orbit, 3, 12,
+                                                      mode="ordered")
+        scalar = guarantee.coupled_floor_incremental(cfg, orbit, 3, 12,
+                                                     mode="ordered",
+                                                     engine="scalar")
+        self.assertEqual(default["coupled_violation"],
+                         scalar["coupled_violation"],
+                         "the default engine must be the scalar one, bit for bit")
