@@ -909,10 +909,22 @@ def check_load_distribution(sampler: "LoadDistributionSampler",
             "load path is itself blind, so the run cannot be trusted")
     hottest, share = max(shares.items(), key=lambda kv: kv[1])
     active = sum(1 for s in shares.values() if s > 0.001)
-    if share > max_share:
+    # The ceiling has to scale with the replica count, or it contradicts its
+    # own rationale. `max_share` of 0.25 is "four times the fair share" ONLY at
+    # sixteen replicas. At one replica the fair share IS 100%, so a 25% ceiling
+    # cannot be satisfied by any run -- the guard fires on a perfectly healthy
+    # cluster. That is not hypothetical: L5's trace-driven sitting peaks at
+    # 1.377 rps, HPA correctly held one replica, and the `hpa` arm was failed
+    # after a complete two-hour run for having nowhere to spread load to.
+    #
+    # Keeping "four times the fair share" as the rule reproduces 25% exactly at
+    # sixteen replicas -- the attempt-4 detection is unchanged where it was
+    # calibrated -- and stays meaningful below that.
+    ceiling = min(1.0, max(max_share, 4.0 / len(shares)))
+    if share > ceiling:
         raise RuntimeError(
             f"load was pinned: pod {hottest} took {share:.1%} of the work "
-            f"(ceiling {max_share:.0%}, fair share {1 / len(shares):.1%} "
+            f"(ceiling {ceiling:.0%}, fair share {1 / len(shares):.1%} "
             f"across {len(shares)} replicas). This is the WP14 attempt-4 "
             "failure mode -- one replica carrying the run until it OOMs")
     if active < min_active_fraction * len(shares):

@@ -146,3 +146,44 @@ been run under this pre-registration.
 
 Nothing else changes: demand, slice, substrate, hypotheses, falsifiers and the
 stopping rule are as frozen above.
+
+## Sitting 1: VOID (2026-09-01, apparatus) — and Amendment 2
+
+The first sitting ran 18:45:03Z–20:56:02Z and produced **no metrics rows at
+all**. Both arms failed, for two different apparatus reasons, and **neither is
+a result**:
+
+* **`hpa`** completed its full two-hour load window and was then failed by
+  `check_load_distribution`, whose 25% ceiling is documented as "four times the
+  fair share" **at sixteen replicas**. This cell peaks at 1.377 rps, so HPA
+  correctly held **one** replica, where the fair share is 100% and a 25%
+  ceiling **cannot be satisfied by any run**. The guard could not pass. Fixed
+  by scaling the ceiling as `min(1, max(0.25, 4/replicas))`, which reproduces
+  25% exactly at sixteen replicas — attempt-4 detection unchanged where it was
+  calibrated — and is now pinned by four tests.
+* **`jcac`** never started: `kubectl -n kube-system` timed out waiting for the
+  condition, the cluster bring-up failure this box shows under memory
+  pressure. The `hpa` cluster had just been torn down and the host did not
+  recover headroom in time.
+
+**Amendment 2 (before any scored result exists).** The stopping rule above
+says an infrastructure abort is VOID and re-sat once. That clause is about the
+*host* failing under a sound apparatus — a stall, a Docker failure, a k6 abort.
+It is **not** the right instrument for a guard that is arithmetically incapable
+of passing, or for a second cluster built without reclaiming memory first:
+those are defects in the apparatus, and WP14's attempts 1–9 are the precedent
+for treating apparatus repair as distinct from a scored sitting.
+
+So sitting 1 is recorded as **apparatus VOID and does not consume the re-sit
+allowance.** To keep that from becoming an elastic excuse, it is bounded here:
+
+* This applies **once**, to sitting 1, for the two named defects above.
+* Any further failure — including another apparatus defect — is treated as an
+  abort under the original clause and consumes the single re-sit.
+* Nothing about the demand, slice, arms, substrate, hypotheses or falsifiers
+  changes. No number has been produced, let alone seen.
+
+**Apparatus change for sitting 2, declared here before it runs:** the arms are
+executed as **separate runner invocations** with a host memory reclaim between
+them, rather than back to back in one process. The 2-hour load window, the
+window, the slice and the arms are unchanged.
