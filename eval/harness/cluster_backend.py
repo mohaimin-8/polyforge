@@ -295,7 +295,36 @@ def prompt_pools(run: RunSpec, tenant_ids) -> dict:
     return pools
 
 
-def k6_script(run: RunSpec, interval_s: int = 10, warmup_s: int = 0) -> str:
+def _stage_target(rps: float, unit_s: int, floor_rate: bool) -> int:
+    """Requests per `unit_s`, as an integer k6 can express.
+
+    `floor_rate` keeps the historic `max(1, ...)`: every synthetic cell has
+    strictly positive demand, so flooring never bit and removing it silently
+    would change committed cells. A trace has real idle buckets, and flooring
+    them would invent traffic the trace does not contain.
+    """
+    scaled = round(rps * unit_s)
+    if floor_rate:
+        return max(1, scaled)
+    return max(0, scaled)
+
+
+# k6 arrival rates are INTEGERS per `timeUnit`. At the default "1s" the finest
+# expressible rate is 1 rps, which is fine for every synthetic cell (they peak
+# near 94 rps per tenant) and destroys a trace-driven one: BurstGPT's projected
+# demand runs 0.0-0.501 rps per tenant, so every non-zero bucket would round to
+# 0 and then be floored to 1 -- eight tenants pinned at a flat 1 rps, the
+# trace's whole shape gone, and the run would look perfectly healthy.
+#
+# "1m" buys 1/60 rps of resolution. The floor is separately optional because a
+# trace has genuinely idle buckets (1320 of 2160 non-zero on window 0) and
+# `max(1, ...)` would fabricate load in the other 840.
+TRACE_TIME_UNIT = "1m"
+
+
+def k6_script(run: RunSpec, interval_s: int = 10, warmup_s: int = 0,
+              *, buckets_override=None, tenant_ids_override=None,
+              time_unit: str = "1s", floor_rate: bool = True) -> str:
     """One k6 scenario per tenant, ramping-arrival-rate stages replaying
     this run's demand buckets. The tenant identity travels as its API key
     (provisioned by execute() before k6 starts); each request samples its
@@ -303,14 +332,21 @@ def k6_script(run: RunSpec, interval_s: int = 10, warmup_s: int = 0) -> str:
     plane's replay endpoint; with the live-AI plane enabled, AI kinds drive
     the gateway's chat endpoint with the cell's prompt-reuse structure so
     the cache and tier knobs bite on real requests."""
-    tenant_ids, buckets, _, _ = workloads.build(
-        run.workload, run.tenant_mix, run.cluster_size, run.seed, run.steps
-    )
+    if buckets_override is not None:
+        # Trace-driven (L5): demand comes from research/analysis/trace_matrix's
+        # own projection, so the live plane replays what the simulator did.
+        tenant_ids, buckets = tenant_ids_override, buckets_override
+    else:
+        tenant_ids, buckets, _, _ = workloads.build(
+            run.workload, run.tenant_mix, run.cluster_size, run.seed, run.steps
+        )
+    unit_s = {"1s": 1, "1m": 60}[time_unit]
     scenarios = {}
     mixes = {}
     for tid in tenant_ids:
         stages = [
-            {"target": max(1, round(bucket[tid].total_rps())), "duration": f"{interval_s}s"}
+            {"target": _stage_target(bucket[tid].total_rps(), unit_s, floor_rate),
+             "duration": f"{interval_s}s"}
             for bucket in buckets
         ]
         # VU pool sizing (WP14, sessions 38-39). `preAllocatedVUs` was 50,
@@ -373,7 +409,7 @@ def k6_script(run: RunSpec, interval_s: int = 10, warmup_s: int = 0) -> str:
         scenarios[f"tenant_{tid}"] = {
             "executor": "ramping-arrival-rate",
             "startRate": stages[0]["target"],
-            "timeUnit": "1s",
+            "timeUnit": time_unit,
             "preAllocatedVUs": 1200,
             "maxVUs": 2000,
             "stages": stages,

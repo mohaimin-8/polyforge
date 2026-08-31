@@ -111,3 +111,65 @@ def test_meta_carries_the_provenance_a_record_must_quote(window):
                 "rate_bucket_s", "control_interval_s", "tenants"):
         assert key in meta, f"meta is missing {key}"
     assert meta["scale_factor"] > 0
+
+
+# --- the k6 encoding, which nearly destroyed the whole idea ------------------
+
+def _stage_targets(script: str, tenant: str) -> list[int]:
+    import re
+    match = re.search(r'"tenant_%s".*?"stages":\s*\[(.*?)\]' % tenant, script, re.S)
+    assert match, f"no stages block for {tenant}"
+    return [int(x) for x in re.findall(r'"target":\s*(\d+)', match.group(1))]
+
+
+def _run_spec():
+    from harness.config import RunSpec
+    return RunSpec(run_id="l5", experiment="trace_live", system="jcac",
+                   workload="ai_cacheable", tenant_mix="uniform",
+                   cluster_size="small", rep=0, seed=1, steps=10,
+                   backend="cluster", store_timeseries=False)
+
+
+def test_default_k6_encoding_would_destroy_trace_demand(window):
+    """The defect, pinned so nobody 'simplifies' the fix away.
+
+    k6 arrival rates are integers per timeUnit. At the default "1s" every
+    trace bucket (0.0-0.501 rps) rounds to 0 and is then floored to 1: each
+    tenant becomes a FLAT 1 rps, idle buckets get invented traffic, and the
+    run drives ~25x the trace's real demand while looking perfectly healthy.
+    """
+    from harness.cluster_backend import k6_script
+    tenant_ids, buckets, _ = window
+    script = k6_script(_run_spec(), buckets_override=buckets,
+                       tenant_ids_override=tenant_ids)
+    for tid in tenant_ids:
+        targets = _stage_targets(script, tid)
+        assert len(set(targets)) == 1, (
+            f"{tid} is not flat under the default encoding -- if this now "
+            "varies, the defect is gone and this test should be retired")
+        assert 0 not in targets, "the default floor should have removed every idle bucket"
+
+
+def test_trace_encoding_preserves_shape_idleness_and_volume(window):
+    """The fix: 1/60 rps resolution and no floor."""
+    from harness.cluster_backend import k6_script, TRACE_TIME_UNIT
+    tenant_ids, buckets, _ = window
+    script = k6_script(_run_spec(), buckets_override=buckets,
+                       tenant_ids_override=tenant_ids,
+                       time_unit=TRACE_TIME_UNIT, floor_rate=False)
+
+    encoded_total = 0.0
+    for tid in tenant_ids:
+        targets = _stage_targets(script, tid)
+        real = {round(b[tid].total_rps(), 4) for b in buckets}
+        # Shape: as many distinct rates as the trace actually has.
+        assert len(set(targets)) == len(real), (
+            f"{tid}: encoded {len(set(targets))} distinct rates, trace has {len(real)}")
+        # Idleness: the trace's silent buckets stay silent.
+        assert targets.count(0) == sum(
+            1 for b in buckets if b[tid].total_rps() == 0.0)
+        encoded_total += sum(targets) / 60.0
+
+    actual_total = sum(sum(b[t].total_rps() for t in tenant_ids) for b in buckets)
+    # Volume: within a few percent, the residual being 1/60 rps rounding.
+    assert encoded_total == pytest.approx(actual_total, rel=0.05)
