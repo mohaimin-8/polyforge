@@ -142,6 +142,7 @@ func main() {
 			log.Error("parse POLYFORGE_REDIS_URL", "error", err)
 			os.Exit(1)
 		}
+		applyRedisTimeouts(options)
 		client := redis.NewClient(options)
 		defer func() { _ = client.Close() }()
 		if rateLimit.RequestsPerMinute > 0 {
@@ -295,6 +296,58 @@ func envDefault(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// Redis timeout floor. go-redis leaves these zero unless the URL set them,
+// and NewClient then fills zeros with ITS defaults: 5s dial, 3s read/write,
+// 3 retries with backoff. On a Redis outage that is 5-20 seconds of blocking
+// per request on the rate-limit hot path, BEFORE server.go's fallback can
+// engage -- so a Redis outage becomes a latency outage for every caller even
+// though the fallback logic is correct.
+//
+// The fallback is a local token bucket, so reaching it quickly costs almost
+// nothing; waiting for it costs the request. These values are therefore
+// aggressive by design, and a deployment that wants go-redis's defaults can
+// set them explicitly in POLYFORGE_REDIS_URL (dial_timeout=, read_timeout=)
+// or via the environment below.
+const (
+	defaultRedisDialTimeout = 200 * time.Millisecond
+	defaultRedisIOTimeout   = 200 * time.Millisecond
+	defaultRedisMaxRetries  = 1
+)
+
+// applyRedisTimeouts fills only what the URL left unset, so an explicit
+// setting in POLYFORGE_REDIS_URL always wins.
+func applyRedisTimeouts(options *redis.Options) {
+	if options == nil {
+		return
+	}
+	if options.DialTimeout == 0 {
+		options.DialTimeout = envDuration("POLYFORGE_REDIS_DIAL_TIMEOUT", defaultRedisDialTimeout)
+	}
+	if options.ReadTimeout == 0 {
+		options.ReadTimeout = envDuration("POLYFORGE_REDIS_READ_TIMEOUT", defaultRedisIOTimeout)
+	}
+	if options.WriteTimeout == 0 {
+		options.WriteTimeout = options.ReadTimeout
+	}
+	// go-redis reads 0 as "use my default of 3" and a negative as "none", so
+	// 0 here is the case that has to be overridden.
+	if options.MaxRetries == 0 {
+		options.MaxRetries = envInt("POLYFORGE_REDIS_MAX_RETRIES", defaultRedisMaxRetries)
+	}
+}
+
+func envDuration(name string, fallback time.Duration) time.Duration {
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }
 
 func envInt(name string, fallback int) int {
