@@ -13,6 +13,46 @@ RESULTS file must carry.
 
 ---
 
+## 0b. The P100 no longer runs torch at all (session 42, measured)
+
+**This supersedes the throughput analysis below as the binding constraint.**
+On 2026-08-31 a probe kernel (`polyforge-gpu-probe`) reported:
+
+```
+torch 2.10.0+cu128
+arch list: ['sm_70','sm_75','sm_80','sm_86','sm_90','sm_100','sm_120']
+GPU0 Tesla P100-PCIE-16GB -- cuda capability 6.0
+"Minimum and Maximum cuda capability supported by this version of PyTorch is (7.0) - (12.0)"
+```
+
+PyTorch 2.10 **dropped Pascal (sm_60)**. Every operation on a P100 now fails
+with `cudaErrorNoKernelImageForDevice`, and the batched bench
+(`kaggle_tier_bench_batched.py`) failed all 16 of its cells that way -- not one
+number was produced. This is not slowness that batching or tuning can address;
+the card cannot execute a kernel.
+
+**The route regressed under us.** `polyforge-tier-server` ran on this same
+P100 on 2026-08-30 17:54 and served requests; Kaggle upgraded the image since.
+Two consequences beyond B1:
+
+* **`TIER_BENCH.md`'s committed P100 rows can no longer be reproduced on
+  Kaggle's current image.** They stand as measured -- an environment moving is
+  not a retraction -- but anyone re-running them needs the note above.
+* `kaggle_tier_bench.py` (single-stream, the original) is equally affected.
+
+**Two ways forward, and the first needs the author.**
+
+1. **`GPU T4 x2`** -- Turing, sm_75, in the supported arch list. This is the
+   clean fix and it also gives two cards. It is **NOT selectable from
+   `kaggle kernels push`** (TIER_BENCH.md section on the script API); only the
+   notebook UI's accelerator picker sets it. So an agent cannot do it.
+2. **Pin an older torch in the kernel** (`pip install 'torch<2.7'`, the last
+   line that shipped sm_60). Cheap to try, but it is a ~2.5 GB install into an
+   image built around a newer CUDA, and it would make the substrate differ from
+   every other measurement. Prefer 1.
+
+---
+
 ## 0a. What this route CANNOT do (session 41, measured)
 
 **A sequential preflight passing does not license a concurrent matrix.**

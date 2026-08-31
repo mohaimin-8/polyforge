@@ -196,8 +196,8 @@ special?" is a figure, not a paragraph. Desk-only, no prereg (descriptive).
 |---|---|---|
 | **L1** | Concurrent `tunnel_preflight` stage | **DONE session 42** — 16 tests green |
 | **L2** | Micro-batching tier server + batched-equals-serial exactness test | **DONE session 42** — per-tier lock replaced by a batching queue; mock-measured **22.57s -> 1.94s for 12 concurrent (11.6x)**; 11 tests pass, the real-model exactness check is gated on `POLYFORGE_TIER_TEST_MODEL` for the Kaggle smoke |
-| **L3** | Re-bench tiers under batching -> `TIER_BENCH_BATCHED.md`. **Also bench at 2+ output lengths** (M1 re-scoped): one length cannot separate prefill from per-token decode, two can, and it costs nothing extra in the same session | ~30 min GPU |
-| **L4** | Score B1 (frozen 4x4 matrix, WL-H1/H2/H3) | 2–4 h GPU |
+| **L3** | **ATTEMPTED session 42 — BLOCKED, and not on throughput.** `kaggle_tier_bench_batched.py` was written (batch 1/8/32/64 x output 48/96, plus a batched-vs-serial exactness check on the real models) and pushed and run on Kaggle. **All 16 cells failed with `cudaErrorNoKernelImageForDevice`.** A probe kernel identified the cause: Kaggle's image now ships **torch 2.10 (arch list sm_70+)** and the free pool grants a **Tesla P100, sm_60** — PyTorch dropped Pascal, so no torch op runs at all. The same P100 served requests on 2026-08-30 17:54; the image moved under us. **Needs `GPU T4 x2`, which is UI-gated and cannot be set from `kaggle kernels push` — an agent cannot unblock this.** See `WAVE4_FREE_ROUTE.md` 0b. | **user: set T4 x2 in the notebook UI** |
+| **L4** | Score B1 (frozen 4x4 matrix, WL-H1/H2/H3) | blocked behind L3 |
 
 See `docs/ZERO_COST_ROADMAP.md` for L1–L4 in full, including the pre-committed
 decision points and the P100-vs-T4x2 fallback.
