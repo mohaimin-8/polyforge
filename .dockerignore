@@ -20,6 +20,15 @@
 
 # Measurement artifacts and generated records -- never inputs to a build
 research/
+# ...except the simulator model, which IS a build input: services/planner's
+# image COPYs research/jcac_sim/ because planner.py imports it over a
+# repo-relative path (ADR 0014). Excluding it made that image unbuildable, and
+# nothing noticed for a session because the planner was built by neither CI nor
+# release.yml -- it was the one deployable image with no build anywhere. Keep
+# this negation adjacent to the rule it exempts; the directory is ~1 MB of
+# Python, not part of the 4.4 GB this file exists to keep out.
+!research/jcac_sim/
+!research/jcac_sim/**
 eval/results/
 reproduce_out/
 benchmarks/
