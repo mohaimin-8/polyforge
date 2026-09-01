@@ -28,14 +28,14 @@ reviewer will raise**, plus packaging. Everything below is traceable to one:
 | id | weakness | closed by |
 |---|---|---|
 | **W1** | No cost advantage (BP-H1 FAIL both traces) | **M2+M3 DONE session 42.** Still not closable — the FAILs stand — but the mechanism is now measured: the cost win and the SLO penalty are the **same 45 windows**, and 79.5% of the overshoot is the budget cap, not control error. `RESULTS_WINDOW_CHARACTER.md` |
-| **W2** | Two live FAILs (SK-H1 rule artifact, SK-H3 by 0.001–0.21 ms) | **L6** removes the confound for any future sitting; the scored FAILs stand |
+| **W2** | Two live FAILs (SK-H1 rule artifact, SK-H3 by 0.001–0.21 ms) | **Not closable.** L6 removes the confound for future sittings; attempt 10's scored FAILs stand as measured and V8 pre-committed it as the last on this machine |
 | **W3** | Theorem is single-tenant; MT extension falsified (S2 FAIL, S3 not evaluable) | **T1 — DONE session 42.** Floor computed (0.126189); S3 **FAIL**. Scope unchanged, reason now measured |
-| **W4** | No real trace has ever driven a real cluster | **L5** |
-| **W5** | Live latency is CPU service time, not service latency | **L6** |
-| **W6** | Stage C is a precondition, not a scored result | L5 supersedes it with a scored one |
-| **W7** | Single machine, single cluster | **L7** (partial — multi-node, not multi-host) |
+| **W4** | No real trace has ever driven a real cluster | **CLOSED session 42.** Two arms x 2.00 h of BurstGPT window 0 on a real cluster, scored against a prereg. TL-H1 PASS (the sim's cost ordering transferred), TL-H2 VACUOUS, TL-H3 PASS. `RESULTS_TRACE_LIVE.md` |
+| **W5** | Live latency is CPU service time, not service latency | **L6 — partly done session 42.** The end-to-end instrument already existed and was never scraped; `soak_observer.sh` now captures it. Unverified against a live cluster, and attempt 10 cannot be re-read |
+| **W6** | Stage C is a precondition, not a scored result | **CLOSED session 42.** L5 is a scored 2 h sitting under its own prereg, so the paper no longer needs to lean on an unscored precondition |
+| **W7** | Single machine, single cluster | **L7 cannot close it, and L5 showed why.** `NODES_BY_SIZE` makes `small` a **2-node** cluster, so the trace sitting already ran multi-NODE — but `load_distribution.json` records **one pod at 100%**, because 1.377 rps needs exactly one replica. A bigger node count changes nothing while the demand needs one pod. Demonstrating multi-node *behaviour* needs a high-demand cell, i.e. the GPU-blocked B1 matrix. Partial credit is not available here and should not be claimed |
 | **W8** | Cache precision 0.313 at τ=0.85 | **C1 — DONE session 42.** Closed *with evidence*: retrieval contributes only +0.047; the ceiling is response stochasticity |
-| **W9** | Coverage 60% vs 80% target | **R1** |
+| **W9** | Coverage 60% vs 80% target | **R1 — DONE session 42.** The 60% figure was wrong (CI measures with Postgres); business logic is **79.5%** excluding generated deepcopy and `cmd/` wiring. Gate raised 60 -> 65 |
 
 ---
 
