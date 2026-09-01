@@ -1,0 +1,3 @@
+system,status,cluster_size,steps,total_cost_usd,mean_violation,mean_jain,cache_hit_rate,ai_p95_ms,crud_p95_ms
+jcac,valid,small,720,1.6,0.0,1.0,0.8485002541942044,1305.088,0.0
+hpa,valid,small,720,0.5507,0.0,1.0,0.7651245551601423,1943.558,0.0

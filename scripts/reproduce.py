@@ -157,6 +157,14 @@ CAMPAIGN_RECORDS = [
     # reporting dominance over a different experiment.
     ("analysis_dominance.py", [], "RESULTS_DOMINANCE.md"),
     #
+    # L5: the first sitting where a REAL TRACE drove a REAL CLUSTER. Two
+    # arms x 720 steps, demand from the simulator's own projection so the
+    # two substrates cannot drift. Rebuilds from the committed
+    # trace_live_runs.csv export (eval/results/*.duckdb is gitignored) plus
+    # trace_live_evidence/ for the TL-H3 delivery gate, and recomputes the
+    # sim side from the trace, so a clean clone gets it.
+    ("analysis_trace_live.py", [], "RESULTS_TRACE_LIVE.md"),
+    #
     # Attempt 6 (WP14). The first sitting to survive long enough to SCORE
     # hypotheses: 11.5M requests over 10 h 44 m, ended by a 19.5 s stall.
     # Rebuilds from eval/results/live_soak_evidence/ -- the exports were taken
