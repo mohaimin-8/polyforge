@@ -1,0 +1,10 @@
+{
+  "samples": 241,
+  "failures": 0,
+  "cpu_ms": {
+    "polyforge-control-plane-64554f8d96-62ht6": 12480.0
+  },
+  "shares": {
+    "polyforge-control-plane-64554f8d96-62ht6": 1.0
+  }
+}
