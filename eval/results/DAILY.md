@@ -1292,3 +1292,9 @@ Appended by the runner every progress tick.
 | 2026-08-30 11:08 | wave4_live_plane | 1/1 | 1 | 10 runs/h |
 | 2026-08-30 11:18 | wave4_live_plane | 1/1 | 1 | 10 runs/h |
 | 2026-08-30 18:09 | wave4_live_plane | 1/1 | 1 | 6 runs/h |
+| 2026-08-31 18:20 | trace_live_smoke | 1/1 | 1 | 15 runs/h |
+| 2026-08-31 18:31 | trace_live_smoke | 1/1 | 1 | 7 runs/h |
+| 2026-08-31 18:43 | trace_live_smoke | 1/1 | 0 | 7 runs/h |
+| 2026-08-31 20:56 | trace_live | 2/2 | 2 | 1 runs/h |
+| 2026-08-31 23:07 | trace_live | 1/1 | 0 | 0 runs/h |
+| 2026-09-01 01:15 | trace_live | 1/1 | 0 | 0 runs/h |
