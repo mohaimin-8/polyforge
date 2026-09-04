@@ -4,7 +4,7 @@ One entry point for every document in this repository. Start here rather than
 browsing directories.
 
 The repository holds ~180 markdown files. That number is not accidental clutter:
-**72 of them are the evidence base** (38 pre-registrations + 34 records), and 31
+**88 of them are the evidence base** (42 pre-registrations + 46 records), and 38
 records are verified byte-identically by `scripts/reproduce.py`. Those cannot be
 merged or rewritten without destroying the reproducibility gate. What *was*
 clutter — superseded planning documents — now lives in [archive/](archive/).
@@ -23,7 +23,7 @@ clutter — superseded planning documents — now lives in [archive/](archive/).
 
 | Document | What it is |
 |---|---|
-| [PUBLICATION_ROADMAP.md](PUBLICATION_ROADMAP.md) | **Source of truth.** Work packages, execute order (§2), progress table (§6) |
+| [PUBLICATION_ROADMAP.md](PUBLICATION_ROADMAP.md) | Work packages WP1-WP15: execute order (§2), progress table (§6). Accurate as history; it no longer names what is next |
 | [MAIN_WORKING_PATH.md](MAIN_WORKING_PATH.md) | Milestone narrative. Context, not scheduling — the roadmap governs order |
 | [COMPLETION_ROADMAP.md](COMPLETION_ROADMAP.md) | **What is left that is not the thesis.** Track A: fix the gateway tier pin and re-sit B1. Track B: Zenodo, images, baseline, Azure scoping |
 | [FINAL_ROADMAP.md](FINAL_ROADMAP.md) | **100% of what is left that is not writing.** Absorbs ZERO_COST + COMPLETION Track A/B; adds theory (T1 S3 exact walk), real-trace live sitting, latency semantics, p99/TTFT, cache embedder. Writing held in §9 |
@@ -31,23 +31,34 @@ clutter — superseded planning documents — now lives in [archive/](archive/).
 | [REMAINING_WORK.md](REMAINING_WORK.md) | Open items and known gaps |
 | [WP14_SOAK_RESTORE.md](WP14_SOAK_RESTORE.md) | How to restore the live-soak apparatus |
 
-> If these disagree, `PUBLICATION_ROADMAP.md` wins.
+> If these disagree, `FINAL_ROADMAP.md` wins — it is the current execution
+> document (§0 maps the nine named weaknesses to the workstream that closes
+> each; §7 is the execute order). `PUBLICATION_ROADMAP.md` remains the record
+> of how WP1-WP15 landed.
 
 ## 3. Evidence base — `../research/analysis/`
 
 The methodological core. Two file families, both load-bearing:
 
-**`PREREG_*.md` (41)** — pre-registrations. Each was committed **and pushed
+**`PREREG_*.md` (42)** — pre-registrations. Each was committed **and pushed
 before** its run; the push event is the timestamp anchor. They are what makes
 the results pre-registered rather than post-hoc. Never edit one after its run.
 
-**`RESULTS_*.md` (40)** — generated records. **36 are in the reproduction gate**
-and must regenerate byte-identically. They are written by their generator
-scripts, never by hand.
+**`RESULTS_*.md` (42)** — generated records. The gate verifies **38** records
+byte-identically: 34 of these, plus `RESULTS.md`, `ADVANCED.md`,
+`FAIRNESS_V2.md` and `PHASE7_ORDINAL.md`, which predate the naming
+convention. Every one of the 38 must regenerate byte-identically. Records are
+written by their generator scripts, never by hand.
 
 ```
 python scripts/reproduce.py      # regenerates and diffs every gated record
 ```
+
+The same evidence base is published as a static site by
+`scripts/build_pages.py` (deployed by `.github/workflows/pages.yml`), so a
+reviewer can read a record without cloning. The site's "in gate" badge is read
+from `reproduce.py` at build time, and `scripts/test_build_pages.py` fails if a
+gated record has no page, if a link is dead, or if two builds differ.
 
 A record is only edited by changing its generator and re-running it. A record
 whose verdict was FAIL or INVALID **stands as committed** — superseding runs get
