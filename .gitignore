@@ -66,3 +66,15 @@ artifacts/openapi.yaml
 # The evidence supplement is built by scripts/build_pages.py and deployed
 # by .github/workflows/pages.yml; the generator is the artifact, not the site.
 site/
+
+# The cloudflared tunnel binary (WAVE4 free route) is downloaded, not built:
+# 38 MB, re-fetchable, and it has no business in the history.
+/cloudflared
+# Raw databases inside evidence directories follow the same rule as the
+# top-level ones: Zenodo carries them, git carries the exports and summaries.
+eval/results/**/*.duckdb
+eval/results/**/*.duckdb.wal
+# The scratch evidence directory live sittings reuse per run (see
+# RESULTS_TRACE_LIVE.md's bound on TL-H3). The per-sitting copies that git
+# keeps are the named ones: *_attemptN_evidence, trace_live_evidence.
+eval/results/live_soak_evidence/

@@ -1,0 +1,40 @@
+{
+  "samples": 2,
+  "failures": 0,
+  "cpu_ms": {
+    "polyforge-control-plane-64554f8d96-8ldnt": 90.0,
+    "polyforge-control-plane-64554f8d96-9x9b4": 60.0,
+    "polyforge-control-plane-64554f8d96-bsbjg": 60.0,
+    "polyforge-control-plane-64554f8d96-dxcs8": 60.0,
+    "polyforge-control-plane-64554f8d96-f5kq5": 90.0,
+    "polyforge-control-plane-64554f8d96-g6qrv": 60.0,
+    "polyforge-control-plane-64554f8d96-g9nsv": 90.0,
+    "polyforge-control-plane-64554f8d96-j82zh": 60.0,
+    "polyforge-control-plane-64554f8d96-kbpwr": 60.0,
+    "polyforge-control-plane-64554f8d96-l7lcr": 60.0,
+    "polyforge-control-plane-64554f8d96-nbvh9": 60.0,
+    "polyforge-control-plane-64554f8d96-tf7rd": 60.0,
+    "polyforge-control-plane-64554f8d96-vdfzv": 60.0,
+    "polyforge-control-plane-64554f8d96-x55lv": 60.0,
+    "polyforge-control-plane-64554f8d96-z5v7q": 60.0,
+    "polyforge-control-plane-64554f8d96-zj4r4": 120.0
+  },
+  "shares": {
+    "polyforge-control-plane-64554f8d96-8ldnt": 0.08108108108108109,
+    "polyforge-control-plane-64554f8d96-9x9b4": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-bsbjg": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-dxcs8": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-f5kq5": 0.08108108108108109,
+    "polyforge-control-plane-64554f8d96-g6qrv": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-g9nsv": 0.08108108108108109,
+    "polyforge-control-plane-64554f8d96-j82zh": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-kbpwr": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-l7lcr": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-nbvh9": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-tf7rd": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-vdfzv": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-x55lv": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-z5v7q": 0.05405405405405406,
+    "polyforge-control-plane-64554f8d96-zj4r4": 0.10810810810810811
+  }
+}
