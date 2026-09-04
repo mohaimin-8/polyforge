@@ -1,0 +1,74 @@
+# The evidence supplement (FINAL_ROADMAP D3): every pre-registration, every
+# generated record and every figure, published as a static site so a reviewer
+# can check a number without cloning the repository.
+#
+# The build reads `scripts/reproduce.py` for the set of records it verifies, so
+# the "in gate" badge on the site is the gate's own list rather than a second
+# one that drifts. It needs no analysis dependencies — both scripts are stdlib
+# only — so this workflow installs pytest and nothing else.
+#
+# ONE-TIME SETUP, OWNER ONLY: Settings -> Pages -> Build and deployment ->
+# Source: "GitHub Actions". Until that is set, `deploy-pages` fails with a 404
+# and the build job still passes. The repository is private today, so the
+# published site inherits that; making it reachable is the same disclosure
+# decision as the GHCR package visibility in D2.
+name: pages
+
+on:
+  push:
+    branches: [main, v-series-validity-remediation]
+    paths:
+      - "research/analysis/**"
+      - "eval/results/figures/**"
+      - "scripts/build_pages.py"
+      - "scripts/pages_markdown.py"
+      - "scripts/reproduce.py"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+# Least privilege: only the deploy job gets the Pages and OIDC tokens. The
+# build job reads the repository and nothing else.
+permissions:
+  contents: read
+
+# Never cancel a deployment midway: a half-published supplement is worse than
+# a stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: pip install pytest
+      - name: Supplement tests (gate parity, dead links, determinism)
+        run: python -m pytest scripts/test_build_pages.py -q
+      - name: Build the supplement
+        env:
+          POLYFORGE_PAGES_COMMIT: ${{ github.sha }}
+        run: python scripts/build_pages.py --out site
+      - name: Evidence base untouched
+        run: git diff --exit-code
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -62,3 +62,7 @@ artifacts/openapi.yaml
 
 # stage_b_controls.sh single-instance lock
 .controls.lock
+
+# The evidence supplement is built by scripts/build_pages.py and deployed
+# by .github/workflows/pages.yml; the generator is the artifact, not the site.
+site/

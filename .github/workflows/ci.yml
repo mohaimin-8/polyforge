@@ -144,6 +144,11 @@ jobs:
           "
       - name: Security study runs (cache side channel)
         run: python research/security/cache_side_channel.py
+      # D3: the evidence supplement must keep telling the truth about the
+      # evidence — every gated record published, the gate badge read from
+      # reproduce.py itself, no dead links, byte-identical rebuilds.
+      - name: Evidence supplement build (gate parity, dead links, determinism)
+        run: python -m pytest scripts/test_build_pages.py -q
 
   # Phase 9: the trace pipelines must stay runnable — synthetic modes are
   # deterministic and dependency-light, so a broken ETL fails CI, not a
