@@ -29,6 +29,7 @@ import (
 	"polyforge/internal/events"
 	pfv1alpha1 "polyforge/internal/operator/api/v1alpha1"
 	"polyforge/internal/operator/controllers"
+	"polyforge/internal/operator/fairness"
 	"polyforge/internal/operator/planner"
 )
 
@@ -167,6 +168,45 @@ func main() {
 			// time flat. It scopes the fairness term to each cell — a
 			// measured global-Jain cost of −0.0053 — so it is opt-in.
 			CellSize: int(envInt32(log, "POLYFORGE_PLAN_CELL_SIZE", 0)),
+		}
+		// W32 noisy-neighbour detection is opt-in and needs a metrics
+		// source. Without POLYFORGE_PSI_PROMETHEUS_URL the planner sees no
+		// interference term at all, which is the behaviour every published
+		// campaign ran with — R4 requires a new mechanism to change nothing
+		// until it is switched on.
+		if promURL := os.Getenv("POLYFORGE_PSI_PROMETHEUS_URL"); promURL != "" {
+			detector := fairness.NewDetector(fairness.DetectorConfig{})
+			feed := fairness.NewPSIFeed(promURL, detector)
+			feed.Log = log
+			// Empty is the in-cluster unauthenticated posture; a Prometheus
+			// behind auth needs this or every poll 401s.
+			feed.Token = os.Getenv("POLYFORGE_PSI_PROMETHEUS_TOKEN")
+			// The tenant label has to be set before the queries are built:
+			// the defaults embed it in both the grouping and the matcher.
+			if label := os.Getenv("POLYFORGE_PSI_TENANT_LABEL"); label != "" {
+				feed.TenantLabel = label
+				feed.Queries = fairness.DefaultPSIQueries(label, fairness.DefaultPSIWindow)
+			}
+			// Per-signal overrides: PSI series names vary by kubelet version
+			// and are absent on cgroup v1, and a syscall rate only exists if
+			// the cluster runs an eBPF exporter to produce one.
+			if query := os.Getenv("POLYFORGE_PSI_QUERY_CPU"); query != "" {
+				feed.Queries.CPUStall = query
+			}
+			if query := os.Getenv("POLYFORGE_PSI_QUERY_MEMORY"); query != "" {
+				feed.Queries.MemPressure = query
+			}
+			if query := os.Getenv("POLYFORGE_PSI_QUERY_SYSCALLS"); query != "" {
+				feed.Queries.Syscalls = query
+			}
+			if err := mgr.Add(feed); err != nil {
+				log.Error("add psi feed", "error", err)
+				os.Exit(1)
+			}
+			runner.Interference = detector
+			log.Info("noisy-neighbour detection enabled",
+				"prometheus", promURL, "tenantLabel", feed.TenantLabel,
+				"syscallSignal", feed.Queries.Syscalls != "")
 		}
 		if natsURL := os.Getenv("POLYFORGE_NATS_URL"); natsURL != "" {
 			backbone, err := events.Connect(context.Background(), natsURL, events.BackboneConfig{})

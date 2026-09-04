@@ -129,3 +129,28 @@ networkPolicy:
 
 nameOverride: ""
 fullnameOverride: ""
+
+# W32 noisy-neighbour detection (internal/operator/fairness). Off unless
+# prometheusURL is set: the detector then scores every tenant's pressure
+# signals against the cluster median and the planner throttles expansion for
+# tenants that stay above the threshold.
+#
+# The signals are kernel PSI, which the kubelet's cAdvisor exports per
+# container. VERIFY THE SERIES EXIST on your nodes before relying on a flag:
+# PSI export is gated by kubelet version and absent on cgroup v1. The queries
+# below override the built-in defaults per signal; leave one empty to use the
+# default, and set `syscalls` only if you run an eBPF exporter that publishes
+# one (no standard exporter does, so that signal contributes nothing by
+# default and the detector scores on two of three axes).
+interference:
+  prometheusURL: ""
+  tenantLabel: tenant
+  # Bearer credential for a Prometheus behind auth. A token belongs in a
+  # Secret, never in values.yaml.
+  tokenSecret:
+    name: ""
+    key: token
+  queries:
+    cpu: ""
+    memory: ""
+    syscalls: ""
