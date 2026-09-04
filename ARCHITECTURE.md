@@ -60,7 +60,7 @@ fairness simultaneously.
 | Classifier | `internal/classifier`, `cmd/classifier-train` | 12-feature window vectors → 5-class taxonomy (`research/TAXONOMY.md`), online labels every 10 s with PSI drift detection |
 | JCAC planner | `services/planner` + `research/jcac_sim` | receding-horizon MPC on a move-blocked action lattice; **the service imports the simulator's controller, so offline and online planning are provably the same code** |
 | Operator | `cmd/operator`, `deploy/operator`, `deploy/helm/polyforge-operator` | 4 CRDs, reconcile with guardrails, ordered finalizer teardown, OTel-traced reconciles, optional **planning cells** (below) |
-| Fairness | `internal/` (W32) | peer-relative noisy-neighbor detection on eBPF-shaped signals → interference penalty in the planner objective; Jain's index exported per cycle |
+| Fairness | `internal/` (W32) | peer-relative noisy-neighbor detection on kernel PSI signals → interference penalty in the planner objective; Jain's index exported per cycle. The production feed is PromQL over cAdvisor's PSI series (`fairness.PSIFeed`), off unless `POLYFORGE_PSI_PROMETHEUS_URL` is set; there is no syscall signal unless the cluster runs an eBPF exporter |
 | Evaluation | `eval/` | YAML-driven harness, 5 tuned baselines, 1,800-run matrix + ablations, DuckDB results, validation/spot-check/KS tooling (`eval/README.md`) |
 
 ## Planning cells, and what fairness means under them

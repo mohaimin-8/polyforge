@@ -75,6 +75,27 @@ spec:
             - name: POLYFORGE_PLAN_CELL_SIZE
               value: {{ .Values.planner.cellSize | quote }}
             {{- end }}
+            {{- if .Values.interference.prometheusURL }}
+            # W32 noisy-neighbour detection. Absent = no interference term,
+            # which is what every published campaign ran with.
+            - name: POLYFORGE_PSI_PROMETHEUS_URL
+              value: {{ .Values.interference.prometheusURL | quote }}
+            - name: POLYFORGE_PSI_TENANT_LABEL
+              value: {{ .Values.interference.tenantLabel | quote }}
+            {{- if .Values.interference.tokenSecret.name }}
+            - name: POLYFORGE_PSI_PROMETHEUS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.interference.tokenSecret.name }}
+                  key: {{ .Values.interference.tokenSecret.key }}
+            {{- end }}
+            {{- range $signal, $query := .Values.interference.queries }}
+            {{- if $query }}
+            - name: POLYFORGE_PSI_QUERY_{{ $signal | upper }}
+              value: {{ $query | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- if .Values.gateway.adminURL }}
             - name: POLYFORGE_GATEWAY_ADMIN_URL
               value: {{ .Values.gateway.adminURL | quote }}
