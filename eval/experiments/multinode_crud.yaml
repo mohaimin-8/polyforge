@@ -1,0 +1,23 @@
+# W7 — does the load actually spread across nodes? (PREREG_MULTINODE.md)
+#
+# The first campaign to use the sampler's node attribution. Every live record
+# before this one reports per-POD spread, because per-pod spread was the only
+# thing `kubectl top pods` ever gave us.
+#
+# CRUD ONLY, and that is the point: the roadmap recorded W7 as needing the
+# GPU-blocked B1 matrix, but the CRUD path needs no GPU at all (the 24 h soak
+# drove 298 rps with no model in the loop). So none of the AI env gates that
+# trace_live.yaml requires apply here - no POLYFORGE_EVAL_LIVE_AI, no tier
+# backends, no shared Postgres for AI metrics.
+#
+# `medium` is the cluster size that matters: NODES_BY_SIZE["medium"] = 4.
+name: multinode_crud
+backend: cluster
+steps: 120
+reps: 1
+systems: [jcac]
+workloads: [crud_bursty]
+tenant_mixes: [uniform]
+cluster_sizes: [medium]
+output: eval/results/multinode_crud.duckdb
+retries: 0
