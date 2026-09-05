@@ -78,3 +78,6 @@ eval/results/**/*.duckdb.wal
 # RESULTS_TRACE_LIVE.md's bound on TL-H3). The per-sitting copies that git
 # keeps are the named ones: *_attemptN_evidence, trace_live_evidence.
 eval/results/live_soak_evidence/
+
+# soak_observer.sh's liveness heartbeat, written where it is launched from.
+.observer.heartbeat

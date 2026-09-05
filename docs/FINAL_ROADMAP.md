@@ -31,7 +31,7 @@ reviewer will raise**, plus packaging. Everything below is traceable to one:
 | **W2** | Two live FAILs (SK-H1 rule artifact, SK-H3 by 0.001–0.21 ms) | **Not closable.** L6 removes the confound for future sittings; attempt 10's scored FAILs stand as measured and V8 pre-committed it as the last on this machine |
 | **W3** | Theorem is single-tenant; MT extension falsified (S2 FAIL, S3 not evaluable) | **T1 — DONE session 42.** Floor computed (0.126189); S3 **FAIL**. Scope unchanged, reason now measured |
 | **W4** | No real trace has ever driven a real cluster | **CLOSED session 42.** Two arms x 2.00 h of BurstGPT window 0 on a real cluster, scored against a prereg. TL-H1 PASS (the sim's cost ordering transferred), TL-H2 VACUOUS, TL-H3 PASS. `RESULTS_TRACE_LIVE.md` |
-| **W5** | Live latency is CPU service time, not service latency | **L6 — partly done session 42.** The end-to-end instrument already existed and was never scraped; `soak_observer.sh` now captures it. Unverified against a live cluster, and attempt 10 cannot be re-read |
+| **W5** | Live latency is CPU service time, not service latency | **L6 — DONE session 43.** The instrument existed and was never scraped; `soak_observer.sh` captures it and the capture is now **verified against a live server** (180/180 requests). The gap is measured: **+21.0% mean, +238.7% p95** on that host, same 172 requests both sides. Still not closable *for the published sittings* — attempt 10's pods are gone and it cannot be re-read — but the caveat the thesis carries is no longer an assertion |
 | **W6** | Stage C is a precondition, not a scored result | **CLOSED session 42.** L5 is a scored 2 h sitting under its own prereg, so the paper no longer needs to lean on an unscored precondition |
 | **W7** | Single machine, single cluster | **L7 cannot close it, and L5 showed why.** `NODES_BY_SIZE` makes `small` a **2-node** cluster, so the trace sitting already ran multi-NODE — but `load_distribution.json` records **one pod at 100%**, because 1.377 rps needs exactly one replica. A bigger node count changes nothing while the demand needs one pod. Demonstrating multi-node *behaviour* needs a high-demand cell, i.e. the GPU-blocked B1 matrix. Partial credit is not available here and should not be claimed |
 | **W8** | Cache precision 0.313 at τ=0.85 | **C1 — DONE session 42.** Closed *with evidence*: retrieval contributes only +0.047; the ceiling is response stochasticity |
@@ -266,6 +266,35 @@ The plumbing exists; what is new is the trace->bucket projection and a prereg.
 
 **Needs a NEW pre-registration** — it is a new scored comparison. Do not fold
 it into `PREREG_WAVE4_LIVE_PLANE`.
+
+### L6 — **DONE (session 43). Verified live, and it found a security defect.**
+
+**Session 43 closed the open half.** The scrape was checked against a real
+control-plane under load (`eval/results/l6_scrape_verification_evidence/`):
+`observer.csv` reached `http_dur_count=180` for exactly the 180 requests sent,
+and `metrics_http_duration.csv` carries the bucket rows a percentile needs.
+
+**The W5 gap is measured rather than asserted.** Over the 172 served requests,
+CPU service time — what every live record's `crud_p95` reports — is mean
+**1.1496 ms / p95 1.4105 ms**, and end-to-end is mean **1.3911 ms / p95
+4.7778 ms**: **+21.0% on the mean and +238.7% on p95**. Same 172 requests on
+both sides. The mean gap is the telemetry write; the p95 gap is that write's
+own tail, and it more than triples the percentile. **Not transferable** — one
+host, SQLite, no concurrency, 180 requests. The sign is structural, the size is
+not this number, and attempt 10 stays closed: the histogram was never scraped
+there and V8 pre-committed it as the last sitting.
+
+**It also found a remotely triggerable memory leak**, which is the argument for
+running instruments rather than reasoning about them. 8 of the 180 requests
+were rate-limited and appeared under the **raw path** as a route label, because
+`ServeMux` sets `r.Pattern` only after it matches and `rateLimit` answers 429
+above the mux. That label keys two unbounded maps, one allocating a histogram
+per key — so any caller could mint permanent series, unauthenticated, by
+tripping the rate limiter or requesting a 404. Fixed (`routePattern` resolves
+through the mux, falls back to one constant; `metrics.boundRoute` caps labels),
+4 tests, mutation-checked. `docs/SECURITY.md` §Session-43.
+
+*Session 42's half, kept for the record:*
 
 ### L6 — **PARTLY DONE (session 42). The instrument already existed.**
 

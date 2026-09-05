@@ -41,6 +41,17 @@ OUT="$EVIDENCE/observer.csv"
 # port-forward is what pinned every request to one pod of sixteen in attempt 4.
 # `/metrics` bypasses the rate limiter (server.go rateLimit), so the scrape
 # cannot consume a tenant's budget.
+# VERIFIED LIVE (session 43): 180 requests against a real control-plane were
+# captured exactly - see eval/results/l6_scrape_verification_evidence/. Two
+# things that verification established and this script must carry:
+#   1. End-to-end runs +21.0% above the telemetry clock on the mean and +238.7%
+#      on p95 (1.3911 vs 1.1496 ms; 4.7778 vs 1.4105 ms) on that host. The sign
+#      is structural; the size is not transferable to a cluster sitting.
+#   2. The histogram has NO status dimension, and since session 43 rate-limited
+#      requests carry their route's real label (they used to mint one series per
+#      raw path - a memory leak, see docs/SECURITY.md). So under heavy 429
+#      traffic the mean below is pulled DOWN by cheap rejections. Read
+#      metrics_http_duration.csv's buckets, not the mean, when that matters.
 NODE_PORT=${NODE_PORT:-30080}
 METRICS_URL="${METRICS_URL:-http://localhost:$NODE_PORT/metrics}"
 METRICS_OUT="$EVIDENCE/metrics_http_duration.csv"
