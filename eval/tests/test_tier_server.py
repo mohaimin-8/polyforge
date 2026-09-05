@@ -233,8 +233,15 @@ def test_batched_generation_matches_serial_exactly():
 
     Run in the Kaggle smoke before TIER_BENCH_BATCHED.md is written.
     """
-    import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    # torch and transformers are NOT harness dependencies - this check runs in
+    # the Kaggle smoke where they exist. In CI they do not, and importing them
+    # unguarded turned "this environment cannot run the check" into a failed
+    # test. The load failure below was already treated as a skip; the import
+    # has to be as well.
+    torch = pytest.importorskip("torch")
+    transformers = pytest.importorskip("transformers")
+    AutoModelForCausalLM = transformers.AutoModelForCausalLM
+    AutoTokenizer = transformers.AutoTokenizer
 
     try:
         tok = AutoTokenizer.from_pretrained(REAL_MODEL)

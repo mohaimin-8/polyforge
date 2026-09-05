@@ -1,6 +1,20 @@
 # Main working path — the single ordered route to a Transactions-level submission
 
-Last updated 2026-08-05. **Start here.** This is the top-level route that
+Last updated 2026-08-05, and **superseded as the execution route on
+2026-08-31**: `docs/FINAL_ROADMAP.md` is what a session executes now (§0 maps
+the nine named weaknesses to the workstream that closes each; §7 is the order).
+This file remains the milestone narrative M1–M6 — read it for *why* the route
+looks the way it does, not for what to do next. Its "next action: M3" is stale.
+
+> **Session 43 (2026-09-05):** D3, R3 and L6 closed. The reproduction gate had
+> been red on clean checkouts since 2026-08-31 while reading 38/38 locally;
+> four causes, all fixed (`FINAL_ROADMAP.md` §5 R5), and a simulated clean
+> clone — no DuckDBs, no raw trace — now rebuilds **38/38 byte-identical**.
+> L6's live verification measured the W5 gap at +21.0% mean / +238.7% p95 and
+> uncovered two metric-cardinality memory leaks (`SECURITY.md` §Session-43).
+> Nothing on the desk route is left but writing and the user's three gates.
+
+This is the top-level route that
 reconciles every open work item into one dependency-ordered path. It sits
 *above* two existing files and does not replace them:
 
