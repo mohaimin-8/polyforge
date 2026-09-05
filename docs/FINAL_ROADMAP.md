@@ -562,21 +562,37 @@ claim gets evidence instead of an assertion.
 
 ## §7 Execute order
 
+**As of session 43 this order is spent.** Everything on it is DONE, WITHDRAWN
+with its premise on record, or waiting on the author. Kept below with its
+outcomes so the sequence is auditable rather than deleted.
+
 ```
-T1  S3 exact walk          desk, no GPU   <- START. Restores the theorem.
-L2  batched tier server    desk, no GPU
-M2  severity decomposition desk, no GPU
-M3  window characterisation desk, no GPU
-C1  real embedder          desk, no GPU
-L3  re-bench (~30 min GPU) ----------------- decision point
-L4  score B1 (2-4 h GPU)
-L6  latency semantics      desk
-M1  p99 + TTFT/TPOT        desk
-L5  trace-driven live sitting (NEW PREREG) + L7 multi-node
-T2  T3  R1  R2  R3  D2  D3
+T1  S3 exact walk           DONE s42   floor 0.126189, S3 FAIL published
+L2  batched tier server     DONE s42   11.6x on the mock
+M2  severity decomposition  DONE s42   79.5% of overshoot is the budget cap
+M3  window characterisation DONE s42   the cost win and the SLO penalty are
+                                       the same 45 windows
+C1  real embedder           WITHDRAWN  retrieval adds +0.047; the ceiling is
+                                       response stochasticity
+L3  re-bench (~30 min GPU)  BLOCKED    P100 is sm_60, torch 2.10 dropped it
+L4  score B1 (2-4 h GPU)    BLOCKED    behind L3 --> USER: set GPU T4 x2
+L6  latency semantics       DONE s43   verified live; W5 gap +21% / +239%
+M1  p99 + TTFT/TPOT         WITHDRAWN  PREREG_LIVE_CHAOS_P99 Part B forbids it
+L5  trace-driven sitting    DONE s42   TL-H1 PASS, TL-H3 PASS
+L7  multi-node              SUPERSEDED by PREREG_MULTINODE_V2: MN-H1 PASS,
+                                       3 nodes, 0.3166/0.3815/0.3019
+T2  WITHDRAWN   T3 DONE s42   R1 DONE s42   R2 DONE s42   R3 DONE s43
+R4s DONE s42    R5 DONE s43   R6 DONE s43   D2 DONE s42   D3 DONE s43
+D1  Zenodo bundle built ------------------- USER: publish for the DOI
 -------------------------------------------------------------
-§9  writing                HELD
+§9  writing                 HELD
 ```
+
+**What is left that is not writing:** three things, none of them mine. Set
+`GPU T4 x2` in the Kaggle notebook UI (unblocks L3, then L4, then B1 — the only
+item that can still move the venue). Publish the Zenodo bundle. Make the GHCR
+packages public and set `PAGES_ENABLED=true` if the supplement should be
+reachable.
 
 Rationale: the four desk items at the top need no external resource and two of
 them (T1, M3) can produce *positive* results. L3 is the cheapest thing that
