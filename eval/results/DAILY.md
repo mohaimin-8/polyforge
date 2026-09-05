@@ -1299,3 +1299,4 @@ Appended by the runner every progress tick.
 | 2026-08-31 23:07 | trace_live | 1/1 | 0 | 0 runs/h |
 | 2026-09-01 01:15 | trace_live | 1/1 | 0 | 0 runs/h |
 | 2026-09-05 08:54 | multinode_crud | 1/1 | 1 | 10 runs/h |
+| 2026-09-05 09:04 | multinode_crud | 1/1 | 1 | 8 runs/h |
