@@ -954,7 +954,7 @@ func (s *Server) requestLog(next http.Handler) http.Handler {
 			recorder.status = http.StatusOK
 		}
 		duration := time.Since(start)
-		route := routePattern(r)
+		route := s.routePattern(r)
 
 		span.SetName(r.Method + " " + route)
 		span.SetAttributes(
@@ -990,14 +990,50 @@ func spanIDOrEmpty(sc trace.SpanContext) string {
 	return sc.SpanID().String()
 }
 
-func routePattern(r *http.Request) string {
-	if r.Pattern != "" {
-		if _, route, ok := strings.Cut(r.Pattern, " "); ok {
-			return route
-		}
-		return r.Pattern
+// unmatchedRoute is the label every request that resolves to no route
+// carries. It is a CONSTANT on purpose — see routePattern.
+const unmatchedRoute = "unmatched"
+
+// routePattern is the metric and log label for a request's route.
+//
+// `r.Pattern` is set by ServeMux *after* it matches, so it is empty for every
+// request that never reaches the mux — which is precisely the rate-limited
+// ones, because rateLimit short-circuits with 429 above it. This used to fall
+// back to `r.URL.Path`, and that was a remotely triggerable memory leak:
+// metrics.RecordHTTPRequest keys two unbounded maps by route, one of them
+// allocating a fresh 12-bucket histogram per key, so every distinct rejected
+// path allocated a permanent series. `/v1/tenants/<any id>/…` and any random
+// 404 path both mint one, unauthenticated, and the rate limiter — the defence
+// — is what feeds it. Found by the L6 scrape verification: 8 of 180 replay
+// requests were 429s and showed up under `route="/v1/tenants/l6/workloads/
+// replay"` beside the 172 under the templated pattern, splitting one route's
+// histogram in two.
+//
+// So: ask the mux for the pattern it *would* have matched (which recovers the
+// real route for rate-limited requests, and is the more useful label anyway),
+// and fall back to a single constant when there is genuinely no route.
+func (s *Server) routePattern(r *http.Request) string {
+	if route, ok := cutPattern(r.Pattern); ok {
+		return route
 	}
-	return r.URL.Path
+	if s.mux != nil {
+		if _, pattern := s.mux.Handler(r); pattern != "" {
+			if route, ok := cutPattern(pattern); ok {
+				return route
+			}
+		}
+	}
+	return unmatchedRoute
+}
+
+func cutPattern(pattern string) (string, bool) {
+	if pattern == "" {
+		return "", false
+	}
+	if _, route, ok := strings.Cut(pattern, " "); ok {
+		return route, true
+	}
+	return pattern, true
 }
 
 func newRequestID() string {

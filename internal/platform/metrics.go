@@ -32,6 +32,8 @@ type metrics struct {
 
 	httpRequests        map[httpMetricKey]uint64
 	httpRequestDuration map[httpDurationMetricKey]*histogram
+	// routeLabels is the distinct-route set boundRoute enforces the cap on.
+	routeLabels map[string]struct{}
 
 	telemetryEvents  map[telemetryMetricKey]uint64
 	telemetryLatency map[string]*histogram
@@ -67,6 +69,7 @@ func newMetrics() *metrics {
 		startedAt:           time.Now().UTC(),
 		httpRequests:        make(map[httpMetricKey]uint64),
 		httpRequestDuration: make(map[httpDurationMetricKey]*histogram),
+		routeLabels:         make(map[string]struct{}),
 		telemetryEvents:     make(map[telemetryMetricKey]uint64),
 		telemetryLatency:    make(map[string]*histogram),
 		telemetryPayload:    make(map[string]*histogram),
@@ -91,6 +94,31 @@ func (m *metrics) DecInFlight() {
 	m.mu.Unlock()
 }
 
+// maxRouteLabels bounds how many distinct route labels the registry will
+// ever hold. Defence in depth behind server.routePattern, which is what
+// actually keeps raw paths out of this map: the two maps below are unbounded
+// and one allocates a histogram per key, so a route label that can be
+// influenced from outside is a remote memory leak. The server has ~60 routes;
+// this leaves generous room for growth while capping the damage if a future
+// middleware starts labelling with something unbounded again.
+const maxRouteLabels = 256
+
+// overflowRoute is where labels past the cap are folded. Seeing it in
+// /metrics means something is minting route labels and should be found.
+const overflowRoute = "overflow"
+
+// boundRoute must be called with m.mu held.
+func (m *metrics) boundRoute(route string) string {
+	if _, known := m.routeLabels[route]; known {
+		return route
+	}
+	if len(m.routeLabels) >= maxRouteLabels {
+		return overflowRoute
+	}
+	m.routeLabels[route] = struct{}{}
+	return route
+}
+
 func (m *metrics) RecordHTTPRequest(method, route string, status int, duration time.Duration) {
 	if m == nil {
 		return
@@ -98,6 +126,7 @@ func (m *metrics) RecordHTTPRequest(method, route string, status int, duration t
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	route = m.boundRoute(route)
 	key := httpMetricKey{Method: method, Route: route, Status: status}
 	m.httpRequests[key]++
 

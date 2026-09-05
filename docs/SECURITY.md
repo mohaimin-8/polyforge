@@ -163,6 +163,49 @@ full pen test: ZAP's passive+API rules are not an adversary, the scan runs
 one tenant against a single-node dev stack, and no active-attack or
 authenticated-fuzzing campaign has been run.
 
+## Session-43 finding: unbounded metric cardinality, remotely triggerable (FIXED)
+
+**Severity: high. Found by accident, by an instrument check** — the L6 `/metrics`
+scrape verification (`eval/results/l6_scrape_verification_evidence/`), not by a
+review pass. 8 of 180 replay requests were rate-limited, and the 429s appeared
+in the histogram under `route="/v1/tenants/l6/workloads/replay"` — the raw path
+— beside the 172 served requests under the templated
+`route="/v1/tenants/{tenant_id}/workloads/replay"`.
+
+**Mechanism.** `routePattern` read `r.Pattern`, which `ServeMux` populates only
+*after* it matches. `Handler()` wraps `rateLimit` above the mux, so every
+rejected request reached the metrics recorder with an empty pattern and fell
+back to `r.URL.Path`. `metrics.RecordHTTPRequest` keys two unbounded maps by
+that label, and one allocates a fresh 12-bucket histogram per key.
+
+**Impact.** Anyone who can reach the server could allocate permanent series in
+its own memory — no authentication needed, since the rate limiter's rejection
+is what mints them, and a 404 does the same. One series set per tenant id under
+load, unbounded under a crafted request stream. The registry never evicts, so
+this is straightforward memory exhaustion against the control plane, and a
+cardinality bomb for any Prometheus scraping it. `kubectl`'s stray `/api` and
+`/apis` probes minted two of these by accident during the verification run,
+which is how visible the path is.
+
+**Fix.** `routePattern` now asks the mux for the pattern it *would* have
+matched — which recovers the real templated route for rate-limited requests,
+the more useful label anyway — and falls back to the single constant
+`unmatched` when nothing matches. Behind that, `metrics.boundRoute` caps
+distinct route labels at 256 and folds the rest into `overflow`, so a future
+middleware cannot reintroduce the leak silently.
+
+**Tests.** `internal/platform/route_label_cardinality_test.go`: ten tenant ids
+through a tripped rate limiter mint no tenant-labelled series; 40 unmatched
+paths collapse to one label; the registry stays bounded when driven directly;
+and a matched route still reports its own pattern. Mutation-checked — restoring
+the `r.URL.Path` fallback fails two of the four.
+
+**Consequence to know about.** Rate-limited requests now share their route's
+duration histogram, which has no status dimension. Heavy 429 traffic therefore
+pulls a route's observed mean *down*, because a rejection is cheap (65 µs here
+against 1.39 ms for a served request). That is the standard Prometheus
+trade-off and is disclosed in `scripts/soak_observer.sh`.
+
 ## Known gaps (honest list)
 
 1. ZAP scan and the compromised-pod simulation have not been executed —
