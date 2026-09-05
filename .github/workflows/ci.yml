@@ -56,11 +56,17 @@ jobs:
       # mechanisms the session-35 audit found real defects in. envtest runs
       # the operator against a real apiserver, so those tests are build-tagged
       # (keeping `go test ./...` green without the binaries) and run here.
+      # setup-envtest is PINNED to the controller-runtime version in go.mod.
+      # It was @latest, and on 2026-09-05 that resolved to v0.25.0, which
+      # requires go >= 1.26.0 while this repo pins the toolchain to 1.25.12
+      # for a CVE fix - so the job started failing on an upstream release
+      # rather than on anything in the tree. Same class of defect as the
+      # unpinned analysis dependencies: a floating version under a gate.
       - name: Operator tests against a real apiserver (envtest)
         run: |
-          go run sigs.k8s.io/controller-runtime/tools/setup-envtest@latest \
+          go run sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.22.4 \
             use 1.31.0 --bin-dir "$RUNNER_TEMP/envtest"
-          KUBEBUILDER_ASSETS="$(go run sigs.k8s.io/controller-runtime/tools/setup-envtest@latest \
+          KUBEBUILDER_ASSETS="$(go run sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.22.4 \
             use 1.31.0 --bin-dir "$RUNNER_TEMP/envtest" -p path)" \
             go test -tags envtest ./internal/operator/controllers/ -run Envtest -count=1 -v
       - name: Coverage gate
@@ -196,6 +202,18 @@ jobs:
         run: python scripts/reproduce.py --check
       - name: Rebuild records + figures from committed exports
         run: python scripts/reproduce.py --out /tmp/reproduce_out
+      # A drift here reads "N changed lines" and nothing else, which is exactly
+      # the information you do not have when the machine that reproduces is not
+      # the machine that failed. reproduce.py already writes a unified diff per
+      # drifted record; print it rather than making the next person guess.
+      - name: Show what drifted
+        if: failure()
+        run: |
+          for f in /tmp/reproduce_out/diff_*.txt; do
+            [ -e "$f" ] || continue
+            echo "=== $f ==="
+            head -60 "$f"
+          done
       - name: Committed records untouched
         run: git diff --exit-code
 
