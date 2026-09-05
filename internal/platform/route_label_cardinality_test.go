@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -168,4 +169,56 @@ func firstMatchingLine(body, needle string) string {
 		}
 	}
 	return ""
+}
+
+// The same defect class, through the documented ingest path and with higher
+// amplification: POST /v1/telemetry carries `service` in the body, validName
+// only requires 1..200 characters, and each distinct value used to allocate a
+// counter plus TWO histograms that are never evicted. In a shared control
+// plane that is one tenant exhausting memory for everyone.
+func TestATenantCannotMintAMetricSeriesPerTelemetryServiceName(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	tenantStore := tenant.NewStore()
+	_, _ = tenantStore.CreateTenant(ctx, tenant.Tenant{ID: "alpha", Name: "Alpha"})
+	key, _ := tenantStore.CreateAPIKey(ctx, "alpha", "alpha", tenant.ScopeFull)
+	instance := NewServer(slog.New(slog.NewTextHandler(io.Discard, nil)),
+		tenantStore, telemetry.NewStore(10000), Config{AdminKey: "admin-test"})
+	server := httptest.NewServer(instance.Handler())
+	defer server.Close()
+
+	// Act: one authenticated tenant, many invented service names.
+	const attempts = maxServiceLabels + 200
+	for i := 0; i < attempts; i++ {
+		body := fmt.Sprintf(
+			`{"tenant_id":"alpha","service":"svc-%d","rps_window":1,"payload_bytes":10,`+
+				`"latency_ms":1,"cache_hit":false,"embedding_density":0.1,"model_tier":"small"}`, i)
+		req, err := http.NewRequest(http.MethodPost, server.URL+"/v1/telemetry", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("X-PolyForge-API-Key", key.Secret)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+	}
+
+	// Assert: the histograms are the expensive part, and there are two per
+	// service. Bounded means bounded regardless of how many names arrive.
+	if got := len(instance.metrics.telemetryLatency); got > maxServiceLabels+1 {
+		t.Fatalf("service labels are unbounded: %d latency histograms after %d names", got, attempts)
+	}
+	if got := len(instance.metrics.telemetryPayload); got > maxServiceLabels+1 {
+		t.Fatalf("service labels are unbounded: %d payload histograms after %d names", got, attempts)
+	}
+	if _, folded := instance.metrics.telemetryLatency[overflowRoute]; !folded {
+		t.Errorf("names past the cap should fold into %q so the condition is visible", overflowRoute)
+	}
+	// A real service name still gets its own series.
+	if _, kept := instance.metrics.telemetryLatency["svc-0"]; !kept {
+		t.Error("the first services must keep their own labels")
+	}
 }
