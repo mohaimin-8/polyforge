@@ -91,8 +91,23 @@ jobs:
           total=$(go tool cover -func=coverage.out | tail -1 | awk '{gsub("%","",$3); print $3}')
           echo "total statement coverage: ${total}%"
           awk -v t="$total" 'BEGIN { exit !(t >= 65.0) }' || { echo "FAIL: coverage ${total}% is below the 65% gate"; exit 1; }
-      - name: Lint OpenAPI
-        run: npx --yes @redocly/cli lint api/openapi.yaml
+
+  # SEPARATE JOBS ON PURPOSE. These two used to be the last steps of `test`,
+  # behind the envtest step - and on 2026-09-05 that turned out to matter: an
+  # upstream release broke envtest's tooling, the job stopped there, and the
+  # CVE gate behind it did not run for a week. By the time it ran again the
+  # toolchain pin was five patch releases stale and govulncheck found SEVEN
+  # reachable stdlib vulnerabilities (docs/SECURITY.md, session 43). A gate
+  # placed behind a fragile step is a gate that stops running silently, so a
+  # gate that must never be masked gets its own job.
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
       # Reachability-aware CVE gate. govulncheck fails only on
       # vulnerabilities our code actually *calls*, so it does not turn
       # every advisory in the module graph into a red build. Added after a
@@ -103,6 +118,13 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           "$(go env GOPATH)/bin/govulncheck" ./...
+
+  openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Lint OpenAPI
+        run: npx --yes @redocly/cli lint api/openapi.yaml
 
   # W23: no secrets in the repo or its history. gitleaks scans every push
   # over the full history (fetch-depth: 0 is what makes that true).
@@ -148,6 +170,9 @@ jobs:
       - name: Harness tests
         run: python -m pytest eval/tests -q
       - name: Smoke the runner end to end (4 runs)
+        # Independent of the suites above, so a failure there must not skip
+        # it: that is how three steps went unrun on 2026-09-05.
+        if: always()
         working-directory: eval
         run: |
           python -m harness.runner experiments/smoke.yaml --limit 4
@@ -159,10 +184,22 @@ jobs:
           assert n == 4, f'expected 4 valid runs, got {n}'
           "
       - name: Security study runs (cache side channel)
+        # Independent of the suites above, so a failure there must not skip
+        # it: that is how three steps went unrun on 2026-09-05.
+        if: always()
         run: python research/security/cache_side_channel.py
-      # D3: the evidence supplement must keep telling the truth about the
-      # evidence — every gated record published, the gate badge read from
-      # reproduce.py itself, no dead links, byte-identical rebuilds.
+
+  # D3's gate, in its own job for the reason vulncheck is: it was the last
+  # step of `python` and a torch import three steps earlier skipped it.
+  supplement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: pip install pytest
       - name: Evidence supplement build (gate parity, dead links, determinism)
         run: python -m pytest scripts/test_build_pages.py -q
 
