@@ -73,6 +73,9 @@ touching storage or the HTTP surface):**
 ```bash
 # PostgreSQL RLS / tenant isolation. These SKIP silently without the env,
 # and a skip prints `ok` — always set it explicitly before claiming RLS.
+# Since session 43 the prose has a mechanism behind it: set
+# POLYFORGE_REQUIRE_POSTGRES=1 (CI does) and a missing fixture FAILS instead
+# of skipping, so a service that never started cannot report ok.
 ./scripts/pg-test-up.sh                      # starts PG, prints the exports
 eval "$(./scripts/pg-test-up.sh --env)"
 go test ./internal/storage/postgres/ -count=1   # expect 3/3 PASS
