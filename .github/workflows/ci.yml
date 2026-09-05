@@ -56,18 +56,28 @@ jobs:
       # mechanisms the session-35 audit found real defects in. envtest runs
       # the operator against a real apiserver, so those tests are build-tagged
       # (keeping `go test ./...` green without the binaries) and run here.
-      # setup-envtest is PINNED to the controller-runtime version in go.mod.
-      # It was @latest, and on 2026-09-05 that resolved to v0.25.0, which
-      # requires go >= 1.26.0 while this repo pins the toolchain to 1.25.12
-      # for a CVE fix - so the job started failing on an upstream release
-      # rather than on anything in the tree. Same class of defect as the
-      # unpinned analysis dependencies: a floating version under a gate.
+      # setup-envtest is a BUILD-TIME tool: it downloads the apiserver and etcd
+      # binaries envtest runs against, and never enters the shipped artifact.
+      # Two facts collide here. Every tagged version of its module - the only
+      # ones published are v0.24.0, v0.24.1 and v0.25.0 - declares `go 1.26.0`,
+      # and this repo pins the toolchain to 1.25.12 because that is where a set
+      # of reachable stdlib CVEs is fixed. So the TOOL is built with an auto
+      # toolchain while the TESTS still run under the pinned one; the pin that
+      # matters for the product is untouched.
+      #
+      # The version is pinned as well. It was @latest, and on 2026-09-05 that
+      # resolved to v0.25.0 and broke this job on an upstream release with
+      # nothing in the tree changing - the same class of defect as the unpinned
+      # analysis dependencies: a floating version underneath a gate.
       - name: Operator tests against a real apiserver (envtest)
+        env:
+          ENVTEST_VERSION: v0.24.1
+          ENVTEST_K8S: 1.31.0
         run: |
-          go run sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.22.4 \
-            use 1.31.0 --bin-dir "$RUNNER_TEMP/envtest"
-          KUBEBUILDER_ASSETS="$(go run sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.22.4 \
-            use 1.31.0 --bin-dir "$RUNNER_TEMP/envtest" -p path)" \
+          tool="sigs.k8s.io/controller-runtime/tools/setup-envtest@${ENVTEST_VERSION}"
+          GOTOOLCHAIN=auto go run "$tool" use "$ENVTEST_K8S" --bin-dir "$RUNNER_TEMP/envtest"
+          assets="$(GOTOOLCHAIN=auto go run "$tool" use "$ENVTEST_K8S" --bin-dir "$RUNNER_TEMP/envtest" -p path)"
+          KUBEBUILDER_ASSETS="$assets" \
             go test -tags envtest ./internal/operator/controllers/ -run Envtest -count=1 -v
       - name: Coverage gate
         # Ratchet: raise toward the 80% target as packages gain tests.
