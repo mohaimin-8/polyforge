@@ -118,6 +118,15 @@ def load_cached_window(index: int):
     return payload["tenant_ids"], buckets, payload["meta"]
 
 
+def _portable_trace_path() -> str:
+    """The trace's path as the record should quote it: relative to the repo and
+    POSIX-separated, so it means the same thing on every machine."""
+    try:
+        return tm.TRACE.resolve().relative_to(REPO_ROOT).as_posix()
+    except ValueError:  # trace configured outside the repo
+        return tm.TRACE.name
+
+
 def window_count() -> int:
     """How many replay windows the committed trace affords.
 
@@ -161,7 +170,12 @@ def trace_window(index: int, *, events=None):
     buckets = tm.window_buckets(df, start_s, k)
     tenant_ids = [f"t{i:02d}" for i in range(tm.TENANTS)]
     meta = {
-        "trace": str(tm.TRACE),
+        # Repo-relative and POSIX, never absolute. The cache is committed and
+        # read on other machines, and `analysis_trace_live.py` renders this
+        # with `Path(...).name` — which on Linux does not split a Windows path
+        # at all, so an absolute `C:\...` from the author's box came out as the
+        # whole string and drifted the record in CI.
+        "trace": _portable_trace_path(),
         "window_index": index,
         "window_start_s": int(start_s),
         "window_hours": tm.WINDOW_H,

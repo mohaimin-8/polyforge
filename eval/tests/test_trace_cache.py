@@ -71,3 +71,23 @@ def test_the_peak_rate_the_conclusion_rests_on_survives_the_cache():
     # conclusion would silently stop holding.
     _, buckets, _ = td.load_cached_window(WINDOW)
     assert td.peak_total_rps(buckets) < 5.0
+
+
+def test_the_cached_trace_path_is_portable():
+    """The cache is committed and read on machines unlike the one that built it.
+
+    `analysis_trace_live.py` renders the provenance with `Path(meta['trace']).name`,
+    and on Linux that does not split a Windows path at all: the first cache
+    carried an absolute Windows path and the record came out quoting the
+    whole string, so CI's reproduction drifted while the author's machine
+    was clean. The stored path must mean the same thing everywhere.
+    """
+    from pathlib import PurePosixPath, PureWindowsPath
+
+    _, _, meta = td.load_cached_window(WINDOW)
+    trace = meta["trace"]
+
+    assert "\\" not in trace, f"backslashes are not portable: {trace!r}"
+    assert not PurePosixPath(trace).is_absolute(), f"absolute path in a committed artifact: {trace!r}"
+    assert not PureWindowsPath(trace).is_absolute(), f"absolute path in a committed artifact: {trace!r}"
+    assert PurePosixPath(trace).name == PureWindowsPath(trace).name == "burstgpt_real.csv.gz"
