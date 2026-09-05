@@ -103,3 +103,40 @@ remainder and is already listed in §8 as permanent.
 
 It does **not** license "distributed", "multi-host", "fault-tolerant", or any
 statement about behaviour under node loss. Nothing here kills a node.
+
+## Sitting 1: VOID (2026-09-05, apparatus) — and Amendment 1
+
+The first sitting ran 373 s and ended `valid_runs: 0`. Cause, from the run's
+own recorded error:
+
+```
+POST /v1/tenants/t00/api-keys -> 404: {"error":{"code":"tenant_not_found", ...}}
+```
+
+The deployment came up as **19 pods across three workers**, and each control
+plane held **its own SQLite**. Provisioning created tenant `t00` against one
+pod and asked the next request for an API key, which landed on a different pod
+that had never heard of it. Nothing to do with nodes, the workload, or the
+sampler.
+
+**The mistake was in this pre-registration, and it is mine.** The design above
+said the AI env gates `trace_live.yaml` requires "do not apply here", which is
+true of `POLYFORGE_EVAL_LIVE_AI` and the tier backends and false of
+`POLYFORGE_EVAL_SHARED_PG=1`. That one is not an AI gate at all — it is the
+session-23 fix for per-pod SQLite, and `live_soak.yaml`, the CRUD-only 24 h
+soak with `LIVE_AI` unset, requires it for exactly this reason: "so every
+control-plane replica writes one Postgres".
+
+**Amendment 1, before the re-run.** The design gains one line:
+
+| | |
+|---|---|
+| required env | `POLYFORGE_EVAL_SHARED_PG=1` — multi-replica storage, not an AI gate |
+
+Nothing else changes. MN-H1's threshold, MN-H2's gate and MN-H3's vacuity
+branch are all untouched, and no number from sitting 1 exists to have informed
+them: the sitting died in provisioning, before the load window.
+
+Per the stopping rule this consumes the one permitted re-run. A second void
+closes the campaign as unresolved.
+
