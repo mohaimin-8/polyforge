@@ -114,7 +114,7 @@ def load_runs(db_path: Path = FULL_DB) -> pd.DataFrame:
     if not db_path.exists():
         export = CSV_EXPORTS.get(db_path)
         if export is not None and export.exists():
-            df = pd.read_csv(export)[RUN_COLUMNS]
+            df = pd.read_csv(export, float_precision="round_trip")[RUN_COLUMNS]
             for col in RUN_COLUMNS[5:]:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
             return (df.sort_values(_RUN_ORDER, kind="mergesort")
@@ -175,7 +175,7 @@ def load_campaign_runs(db_path: Path, csv_path: Path) -> pd.DataFrame:
         return df
     if csv_path.exists():
         # Exports carry only valid rows, so there is no status filter here.
-        df = pd.read_csv(csv_path)[CAMPAIGN_RUN_COLUMNS]
+        df = pd.read_csv(csv_path, float_precision="round_trip")[CAMPAIGN_RUN_COLUMNS]
         for col in ("total_cost_usd", "mean_violation", "mean_jain", "steps"):
             df[col] = pd.to_numeric(df[col], errors="coerce")
         return df
@@ -196,7 +196,7 @@ _TS_SLICE_CSV = _RESULTS_DIR / "agg_fig09_timeseries_slices.csv.gz"
 def load_timeseries(db_path: Path, **filters) -> pd.DataFrame:
     if not db_path.exists():
         if db_path == FULL_DB and _TS_SLICE_CSV.exists():
-            df = pd.read_csv(_TS_SLICE_CSV)
+            df = pd.read_csv(_TS_SLICE_CSV, float_precision="round_trip")
             for key, value in filters.items():
                 if key not in df.columns:
                     df = df.iloc[0:0]

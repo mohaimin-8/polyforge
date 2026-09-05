@@ -107,7 +107,11 @@ func (s *Store) EvalAggregate(ctx context.Context, spec EvalAggSpec) (EvalAgg, e
 	if err != nil {
 		return out, fmt.Errorf("check tenant plans: %w", err)
 	}
-	for rows.Next() {
+	// One offender is enough to fail, so this reads the first row and stops.
+	// It was written as a `for` that always returns, which staticcheck flagged
+	// (SA4004) and which hid the missing rows.Err() check below: a query that
+	// failed mid-iteration used to look exactly like "no unrecognised plans".
+	if rows.Next() {
 		var id, plan string
 		if err := rows.Scan(&id, &plan); err != nil {
 			rows.Close()
@@ -118,6 +122,9 @@ func (s *Store) EvalAggregate(ctx context.Context, spec EvalAggSpec) (EvalAgg, e
 			"latency without its SLO class", id, plan)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return out, fmt.Errorf("check tenant plans: %w", err)
+	}
 
 	base, args := s.baseCTE(spec)
 

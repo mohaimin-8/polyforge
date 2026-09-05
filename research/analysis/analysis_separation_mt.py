@@ -76,7 +76,12 @@ _RESULTS = Path(__file__).resolve().parents[2] / "eval" / "results"
 # cluster size whose equal share the M3 prose called infeasible.
 CELL = {"workload": "flash_crud", "cluster_size": "small", "tenant_mix": "uniform"}
 V3_DB = _RESULTS / "raw_sim_v3.duckdb"
-V3_CSV = _RESULTS / "metrics_full.csv.gz"
+# The committed export of V3_DB, which is what a clean clone has. This
+# pointed at metrics_full.csv.gz — the v1 matrix, which carries no
+# flash_crud rows at all — so on a clean clone measured_violations()
+# returned None and this record silently lost its entire V2 section,
+# printing "Not evaluable" in place of the falsification it reports.
+V3_CSV = _RESULTS / "metrics_matrix_v3_overload.csv.gz"
 
 
 def config_for(cluster_size: str) -> TenantConfig:
@@ -98,7 +103,7 @@ def measured_violations() -> pd.DataFrame | None:
                          "on r.run_id = m.run_id where r.status = 'valid'").fetchdf()
         con.close()
     elif V3_CSV.exists():
-        df = pd.read_csv(V3_CSV)
+        df = pd.read_csv(V3_CSV, float_precision="round_trip")
     else:
         return None
     for key, value in CELL.items():

@@ -44,7 +44,7 @@ def load_worst_tenant(db_path: Path) -> pd.DataFrame:
     if not db_path.exists():
         agg = db_path.parent / "agg_fairness_v2_worst_tenant.csv.gz"
         if agg.exists():
-            df = pd.read_csv(agg)
+            df = pd.read_csv(agg, float_precision="round_trip")
             for col in ("worst_tenant_p95_ms", "worst_tenant_violation"):
                 df[col] = pd.to_numeric(df[col], errors="coerce")
             return df

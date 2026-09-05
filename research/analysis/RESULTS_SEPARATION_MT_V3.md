@@ -16,6 +16,8 @@ The eight-tenant floor **is computable**: **0.126189**, from an exact ordered wa
 
 The expensive rows cannot live inside `scripts/reproduce.py`: the largest walk in the artifact takes ~120 minutes and the gate re-runs every analysis. So they are computed once into `separation_mt_v3_walk.json` and the cheap rows are **re-derived here at gate time** and compared. A stale or edited artifact fails this check instead of passing quietly.
 
+The comparison is to a relative tolerance of 1e-12, not exact: `coupled_floor_incremental_batched` documents its aggregate as a **chunked** float64 sum whose last bits depend on how the reduction is split, so an exact test measured the platform rather than the artifact. It did — on Linux row 6 re-derives as 0.04905754327774048 against the committed 0.0490575432777405, one ulp on a number reported to six decimals. The tolerance is six orders tighter than that reported precision, and a stale artifact misses by orders of magnitude.
+
 Rows re-derived: **1..6**. **S5 PASS**.
 
 

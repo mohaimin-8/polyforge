@@ -144,7 +144,7 @@ def tier_posture(db_path: Path) -> pd.DataFrame:
         agg = (db_path.parent /
                f"agg_tier_posture_{db_path.stem.replace('raw_sim_', '')}.csv.gz")
         if agg.exists():
-            df = pd.read_csv(agg)
+            df = pd.read_csv(agg, float_precision="round_trip")
             df["n"] = pd.to_numeric(df["n"], errors="coerce")
             df["mean_cache_mb"] = pd.to_numeric(df["mean_cache_mb"], errors="coerce")
             return df

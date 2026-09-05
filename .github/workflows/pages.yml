@@ -8,8 +8,14 @@
 # only — so this workflow installs pytest and nothing else.
 #
 # ONE-TIME SETUP, OWNER ONLY: Settings -> Pages -> Build and deployment ->
-# Source: "GitHub Actions". Until that is set, `deploy-pages` fails with a 404
-# and the build job still passes. The repository is private today, so the
+# Source: "GitHub Actions", then set the repository variable PAGES_ENABLED to
+# "true" (Settings -> Secrets and variables -> Actions -> Variables).
+#
+# The variable exists so this workflow does not paint every push red while the
+# decision is pending: without Pages configured `deploy-pages` fails with a
+# 404, and a permanently failing job is how a team learns to stop reading CI.
+# The build job runs regardless, so the supplement is validated on every push
+# whether or not it is published. The repository is private today, so the
 # published site inherits that; making it reachable is the same disclosure
 # decision as the GHCR package visibility in D2.
 name: pages
@@ -61,6 +67,9 @@ jobs:
 
   deploy:
     needs: build
+    # Opt-in: see the note at the top. Without it the build still gates every
+    # push; only publication waits on the owner's decision.
+    if: vars.PAGES_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

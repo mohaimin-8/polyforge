@@ -65,7 +65,7 @@ def load() -> pd.DataFrame:
                          "on r.run_id = m.run_id where r.status = 'valid'").fetchdf()
         con.close()
     elif CSV.exists():
-        df = pd.read_csv(CSV)
+        df = pd.read_csv(CSV, float_precision="round_trip")
     else:
         raise FileNotFoundError(f"{DB.name} missing and export {CSV.name} absent")
     # Identical to stats.composite_objective and every matrix campaign.

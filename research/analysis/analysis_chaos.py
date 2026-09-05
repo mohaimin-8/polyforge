@@ -67,7 +67,7 @@ def violation_traces() -> pd.DataFrame:
     """
     if not DB.exists():
         if TRACES_CSV.exists():
-            df = pd.read_csv(TRACES_CSV)
+            df = pd.read_csv(TRACES_CSV, float_precision="round_trip")
             df["step"] = pd.to_numeric(df["step"], errors="coerce")
             df["violation"] = pd.to_numeric(df["violation"], errors="coerce")
             return df

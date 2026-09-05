@@ -72,7 +72,7 @@ def load(db: Path, label: str, csv: Path | None = None) -> pd.DataFrame:
         ).fetchdf()
         con.close()
     elif csv is not None and csv.exists():
-        raw = pd.read_csv(csv)
+        raw = pd.read_csv(csv, float_precision="round_trip")
         raw = raw[raw.status == "valid"]
         df = pd.DataFrame({
             "system": raw.system, "workload": raw.workload, "rep": raw.rep,
