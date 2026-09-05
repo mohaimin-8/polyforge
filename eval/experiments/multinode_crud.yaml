@@ -6,9 +6,16 @@
 #
 # CRUD ONLY, and that is the point: the roadmap recorded W7 as needing the
 # GPU-blocked B1 matrix, but the CRUD path needs no GPU at all (the 24 h soak
-# drove 298 rps with no model in the loop). So none of the AI env gates that
-# trace_live.yaml requires apply here - no POLYFORGE_EVAL_LIVE_AI, no tier
-# backends, no shared Postgres for AI metrics.
+# drove 298 rps with no model in the loop). So the AI gates do not apply here:
+# no POLYFORGE_EVAL_LIVE_AI, no tier backends.
+#
+# REQUIRED, and sitting 1 died for want of it:
+#   POLYFORGE_EVAL_SHARED_PG=1
+# This is NOT an AI gate. It is the session-23 fix for per-pod SQLite, and it
+# matters MORE here than anywhere: `medium` brings up ~19 replicas, so without
+# it tenant provisioning creates a tenant on one pod and asks the next one for
+# its API key (`404 tenant_not_found`, 373 s in). live_soak.yaml - CRUD only,
+# LIVE_AI unset - requires it for the same reason.
 #
 # `medium` is the cluster size that matters: NODES_BY_SIZE["medium"] = 4.
 name: multinode_crud
