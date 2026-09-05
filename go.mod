@@ -5,7 +5,15 @@ go 1.25.0
 // Patch-pinned so every build (local, CI, Docker) runs a toolchain with
 // current stdlib security fixes; govulncheck found 17 reachable stdlib
 // vulns on 1.25.5, all fixed by 1.25.12. GOTOOLCHAIN=auto downloads it.
-toolchain go1.25.12
+//
+// Bumped 1.25.12 -> 1.25.14 (session 43). A pin against known CVEs ages into
+// a pin against fixed ones: govulncheck reported SEVEN reachable stdlib
+// vulnerabilities on 1.25.12 - GO-2026-6218 (net/url), 6091 (html/template),
+// 6090 (crypto/tls), 6089 and 5026 (net/http), 6088 (encoding/xml) and 5972
+// (encoding/asn1) - every one of them fixed in 1.25.13. The gate that says so
+// had been unreachable in CI since 2026-08-31, because the envtest step above
+// it failed first and the job never got this far. Re-pin when it speaks again.
+toolchain go1.25.14
 
 require (
 	github.com/alicebob/miniredis/v2 v2.38.0
