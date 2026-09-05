@@ -140,3 +140,56 @@ them: the sitting died in provisioning, before the load window.
 Per the stopping rule this consumes the one permitted re-run. A second void
 closes the campaign as unresolved.
 
+## Sitting 2: VOID (2026-09-05, substrate) — campaign CLOSED UNRESOLVED
+
+The re-run cleared provisioning: Amendment 1's `POLYFORGE_EVAL_SHARED_PG=1` was
+the right diagnosis, the tenants were created, and the sitting reached the load
+window. It then ended `valid_runs: 0` at 477 s, rejected by the harness's own
+validity guard:
+
+```
+replica sampler covered 7% of the load window (8 samples, 0 failed attempts):
+infra cost would be under-counted
+```
+
+**The guard is right and the cause is upstream of it.** k6's log says why:
+
+```
+thresholds on metrics 'dropped_iterations, http_req_failed' were crossed;
+at least one has abortOnFail enabled, stopping test prematurely
+```
+
+63 seconds into a 20 m 10 s window, with **10.6% of requests failing**. The
+`crud_bursty` cell at `medium` asks for 1200–1443 VUs *per tenant* across eight
+tenants; a four-node kind cluster on an eight-core laptop cannot serve that, so
+k6 aborted and the sampler never got past eight samples.
+
+**This is a substrate limit, not a controller result, and not a node result.**
+Nothing here says anything about MN-H1: the load window never ran long enough
+to measure spread, and `load_distribution.json` was never written. Scoring the
+hypothesis from a 63-second fragment would be exactly the kind of salvage this
+pre-registration exists to prevent.
+
+**Per the stopping rule, two voids close the campaign as unresolved.** It is
+closed. MN-H1, MN-H2 and MN-H3 are **not evaluated**, no `RESULTS_MULTINODE.md`
+is written, and none of this is re-run under this pre-registration.
+
+### What the campaign did establish, and what it leaves
+
+Established, and it stands independently of the voids:
+
+- **The instrumentation gap was real.** Node placement was never collected by
+  anything in this repository; `LoadDistributionSampler` now resolves it. That
+  finding came from reading the sampler, not from this campaign.
+- **W7 was mis-diagnosed as GPU-blocked.** Both sittings ran the CRUD path with
+  no GPU, no tier backend and no Kaggle, and both got further than the AI path
+  ever has locally. The GPU was never the obstacle.
+- **The obstacle is host capacity.** Eight cores cannot serve `crud_bursty` at
+  `medium`. That is the same shape as B1's blocker — a substrate that cannot
+  serve the cell's concurrency — arrived at from the opposite direction.
+
+Left for a **new** pre-registration, if the question is worth another sitting:
+a smaller cell (fewer tenants, or `crud_steady` rather than `crud_bursty`)
+sized to what this host can actually serve, with the VU count justified against
+measured capacity *before* the run rather than discovered by aborting one.
+
