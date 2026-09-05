@@ -1,0 +1,29 @@
+# W7 v2 — node spread, sized to what this host serves (PREREG_MULTINODE_V2.md).
+#
+# The v1 campaign (multinode_crud.yaml) is CLOSED UNRESOLVED after two voids.
+# This design is built from what those voids measured:
+#
+#   `medium`, not `small`: kind_config builds control-plane + (nodes - 1)
+#   workers, so small = one worker and every pod lands on it by construction.
+#
+#   crud_steady, not crud_bursty: 235.6 rps peak against 412.5, measured
+#   offline from workloads.build. Cluster size does not change demand at all,
+#   only the replica ceiling, so the workload class is the only lever.
+#
+# REQUIRED, and v1 died twice for want of these:
+#   POLYFORGE_EVAL_SHARED_PG=1          multi-replica storage, not an AI gate
+#   POLYFORGE_EVAL_WARMUP_SECONDS=420   the operator scales toward the ceiling
+#                                       during the window and cold pods take
+#                                       3-4 minutes to start; the warm-up is
+#                                       discarded, so lengthening it cannot
+#                                       flatter anything.
+name: multinode_steady
+backend: cluster
+steps: 120
+reps: 1
+systems: [jcac]
+workloads: [crud_steady]
+tenant_mixes: [uniform]
+cluster_sizes: [medium]
+output: eval/results/multinode_steady.duckdb
+retries: 0
