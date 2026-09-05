@@ -1,0 +1,230 @@
+{
+  "total_cost_usd": 0.256,
+  "cost_tier_usd": 0,
+  "cost_infra_usd": 0.256,
+  "mean_violation": 0,
+  "violation_step_share": 0,
+  "mean_jain": 1,
+  "cache_hit_rate": 0,
+  "crud_p95_ms": 2.977808,
+  "ai_p95_ms": 0,
+  "crud_p99_ms": 8.102492,
+  "ai_p99_ms": 0,
+  "tier_requests": {},
+  "buckets": [
+    {
+      "bucket_start_utc": "2026-09-05T10:10:00Z",
+      "n_events": 13953,
+      "crud_p95_ms": 6.038618,
+      "crud_p99_ms": 14.820023,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:11:00Z",
+      "n_events": 13810,
+      "crud_p95_ms": 3.331717,
+      "crud_p99_ms": 8.794985,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:12:00Z",
+      "n_events": 13628,
+      "crud_p95_ms": 2.211905,
+      "crud_p99_ms": 8.008275,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:13:00Z",
+      "n_events": 13643,
+      "crud_p95_ms": 3.184045,
+      "crud_p99_ms": 8.188931,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:14:00Z",
+      "n_events": 13772,
+      "crud_p95_ms": 2.504351,
+      "crud_p99_ms": 8.020505,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:15:00Z",
+      "n_events": 13981,
+      "crud_p95_ms": 2.945394,
+      "crud_p99_ms": 8.030519,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:16:00Z",
+      "n_events": 14040,
+      "crud_p95_ms": 2.398588,
+      "crud_p99_ms": 8.009741,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:17:00Z",
+      "n_events": 13910,
+      "crud_p95_ms": 2.936449,
+      "crud_p99_ms": 8.059451,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:18:00Z",
+      "n_events": 13753,
+      "crud_p95_ms": 2.753451,
+      "crud_p99_ms": 8.028943,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:19:00Z",
+      "n_events": 13611,
+      "crud_p95_ms": 3.041609,
+      "crud_p99_ms": 8.047645,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:20:00Z",
+      "n_events": 13665,
+      "crud_p95_ms": 2.837315,
+      "crud_p99_ms": 8.01149,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:21:00Z",
+      "n_events": 13854,
+      "crud_p95_ms": 3.646631,
+      "crud_p99_ms": 8.746629,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:22:00Z",
+      "n_events": 14012,
+      "crud_p95_ms": 2.828444,
+      "crud_p99_ms": 8.028514,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:23:00Z",
+      "n_events": 14015,
+      "crud_p95_ms": 3.154359,
+      "crud_p99_ms": 8.091223,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:24:00Z",
+      "n_events": 13866,
+      "crud_p95_ms": 2.450609,
+      "crud_p99_ms": 8.01166,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:25:00Z",
+      "n_events": 13689,
+      "crud_p95_ms": 3.581411,
+      "crud_p99_ms": 8.938494,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:26:00Z",
+      "n_events": 13609,
+      "crud_p95_ms": 2.492262,
+      "crud_p99_ms": 8.011044,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:27:00Z",
+      "n_events": 13710,
+      "crud_p95_ms": 2.736745,
+      "crud_p99_ms": 8.080816,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:28:00Z",
+      "n_events": 13936,
+      "crud_p95_ms": 2.911814,
+      "crud_p99_ms": 8.202491,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:29:00Z",
+      "n_events": 14026,
+      "crud_p95_ms": 2.808345,
+      "crud_p99_ms": 8.036445,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-05T10:30:00Z",
+      "n_events": 2291,
+      "crud_p95_ms": 2.781386,
+      "crud_p99_ms": 8.075598,
+      "ai_p95_ms": 0,
+      "ai_p99_ms": 0,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    }
+  ],
+  "n_events": 278774,
+  "n_tenants": 8,
+  "generated_at_utc": "2026-09-05T10:30:18Z",
+  "cost_infra_source_note": "infra component injected via --infra-cost-usd; replica-hours are not visible in-pod"
+}
