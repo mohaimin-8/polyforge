@@ -164,6 +164,13 @@ CAMPAIGN_RECORDS = [
     # trace_live_evidence/ for the TL-H3 delivery gate, and recomputes the
     # sim side from the trace, so a clean clone gets it.
     ("analysis_trace_live.py", [], "RESULTS_TRACE_LIVE.md"),
+    # W7 v2: node spread. Reads the committed load_distribution.json from the
+    # sitting rather than a campaign DB - the verdicts are about placement,
+    # which lives in that evidence file and nowhere else.
+    ("analysis_multinode.py",
+     ["--evidence", str(RESULTS / "multinode_steady_evidence")],
+     "RESULTS_MULTINODE.md"),
+
     #
     # Attempt 6 (WP14). The first sitting to survive long enough to SCORE
     # hypotheses: 11.5M requests over 10 h 44 m, ended by a 19.5 s stall.
