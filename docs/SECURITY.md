@@ -163,6 +163,33 @@ full pen test: ZAP's passive+API rules are not an adversary, the scan runs
 one tenant against a single-node dev stack, and no active-attack or
 authenticated-fuzzing campaign has been run.
 
+## Session-43 finding: seven reachable stdlib CVEs behind an unreachable gate (FIXED)
+
+**Severity: high, and the mechanism matters more than the CVEs.** The Go
+toolchain is patch-pinned in `go.mod` precisely so every build carries current
+stdlib fixes, and `govulncheck` in CI is what proves the pin is still current.
+That scan had not run since 2026-08-31: the envtest step above it failed on an
+upstream tooling change, the job stopped there, and the three steps after it —
+coverage gate, OpenAPI lint, vulnerability scan — were never reached.
+
+By the time the step ran again the pin was five patch releases stale and
+`govulncheck` reported **seven reachable** stdlib vulnerabilities on 1.25.12:
+GO-2026-6218 (`net/url`), GO-2026-6091 (`html/template`), GO-2026-6090
+(`crypto/tls`), GO-2026-6089 and GO-2026-5026 (`net/http`), GO-2026-6088
+(`encoding/xml`), GO-2026-5972 (`encoding/asn1`). All fixed in 1.25.13. The
+traces are live code paths, not theoretical reachability — `OIDCProvider.Exchange`
+into `url.URL.Parse`, and the control plane's `ListenAndServe` into
+`template.Template.Execute`.
+
+**Fixed** by bumping the pin to 1.25.14 and verifying locally rather than
+leaving it to CI: `govulncheck` goes from seven reachable vulnerabilities to
+"No vulnerabilities found", and the full Go suite passes on the new toolchain.
+
+**The lesson is about gate ordering.** A security gate that runs after a
+fragile step is a security gate that stops running silently. `go.mod`'s comment
+already recorded this happening once (17 reachable vulns on 1.25.5); it
+happened again, and this time nothing could say so for a week.
+
 ## Session-43 finding: unbounded metric cardinality, remotely triggerable (FIXED)
 
 **Severity: high. Found by accident, by an instrument check** — the L6 `/metrics`
