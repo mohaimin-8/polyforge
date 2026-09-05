@@ -46,6 +46,15 @@ func evalParityDatabase(t *testing.T, ctx context.Context) (string, string) {
 	adminURL := os.Getenv("POLYFORGE_TEST_POSTGRES_ADMIN_URL")
 	appURL := os.Getenv("POLYFORGE_TEST_POSTGRES_APP_URL")
 	if adminURL == "" || appURL == "" {
+		// Same rule as internal/storage/postgres: a skip prints `ok`, and this
+		// is the parity check between the SQLite and PostgreSQL export paths -
+		// the export that could not handle a 24 h sitting until WP14 found it.
+		// Where the fixture is supposed to exist, its absence is a failure.
+		if os.Getenv("POLYFORGE_REQUIRE_POSTGRES") != "" {
+			t.Fatal("POLYFORGE_REQUIRE_POSTGRES is set but the PostgreSQL " +
+				"integration URLs are not configured: export parity would " +
+				"report ok without being checked at all")
+		}
 		t.Skip("PostgreSQL integration URLs are not configured")
 	}
 
