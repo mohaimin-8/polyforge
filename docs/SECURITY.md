@@ -200,6 +200,18 @@ paths collapse to one label; the registry stays bounded when driven directly;
 and a matched route still reports its own pattern. Mutation-checked — restoring
 the `r.URL.Path` fallback fails two of the four.
 
+**A second door, found by looking for the same class.** `POST /v1/telemetry`
+carries `service` in the request body and `validName` only requires 1–200
+characters, so `RecordTelemetryEvent` keyed a counter **and two histograms**
+per distinct string. Higher amplification than the route door and reachable by
+any tenant holding a valid API key — in a shared control plane, one tenant
+exhausting memory for every tenant. `modelTier` was already safe
+(`validModelTier` is an allow-list of five values). Both dimensions now go
+through `boundLabel`, capped at 256 distinct values with the rest folded into
+`overflow`. Test: one authenticated tenant posting 456 invented service names
+leaves the histogram maps bounded and the first names individually labelled;
+mutation-checked by removing the cap.
+
 **Consequence to know about.** Rate-limited requests now share their route's
 duration histogram, which has no status dimension. Heavy 429 traffic therefore
 pulls a route's observed mean *down*, because a rejection is cheap (65 µs here

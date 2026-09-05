@@ -32,8 +32,10 @@ type metrics struct {
 
 	httpRequests        map[httpMetricKey]uint64
 	httpRequestDuration map[httpDurationMetricKey]*histogram
-	// routeLabels is the distinct-route set boundRoute enforces the cap on.
-	routeLabels map[string]struct{}
+	// routeLabels and serviceLabels are the distinct-label sets the caps are
+	// enforced on; see the comment above maxRouteLabels for why they exist.
+	routeLabels   map[string]struct{}
+	serviceLabels map[string]struct{}
 
 	telemetryEvents  map[telemetryMetricKey]uint64
 	telemetryLatency map[string]*histogram
@@ -70,6 +72,7 @@ func newMetrics() *metrics {
 		httpRequests:        make(map[httpMetricKey]uint64),
 		httpRequestDuration: make(map[httpDurationMetricKey]*histogram),
 		routeLabels:         make(map[string]struct{}),
+		serviceLabels:       make(map[string]struct{}),
 		telemetryEvents:     make(map[telemetryMetricKey]uint64),
 		telemetryLatency:    make(map[string]*histogram),
 		telemetryPayload:    make(map[string]*histogram),
@@ -94,29 +97,46 @@ func (m *metrics) DecInFlight() {
 	m.mu.Unlock()
 }
 
-// maxRouteLabels bounds how many distinct route labels the registry will
-// ever hold. Defence in depth behind server.routePattern, which is what
-// actually keeps raw paths out of this map: the two maps below are unbounded
-// and one allocates a histogram per key, so a route label that can be
-// influenced from outside is a remote memory leak. The server has ~60 routes;
-// this leaves generous room for growth while capping the damage if a future
-// middleware starts labelling with something unbounded again.
+// Every map in this registry is unbounded and several allocate a histogram
+// per key, so ANY label value that can be influenced from outside is a remote
+// memory leak. Two doors were open, both found in session 43:
+//
+//   - route: rate-limited and unmatched requests used to be labelled with the
+//     raw URL path (server.routePattern, now fixed at the source).
+//   - service: `POST /v1/telemetry` carries it in the body and validName only
+//     requires 1..200 characters, so one authenticated tenant could allocate
+//     two histograms per distinct string — in a shared control plane that is
+//     cross-tenant denial of service through the documented ingest path.
+//
+// The label caps below are the backstop that makes both bounded regardless of
+// what the callers do. 256 is generous for a deployment (the server has ~60
+// routes; a tenant estate has far fewer than 256 real service names) and the
+// overflow label makes the condition visible rather than silent.
 const maxRouteLabels = 256
 
-// overflowRoute is where labels past the cap are folded. Seeing it in
-// /metrics means something is minting route labels and should be found.
+// maxServiceLabels bounds telemetry's client-supplied service dimension.
+const maxServiceLabels = 256
+
+// overflowRoute is where labels past a cap are folded. Seeing it in /metrics
+// means something is minting labels and should be found.
 const overflowRoute = "overflow"
+
+// boundLabel folds a value into overflowRoute once the set is full. Must be
+// called with m.mu held.
+func boundLabel(seen map[string]struct{}, value string, limit int) string {
+	if _, known := seen[value]; known {
+		return value
+	}
+	if len(seen) >= limit {
+		return overflowRoute
+	}
+	seen[value] = struct{}{}
+	return value
+}
 
 // boundRoute must be called with m.mu held.
 func (m *metrics) boundRoute(route string) string {
-	if _, known := m.routeLabels[route]; known {
-		return route
-	}
-	if len(m.routeLabels) >= maxRouteLabels {
-		return overflowRoute
-	}
-	m.routeLabels[route] = struct{}{}
-	return route
+	return boundLabel(m.routeLabels, route, maxRouteLabels)
 }
 
 func (m *metrics) RecordHTTPRequest(method, route string, status int, duration time.Duration) {
@@ -154,6 +174,11 @@ func (m *metrics) RecordTelemetryEvent(event telemetry.Event) {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// The service name comes from the request body; the cap is what keeps a
+	// tenant from turning it into unbounded allocation. modelTier needs no
+	// cap: validModelTier is an allow-list of five values.
+	service = boundLabel(m.serviceLabels, service, maxServiceLabels)
 
 	m.telemetryEvents[telemetryMetricKey{
 		Service:   service,
