@@ -4,7 +4,7 @@ One entry point for every document in this repository. Start here rather than
 browsing directories.
 
 The repository holds ~180 markdown files. That number is not accidental clutter:
-**88 of them are the evidence base** (42 pre-registrations + 46 records), and 38
+**91 of them are the evidence base** (44 pre-registrations + 47 records), and 39
 records are verified byte-identically by `scripts/reproduce.py`. Those cannot be
 merged or rewritten without destroying the reproducibility gate. What *was*
 clutter — superseded planning documents — now lives in [archive/](archive/).
@@ -40,14 +40,14 @@ clutter — superseded planning documents — now lives in [archive/](archive/).
 
 The methodological core. Two file families, both load-bearing:
 
-**`PREREG_*.md` (42)** — pre-registrations. Each was committed **and pushed
+**`PREREG_*.md` (44)** — pre-registrations. Each was committed **and pushed
 before** its run; the push event is the timestamp anchor. They are what makes
 the results pre-registered rather than post-hoc. Never edit one after its run.
 
-**`RESULTS_*.md` (42)** — generated records. The gate verifies **38** records
-byte-identically: 34 of these, plus `RESULTS.md`, `ADVANCED.md`,
+**`RESULTS_*.md` (43)** — generated records. The gate verifies **39** records
+byte-identically: 35 of these, plus `RESULTS.md`, `ADVANCED.md`,
 `FAIRNESS_V2.md` and `PHASE7_ORDINAL.md`, which predate the naming
-convention. Every one of the 38 must regenerate byte-identically. Records are
+convention. Every one of the 39 must regenerate byte-identically. Records are
 written by their generator scripts, never by hand.
 
 ```

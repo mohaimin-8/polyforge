@@ -591,7 +591,12 @@ Finishing everything above does **not** produce:
 
 1. **A cost advantage.** BP-H1 stays FAIL on both traces. Nothing here targets
    it, and nothing should: the feasibility result is the finding.
-2. **Multi-host or multi-zone evidence.** L7 buys multi-node on one machine.
+2. **Multi-host or multi-zone evidence.** Multi-NODE is no longer in this
+   list — `RESULTS_MULTINODE.md` measured 16 pods across three workers at
+   0.3166 / 0.3815 / 0.3019, so W7's residue is *single machine*. What
+   stays open is exactly that: every node is a container sharing one
+   kernel, one disk and one NIC, so nothing here speaks to partitions,
+   zone failure or cross-host latency, and nothing killed a node.
 3. **Production scale.** SageServe's 10M served requests remains conceded; the
    10.63M-request demand-side replay is the analog.
 4. **Three model tiers**, on the free route. `large` needs VRAM the free pool
