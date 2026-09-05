@@ -26,6 +26,10 @@ jobs:
     env:
       POLYFORGE_TEST_POSTGRES_ADMIN_URL: postgres://polyforge_admin@localhost:5432/polyforge?sslmode=disable
       POLYFORGE_TEST_POSTGRES_APP_URL: postgres://polyforge_app@localhost:5432/polyforge?sslmode=disable
+      # The service above is supposed to be there, so a missing fixture is a
+      # failure here rather than a skip. A skip prints `ok`, and this suite is
+      # the only cover RLS tenant isolation has.
+      POLYFORGE_REQUIRE_POSTGRES: "1"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6

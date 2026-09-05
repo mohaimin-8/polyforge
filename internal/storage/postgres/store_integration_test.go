@@ -16,11 +16,24 @@ import (
 
 // openIntegrationStore skips the test unless the PostgreSQL fixture URLs are
 // configured, then returns a migrated store bound to the test lifetime.
+//
+// A SKIP PRINTS `ok`. This is the production storage backend and the only
+// place RLS tenant isolation is exercised, so "the fixture was not there" and
+// "the isolation holds" produce the same green line in `go test ./...` — the
+// roadmap's gate battery warns about it in prose, which is not a mechanism.
+// Where the fixture is SUPPOSED to exist (CI sets the service and the URLs),
+// POLYFORGE_REQUIRE_POSTGRES=1 turns the skip into a failure, so a service
+// that fails to start cannot quietly take RLS coverage with it.
 func openIntegrationStore(t *testing.T, ctx context.Context) *Store {
 	t.Helper()
 	adminURL := os.Getenv("POLYFORGE_TEST_POSTGRES_ADMIN_URL")
 	appURL := os.Getenv("POLYFORGE_TEST_POSTGRES_APP_URL")
 	if adminURL == "" || appURL == "" {
+		if os.Getenv("POLYFORGE_REQUIRE_POSTGRES") != "" {
+			t.Fatal("POLYFORGE_REQUIRE_POSTGRES is set but the PostgreSQL " +
+				"integration URLs are not configured: this suite is the only " +
+				"cover RLS tenant isolation has, and skipping it would report ok")
+		}
 		t.Skip("PostgreSQL integration URLs are not configured")
 	}
 	store, err := Open(ctx, Config{AdminURL: adminURL, AppURL: appURL})
