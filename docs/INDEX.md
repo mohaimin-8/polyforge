@@ -51,7 +51,8 @@ convention. Every one of the 38 must regenerate byte-identically. Records are
 written by their generator scripts, never by hand.
 
 ```
-python scripts/reproduce.py      # regenerates and diffs every gated record
+pip install -r eval/requirements-reproduce.txt   # PINNED: byte-identity is
+python scripts/reproduce.py                     # scoped to these versions
 ```
 
 The same evidence base is published as a static site by

@@ -1,5 +1,19 @@
 # Remaining work — the honest ledger of what is left and who owns it
 
+> **Execution route as of session 42: `docs/FINAL_ROADMAP.md`.** It maps the
+> nine named weaknesses to the workstream that closes each (§0) and carries
+> the execute order (§7). `PUBLICATION_ROADMAP.md` below remains accurate as
+> the WP1–WP15 history; it no longer names what is next.
+>
+> **Session 43 closed D3, R3 and L6, and fixed a red CI nobody was watching.**
+> The reproduction gate had been failing on clean checkouts since
+> 2026-08-31 while reading 38/38 locally — four causes, all fixed at source
+> (`FINAL_ROADMAP.md` §5 R5). L6's live verification measured the W5 gap
+> (+21.0% mean, +238.7% p95) and turned up two metric-cardinality memory
+> leaks, both fixed (`SECURITY.md` §Session-43). What is left that is not
+> writing: B1 (Kaggle `GPU T4 x2`, user-gated), the Zenodo publish, GHCR and
+> Pages visibility.
+
 > **Execution route: `docs/PUBLICATION_ROADMAP.md`** (added end of session
 > 35) — work packages WP1–WP11 with exact steps, preregs, gates and a
 > progress table. This ledger stays the owner-split *view*; the roadmap is

@@ -49,7 +49,7 @@ def load() -> pd.DataFrame:
         con.close()
         return df
     if CSV.exists():
-        return pd.read_csv(CSV)
+        return pd.read_csv(CSV, float_precision="round_trip")
     raise FileNotFoundError(f"{DB.name} missing and export {CSV.name} absent")
 
 

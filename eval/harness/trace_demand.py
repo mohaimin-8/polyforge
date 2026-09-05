@@ -41,6 +41,9 @@ frozen prereg after seeing results.
 
 from __future__ import annotations
 
+import dataclasses
+import gzip
+import json
 import sys
 from pathlib import Path
 
@@ -56,9 +59,72 @@ from model import CONTROL_INTERVAL_S  # noqa: E402
 # longer line up with the replayed windows and the whole point is lost.
 BUCKETS_PER_WINDOW = tm.WINDOW_H * 3600 // CONTROL_INTERVAL_S
 
+# A committed projection of the windows a record depends on.
+#
+# The raw BurstGPT trace is 56 MB of downloaded public dataset, deliberately
+# not vendored (`.gitignore`: raw datasets are fetched, never committed). That
+# was fine until L5 put `analysis_trace_live.py` in the reproduction gate: on a
+# clean clone the trace is absent, the script raised FileNotFoundError, and
+# `RESULTS_TRACE_LIVE.md` came out NOT PRODUCED. The gate has been red in CI
+# since 2026-08-31 for exactly this, while passing on the author's machine
+# where the file happens to exist — the worst shape a reproduction claim can
+# take.
+#
+# The projection of one window is 5 KB gzipped, so it is committed. Same
+# pattern as `research/analysis/separation_mt_v3_walk.json`: a derived artifact
+# small enough to carry, with a staleness check that re-derives it wherever the
+# raw input IS present (`test_trace_cache.py`). A clean clone reproduces the
+# record; a machine with the trace proves the cache still matches it.
+CACHE_DIR = Path(__file__).resolve().parent / "trace_cache"
+
+
+def _cache_path(index: int) -> Path:
+    return CACHE_DIR / f"window{index}.json.gz"
+
+
+def _demand_type():
+    """`workloads.Demand`, imported lazily so the module keeps its light
+    import surface (`trace_matrix` alone pulls in pandas)."""
+    from harness import workloads
+
+    return workloads.Demand
+
+
+def serialise_window(tenant_ids, buckets, meta) -> bytes:
+    """The canonical bytes for a cached window. Sorted keys and no spaces so
+    two builds of the same window compare byte for byte."""
+    payload = {
+        "tenant_ids": list(tenant_ids),
+        "meta": meta,
+        "buckets": [{t: dataclasses.asdict(d) for t, d in bucket.items()}
+                    for bucket in buckets],
+    }
+    return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+
+
+def load_cached_window(index: int):
+    """Read a committed window. Raises if it was never built."""
+    path = _cache_path(index)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"window {index} has no committed projection ({path.name}) and the raw "
+            f"trace is absent ({tm.TRACE}). Fetch the trace with "
+            f"`python research/traces/fetch_burstgpt.py`, or build the cache with "
+            f"`python -m harness.trace_demand --build-cache {index}`.")
+    payload = json.loads(gzip.decompress(path.read_bytes()).decode())
+    demand = _demand_type()
+    buckets = [{t: demand(**fields) for t, fields in bucket.items()}
+               for bucket in payload["buckets"]]
+    return payload["tenant_ids"], buckets, payload["meta"]
+
 
 def window_count() -> int:
-    """How many replay windows the committed trace affords."""
+    """How many replay windows the committed trace affords.
+
+    Falls back to the number recorded in a cached window's metadata, so a
+    clean clone without the raw trace can still answer it."""
+    if not tm.TRACE.exists():
+        return int(load_cached_window(0)[2]["window_count"])
     df = tm.load_events()
     return len(tm.window_starts(tm.segments_of(df)))
 
@@ -74,6 +140,16 @@ def trace_window(index: int, *, events=None):
     `meta` carries the provenance a record has to quote: which window, which
     trace second it starts at, and the scale factor applied.
     """
+    if events is None and not tm.TRACE.exists():
+        # No raw trace: fall back to the committed projection rather than
+        # failing. This is what makes the record rebuildable on a clean clone.
+        # The range check comes first so an out-of-range index still raises
+        # IndexError here, exactly as it does with the trace present.
+        count = window_count()
+        if not 0 <= index < count:
+            raise IndexError(
+                f"window {index} out of range; the trace affords {count}")
+        return load_cached_window(index)
     df = tm.load_events() if events is None else events
     segs = tm.segments_of(df)
     starts = tm.window_starts(segs)
@@ -94,6 +170,8 @@ def trace_window(index: int, *, events=None):
         "control_interval_s": CONTROL_INTERVAL_S,
         "tenants": tm.TENANTS,
         "buckets": len(buckets),
+        # Carried so window_count() has an answer on a clean clone.
+        "window_count": len(starts),
         "kinds": sorted({kind for b in buckets for d in b.values() for kind in d.rps}),
     }
     return tenant_ids, buckets, meta
@@ -107,3 +185,22 @@ def peak_total_rps(buckets) -> float:
     at a synthetic cell's, or the preflight would certify the wrong load.
     """
     return max(sum(d.total_rps() for d in bucket.values()) for bucket in buckets)
+
+
+def _build_cache(index: int) -> Path:
+    """Regenerate a committed window from the raw trace."""
+    if not tm.TRACE.exists():
+        raise SystemExit(f"the raw trace is required to build the cache: {tm.TRACE}")
+    tenant_ids, buckets, meta = trace_window(index)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    path = _cache_path(index)
+    path.write_bytes(gzip.compress(serialise_window(tenant_ids, buckets, meta), 9))
+    return path
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "--build-cache":
+        written = _build_cache(int(sys.argv[2]))
+        print(f"wrote {written} ({written.stat().st_size} bytes)")
+    else:
+        raise SystemExit("usage: python -m harness.trace_demand --build-cache <window>")

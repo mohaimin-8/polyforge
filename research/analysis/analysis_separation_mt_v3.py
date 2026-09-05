@@ -43,8 +43,11 @@ committed before the walk finishes.
   S5 (soundness, NEW — the artifact is not stale). The expensive rows live in
       a committed JSON because a 2.2-hour walk cannot sit inside
       `scripts/reproduce.py`. So this record RE-DERIVES the cheap rows at gate
-      time and compares them to the artifact. Any mismatch is a FAIL and the
-      record refuses to report the expensive rows.
+      time and compares them to the artifact, to a relative tolerance of
+      1e-12 -- six orders tighter than the six decimals the record reports,
+      and loose enough not to read the batched sum's documented last-bit
+      instability as a stale artifact. Any mismatch is a FAIL and the record
+      refuses to report the expensive rows.
 
   S3 (the claim). The corrected floor bounds UNAVOIDABLE violation, so **every
       arm's measured `mean_violation` on the matching cell must be at or above
@@ -78,6 +81,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -85,6 +89,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import analysis_separation as sep  # noqa: E402
 import analysis_separation_mt as mt  # noqa: E402
 from separation_mt_v3_walk import DEFAULT_OUT, cell  # noqa: E402
+
+# S5's staleness tolerance. NOT exact, and the reason is in
+# coupled_floor_incremental_batched's own contract: its aggregate is a
+# CHUNKED float64 sum whose last bits depend on how the reduction is
+# split, so an exact test measures the platform rather than the artifact.
+# It did: on Linux row 6 re-derives as 0.04905754327774048 against the
+# committed 0.0490575432777405. One ulp, on a number reported to six
+# decimals. A stale artifact misses by orders of magnitude, not an ulp.
+S5_REL_TOL = 1e-12
+S5_ABS_TOL = 1e-15
 from stats import record_path  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "jcac_sim"))
@@ -120,7 +134,7 @@ def main() -> int:
         fresh = guarantee.coupled_floor_incremental_batched(
             cfg, orbit, n, cap)["coupled_violation"]
         stored = rows[n]["coupled_violation"]
-        if fresh != stored:
+        if not math.isclose(fresh, stored, rel_tol=S5_REL_TOL, abs_tol=S5_ABS_TOL):
             mismatches.append((n, stored, fresh))
     s5 = not mismatches
 
@@ -199,6 +213,14 @@ def main() -> int:
       f"`{args.walk.name}` and the cheap rows are **re-derived here at gate "
       "time** and compared. A stale or edited artifact fails this check "
       "instead of passing quietly.\n")
+    w(f"The comparison is to a relative tolerance of {S5_REL_TOL:g}, not exact: "
+      "`coupled_floor_incremental_batched` documents its aggregate as a "
+      "**chunked** float64 sum whose last bits depend on how the reduction is "
+      "split, so an exact test measured the platform rather than the artifact. "
+      "It did — on Linux row 6 re-derives as 0.04905754327774048 against "
+      "the committed 0.0490575432777405, one ulp on a number reported to six "
+      "decimals. The tolerance is six orders tighter than that reported "
+      "precision, and a stale artifact misses by orders of magnitude.\n")
     w(f"Rows re-derived: **1..{min(args.verify_upto, walk['tenants_walked_to'])}**. "
       f"**S5 {'PASS' if s5 else 'FAIL'}**"
       + ("" if s5 else f" — mismatches: {mismatches}") + ".\n")

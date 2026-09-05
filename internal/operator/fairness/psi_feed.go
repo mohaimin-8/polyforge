@@ -256,7 +256,7 @@ func (f *PSIFeed) query(ctx context.Context, expr, label string) (map[string]flo
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxPSIResponseBytes))
 	if err != nil {
 		return nil, err
