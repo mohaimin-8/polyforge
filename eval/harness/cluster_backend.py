@@ -1174,6 +1174,11 @@ class LoadDistributionSampler(threading.Thread):
         self.namespace = namespace
         self.selector = selector
         self.cpu_ms: dict[str, float] = {}
+        # Which node each pod is scheduled on. Sampled alongside CPU because
+        # `kubectl top pods` does not carry it, which is why every live record
+        # so far reports per-POD spread and nothing about NODES -- see
+        # node_shares() for why that matters to W7.
+        self.node_of: dict[str, str] = {}
         self.samples = 0
         self.failures = 0
         self._stop = threading.Event()
@@ -1202,6 +1207,8 @@ class LoadDistributionSampler(threading.Thread):
                 if len(parts) < 2 or not parts[1].endswith("m"):
                     continue
                 pod, cpu = parts[0], float(parts[1][:-1])
+                if pod not in self.node_of:
+                    self._resolve_node(pod)
                 # Accumulate CPU-milli-seconds, so a pod that is hot for half
                 # the run and idle for the rest is weighted accordingly.
                 self.cpu_ms[pod] = self.cpu_ms.get(pod, 0.0) + cpu * self.INTERVAL_S
@@ -1211,11 +1218,55 @@ class LoadDistributionSampler(threading.Thread):
         except Exception:
             self.failures += 1
 
+    def _resolve_node(self, pod: str) -> None:
+        """Record the node a pod is scheduled on, once per pod.
+
+        Looked up lazily rather than every sample: placement changes only when
+        a pod is rescheduled, and a rescheduled pod arrives under a new name.
+        A failure here is not a sampling failure -- the CPU reading is still
+        good, we just cannot attribute it -- so it does not touch `failures`.
+        """
+        try:
+            proc = subprocess.run(
+                ["kubectl", "--namespace", self.namespace, "get", "pod", pod,
+                 "-o", "jsonpath={.spec.nodeName}"],
+                capture_output=True, text=True, timeout=15,
+                encoding="utf-8", errors="replace")
+            if proc.returncode == 0 and proc.stdout.strip():
+                self.node_of[pod] = proc.stdout.strip()
+        except Exception:
+            pass
+
     def shares(self) -> dict[str, float]:
         total = sum(self.cpu_ms.values())
         if total <= 0:
             return {}
         return {pod: cpu / total for pod, cpu in sorted(self.cpu_ms.items())}
+
+    def node_shares(self) -> dict[str, float]:
+        """The same CPU, aggregated by node instead of by pod.
+
+        W7 ("single machine, single cluster") is recorded in FINAL_ROADMAP as
+        needing a high-demand cell, i.e. the GPU-blocked B1 matrix. That reads
+        the constraint off the wrong axis: `NODES_BY_SIZE` already gives
+        `small` two nodes and `medium` four, and the CRUD path needs no GPU at
+        all -- the 24 h soak drove 298 rps across sixteen pods. What was
+        actually missing is this function. Every live record so far reports
+        per-pod spread because per-pod spread is the only thing that was ever
+        collected, so no sitting, however large, could have produced node-level
+        evidence.
+
+        Pods whose node could not be resolved are grouped under "unknown"
+        rather than dropped, so the shares always sum to the CPU observed.
+        """
+        total = sum(self.cpu_ms.values())
+        if total <= 0:
+            return {}
+        by_node: dict[str, float] = {}
+        for pod, cpu in self.cpu_ms.items():
+            node = self.node_of.get(pod, "unknown")
+            by_node[node] = by_node.get(node, 0.0) + cpu
+        return {node: cpu / total for node, cpu in sorted(by_node.items())}
 
 
 class ReplicaSampler(threading.Thread):
@@ -1388,7 +1439,9 @@ def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
                 json.dumps({"samples": loadspread.samples,
                             "failures": loadspread.failures,
                             "cpu_ms": loadspread.cpu_ms,
-                            "shares": loadspread.shares()}, indent=2),
+                            "shares": loadspread.shares(),
+                            "node_of": loadspread.node_of,
+                            "node_shares": loadspread.node_shares()}, indent=2),
                 encoding="utf-8")
     except Exception:
         pass
