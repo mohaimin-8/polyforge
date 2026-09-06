@@ -55,6 +55,27 @@ jobs:
           version: v2.6.2
       - name: Test (race detector + coverage)
         run: go test ./... -count=1 -race -covermode=atomic -coverprofile=coverage.out
+      # Ordered directly after the step that writes coverage.out, and that is
+      # deliberate. It used to sit AFTER the envtest step, which it does not
+      # depend on at all -- so for the week envtest was broken on an upstream
+      # release (R5), this gate did not run and nothing said so. R6 recorded
+      # the placement as a real dependency on 'the step before it'; envtest
+      # was the step before it. Moving it up removes the coupling rather than
+      # papering over it with if: always(), which would run the gate even when
+      # there is no coverage profile to read.
+      - name: Coverage gate
+        # Ratchet: raise toward the 80% target as packages gain tests.
+        # First green CI run (2026-07-09) measured 66.5% with the PostgreSQL suite.
+        # Session 42 re-measured 68.8% after the postgres store's CRUD, outbox and
+        # saga paths gained tests (that package went 32.7% -> 63.2%). The gate moved
+        # 60 -> 65 to hold the gain, kept below the measurement so ordinary drift
+        # does not redden CI. NOTE: this total counts generated deepcopy and cmd/
+        # main() wiring; on business logic alone it is 79.5%.
+        run: |
+          total=$(go tool cover -func=coverage.out | tail -1 | awk '{gsub("%","",$3); print $3}')
+          echo "total statement coverage: ${total}%"
+          awk -v t="$total" 'BEGIN { exit !(t >= 65.0) }' || { echo "FAIL: coverage ${total}% is below the 65% gate"; exit 1; }
+
       # The suite above uses fake clients, which cannot reproduce optimistic
       # concurrency, CEL validation, or status subresources — the three
       # mechanisms the session-35 audit found real defects in. envtest runs
@@ -83,19 +104,6 @@ jobs:
           assets="$(GOTOOLCHAIN=auto go run "$tool" use "$ENVTEST_K8S" --bin-dir "$RUNNER_TEMP/envtest" -p path)"
           KUBEBUILDER_ASSETS="$assets" \
             go test -tags envtest ./internal/operator/controllers/ -run Envtest -count=1 -v
-      - name: Coverage gate
-        # Ratchet: raise toward the 80% target as packages gain tests.
-        # First green CI run (2026-07-09) measured 66.5% with the PostgreSQL suite.
-        # Session 42 re-measured 68.8% after the postgres store's CRUD, outbox and
-        # saga paths gained tests (that package went 32.7% -> 63.2%). The gate moved
-        # 60 -> 65 to hold the gain, kept below the measurement so ordinary drift
-        # does not redden CI. NOTE: this total counts generated deepcopy and cmd/
-        # main() wiring; on business logic alone it is 79.5%.
-        run: |
-          total=$(go tool cover -func=coverage.out | tail -1 | awk '{gsub("%","",$3); print $3}')
-          echo "total statement coverage: ${total}%"
-          awk -v t="$total" 'BEGIN { exit !(t >= 65.0) }' || { echo "FAIL: coverage ${total}% is below the 65% gate"; exit 1; }
-
   # SEPARATE JOBS ON PURPOSE. These two used to be the last steps of `test`,
   # behind the envtest step - and on 2026-09-05 that turned out to matter: an
   # upstream release broke envtest's tooling, the job stopped there, and the
@@ -336,7 +344,37 @@ jobs:
         run: |
           helm lint deploy/helm/polyforge
           helm lint deploy/helm/polyforge-operator
-      - name: Render operator chart (planner on and off)
+      # `helm template ... > /dev/null` was here. It catches a chart that
+      # fails to render and nothing else: if planner.enabled stopped removing
+      # the planner, or a chart default drifted to an image release.yml does
+      # not publish, this job stayed green. The second one was not
+      # hypothetical -- D2 found the operator chart defaulting to an image
+      # name that had never been published, by hand, and the SAME defect was
+      # still sitting in the application chart in session 43:
+      # `polyforge/control-plane:dev`, unqualified, resolving to Docker Hub.
+      - name: Render the charts, and check what they rendered
         run: |
-          helm template t deploy/helm/polyforge-operator > /dev/null
-          helm template t deploy/helm/polyforge-operator --set planner.enabled=false > /dev/null
+          set -euo pipefail
+          helm template t deploy/helm/polyforge-operator > on.yaml
+          helm template t deploy/helm/polyforge-operator --set planner.enabled=false > off.yaml
+          helm template t deploy/helm/polyforge > app.yaml
+          helm template t deploy/helm/polyforge --set gateway.enabled=true > gw.yaml
+
+          if ! grep -q 'polyforge/planner' on.yaml; then
+            echo "FAIL: the default operator render has no planner image"; exit 1
+          fi
+          if grep -q 'polyforge/planner' off.yaml; then
+            echo "FAIL: planner.enabled=false still renders the planner"; exit 1
+          fi
+
+          published="ghcr.io/${GITHUB_REPOSITORY}/(control-plane|ai-gateway|operator|planner)"
+          rendered=$(grep -hE '^[[:space:]]+image:' on.yaml off.yaml app.yaml gw.yaml \
+            | sed -E 's#^[[:space:]]+image:[[:space:]]*##; s#"##g; s#[:@][^/]*$##' | sort -u)
+          echo "rendered image repositories:"; echo "$rendered"
+          bad=$(echo "$rendered" | grep -vE "^${published}$" || true)
+          if [ -n "$bad" ]; then
+            echo "FAIL: the charts default to image(s) release.yml does not publish:"
+            echo "$bad"
+            exit 1
+          fi
+
