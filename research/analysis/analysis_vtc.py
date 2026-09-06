@@ -20,7 +20,12 @@ from fairness_v2 import load_worst_tenant
 from run_analysis import METRIC_LABELS, md_table
 
 DB = stats.REPO_ROOT / "eval" / "results" / "vtc_fairness.duckdb"
-OUT = Path(__file__).resolve().parent / "VTC_FAIRNESS.md"
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it.
+# It resolved to this directory unconditionally until session 43, which meant
+# the committed record was the only place this script could write: running it
+# overwrote the published record, and the reproduction gate could not
+# regenerate it into a scratch directory to compare.
+OUT = stats.record_path("VTC_FAIRNESS.md")
 
 JCAC, VTC = "jcac", "vtc_replica"
 CELLS = ["workload", "tenant_mix", "cluster_size", "rep"]

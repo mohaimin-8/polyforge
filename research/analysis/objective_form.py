@@ -64,7 +64,12 @@ import stats
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_DIR = REPO_ROOT / "eval" / "results"
-OUT = Path(__file__).resolve().parent / "OBJECTIVE_FORM.md"
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it.
+# It resolved to this directory unconditionally until session 43, which meant
+# the committed record was the only place this script could write: running it
+# overwrote the published record, and the reproduction gate could not
+# regenerate it into a scratch directory to compare.
+OUT = stats.record_path("OBJECTIVE_FORM.md")
 
 ALPHA = 0.01
 EPSILON = 0.01

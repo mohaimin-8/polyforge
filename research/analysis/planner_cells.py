@@ -27,10 +27,17 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "services" / "planner"))
 sys.path.insert(0, str(REPO_ROOT / "research" / "jcac_sim"))
+
+import stats  # noqa: E402  (research/analysis/stats.py)
 from planner import PlannerCore  # noqa: E402
 from model import jain_index  # noqa: E402
 
-OUT = Path(__file__).resolve().parent / "PLANNER_CELLS.md"
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it.
+# It resolved to this directory unconditionally until session 43, which meant
+# the committed record was the only place this script could write: running it
+# overwrote the published record, and the reproduction gate could not
+# regenerate it into a scratch directory to compare.
+OUT = stats.record_path("PLANNER_CELLS.md")
 
 # Frozen grid (see prereg).
 TENANT_COUNTS = (8, 32, 64, 128, 256, 512, 1024)

@@ -21,6 +21,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "jcac_sim"))
 
+import stats  # noqa: E402  (research/analysis/stats.py)
+
 import model  # noqa: E402
 import simulate  # noqa: E402
 from controller import ClusterLimits, Weights  # noqa: E402
@@ -181,7 +183,7 @@ def main() -> None:
                  "graceful variant (keep enough cache to cut misses under a tight budget) "
                  "is the only design that could differ, and it is named as future work, "
                  "not run here.")
-    out_md = Path(__file__).resolve().parent / "DEGRADE_PROBE.md"
+    out_md = stats.record_path("DEGRADE_PROBE.md")
     out_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {out_md} and {out_csv}")
 

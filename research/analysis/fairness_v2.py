@@ -42,7 +42,14 @@ def load_worst_tenant(db_path: Path) -> pd.DataFrame:
     the timeseries are Zenodo-archived (192k rows), the grouped result is
     200, so the aggregate is what git carries."""
     if not db_path.exists():
-        agg = db_path.parent / "agg_fairness_v2_worst_tenant.csv.gz"
+        # Keyed to the campaign being scored, not hardcoded. It named
+        # fairness_v2's aggregate unconditionally, and analysis_vtc.py calls
+        # this same function with vtc_fairness.duckdb -- so on a clean clone
+        # VTC silently scored the FAIRNESS campaign's 200 rows, whose run_ids
+        # do not match its own, and VTC_FAIRNESS.md regenerated as a table of
+        # zeros that still looked like a result. Same defect as R5's export
+        # fallback pointing at the wrong file, in a second script.
+        agg = db_path.parent / f"agg_{db_path.stem}_worst_tenant.csv.gz"
         if agg.exists():
             df = pd.read_csv(agg, float_precision="round_trip")
             for col in ("worst_tenant_p95_ms", "worst_tenant_violation"):

@@ -35,6 +35,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "jcac_sim"))
 
+import stats  # noqa: E402  (research/analysis/stats.py)
+
 import model  # noqa: E402
 from controller import (  # noqa: E402
     COST_SCALE_USD,
@@ -232,7 +234,7 @@ def main() -> None:
     h1 = all(med <= 0.01 and mx <= 0.05 for med, mx in verdicts)
     lines.append(f"**CG-H1 (median gap <= 1% and max gap <= 5% at every N): "
                  f"{'PASS' if h1 else 'FAIL'}.**")
-    out_md = Path(__file__).resolve().parent / f"COORD_GAP{suffix.upper()}.md"
+    out_md = stats.record_path(f"COORD_GAP{suffix.upper()}.md")
     out_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {out_md} and {out_csv}")
 
