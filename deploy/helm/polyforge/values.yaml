@@ -1,9 +1,17 @@
 # Env-specific overrides land here (the point of the chart, per roadmap W10):
 # image tag, replica count, and resource limits are all templated.
 
+# Defaults are the images release.yml publishes, so `helm install` from the
+# published chart pulls something that exists. `polyforge/control-plane:dev`
+# was the default until session 43: unqualified, so it resolves to Docker Hub,
+# where nothing of that name is published -- the same defect D2 fixed in the
+# operator chart and left standing here, because the helm job rendered the
+# chart to /dev/null and never looked at what came out. The eval harness runs
+# on kind with side-loaded images and overrides both fields back to the local
+# names (HELM_EVAL_BASE_VALUES in eval/harness/cluster_backend.py).
 image:
-  repository: polyforge/control-plane
-  tag: dev
+  repository: ghcr.io/mohaimin-8/polyforge/control-plane
+  tag: ""            # defaults to .Chart.appVersion
   pullPolicy: IfNotPresent
 
 replicaCount: 2
@@ -54,8 +62,8 @@ autoscaling:
 gateway:
   enabled: false
   image:
-    repository: polyforge/ai-gateway
-    tag: dev
+    repository: ghcr.io/mohaimin-8/polyforge/ai-gateway
+    tag: ""          # defaults to .Chart.appVersion
     pullPolicy: IfNotPresent
   replicaCount: 1
   # JSON map tier -> backend, e.g.

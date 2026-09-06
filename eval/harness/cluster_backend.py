@@ -539,6 +539,14 @@ export default function () {{
 # and the platform rate limiter out of the way — the run's arrival rates
 # are the experiment, not a policy under test.
 HELM_EVAL_BASE_VALUES = {
+    # Pinned here rather than inherited from the chart. The chart now defaults
+    # to the published GHCR images so an install from the published chart
+    # works; this cluster is kind with images side-loaded by `kind load`, so
+    # the run needs the local names. It used to rely on the chart default
+    # happening to be the kind-local value, which is what let that default
+    # stay wrong for a real install without any run noticing.
+    "image.repository": "polyforge/control-plane",
+    "image.tag": "dev",
     "postgres.adminURL": "",
     "postgres.appURL": "",
     # The eval cluster deploys no Redis, and the chart's default
