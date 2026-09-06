@@ -57,6 +57,7 @@ from __future__ import annotations
 import argparse
 import glob
 import hashlib
+import tempfile
 import sys
 from pathlib import Path
 
@@ -66,6 +67,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "jcac_sim"))
 from model import TIER_COST_USD_PER_REQ  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "SEMANTIC_CACHE.md"
+
+# A smoke run must not be able to overwrite the published record. This script
+# wrote the same document whichever way it ran, and its own docstring lists
+# `python semantic_cache_eval.py` -- synthetic prompts through the lexical
+# fallback embedder -- as the first usage. So the published LMSYS + MiniLM
+# numbers could be replaced by numbers of an entirely different provenance by
+# anyone smoke-testing the protocol, and CI had to `git checkout --` the file
+# afterwards to undo exactly that. Provenance now chooses the destination, and
+# CI asserts the published record was left alone instead of restoring it.
+SMOKE_OUT = Path(tempfile.gettempdir()) / "SEMANTIC_CACHE_smoke.md"
 THRESHOLDS = (0.70, 0.75, 0.80, 0.85, 0.90, 0.95)
 # A hit avoids one mid-tier model call; miss pays it. The dollar axis.
 CALL_PRICE_USD = TIER_COST_USD_PER_REQ["mid"]
@@ -216,6 +227,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--conversations", default=None, help="real LMSYS parquet glob")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--out", default=None,
+                    help="where to write the record; without it the published "
+                         "record is written ONLY by a published-provenance run "
+                         "(real LMSYS conversations through the MiniLM encoder)")
     ap.add_argument("--fixed-cache", type=int, default=200,
                     help="fixed cache entry cap (the naive baseline)")
     ap.add_argument("--sample", type=int, default=None,
@@ -335,9 +350,15 @@ def main() -> None:
       "installed. The LMSYS ETL that normalizes the same dataset for demand "
       "replay is `research/traces/etl_lmsys_chat1m.py`.")
 
-    OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"wrote {OUT}: adaptive@0.85={adaptive[0.85]:.3f} fixed@0.85={fixed[0.85]:.3f} "
-          f"embedder={emb.name}")
+    published = bool(args.conversations) and isinstance(emb, MiniLMEmbedder)
+    destination = Path(args.out) if args.out else (OUT if published else SMOKE_OUT)
+    destination.write_text(chr(10).join(lines) + chr(10), encoding="utf-8")
+    print(f"wrote {destination}: adaptive@0.85={adaptive[0.85]:.3f} "
+          f"fixed@0.85={fixed[0.85]:.3f} embedder={emb.name}")
+    if not published and not args.out:
+        print(f"provenance is not the published one (data="
+              f"{'LMSYS' if args.conversations else 'synthetic'}, "
+              f"embedder={emb.name}), so {OUT.name} was left untouched.")
 
 
 if __name__ == "__main__":
