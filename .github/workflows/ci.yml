@@ -136,7 +136,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Lint OpenAPI
-        run: npx --yes @redocly/cli lint api/openapi.yaml
+        run: # Pinned. It was @redocly/cli (floating), which is a linter version
+          # that can change underneath a gate without anything in the tree
+          # changing -- the shape that broke setup-envtest in R5. 2.51.2
+          # is the version this spec was verified against.
+          npx --yes @redocly/cli@2.51.2 lint api/openapi.yaml
 
   # W23: no secrets in the repo or its history. gitleaks scans every push
   # over the full history (fetch-depth: 0 is what makes that true).
@@ -294,7 +298,14 @@ jobs:
         working-directory: research/analysis
         run: |
           python semantic_cache_eval.py
-          git checkout -- SEMANTIC_CACHE.md
+          # `git checkout -- SEMANTIC_CACHE.md` was here. The smoke run
+          # overwrote the published LMSYS + MiniLM record with synthetic
+          # numbers and CI quietly undid it; on a machine with
+          # sentence-transformers installed that swap reads adaptive@0.85
+          # = 1.000 against the published 0.296. The script now refuses to
+          # write the published record unless the run has its provenance,
+          # so this asserts the file was left alone instead of repairing it.
+          git diff --exit-code -- SEMANTIC_CACHE.md
 
   # Session 28: every push proves the paper's numbers re-derive on a clean
   # checkout — the "git tier" of scripts/reproduce.py rebuilds RESULTS.md,
