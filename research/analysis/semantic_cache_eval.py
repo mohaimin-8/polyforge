@@ -64,9 +64,14 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "jcac_sim"))
+
+import stats  # noqa: E402  (research/analysis/stats.py)
 from model import TIER_COST_USD_PER_REQ  # noqa: E402
 
-OUT = Path(__file__).resolve().parent / "SEMANTIC_CACHE.md"
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it;
+# it resolved to this directory unconditionally, so running the script
+# overwrote the committed record and the gate could not compare it.
+OUT = stats.record_path("SEMANTIC_CACHE.md")
 
 # A smoke run must not be able to overwrite the published record. This script
 # wrote the same document whichever way it ran, and its own docstring lists

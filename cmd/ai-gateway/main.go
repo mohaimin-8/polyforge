@@ -30,6 +30,7 @@ import (
 	"polyforge/internal/ai/agent"
 	"polyforge/internal/ai/embed"
 	"polyforge/internal/ai/gateway"
+	"polyforge/internal/redisopt"
 	"polyforge/internal/secrets"
 	postgresstore "polyforge/internal/storage/postgres"
 	sqlitestore "polyforge/internal/storage/sqlite"
@@ -122,6 +123,12 @@ func main() {
 				log.Error("parse POLYFORGE_REDIS_URL", "error", err)
 				os.Exit(1)
 			}
+			// Without this the gateway kept go-redis's 5 s dial and three
+			// retries, so an unreachable Redis stalled every request that
+			// touched the shared breaker before the in-process fallback could
+			// engage. The control plane fixed that in session 35; this service
+			// never got it.
+			redisopt.Apply(options)
 			client := redis.NewClient(options)
 			defer func() { _ = client.Close() }()
 			chatProvider = gateway.NewSharedCanaryProvider(provider, canaryProvider, weight, client, canaryModel)

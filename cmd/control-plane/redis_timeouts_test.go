@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"polyforge/internal/redisopt"
 )
 
 // The defect these pin: redis.ParseURL leaves the timeout fields zero, and
@@ -25,18 +27,18 @@ func TestApplyRedisTimeoutsFillsUnsetFields(t *testing.T) {
 
 	applyRedisTimeouts(options)
 
-	if options.DialTimeout != defaultRedisDialTimeout {
-		t.Errorf("DialTimeout = %v, want %v", options.DialTimeout, defaultRedisDialTimeout)
+	if options.DialTimeout != redisopt.DefaultDialTimeout {
+		t.Errorf("DialTimeout = %v, want %v", options.DialTimeout, redisopt.DefaultDialTimeout)
 	}
-	if options.ReadTimeout != defaultRedisIOTimeout {
-		t.Errorf("ReadTimeout = %v, want %v", options.ReadTimeout, defaultRedisIOTimeout)
+	if options.ReadTimeout != redisopt.DefaultIOTimeout {
+		t.Errorf("ReadTimeout = %v, want %v", options.ReadTimeout, redisopt.DefaultIOTimeout)
 	}
 	if options.WriteTimeout != options.ReadTimeout {
 		t.Errorf("WriteTimeout = %v, want it to track ReadTimeout %v",
 			options.WriteTimeout, options.ReadTimeout)
 	}
-	if options.MaxRetries != defaultRedisMaxRetries {
-		t.Errorf("MaxRetries = %d, want %d", options.MaxRetries, defaultRedisMaxRetries)
+	if options.MaxRetries != redisopt.DefaultMaxRetries {
+		t.Errorf("MaxRetries = %d, want %d", options.MaxRetries, redisopt.DefaultMaxRetries)
 	}
 }
 
@@ -99,9 +101,9 @@ func TestApplyRedisTimeoutsIgnoresGarbageEnvironment(t *testing.T) {
 	options, _ := redis.ParseURL("redis://localhost:6379/0")
 	applyRedisTimeouts(options)
 
-	if options.DialTimeout != defaultRedisDialTimeout {
+	if options.DialTimeout != redisopt.DefaultDialTimeout {
 		t.Errorf("DialTimeout = %v, want the safe default %v",
-			options.DialTimeout, defaultRedisDialTimeout)
+			options.DialTimeout, redisopt.DefaultDialTimeout)
 	}
 }
 

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: PolyForge Control Plane API
-  version: 0.6.0
+  version: 0.9.0
   description: Multi-tenant control-plane API for PolyForge research infrastructure.
   license:
     name: MIT

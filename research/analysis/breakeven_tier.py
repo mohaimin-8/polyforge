@@ -76,9 +76,14 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
+import stats  # noqa: E402  (research/analysis/stats.py)
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_DIR = REPO_ROOT / "eval" / "results"
-OUT = Path(__file__).resolve().parent / "BREAKEVEN_TIER.md"
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it;
+# it resolved to this directory unconditionally, so running the script
+# overwrote the committed record and the gate could not compare it.
+OUT = stats.record_path("BREAKEVEN_TIER.md")
 
 # Frozen economy of every committed campaign (model.py).
 P_OLD = {"small": 1e-4, "mid": 1e-3, "large": 1e-2}

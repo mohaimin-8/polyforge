@@ -50,7 +50,10 @@ import stats
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_DIR = REPO_ROOT / "eval" / "results"
-OUT = Path(__file__).resolve().parent / "SENSITIVITY_J.md"
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it;
+# it resolved to this directory unconditionally, so running the script
+# overwrote the committed record and the gate could not compare it.
+OUT = stats.record_path("SENSITIVITY_J.md")
 
 # Frozen grid — do not extend after execution.
 W_VIOLATION = [0.0, 0.5, 1.0, 2.0, 4.0]
