@@ -22,7 +22,14 @@ import numpy as np
 
 import planner_cells as base  # frozen protocol: payload, metrics, constants
 
-OUT = Path(__file__).resolve().parent / "PLANNER_CELLS_DEALIAS.md"
+import stats  # noqa: E402  (research/analysis/stats.py)
+
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it.
+# It resolved to this directory unconditionally until session 43, which meant
+# the committed record was the only place this script could write: running it
+# overwrote the published record, and the reproduction gate could not
+# regenerate it into a scratch directory to compare.
+OUT = stats.record_path("PLANNER_CELLS_DEALIAS.md")
 FROZEN = Path(__file__).resolve().parent / "PLANNER_CELLS.md"
 DJAIN_TOL = base.DJAIN_TOL
 

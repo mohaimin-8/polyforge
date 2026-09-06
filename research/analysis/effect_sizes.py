@@ -33,8 +33,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+import stats  # noqa: E402  (research/analysis/stats.py)
+
 ROOT = Path(__file__).resolve().parents[2]
-OUT = Path(__file__).resolve().parent / "EFFECT_SIZES.md"
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it.
+# It resolved to this directory unconditionally until session 43, which meant
+# the committed record was the only place this script could write: running it
+# overwrote the published record, and the reproduction gate could not
+# regenerate it into a scratch directory to compare.
+OUT = stats.record_path("EFFECT_SIZES.md")
 TABLES = {
     "first sample (n=16, underpowered — transparency only)":
         ROOT / "eval" / "results" / "trace_replay_runs.csv",

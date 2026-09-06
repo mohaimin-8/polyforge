@@ -90,6 +90,27 @@ VIEWS = [
         ORDER BY run_id
         """,
     ),
+    (
+        "vtc_fairness.duckdb",
+        "agg_vtc_fairness_worst_tenant.csv.gz",
+        # research/analysis/analysis_vtc.py, via the same loader
+        """
+        WITH per_tenant AS (
+            SELECT r.run_id, r.system, r.workload, r.tenant_mix,
+                   r.cluster_size, r.rep, t.tenant,
+                   quantile_cont(t.ai_p95_ms, 0.95) AS tenant_p95,
+                   avg(t.violation) AS tenant_violation
+            FROM timeseries t JOIN runs r USING (run_id)
+            WHERE r.status = 'valid'
+            GROUP BY ALL
+        )
+        SELECT run_id, system, workload, tenant_mix, cluster_size, rep,
+               max(tenant_p95) AS worst_tenant_p95_ms,
+               max(tenant_violation) AS worst_tenant_violation
+        FROM per_tenant GROUP BY ALL
+        ORDER BY run_id
+        """,
+    ),
 ] + [
     (
         db,

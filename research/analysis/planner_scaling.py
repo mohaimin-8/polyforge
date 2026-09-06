@@ -34,9 +34,16 @@ from statistics import median
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services" / "planner"))
+
+import stats  # noqa: E402  (research/analysis/stats.py)
 from planner import PlannerCore  # noqa: E402
 
-OUT = Path(__file__).resolve().parent / "PLANNER_SCALING.md"
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it.
+# It resolved to this directory unconditionally until session 43, which meant
+# the committed record was the only place this script could write: running it
+# overwrote the published record, and the reproduction gate could not
+# regenerate it into a scratch directory to compare.
+OUT = stats.record_path("PLANNER_SCALING.md")
 TENANT_COUNTS = (8, 16, 32, 64, 128, 256)
 CALLS_PER_N = 20
 SEED = 42

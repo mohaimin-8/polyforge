@@ -206,16 +206,34 @@ func TestEnvtestAuditSurvivesStatusConflict(t *testing.T) {
 	// Retrying is safe precisely because it only happens when nothing was
 	// planned: the spec is unchanged, so no cycle is repeated after a
 	// successful one.
+	// The cycle has to reach the path under test: gather must give the
+	// planner something, AND the spec update must land. The competing
+	// writer bumps resourceVersion, so the spec Update can itself lose with
+	// a 409 -- a different race from the one this test is about, which is a
+	// spec that DID apply and a status write that then conflicts. Retry
+	// until the intended path is exercised, and fail if it never is.
 	const attempts = 5
+	applied := func() bool {
+		var p pfv1alpha1.Policy
+		if err := c.Get(ctx, types.NamespacedName{Name: "acme"}, &p); err != nil {
+			return false
+		}
+		return p.Spec.Replicas == 4 && p.Spec.CacheSizeMB == 256
+	}
 	for attempt := 1; attempt <= attempts; attempt++ {
 		contendedCycle()
-		if len(stub.requests) > 0 {
+		if len(stub.requests) > 0 && applied() {
 			break
 		}
 	}
 	if len(stub.requests) == 0 {
 		t.Fatalf("gather produced no input in %d contended cycles, so the "+
 			"conflict path was never exercised; see the logged reason above", attempts)
+	}
+	if !applied() {
+		t.Fatalf("the spec update lost to the competing writer in all %d "+
+			"cycles, so the status-conflict path was never reached; that is a "+
+			"contention failure of the test's own setup, not of the audit", attempts)
 	}
 
 	var got pfv1alpha1.Policy
