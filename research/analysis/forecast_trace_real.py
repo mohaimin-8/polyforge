@@ -25,7 +25,12 @@ from pathlib import Path
 
 from forecast_trace import METHODS, detected_period, rolling_one_step, total_chat_series
 
-OUT = Path(__file__).resolve().parent / "FORECAST_TRACE_REAL.md"
+import stats  # noqa: E402  (research/analysis/stats.py)
+
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it;
+# it resolved to this directory unconditionally, so running the script
+# overwrote the committed record and the gate could not compare it.
+OUT = stats.record_path("FORECAST_TRACE_REAL.md")
 DEFAULT_TRACE = Path(__file__).resolve().parents[1] / "traces" / "out" / "burstgpt_real.csv.gz"
 GAP_BUCKETS = 24  # >= one silent day at hourly buckets = a collection gap
 

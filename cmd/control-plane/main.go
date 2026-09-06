@@ -23,6 +23,7 @@ import (
 	"polyforge/internal/idempotency"
 	"polyforge/internal/limit"
 	"polyforge/internal/platform"
+	"polyforge/internal/redisopt"
 	"polyforge/internal/secrets"
 	postgresstore "polyforge/internal/storage/postgres"
 	sqlitestore "polyforge/internal/storage/sqlite"
@@ -310,44 +311,12 @@ func envDefault(name, fallback string) string {
 // aggressive by design, and a deployment that wants go-redis's defaults can
 // set them explicitly in POLYFORGE_REDIS_URL (dial_timeout=, read_timeout=)
 // or via the environment below.
-const (
-	defaultRedisDialTimeout = 200 * time.Millisecond
-	defaultRedisIOTimeout   = 200 * time.Millisecond
-	defaultRedisMaxRetries  = 1
-)
-
-// applyRedisTimeouts fills only what the URL left unset, so an explicit
-// setting in POLYFORGE_REDIS_URL always wins.
+// applyRedisTimeouts delegates to internal/redisopt. The defaults used to live
+// here as unexported constants, which is why the ai-gateway -- a separate main
+// package that parses its own POLYFORGE_REDIS_URL -- never got them and kept
+// go-redis's 5 s dial. A shared default only one caller applies is not shared.
 func applyRedisTimeouts(options *redis.Options) {
-	if options == nil {
-		return
-	}
-	if options.DialTimeout == 0 {
-		options.DialTimeout = envDuration("POLYFORGE_REDIS_DIAL_TIMEOUT", defaultRedisDialTimeout)
-	}
-	if options.ReadTimeout == 0 {
-		options.ReadTimeout = envDuration("POLYFORGE_REDIS_READ_TIMEOUT", defaultRedisIOTimeout)
-	}
-	if options.WriteTimeout == 0 {
-		options.WriteTimeout = options.ReadTimeout
-	}
-	// go-redis reads 0 as "use my default of 3" and a negative as "none", so
-	// 0 here is the case that has to be overridden.
-	if options.MaxRetries == 0 {
-		options.MaxRetries = envInt("POLYFORGE_REDIS_MAX_RETRIES", defaultRedisMaxRetries)
-	}
-}
-
-func envDuration(name string, fallback time.Duration) time.Duration {
-	value := os.Getenv(name)
-	if value == "" {
-		return fallback
-	}
-	parsed, err := time.ParseDuration(value)
-	if err != nil || parsed <= 0 {
-		return fallback
-	}
-	return parsed
+	redisopt.Apply(options)
 }
 
 func envInt(name string, fallback int) int {

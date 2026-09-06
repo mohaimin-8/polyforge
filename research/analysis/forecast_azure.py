@@ -50,11 +50,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "jcac_sim"))
 
+import stats  # noqa: E402  (research/analysis/stats.py)
+
 from forecast_trace import METHODS, detected_period, rolling_one_step  # noqa: E402
 from forecast_trace_real import contiguous_segments  # noqa: E402
 from simulate import load_trace_buckets  # noqa: E402
 
-OUT = Path(__file__).resolve().parent / "FORECAST_AZURE.md"
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it;
+# it resolved to this directory unconditionally, so running the script
+# overwrote the committed record and the gate could not compare it.
+OUT = stats.record_path("FORECAST_AZURE.md")
 TRACE = Path(__file__).resolve().parents[1] / "traces" / "out" / "azure_llm_2024.csv.gz"
 INTERVAL_S = 3600
 

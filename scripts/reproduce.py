@@ -111,6 +111,7 @@ CAMPAIGN_RECORDS = [
     ("planner_cells_dealias.py", [], "PLANNER_CELLS_DEALIAS.md"),
     ("analysis_vtc.py", [], "VTC_FAIRNESS.md"),
     ("coordination_gap.py", ["--anchored"], "COORD_GAP_ANCHORED.md"),
+    ("sensitivity_j.py", [], "SENSITIVITY_J.md"),
     # Both traces of the budget-parity campaign are in, so the record joins
     # the gate as PREREG_BUDGET_PARITY requires. It was deliberately held out
     # while only Azure had landed: an interim record cannot carry a
@@ -441,7 +442,8 @@ UNGATED = {
         "as PLANNER_CELLS.md: wall-clock planner latency, machine-dependent "
         "by construction",
     "CACHE_PRECISION.md":
-        "needs --conversations, the licence-gated LMSYS-Chat-1M parquet",
+        "cache_hit_precision.py requires --conversations, the licence-gated "
+        "LMSYS-Chat-1M parquet",
     "SEMANTIC_CACHE.md":
         "the published record is the LMSYS + MiniLM run; a desk rebuild has "
         "neither the dataset nor the encoder, and the script now refuses to "
@@ -458,11 +460,9 @@ UNGATED = {
     "PSEUDO_TENANT.md":
         "needs the Wave 2 per-tenant timeseries, archive tier only",
     "BREAKEVEN_TIER.md":
-        "an analysis_econ.py view whose campaign DuckDB is archive tier and "
-        "has no committed aggregate",
-    "SENSITIVITY_J.md":
-        "a second output of objective_form.py that only its sweep mode writes; "
-        "the sweep needs the archive-tier campaign",
+        "breakeven_tier.py needs its campaign DuckDB, which is archive tier "
+        "with no committed aggregate; on a clean clone it fails opening the "
+        "database rather than degrading, which is the right behaviour",
     "OSF_REGISTRATION.md":
         "a registration document, not a measurement record",
     "THEORY_V2.md":

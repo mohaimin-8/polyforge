@@ -11,8 +11,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | | |
 |---|---:|
 | records | 67 |
-| regenerated and compared | 49 |
-| outside the gate, reason stated | 18 |
+| regenerated and compared | 50 |
+| outside the gate, reason stated | 17 |
 | outside the gate, no entry | 0 |
 
 | record | hypotheses it names | reproduced |
@@ -81,7 +81,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_WAVE4_LIVE_PLANE.md` | WL-H1, WL-H2 | yes |
 | `RESULTS_WINDOW_CHARACTER.md` | BP-H1, TP-H1 | yes |
 | `SEMANTIC_CACHE.md` | - | no, reason stated |
-| `SENSITIVITY_J.md` | - | no, reason stated |
+| `SENSITIVITY_J.md` | - | yes |
 | `VTC_FAIRNESS.md` | - | yes |
 | `RESULTS_WIRE_ATTACK.md` | WA-H1, WA-H2, WA-H3 | no, reason stated |
 

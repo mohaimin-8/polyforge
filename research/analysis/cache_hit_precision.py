@@ -72,7 +72,12 @@ from pathlib import Path
 
 import numpy as np
 
-OUT = Path(__file__).resolve().parent / "CACHE_PRECISION.md"
+import stats  # noqa: E402  (research/analysis/stats.py)
+
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it;
+# it resolved to this directory unconditionally, so running the script
+# overwrote the committed record and the gate could not compare it.
+OUT = stats.record_path("CACHE_PRECISION.md")
 THRESHOLDS = (0.70, 0.75, 0.80, 0.85, 0.90, 0.95)
 AGREEMENT_HEADLINE = 0.70
 AGREEMENT_SENSITIVITY = (0.60, 0.70, 0.80)

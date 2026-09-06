@@ -26,12 +26,17 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "jcac_sim"))
+
+import stats  # noqa: E402  (research/analysis/stats.py)
 from controller import Forecast  # noqa: E402
 from model import Demand  # noqa: E402
 from simulate import load_trace_buckets  # noqa: E402
 
 METHODS = ("persistence", "trend", "holt", "seasonal")
-OUT = Path(__file__).resolve().parent / "FORECAST_TRACE.md"
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect it;
+# it resolved to this directory unconditionally, so running the script
+# overwrote the committed record and the gate could not compare it.
+OUT = stats.record_path("FORECAST_TRACE.md")
 
 
 def total_chat_series(trace: Path, interval_s: int) -> list[float]:
