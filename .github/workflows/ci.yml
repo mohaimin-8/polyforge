@@ -193,6 +193,24 @@ jobs:
         if: always()
         run: python research/security/cache_side_channel.py
 
+  # 23 tests across four files that pin properties of the analysis layer -
+  # trace parity, budget parity, the shared stats helpers, and SK-H1's
+  # discriminability cross-check - and until session 43 CI ran NONE of them.
+  # They existed, passed locally, and gated nothing. Own job, for the reason
+  # vulncheck and supplement have one: a gate that shares a job with a
+  # fragile step is a gate that stops running without saying so.
+  analysis-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install the pinned analysis dependencies
+        run: pip install -r eval/requirements-reproduce.txt
+      - name: Analysis layer tests
+        run: python -m pytest research/analysis -q
+
   # D3's gate, in its own job for the reason vulncheck is: it was the last
   # step of `python` and a torch import three steps earlier skipped it.
   supplement:
