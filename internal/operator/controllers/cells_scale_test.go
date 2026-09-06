@@ -77,6 +77,11 @@ type cellScaleRow struct {
 func TestCellsScaleOnShippedPath(t *testing.T) {
 	url := os.Getenv("POLYFORGE_TEST_PLANNER_URL")
 	if url == "" {
+		if os.Getenv("POLYFORGE_REQUIRE_PLANNER") != "" {
+			t.Fatal("POLYFORGE_REQUIRE_PLANNER is set but " +
+				"POLYFORGE_TEST_PLANNER_URL is not: the shipped cell-scaling " +
+				"path would go unexercised and the run would still report ok")
+		}
 		t.Skip("POLYFORGE_TEST_PLANNER_URL not set; shipped-path cell scaling not exercised")
 	}
 	client := planner.NewHTTPClient(url, 120*time.Second).
