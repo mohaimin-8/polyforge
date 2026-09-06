@@ -120,7 +120,9 @@ def main() -> None:
         print(f"budget {budget:.2f}: outage shed {rows[-1]['shed_outage']:.2%} "
               f"-> graceful {rows[-1]['graceful_outage']:.2%}")
 
-    out_csv = Path(__file__).resolve().parent / "degrade_probe.csv"
+    # Redirected like the record, for the reason in coordination_gap.py:
+    # a gate that rewrites committed files is not observing them.
+    out_csv = stats.record_path("degrade_probe.csv")
     with out_csv.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
