@@ -212,8 +212,24 @@ jobs:
           python-version: "3.13"
       - name: Install harness dependencies
         run: pip install -r eval/requirements.txt
+      # `unittest discover` exits 0 when it discovers NOTHING -- measured: a
+      # pattern matching no file prints NO TESTS RAN and returns 0. This suite
+      # is 167 tests, the largest in the repo and the only cover the simulator
+      # has, so a rename or an import error at the discovery root would remove
+      # all of it from CI in silence. pytest does not share the flaw (exit 5 on
+      # an empty collection, measured), so only this one needs the assertion.
+      # The floor sits below the current count for the same reason the coverage
+      # gate does: it catches the suite vanishing, not ordinary churn.
       - name: Simulator + baselines tests
-        run: python -m unittest discover -s research/jcac_sim -q
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s research/jcac_sim 2>&1 | tee sim.log
+          ran=$(grep -oE '^Ran [0-9]+ test' sim.log | grep -oE '[0-9]+' | head -1)
+          echo "simulator suite ran ${ran:-0} tests"
+          if [ "${ran:-0}" -lt 150 ]; then
+            echo "FAIL: expected at least 150 simulator tests, ran ${ran:-0}"
+            exit 1
+          fi
       - name: Planner service tests
         run: python -m pytest services/planner -q
       - name: Harness tests
