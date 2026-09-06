@@ -1,0 +1,454 @@
+{
+ "axes": [
+  {
+   "collections": [],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#c3c2b7ff",
+     "label": "_child0",
+     "marker": "None",
+     "points": [
+      [
+       "0",
+       "0"
+      ],
+      [
+       "0",
+       "1"
+      ]
+     ],
+     "style": "-",
+     "width": "0.8"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child1",
+     "marker": "o",
+     "points": [
+      [
+       "2.12142087456",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child3",
+     "marker": "o",
+     "points": [
+      [
+       "2883.73626794",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child5",
+     "marker": "o",
+     "points": [
+      [
+       "35.7440213666",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child7",
+     "marker": "o",
+     "points": [
+      [
+       "0.172010733408",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    }
+   ],
+   "patches": [],
+   "texts": [
+    {
+     "colour": "#52514eff",
+     "text": "+2.1%*",
+     "xy": [
+      "0",
+      "8"
+     ]
+    },
+    {
+     "colour": "#52514eff",
+     "text": "+2883.7%*",
+     "xy": [
+      "0",
+      "8"
+     ]
+    },
+    {
+     "colour": "#52514eff",
+     "text": "+35.7%*",
+     "xy": [
+      "0",
+      "8"
+     ]
+    },
+    {
+     "colour": "#52514eff",
+     "text": "+0.2%",
+     "xy": [
+      "0",
+      "8"
+     ]
+    }
+   ],
+   "title": "cost",
+   "xlabel": "",
+   "xlim": [
+    "-2",
+    "11534.9450717"
+   ],
+   "xscale": "symlog",
+   "xticklabels": [
+    "$\\mathdefault{0}$",
+    "$\\mathdefault{10^{1}}$",
+    "$\\mathdefault{10^{2}}$",
+    "$\\mathdefault{10^{3}}$",
+    "$\\mathdefault{10^{4}}$"
+   ],
+   "xticks": [
+    "0",
+    "10",
+    "100",
+    "1000",
+    "10000"
+   ],
+   "ylabel": "",
+   "ylim": [
+    "-0.6",
+    "3.8"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "\u2212 classifier",
+    "\u2212 joint ctrl",
+    "\u2212 cost-aware evict",
+    "\u2212 fairness"
+   ],
+   "yticks": [
+    "3",
+    "2",
+    "1",
+    "0"
+   ]
+  },
+  {
+   "collections": [],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#c3c2b7ff",
+     "label": "_child0",
+     "marker": "None",
+     "points": [
+      [
+       "0",
+       "0"
+      ],
+      [
+       "0",
+       "1"
+      ]
+     ],
+     "style": "-",
+     "width": "0.8"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child1",
+     "marker": "o",
+     "points": [
+      [
+       "-5.84503342343",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child3",
+     "marker": "o",
+     "points": [
+      [
+       "9.34966699638",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child5",
+     "marker": "o",
+     "points": [
+      [
+       "1.64667802943",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child7",
+     "marker": "o",
+     "points": [
+      [
+       "2.92241840676",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    }
+   ],
+   "patches": [],
+   "texts": [
+    {
+     "colour": "#52514eff",
+     "text": "-5.8%*",
+     "xy": [
+      "0",
+      "8"
+     ]
+    },
+    {
+     "colour": "#52514eff",
+     "text": "+9.3%",
+     "xy": [
+      "0",
+      "8"
+     ]
+    },
+    {
+     "colour": "#52514eff",
+     "text": "+1.6%",
+     "xy": [
+      "0",
+      "8"
+     ]
+    },
+    {
+     "colour": "#52514eff",
+     "text": "+2.9%",
+     "xy": [
+      "0",
+      "8"
+     ]
+    }
+   ],
+   "title": "SLO violation",
+   "xlabel": "",
+   "xlim": [
+    "-11.0523835718",
+    "14.5570171447"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "\u221220",
+    "\u221210",
+    "0",
+    "10",
+    "20"
+   ],
+   "xticks": [
+    "-20",
+    "-10",
+    "0",
+    "10",
+    "20"
+   ],
+   "ylabel": "",
+   "ylim": [
+    "-0.6",
+    "3.8"
+   ],
+   "yscale": "linear",
+   "yticklabels": [],
+   "yticks": [
+    "3",
+    "2",
+    "1",
+    "0"
+   ]
+  },
+  {
+   "collections": [],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#c3c2b7ff",
+     "label": "_child0",
+     "marker": "None",
+     "points": [
+      [
+       "0",
+       "0"
+      ],
+      [
+       "0",
+       "1"
+      ]
+     ],
+     "style": "-",
+     "width": "0.8"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child1",
+     "marker": "o",
+     "points": [
+      [
+       "0.0881644508563",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child3",
+     "marker": "o",
+     "points": [
+      [
+       "-1.88540665359",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child5",
+     "marker": "o",
+     "points": [
+      [
+       "-0.130090313818",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child7",
+     "marker": "o",
+     "points": [
+      [
+       "-0.136113641286",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    }
+   ],
+   "patches": [],
+   "texts": [
+    {
+     "colour": "#52514eff",
+     "text": "+0.1%",
+     "xy": [
+      "0",
+      "8"
+     ]
+    },
+    {
+     "colour": "#52514eff",
+     "text": "-1.9%*",
+     "xy": [
+      "0",
+      "8"
+     ]
+    },
+    {
+     "colour": "#52514eff",
+     "text": "-0.1%",
+     "xy": [
+      "0",
+      "8"
+     ]
+    },
+    {
+     "colour": "#52514eff",
+     "text": "-0.1%",
+     "xy": [
+      "0",
+      "8"
+     ]
+    }
+   ],
+   "title": "Jain fairness",
+   "xlabel": "",
+   "xlim": [
+    "-3.7338396477",
+    "1.93659744497"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "\u22124",
+    "\u22122",
+    "0",
+    "2"
+   ],
+   "xticks": [
+    "-4",
+    "-2",
+    "0",
+    "2"
+   ],
+   "ylabel": "",
+   "ylim": [
+    "-0.6",
+    "3.8"
+   ],
+   "yscale": "linear",
+   "yticklabels": [],
+   "yticks": [
+    "3",
+    "2",
+    "1",
+    "0"
+   ]
+  }
+ ],
+ "figure": "fig08_ablation_deltas",
+ "size_inches": [
+  "7.2",
+  "2.3"
+ ],
+ "texts": [
+  {
+   "colour": "#000000ff",
+   "text": "change vs full PolyForge when one component is removed (%)",
+   "xy": [
+    "0.5",
+    "1.06"
+   ]
+  }
+ ]
+}

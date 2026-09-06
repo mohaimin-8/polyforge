@@ -1,0 +1,262 @@
+{
+ "axes": [
+  {
+   "collections": [
+    {
+     "edgecolours": [
+      "#2a78d6ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.0571897925511",
+        "5"
+       ],
+       [
+        "0.0805927734789",
+        "5"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#1baf7aff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.0604070856502",
+        "4"
+       ],
+       [
+        "0.0864233875058",
+        "4"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#eda100ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.0539245124418",
+        "3"
+       ],
+       [
+        "0.0818963406032",
+        "3"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#008300ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.0918231919627",
+        "2"
+       ],
+       [
+        "0.116439338961",
+        "2"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#4a3aa7ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.00426336831149",
+        "1"
+       ],
+       [
+        "0.00832704037688",
+        "1"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#e34948ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.0366775253815",
+        "0"
+       ],
+       [
+        "0.0522388831927",
+        "0"
+       ]
+      ]
+     ]
+    }
+   ],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child1",
+     "marker": "o",
+     "points": [
+      [
+       "0.068891283015",
+       "5"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_child3",
+     "marker": "o",
+     "points": [
+      [
+       "0.073415236578",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "_child5",
+     "marker": "o",
+     "points": [
+      [
+       "0.0679104265225",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "_child7",
+     "marker": "o",
+     "points": [
+      [
+       "0.104131265462",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_child9",
+     "marker": "o",
+     "points": [
+      [
+       "0.00629520434419",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child11",
+     "marker": "o",
+     "points": [
+      [
+       "0.0444582042871",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    }
+   ],
+   "patches": [],
+   "texts": [],
+   "title": "",
+   "xlabel": "mean SLO violation (0\u20131)",
+   "xlim": [
+    "-0.00134543022099",
+    "0.122048137494"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "\u22120.02",
+    "0.00",
+    "0.02",
+    "0.04",
+    "0.06",
+    "0.08",
+    "0.10",
+    "0.12",
+    "0.14"
+   ],
+   "xticks": [
+    "-0.02",
+    "0",
+    "0.02",
+    "0.04",
+    "0.06",
+    "0.08",
+    "0.1",
+    "0.12",
+    "0.14"
+   ],
+   "ylabel": "",
+   "ylim": [
+    "-0.25",
+    "5.25"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "PolyForge",
+    "HPA",
+    "KEDA",
+    "FIRM",
+    "Static",
+    "GPTCache"
+   ],
+   "yticks": [
+    "5",
+    "4",
+    "3",
+    "2",
+    "1",
+    "0"
+   ]
+  }
+ ],
+ "figure": "fig02_violation_by_system",
+ "size_inches": [
+  "3.6",
+  "2.2"
+ ],
+ "texts": []
+}

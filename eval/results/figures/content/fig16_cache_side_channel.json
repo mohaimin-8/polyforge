@@ -1,0 +1,279 @@
+{
+ "axes": [
+  {
+   "collections": [],
+   "legend": [
+    "Shared cache (GPTCache default)",
+    "PolyForge per-tenant cache"
+   ],
+   "lines": [
+    {
+     "colour": "#e34948ff",
+     "label": "Shared cache (GPTCache default)",
+     "marker": "o",
+     "points": [
+      [
+       "0.05",
+       "0.5149"
+      ],
+      [
+       "0.1",
+       "0.5355"
+      ],
+      [
+       "0.2",
+       "0.5751"
+      ],
+      [
+       "0.35",
+       "0.6417"
+      ],
+      [
+       "0.5",
+       "0.7039"
+      ],
+      [
+       "0.7",
+       "0.7921"
+      ],
+      [
+       "0.9",
+       "0.8772"
+      ]
+     ],
+     "style": "-",
+     "width": "2"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "PolyForge per-tenant cache",
+     "marker": "o",
+     "points": [
+      [
+       "0.05",
+       "0.4973"
+      ],
+      [
+       "0.1",
+       "0.4973"
+      ],
+      [
+       "0.2",
+       "0.4973"
+      ],
+      [
+       "0.35",
+       "0.4973"
+      ],
+      [
+       "0.5",
+       "0.4973"
+      ],
+      [
+       "0.7",
+       "0.4973"
+      ],
+      [
+       "0.9",
+       "0.4973"
+      ]
+     ],
+     "style": "-",
+     "width": "2"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_child2",
+     "marker": "None",
+     "points": [
+      [
+       "0",
+       "0.5"
+      ],
+      [
+       "1",
+       "0.5"
+      ]
+     ],
+     "style": "--",
+     "width": "1"
+    }
+   ],
+   "patches": [],
+   "texts": [
+    {
+     "colour": "#898781ff",
+     "text": "attacker at chance",
+     "xy": [
+      "0.06",
+      "0.52"
+     ]
+    }
+   ],
+   "title": "",
+   "xlabel": "cross-tenant cache warming",
+   "xlim": [
+    "0.0075",
+    "0.9425"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "0.0",
+    "0.2",
+    "0.4",
+    "0.6",
+    "0.8",
+    "1.0"
+   ],
+   "xticks": [
+    "0",
+    "0.2",
+    "0.4",
+    "0.6",
+    "0.8",
+    "1"
+   ],
+   "ylabel": "membership-inference AUC",
+   "ylim": [
+    "0.45",
+    "1"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "0.4",
+    "0.5",
+    "0.6",
+    "0.7",
+    "0.8",
+    "0.9",
+    "1.0"
+   ],
+   "yticks": [
+    "0.4",
+    "0.5",
+    "0.6",
+    "0.7",
+    "0.8",
+    "0.9",
+    "1"
+   ]
+  },
+  {
+   "collections": [],
+   "legend": [],
+   "lines": [],
+   "patches": [
+    {
+     "colour": "#8a8a86ff",
+     "height": "0.8",
+     "kind": "Rectangle",
+     "width": "0.6",
+     "xy": [
+      "-0.3",
+      "0"
+     ]
+    },
+    {
+     "colour": "#e34948ff",
+     "height": "0.5667",
+     "kind": "Rectangle",
+     "width": "0.6",
+     "xy": [
+      "0.7",
+      "0"
+     ]
+    },
+    {
+     "colour": "#2a78d6ff",
+     "height": "0.608",
+     "kind": "Rectangle",
+     "width": "0.6",
+     "xy": [
+      "1.7",
+      "0"
+     ]
+    }
+   ],
+   "texts": [
+    {
+     "colour": "#52514eff",
+     "text": "80%",
+     "xy": [
+      "0",
+      "3"
+     ]
+    },
+    {
+     "colour": "#52514eff",
+     "text": "57%",
+     "xy": [
+      "0",
+      "3"
+     ]
+    },
+    {
+     "colour": "#52514eff",
+     "text": "61%",
+     "xy": [
+      "0",
+      "3"
+     ]
+    }
+   ],
+   "title": "",
+   "xlabel": "",
+   "xlim": [
+    "-0.43",
+    "2.43"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "shared\n(insecure)",
+    "equal split\n(naive secure)",
+    "PolyForge\n(demand-sized)"
+   ],
+   "xticks": [
+    "0",
+    "1",
+    "2"
+   ],
+   "ylabel": "aggregate cache hit rate",
+   "ylim": [
+    "0",
+    "1"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "0.0",
+    "0.2",
+    "0.4",
+    "0.6",
+    "0.8",
+    "1.0"
+   ],
+   "yticks": [
+    "0",
+    "0.2",
+    "0.4",
+    "0.6",
+    "0.8",
+    "1"
+   ]
+  }
+ ],
+ "figure": "fig16_cache_side_channel",
+ "size_inches": [
+  "7",
+  "2.6"
+ ],
+ "texts": [
+  {
+   "colour": "#000000ff",
+   "text": "Cross-tenant timing side channel: the leak, and the cost of closing it",
+   "xy": [
+    "0.5",
+    "1.03"
+   ]
+  }
+ ]
+}
