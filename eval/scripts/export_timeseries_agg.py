@@ -87,6 +87,7 @@ VIEWS = [
                max(tenant_p95) AS worst_tenant_p95_ms,
                max(tenant_violation) AS worst_tenant_violation
         FROM per_tenant GROUP BY ALL
+        ORDER BY run_id
         """,
     ),
 ] + [
@@ -100,13 +101,26 @@ VIEWS = [
         FROM timeseries t JOIN runs r USING (run_id)
         WHERE r.status = 'valid'
         GROUP BY r.system, t.tier
+        ORDER BY r.system, t.tier
         """,
     )
+    # raw_sim_clamp was missing from this list until session 43, so
+    # RESULTS_MOVE_CLAMP.md had no clean-clone fallback: it regenerated on the
+    # author's machine from the gitignored DuckDB and failed the moment the
+    # record was added to the reproduction gate, which is exactly the
+    # works-here-only shape R5 fixed for four other records.
     for db in ("raw_sim_gpu_econ.duckdb", "raw_sim_hk.duckdb", "raw_sim_lm.duckdb",
-               "raw_sim_mixp95.duckdb", "raw_sim_tierwu.duckdb")
+               "raw_sim_mixp95.duckdb", "raw_sim_tierwu.duckdb",
+               "raw_sim_clamp.duckdb")
 ]
 
 
+# Every query carries an ORDER BY. Two did not until session 43, so re-running
+# this exporter produced a different byte stream from the same data -- DuckDB's
+# GROUP BY does not promise an order -- and the committed aggregates could not
+# be regenerated and compared. The records were unaffected (their analyses
+# group and sort again), but "re-export and diff" was not a check anyone could
+# run, which is the point of committing these files at all.
 def main() -> None:
     for db_name, out_name, query in VIEWS:
         db = RESULTS / db_name
