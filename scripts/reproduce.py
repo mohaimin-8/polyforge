@@ -167,6 +167,9 @@ CAMPAIGN_RECORDS = [
     # W7 v2: node spread. Reads the committed load_distribution.json from the
     # sitting rather than a campaign DB - the verdicts are about placement,
     # which lives in that evidence file and nowhere else.
+    # W2: whether SK-H1's frozen rule can resolve a fault at all. Reads the
+    # committed attempt-10 export; descriptive, and it revises no verdict.
+    ("analysis_skh1_discriminability.py", [], "RESULTS_SKH1_DISCRIMINABILITY.md"),
     ("analysis_multinode.py",
      ["--evidence", str(RESULTS / "multinode_steady_evidence")],
      "RESULTS_MULTINODE.md"),
