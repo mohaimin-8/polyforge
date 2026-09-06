@@ -112,6 +112,13 @@ def main() -> int:
       "300 s recovery window, against the frozen 20% band. It is applied at "
       f"every minute whose windows clear every injected fault by {GUARD_S} s.\n")
 
+    w("\nThe comparison is like for like, and that is checked rather than "
+      "assumed: `test_skh1_discriminability.py` asserts that this module's "
+      "`deviation()` reproduces V8's own score **exactly** for all eight "
+      "injections. Importing the function is not the same as applying it "
+      "identically — the window offsets could still differ — so the property "
+      "the argument rests on is pinned by a test.\n")
+
     w("\n| | |")
     w("|---|---:|")
     w(f"| fault-free windows tested | {len(devs)} |")

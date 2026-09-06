@@ -13,6 +13,9 @@ V8 reports SK-H1 FAIL on 1 of 8 injections, and observes that `crud_p95` oscilla
 SK-H1's statistic is imported from `analysis_live_soak_v8`, not re-implemented: median of the 600 s baseline against the maximum of the 300 s recovery window, against the frozen 20% band. It is applied at every minute whose windows clear every injected fault by 900 s.
 
 
+The comparison is like for like, and that is checked rather than assumed: `test_skh1_discriminability.py` asserts that this module's `deviation()` reproduces V8's own score **exactly** for all eight injections. Importing the function is not the same as applying it identically — the window offsets could still differ — so the property the argument rests on is pinned by a test.
+
+
 | | |
 |---|---:|
 | fault-free windows tested | 1049 |
