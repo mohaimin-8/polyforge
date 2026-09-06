@@ -29,6 +29,7 @@ Usage (from the repo root):
 from __future__ import annotations
 
 import gzip
+import io
 from pathlib import Path
 
 import duckdb
@@ -152,7 +153,13 @@ def main() -> None:
         rows = con.execute(query).fetchall()
         columns = [d[0] for d in con.description]
         con.close()
-        with gzip.open(RESULTS / out_name, "wt", newline="", encoding="utf-8") as f:
+        # mtime=0: gzip stamps the current time into its header, so re-running
+        # this exporter produced a new byte stream from identical data even
+        # after the queries were ordered. "Re-export and diff" is the only
+        # check these committed aggregates can carry, and a moving header
+        # defeats it.
+        raw = gzip.GzipFile(RESULTS / out_name, "wb", mtime=0)
+        with io.TextIOWrapper(raw, newline="", encoding="utf-8") as f:
             f.write(",".join(columns) + "\n")
             for row in rows:
                 f.write(",".join("" if v is None else str(v) for v in row) + "\n")
