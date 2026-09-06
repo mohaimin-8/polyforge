@@ -99,6 +99,18 @@ CAMPAIGN_RECORDS = [
     # list has nothing checking it. This one is rebuilt and compared like any
     # other record, so a new record that nobody registers shows up as drift.
     ("records_index.py", [], "RECORDS_INDEX.md"),
+    # Wave 1-5 records, brought into the gate in session 43. They were outside
+    # it because their generators wrote to their own directory instead of
+    # through stats.record_path -- running one overwrote the published record,
+    # and the gate could not redirect them to compare. Converted, probed on a
+    # real clean clone, and these seven reproduce identically there.
+    ("cells_shipped.py", [], "CELLS_SHIPPED.md"),
+    ("degrade_probe.py", [], "DEGRADE_PROBE.md"),
+    ("effect_sizes.py", [], "EFFECT_SIZES.md"),
+    ("objective_form.py", [], "OBJECTIVE_FORM.md"),
+    ("planner_cells_dealias.py", [], "PLANNER_CELLS_DEALIAS.md"),
+    ("analysis_vtc.py", [], "VTC_FAIRNESS.md"),
+    ("coordination_gap.py", ["--anchored"], "COORD_GAP_ANCHORED.md"),
     # Both traces of the budget-parity campaign are in, so the record joins
     # the gate as PREREG_BUDGET_PARITY requires. It was deliberately held out
     # while only Azure had landed: an interim record cannot carry a
@@ -411,13 +423,62 @@ UNGATED = {
     "RESULTS_WIRE_ATTACK.md":
         "a live security campaign against a running gateway, not a desk "
         "re-derivation",
+    # --- Wave 1-5 records outside the RESULTS_* family, audited session 43 ---
+    "COORD_GAP.md":
+        "the committed record is HAND-EXTENDED beyond what coordination_gap.py "
+        "writes: re-wrapped prose, a Scored instances heading, and a whole "
+        "section diagnosing the 37 discarded instances that the generator does "
+        "not produce. Its numbers were checked against a clean-clone "
+        "regeneration and agree exactly (37/37, 46/46, 0.0000%, CG-H1 PASS), so "
+        "no result is misstated -- but the document cannot be regenerated, and "
+        "the repository's rule that records are machine-written does not hold "
+        "for this one",
+    "PLANNER_CELLS.md":
+        "a wall-clock benchmark table (planning latency per cell count); the "
+        "numbers are timings of the machine that ran it and cannot reproduce "
+        "byte-identically anywhere else",
+    "PLANNER_SCALING.md":
+        "as PLANNER_CELLS.md: wall-clock planner latency, machine-dependent "
+        "by construction",
+    "CACHE_PRECISION.md":
+        "needs --conversations, the licence-gated LMSYS-Chat-1M parquet",
+    "SEMANTIC_CACHE.md":
+        "the published record is the LMSYS + MiniLM run; a desk rebuild has "
+        "neither the dataset nor the encoder, and the script now refuses to "
+        "write this file unless the run has that provenance",
+    "FORECAST_TRACE.md":
+        "replays the raw BurstGPT trace, which is 56 MB and not vendored",
+    "FORECAST_TRACE_REAL.md":
+        "as FORECAST_TRACE.md: the un-vendored raw trace",
+    "FORECAST_AZURE.md":
+        "replays the raw Azure LLM 2024 trace, also not vendored",
+    "FORECAST_MR.md":
+        "no generator writes it; its own header states it is engineering "
+        "validation of the deployed artifact, not a thesis claim",
+    "PSEUDO_TENANT.md":
+        "needs the Wave 2 per-tenant timeseries, archive tier only",
+    "BREAKEVEN_TIER.md":
+        "an analysis_econ.py view whose campaign DuckDB is archive tier and "
+        "has no committed aggregate",
+    "SENSITIVITY_J.md":
+        "a second output of objective_form.py that only its sweep mode writes; "
+        "the sweep needs the archive-tier campaign",
+    "OSF_REGISTRATION.md":
+        "a registration document, not a measurement record",
+    "THEORY_V2.md":
+        "theory, not a measurement record",
 }
 
 
 def uncovered_records() -> list[str]:
     """Published records that are neither gated nor excused."""
     gated = {r for r, _ in RECORDS} | {r for _, _, r in CAMPAIGN_RECORDS}
-    found = ({p.name for p in ANALYSIS.glob("RESULTS_*.md")}
+    # Every record document, not just the RESULTS_* family. Session 43 widened
+    # this: 19 Wave 1-5 records sat outside the family and therefore outside
+    # the audit, which is how COORD_GAP could be hand-extended and VTC_FAIRNESS
+    # could regenerate as zeros with nothing noticing either.
+    found = ({p.name for p in ANALYSIS.glob("*.md")
+              if not p.name.startswith("PREREG_")}
              | {p.name for p in RESULTS.rglob("RESULTS_*.md")})
     return sorted(n for n in found if n not in gated and n not in UNGATED)
 
