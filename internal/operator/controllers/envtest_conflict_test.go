@@ -173,34 +173,49 @@ func TestEnvtestAuditSurvivesStatusConflict(t *testing.T) {
 
 	// Race a competing status writer against the plan cycle, which is what
 	// PolicyReconciler does in production.
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for i := 0; i < 20; i++ {
-			var p pfv1alpha1.Policy
-			if err := c.Get(ctx, types.NamespacedName{Name: "acme"}, &p); err == nil {
-				p.Status.AppliedReplicas = int32(i)
-				_ = c.Status().Update(ctx, &p)
+	contendedCycle := func() {
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			for i := 0; i < 20; i++ {
+				var p pfv1alpha1.Policy
+				if err := c.Get(ctx, types.NamespacedName{Name: "acme"}, &p); err == nil {
+					p.Status.AppliedReplicas = int32(i)
+					_ = c.Status().Update(ctx, &p)
+				}
+				time.Sleep(2 * time.Millisecond)
 			}
-			time.Sleep(2 * time.Millisecond)
+		}()
+		if err := runner.RunOnce(ctx); err != nil {
+			t.Fatalf("RunOnce under status contention: %v", err)
 		}
-	}()
-
-	if err := runner.RunOnce(ctx); err != nil {
-		t.Fatalf("RunOnce under status contention: %v", err)
+		<-done
 	}
-	<-done
 
 	// `gather` skips a tenant whose Policy or Budget read fails, and RunOnce
-	// then returns nil with nothing planned — deliberately, because holding
+	// then returns nil with nothing planned - deliberately, because holding
 	// the last good plan is the honest response to not knowing. That path is
-	// not what this test is about, and on a loaded runner it is reachable: the
-	// test failed exactly once on CI, with the planner never called. Say so
-	// and skip, rather than reporting a designed behaviour as a lost audit.
+	// not what this test is about, and on a loaded runner it is reachable:
+	// the test failed exactly once on CI, with the planner never called.
+	//
+	// This used to t.Skip at that point. A skip is invisible in `go test`
+	// output, so a regression that made gather always drop the tenant would
+	// leave the conflict path permanently unasserted while CI stayed green -
+	// the shape R16 found in the planner tests. Retry the contended cycle
+	// instead, and fail if no attempt ever gave the planner anything to do.
+	// Retrying is safe precisely because it only happens when nothing was
+	// planned: the spec is unchanged, so no cycle is repeated after a
+	// successful one.
+	const attempts = 5
+	for attempt := 1; attempt <= attempts; attempt++ {
+		contendedCycle()
+		if len(stub.requests) > 0 {
+			break
+		}
+	}
 	if len(stub.requests) == 0 {
-		t.Skip("the plan cycle had no input this run — gather skipped the " +
-			"tenant, so there was no spec change to audit. See the logged " +
-			"reason above; this test asserts the conflict path, not gather's.")
+		t.Fatalf("gather produced no input in %d contended cycles, so the "+
+			"conflict path was never exercised; see the logged reason above", attempts)
 	}
 
 	var got pfv1alpha1.Policy
