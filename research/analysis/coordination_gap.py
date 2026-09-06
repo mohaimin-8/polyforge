@@ -195,7 +195,10 @@ def main() -> None:
                   f"{'EXACT' if rows[-1]['exact'] else ''}")
 
     suffix = "_anchored" if anchored else ""
-    out_csv = Path(__file__).resolve().parent / f"coord_gap{suffix}.csv"
+    # Redirected like the record. It wrote here unconditionally, so a
+    # reproduce run -- whose whole promise is that committed files are not
+    # modified -- rewrote the committed CSV as a side effect.
+    out_csv = stats.record_path(f"coord_gap{suffix}.csv")
     with out_csv.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=[
             "n", "seed", "status", "cd_score", "opt_score", "rel_gap", "exact"])
