@@ -304,7 +304,13 @@ def build(out: Path, strict: bool = False, force: bool = False) -> dict[str, int
                          "from <code>scripts/reproduce.py</code> at build time.</p>"
                          + document_list(records, gated, True), "Records"),
         "preregs.html": ("<h1>Pre-registrations</h1><p class=\"lede\">Each was committed and "
-                         "pushed before its campaign ran, and none has been edited since.</p>"
+                         "pushed before its campaign ran, with one disclosed exception, and "
+                         "seven carry amendments added while their campaign was still open. "
+                         "<code>scripts/check_preregs.py</code> checks this against git "
+                         "history on every CI run: none was edited after its results "
+                         "existed, and the one campaign whose pre-registration was "
+                         "committed together with its own record is named there rather "
+                         "than left to be found.</p>"
                          + document_list(preregs, gated, False), "Pre-registrations"),
         "figures.html": (figures_body(caption_map), "Figures"),
     }

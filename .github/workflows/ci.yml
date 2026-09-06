@@ -199,6 +199,26 @@ jobs:
   # They existed, passed locally, and gated nothing. Own job, for the reason
   # vulncheck and supplement have one: a gate that shares a job with a
   # fragile step is a gate that stops running without saying so.
+  # The cardinal rule, checked instead of asserted. Needs full history:
+  # a depth-1 checkout has none, so every ordering check would pass on a
+  # single commit -- check_preregs.py refuses a shallow clone rather than
+  # reporting that as success.
+  preregs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: pip install pytest
+      - name: No frozen rule was touched after its result existed
+        run: python scripts/check_preregs.py
+      - name: The gate itself can fail
+        run: python -m pytest scripts/test_check_preregs.py -q
+
   analysis-tests:
     runs-on: ubuntu-latest
     steps:
