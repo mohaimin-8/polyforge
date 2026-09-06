@@ -305,6 +305,11 @@ jobs:
         run: pip install pytest
       - name: Evidence supplement build (gate parity, dead links, determinism)
         run: python -m pytest scripts/test_build_pages.py -q
+      # The records are gated byte-for-byte; the roadmap is prose that copies
+      # from them, and nothing read the copy. A node share was quoted as
+      # 0.3166 in three places for a record that reports 0.3165.
+      - name: Numbers the roadmap quotes still match their records
+        run: python -m pytest scripts/test_roadmap_claims.py -q
 
   # Phase 9: the trace pipelines must stay runnable — synthetic modes are
   # deterministic and dependency-light, so a broken ETL fails CI, not a

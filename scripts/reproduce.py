@@ -75,6 +75,7 @@ CAMPAIGN_RECORDS = [
     ("analysis_econ.py", ["lm"], "RESULTS_LM_ADOPTION.md"),
     ("analysis_econ.py", ["mixp95"], "RESULTS_MIXTURE_P95.md"),
     ("analysis_econ.py", ["tierwu"], "RESULTS_TIER_WU.md"),
+    ("analysis_econ.py", ["clamp"], "RESULTS_MOVE_CLAMP.md"),
     ("analysis_eviction_parity.py", [], "RESULTS_EVICTION_PARITY.md"),
     # Live-derived records were entirely outside this gate until session 35 —
     # the audit's D10 finding. phase7_ordinal now falls back to its committed
@@ -88,6 +89,16 @@ CAMPAIGN_RECORDS = [
     # plant constants, so it rebuilds on a clean clone unconditionally.
     ("analysis_separation.py", [], "RESULTS_SEPARATION.md"),
     ("analysis_trace_parity.py", [], "RESULTS_TRACE_PARITY.md"),
+    # Wave 3 live chaos + p99. Scores the committed run-level CSV from the
+    # session-23 sitting (eval/results/live_chaos_p99_runs.csv); the per-step
+    # series and raw duckdbs are gitignored and travel in the Zenodo bundle.
+    ("live_chaos_p99.py", [], "RESULTS_LIVE_CHAOS_P99.md"),
+    # The record index itself. Generated, so gating it is what stops the SET of
+    # records drifting: RESULTS_MASTER claimed to cover every measured result
+    # and had been seven records behind since session 27, because a hand-kept
+    # list has nothing checking it. This one is rebuilt and compared like any
+    # other record, so a new record that nobody registers shows up as drift.
+    ("records_index.py", [], "RECORDS_INDEX.md"),
     # Both traces of the budget-parity campaign are in, so the record joins
     # the gate as PREREG_BUDGET_PARITY requires. It was deliberately held out
     # while only Azure had landed: an interim record cannot carry a
@@ -372,6 +383,45 @@ def compare_figures(fig_dir: Path) -> list[tuple[str, str]]:
     return drifted
 
 
+# Records deliberately OUTSIDE this gate, each with its reason. A published
+# record that no gate covers is how drift goes unnoticed, and until session 43
+# eight of them sat outside with nothing saying so -- omission and decision
+# looked identical from here. Two of the eight (MOVE_CLAMP, LIVE_CHAOS_P99)
+# turned out to be pure oversight: they reproduced byte-identically the moment
+# they were registered. The rest have real reasons, written down.
+UNGATED = {
+    "RESULTS_CACHE_CEILING.md":
+        "regenerates identically (verified session 43) but needs "
+        "sentence-transformers, deliberately absent from "
+        "requirements-reproduce.txt, plus 565 s to encode 16,422 responses; on "
+        "the pinned environment it would quietly score the fallback embedder",
+    "RESULTS_MASTER.md":
+        "a consolidated reading entry point over the other records, maintained "
+        "by hand -- there is no generator to re-run",
+    "RESULTS_STRUCTREAL.md":
+        "exploratory, no registered hypotheses; needs raw_sim_structreal.duckdb, "
+        "which is archive tier only",
+    "RESULTS_TRACE.md":
+        "re-runs the BurstGPT replay campaign against the raw trace, which is "
+        "56 MB and deliberately not vendored",
+    "RESULTS_TRACE2.md":
+        "as RESULTS_TRACE.md: 96 windows of the same un-vendored raw trace",
+    "RESULTS_TRACE_AZURE.md":
+        "as RESULTS_TRACE.md: 72 windows of the raw Azure LLM 2024 trace",
+    "RESULTS_WIRE_ATTACK.md":
+        "a live security campaign against a running gateway, not a desk "
+        "re-derivation",
+}
+
+
+def uncovered_records() -> list[str]:
+    """Published records that are neither gated nor excused."""
+    gated = {r for r, _ in RECORDS} | {r for _, _, r in CAMPAIGN_RECORDS}
+    found = ({p.name for p in ANALYSIS.glob("RESULTS_*.md")}
+             | {p.name for p in RESULTS.rglob("RESULTS_*.md")})
+    return sorted(n for n in found if n not in gated and n not in UNGATED)
+
+
 def not_available(record: str) -> bool:
     db = dict(RECORDS).get(record)
     return bool(db) and not (RESULTS / db).exists()
@@ -454,6 +504,13 @@ def main() -> int:
           f"-- {exact} byte-for-byte, {matched - exact} differing only in "
           f"line endings (Path.write_text emits CRLF on Windows; "
           f".gitattributes checks out LF everywhere)")
+    orphans = uncovered_records()
+    print(f"  {'record coverage':<{width}} "
+          f"{len(all_records)} gated, {len(UNGATED)} outside the gate with "
+          f"a stated reason, {len(orphans)} unaccounted for")
+    for name in orphans:
+        print(f"    UNCOVERED: {name} -- gate it, or list it in UNGATED "
+              f"with the reason it cannot be")
     for record, err in failed_campaigns:
         print(f"    campaign script for {record} exited nonzero: "
               f"{' '.join(err) or 'see output above'}")
@@ -505,12 +562,12 @@ def main() -> int:
     # campaign script crashed — the gate reported failure only in prose.
     drifted = len(all_records) - matched
     raster_fail = fig_drift if same_renderer else []
-    if drifted or failed_campaigns or content_drift or raster_fail:
+    if drifted or failed_campaigns or content_drift or raster_fail or orphans:
         print(f"\nFAILED: {drifted} record(s) not byte-identical, "
               f"{len(failed_campaigns)} campaign script(s) exited nonzero, "
               f"{len(content_drift)} figure(s) plotting different data, "
               f"{len(raster_fail)} figure file(s) not identical on a "
-              f"matching renderer.")
+              f"matching renderer, {len(orphans)} record(s) covered by no gate.")
         return 1
     return 0
 

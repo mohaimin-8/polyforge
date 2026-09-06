@@ -32,9 +32,16 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+import stats  # noqa: E402  (research/analysis/stats.py)
+
 ROOT = Path(__file__).resolve().parents[2]
 CSV = ROOT / "eval" / "results" / "live_chaos_p99_runs.csv"
-OUT = Path(__file__).resolve().parent / "RESULTS_LIVE_CHAOS_P99.md"
+# Written through stats.record_path like every other generator. It used to
+# resolve to this directory unconditionally, which meant the committed
+# record was the ONLY place it could write: running the script overwrote
+# the published record, and scripts/reproduce.py could not regenerate it
+# into a scratch directory to compare. Both problems, one line.
+OUT = stats.record_path("RESULTS_LIVE_CHAOS_P99.md")
 
 CHAOS_TOL = 0.05
 STEP_SECONDS = 10
