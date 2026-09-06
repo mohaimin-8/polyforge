@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -261,6 +262,42 @@ def diff_record(name: str, out_dir: Path) -> str:
     return f"drift: {len(delta)} changed lines (see diff_{name}.txt)"
 
 
+# matplotlib stamps /CreationDate and /ModDate into every PDF it writes, so a
+# PDF can never be byte-identical across two runs however deterministic the
+# plot is. Stripping exactly those two keys is the whole normalisation: on the
+# session-43 audit all 19 PDFs matched after it, and all 19 PNGs matched with
+# no normalisation at all.
+_PDF_TIMESTAMPS = re.compile(rb"/(CreationDate|ModDate)\s*\([^)]*\)")
+
+
+def figure_bytes(path: Path) -> bytes:
+    raw = path.read_bytes()
+    return _PDF_TIMESTAMPS.sub(b"", raw) if path.suffix == ".pdf" else raw
+
+
+def compare_figures(fig_dir: Path) -> list[tuple[str, str]]:
+    """Every rebuilt figure against its committed copy.
+
+    Until session 43 this did not exist: the gate counted how many figures
+    were REBUILT and never once compared them, so all nineteen could have
+    changed — different data, different axes, a different result — and it
+    would still have printed 19/19 and passed. The records were verified
+    byte-identically; the figures that visualise those records were not
+    verified at all, and the thesis cites them.
+    """
+    drifted: list[tuple[str, str]] = []
+    for rebuilt in sorted(fig_dir.glob("fig*")):
+        if rebuilt.suffix not in (".pdf", ".png"):
+            continue
+        committed = FIGURES / rebuilt.name
+        if not committed.exists():
+            drifted.append((rebuilt.name, "no committed copy to compare"))
+            continue
+        if figure_bytes(committed) != figure_bytes(rebuilt):
+            drifted.append((rebuilt.name, "content differs"))
+    return drifted
+
+
 def not_available(record: str) -> bool:
     db = dict(RECORDS).get(record)
     return bool(db) and not (RESULTS / db).exists()
@@ -345,8 +382,15 @@ def main() -> int:
     rebuilt_figs = sorted(p.stem for p in fig_dir.glob("fig*.pdf"))
     committed_figs = sorted(p.stem for p in FIGURES.glob("fig*.pdf"))
     missing = [f for f in committed_figs if f not in rebuilt_figs]
+    fig_drift = compare_figures(fig_dir)
     print(f"  {'figures':<{width}} {len(rebuilt_figs)}/{len(committed_figs)} "
           f"rebuilt as vector PDF + 600-DPI PNG")
+    fig_matched = len(rebuilt_figs) * 2 - len(fig_drift)
+    print(f"  {'figure content':<{width}} "
+          f"{fig_matched}/{len(rebuilt_figs) * 2} identical to the committed "
+          f"file (PDF + PNG; the PDF without its creation timestamp)")
+    for name, why in fig_drift:
+        print(f"    DRIFT: {name} ({why})")
     for f in missing:
         if tier == "git" or f == "fig09_adaptation_trace":
             print(f"    not rebuilt: {f} (needs archive timeseries)")
@@ -359,9 +403,10 @@ def main() -> int:
     # scripts/reproduce.py` saw green while every record drifted and every
     # campaign script crashed — the gate reported failure only in prose.
     drifted = len(all_records) - matched
-    if drifted or failed_campaigns:
+    if drifted or failed_campaigns or fig_drift:
         print(f"\nFAILED: {drifted} record(s) not byte-identical, "
-              f"{len(failed_campaigns)} campaign script(s) exited nonzero.")
+              f"{len(failed_campaigns)} campaign script(s) exited nonzero, "
+              f"{len(fig_drift)} figure file(s) not identical.")
         return 1
     return 0
 
