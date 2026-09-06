@@ -26,7 +26,14 @@ from trace_matrix import (  # noqa: F401  (shared frozen constants)
     paired, run_one, scale_factor, segments_of,
 )
 
-OUT_MD = Path(__file__).resolve().parent / "RESULTS_TRACE2.md"
+import stats  # noqa: E402  (research/analysis/stats.py)
+
+# Written through stats.record_path like every other generator. It used to
+# resolve to this directory unconditionally, which meant the committed
+# record was the ONLY place it could write: running the script overwrote
+# the published record, and scripts/reproduce.py could not regenerate it
+# into a scratch directory to compare. Both problems, one line.
+OUT_MD = stats.record_path("RESULTS_TRACE2.md")
 OUT_CSV = REPO_ROOT / "eval" / "results" / "trace_replay2_runs.csv"
 
 # --- PREREG_TRACE2 §2 deltas (frozen) ------------------------------------

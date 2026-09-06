@@ -33,8 +33,15 @@ from trace_matrix import (  # noqa: F401  (shared frozen machinery)
 )
 from model import CONTROL_INTERVAL_S, WORK_UNITS, Demand  # noqa: E402
 
+import stats  # noqa: E402  (research/analysis/stats.py)
+
 TRACE = REPO_ROOT / "research" / "traces" / "out" / "azure_llm_2024.csv.gz"
-OUT_MD = Path(__file__).resolve().parent / "RESULTS_TRACE_AZURE.md"
+# Written through stats.record_path like every other generator. It used to
+# resolve to this directory unconditionally, which meant the committed
+# record was the ONLY place it could write: running the script overwrote
+# the published record, and scripts/reproduce.py could not regenerate it
+# into a scratch directory to compare. Both problems, one line.
+OUT_MD = stats.record_path("RESULTS_TRACE_AZURE.md")
 OUT_CSV = REPO_ROOT / "eval" / "results" / "trace_replay_azure_runs.csv"
 
 # --- frozen protocol constants (PREREG_TRACE_AZURE.md §2) -----------------

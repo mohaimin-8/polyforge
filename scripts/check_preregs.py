@@ -43,6 +43,46 @@ from pathlib import Path
 # that campaign ran, and for this one result the freeze rests on the document
 # alone. Listed so the check fails on a NEW violation instead of sitting
 # permanently red -- and so the exception is published rather than absorbed.
+# Not every campaign names its record after its pre-registration, so matching
+# on the name alone left 12 of 44 preregs with "no matching record" and
+# therefore never ordering-checked -- a gate quietly covering three quarters of
+# its domain while reporting nothing wrong.
+#
+# Each entry was derived from the prereg's OWN registered hypothesis prefix
+# (the tags in its hypothesis headings) and the record that reports that
+# prefix -- not from the first RESULTS_*.md the prereg happens to mention. That
+# looser rule produced two false violations: PREREG_VIOLATION_PARITY cites
+# TP-* while registering VP-*, and PREREG_LIVE_SOAK_V6 cites the previous
+# attempt's record.
+RECORD_FOR = {
+    "PREREG_COORD_GAP": "COORD_GAP.md",                     # CG-H*
+    "PREREG_DEGRADE": "DEGRADE_PROBE.md",                   # DG-H*
+    "PREREG_LEARNED_CONTROL": "RESULTS_LEARNED.md",         # LR-H*
+    "PREREG_MULTINODE_V2": "RESULTS_MULTINODE.md",          # MN-H*
+    "PREREG_PLANNER_CELLS": "PLANNER_CELLS.md",             # PS-H*
+    "PREREG_PLANNER_CELLS_DEALIAS": "PLANNER_CELLS_DEALIAS.md",  # PF-H*
+    "PREREG_PSEUDO_TENANT": "PSEUDO_TENANT.md",             # PT-H*
+    "PREREG_RISK_MPC": "RESULTS_RISK.md",                   # RQ-H*
+    "PREREG_VTC": "VTC_FAIRNESS.md",                        # registers no tags
+    "PREREG_WIRE_ATTACK": "security/RESULTS_WIRE_ATTACK.md",  # WA-H*
+}
+
+# Two preregs have no record, and both dispositions are disclosed rather than
+# left as silence. An unreported pre-registration is the file-drawer problem
+# these documents exist to prevent, so they are named here instead of sitting
+# in an "unmatched" count nobody reads.
+NO_RECORD = {
+    "PREREG_VIOLATION_PARITY":
+        "premise falsified before the ladder ran: the frozen beta ladder is "
+        "inert (mean_excess 4.8319 -> 4.8314 across a 32x increase, f045e68). "
+        "The prereg stays frozen and PREREG_BUDGET_PARITY discloses that its "
+        "ladder is not run.",
+    "PREREG_LIVE_SOAK_V6":
+        "attempt 8 produced no scoreable sitting, so it has no record of its "
+        "own; its evidence is quoted inside RESULTS_LIVE_SOAK_V7.md, which "
+        "reports the attempt that followed it.",
+}
+
 DISCLOSED = {
     "PREREG_EVICTION_PARITY":
         "committed in the same commit (ec7a230) as its own record and data; "
@@ -80,7 +120,8 @@ def commits(path: Path) -> list[tuple[int, str]]:
 
 
 def record_for(prereg: Path) -> Path | None:
-    name = "RESULTS_" + prereg.stem[len("PREREG_"):] + ".md"
+    name = RECORD_FOR.get(prereg.stem,
+                          "RESULTS_" + prereg.stem[len("PREREG_"):] + ".md")
     for base in RESULT_DIRS:
         if (base / name).exists():
             return base / name
@@ -110,12 +151,16 @@ def main() -> int:
     disclosed_seen: set[str] = set()
     amended: list[tuple[str, int]] = []
     unmatched: list[str] = []
+    recordless: list[str] = []
     width = max(len(p.stem) for p in preregs)
 
     for prereg in preregs:
         history = commits(prereg)
         if len(history) > 1:
             amended.append((prereg.stem, len(history)))
+        if prereg.stem in NO_RECORD:
+            recordless.append(prereg.stem)
+            continue
         record = record_for(prereg)
         if record is None:
             unmatched.append(prereg.stem)
@@ -138,10 +183,13 @@ def main() -> int:
     print(f"amended after freezing      {len(amended)}")
     for name, n in sorted(amended):
         print(f"  {name:<{width}} {n} commits")
+    print(f"no record, disclosed        {len(recordless)}")
+    for name in sorted(recordless):
+        print(f"  {name}: {NO_RECORD[name]}")
     if unmatched:
-        print(f"no matching record (yet)    {len(unmatched)}")
+        print(f"UNMAPPED (ordering unchecked) {len(unmatched)}")
         for name in unmatched:
-            print(f"  {name}")
+            print(f"  {name} -- add it to RECORD_FOR or NO_RECORD")
     print(f"edited after their results  {len(violations)}")
     for line in violations:
         print(f"  VIOLATION: {line}")

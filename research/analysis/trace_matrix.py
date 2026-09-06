@@ -27,13 +27,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "research" / "jcac_sim"))
 sys.path.insert(0, str(REPO_ROOT / "eval"))
 
+import stats  # noqa: E402  (research/analysis/stats.py)
+
 import simulate  # noqa: E402
 from controller import ClusterLimits, Weights  # noqa: E402
 from model import CONTROL_INTERVAL_S, WORK_UNITS, Demand  # noqa: E402
 from harness.systems import SYSTEMS, lru_miss_cost_factor, tuned_params  # noqa: E402
 
 TRACE = REPO_ROOT / "research" / "traces" / "out" / "burstgpt_real.csv.gz"
-OUT_MD = Path(__file__).resolve().parent / "RESULTS_TRACE.md"
+# Written through stats.record_path like every other generator. It used to
+# resolve to this directory unconditionally, which meant the committed
+# record was the ONLY place it could write: running the script overwrote
+# the published record, and scripts/reproduce.py could not regenerate it
+# into a scratch directory to compare. Both problems, one line.
+OUT_MD = stats.record_path("RESULTS_TRACE.md")
 OUT_CSV = REPO_ROOT / "eval" / "results" / "trace_replay_runs.csv"
 
 # --- frozen protocol constants (PREREG_TRACE.md §2) ----------------------
