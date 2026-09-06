@@ -11,31 +11,31 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | | |
 |---|---:|
 | records | 67 |
-| regenerated and compared | 42 |
-| outside the gate, reason stated | 6 |
-| outside the gate, no entry | 19 |
+| regenerated and compared | 49 |
+| outside the gate, reason stated | 18 |
+| outside the gate, no entry | 0 |
 
 | record | hypotheses it names | reproduced |
 |---|---|---|
 | `ADVANCED.md` | - | yes |
-| `BREAKEVEN_TIER.md` | - | no |
-| `CACHE_PRECISION.md` | - | no |
-| `CELLS_SHIPPED.md` | PF-H1, PS-H1 | no |
-| `COORD_GAP.md` | CG-H1 | no |
-| `COORD_GAP_ANCHORED.md` | CG-H1 | no |
-| `DEGRADE_PROBE.md` | DG-H1, DG-H2 | no |
-| `EFFECT_SIZES.md` | - | no |
+| `BREAKEVEN_TIER.md` | - | no, reason stated |
+| `CACHE_PRECISION.md` | - | no, reason stated |
+| `CELLS_SHIPPED.md` | PF-H1, PS-H1 | yes |
+| `COORD_GAP.md` | CG-H1 | no, reason stated |
+| `COORD_GAP_ANCHORED.md` | CG-H1 | yes |
+| `DEGRADE_PROBE.md` | DG-H1, DG-H2 | yes |
+| `EFFECT_SIZES.md` | - | yes |
 | `FAIRNESS_V2.md` | - | yes |
-| `FORECAST_AZURE.md` | - | no |
-| `FORECAST_MR.md` | - | no |
-| `FORECAST_TRACE.md` | - | no |
-| `FORECAST_TRACE_REAL.md` | - | no |
-| `OBJECTIVE_FORM.md` | - | no |
+| `FORECAST_AZURE.md` | - | no, reason stated |
+| `FORECAST_MR.md` | - | no, reason stated |
+| `FORECAST_TRACE.md` | - | no, reason stated |
+| `FORECAST_TRACE_REAL.md` | - | no, reason stated |
+| `OBJECTIVE_FORM.md` | - | yes |
 | `PHASE7_ORDINAL.md` | - | yes |
-| `PLANNER_CELLS.md` | PS-H1, PS-H2, PS-H3 | no |
-| `PLANNER_CELLS_DEALIAS.md` | PF-H1, PF-H2, PS-H1, PS-H2 | no |
-| `PLANNER_SCALING.md` | - | no |
-| `PSEUDO_TENANT.md` | PT-H1, PT-H2, PT-H3 | no |
+| `PLANNER_CELLS.md` | PS-H1, PS-H2, PS-H3 | no, reason stated |
+| `PLANNER_CELLS_DEALIAS.md` | PF-H1, PF-H2, PS-H1, PS-H2 | yes |
+| `PLANNER_SCALING.md` | - | no, reason stated |
+| `PSEUDO_TENANT.md` | PT-H1, PT-H2, PT-H3 | no, reason stated |
 | `RESULTS.md` | - | yes |
 | `RESULTS_BUDGET_PARITY.md` | BP-H1, BP-H1a, BP-H1b, BP-H2, BP-H2a, BP-H2b, BP-H3 | yes |
 | `RESULTS_CACHE_CEILING.md` | - | no, reason stated |
@@ -80,8 +80,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_V3.md` | - | yes |
 | `RESULTS_WAVE4_LIVE_PLANE.md` | WL-H1, WL-H2 | yes |
 | `RESULTS_WINDOW_CHARACTER.md` | BP-H1, TP-H1 | yes |
-| `SEMANTIC_CACHE.md` | - | no |
-| `SENSITIVITY_J.md` | - | no |
-| `VTC_FAIRNESS.md` | - | no |
+| `SEMANTIC_CACHE.md` | - | no, reason stated |
+| `SENSITIVITY_J.md` | - | no, reason stated |
+| `VTC_FAIRNESS.md` | - | yes |
 | `RESULTS_WIRE_ATTACK.md` | WA-H1, WA-H2, WA-H3 | no, reason stated |
 
