@@ -1,0 +1,254 @@
+{
+ "axes": [
+  {
+   "collections": [
+    {
+     "edgecolours": [
+      "#2a78d6ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "2.16984524406",
+        "5"
+       ],
+       [
+        "2.57100619896",
+        "5"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#1baf7aff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "3.33402677262",
+        "4"
+       ],
+       [
+        "4.08766453484",
+        "4"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#eda100ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "3.74317526566",
+        "3"
+       ],
+       [
+        "4.45217060667",
+        "3"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#008300ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "3.52127385656",
+        "2"
+       ],
+       [
+        "4.27127275318",
+        "2"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#4a3aa7ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "25.914014236",
+        "1"
+       ],
+       [
+        "31.6172704829",
+        "1"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#e34948ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "58.841288726",
+        "0"
+       ],
+       [
+        "82.6744096902",
+        "0"
+       ]
+      ]
+     ]
+    }
+   ],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child1",
+     "marker": "o",
+     "points": [
+      [
+       "2.37042572151",
+       "5"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_child3",
+     "marker": "o",
+     "points": [
+      [
+       "3.71084565373",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "_child5",
+     "marker": "o",
+     "points": [
+      [
+       "4.09767293617",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "_child7",
+     "marker": "o",
+     "points": [
+      [
+       "3.89627330487",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_child9",
+     "marker": "o",
+     "points": [
+      [
+       "28.7656423594",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child11",
+     "marker": "o",
+     "points": [
+      [
+       "70.7578492081",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    }
+   ],
+   "patches": [],
+   "texts": [],
+   "title": "",
+   "xlabel": "total cost per run (USD, log)",
+   "xlim": [
+    "1.80876290811",
+    "99.1786562339"
+   ],
+   "xscale": "log",
+   "xticklabels": [
+    "$\\mathdefault{10^{-1}}$",
+    "$\\mathdefault{10^{0}}$",
+    "$\\mathdefault{10^{1}}$",
+    "$\\mathdefault{10^{2}}$",
+    "$\\mathdefault{10^{3}}$"
+   ],
+   "xticks": [
+    "0.1",
+    "1",
+    "10",
+    "100",
+    "1000"
+   ],
+   "ylabel": "",
+   "ylim": [
+    "-0.25",
+    "5.25"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "PolyForge",
+    "HPA",
+    "KEDA",
+    "FIRM",
+    "Static",
+    "GPTCache"
+   ],
+   "yticks": [
+    "5",
+    "4",
+    "3",
+    "2",
+    "1",
+    "0"
+   ]
+  }
+ ],
+ "figure": "fig01_cost_by_system",
+ "size_inches": [
+  "3.6",
+  "2.2"
+ ],
+ "texts": []
+}

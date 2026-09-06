@@ -32,14 +32,17 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import json
 import os
 import re
 import subprocess
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ANALYSIS = REPO_ROOT / "research" / "analysis"
+CRLF, LF = bytes([13, 10]), bytes([10])
 RESULTS = REPO_ROOT / "eval" / "results"
 FIGURES = RESULTS / "figures"
 
@@ -249,12 +252,25 @@ def diff_record(name: str, out_dir: Path) -> str:
         return "skipped (needs archive)" if not_available(name) else "NOT PRODUCED"
     if not committed.exists():
         return "no committed version to compare"
-    a = committed.read_text(encoding="utf-8").splitlines()
-    b = rebuilt.read_text(encoding="utf-8").splitlines()
+    # Bytes, not splitlines(). The check here used to compare
+    # `.splitlines()` lists while reporting MATCH (byte-identical), which
+    # claimed more than it verified in two ways: splitlines() erases the
+    # presence of a final newline entirely, and it also splits on form
+    # feed and the Unicode separators. What it did do -- absorb the CRLF
+    # that Path.write_text emits on Windows against the LF that
+    # .gitattributes checks out everywhere -- is kept, but as an explicit
+    # and auditable newline canonicalisation rather than as a side effect.
+    raw_committed, raw_rebuilt = committed.read_bytes(), rebuilt.read_bytes()
+    if raw_committed == raw_rebuilt:
+        return "MATCH (byte-identical)"
+    canon_committed = raw_committed.replace(CRLF, LF)
+    canon_rebuilt = raw_rebuilt.replace(CRLF, LF)
+    if canon_committed == canon_rebuilt:
+        return "MATCH (identical; CRLF vs LF only)"
+    a = canon_committed.decode("utf-8").split(chr(10))
+    b = canon_rebuilt.decode("utf-8").split(chr(10))
     delta = [ln for ln in difflib.unified_diff(a, b, lineterm="")
              if ln[:1] in "+-" and ln[:3] not in ("+++", "---")]
-    if not delta:
-        return "MATCH (byte-identical)"
     (out_dir / f"diff_{name}.txt").write_text(
         "\n".join(difflib.unified_diff(a, b, f"committed/{name}",
                                        f"rebuilt/{name}", lineterm="")),
@@ -273,6 +289,64 @@ _PDF_TIMESTAMPS = re.compile(rb"/(CreationDate|ModDate)\s*\([^)]*\)")
 def figure_bytes(path: Path) -> bytes:
     raw = path.read_bytes()
     return _PDF_TIMESTAMPS.sub(b"", raw) if path.suffix == ".pdf" else raw
+
+
+CONTENT = "content"
+
+
+def compare_figure_content(fig_dir: Path) -> tuple[list[tuple[str, str]], int]:
+    """What each figure PLOTS, against the committed dump of the same.
+
+    This is the check that can run anywhere. `figures.save()` writes a
+    canonical JSON of every line, bar, scatter offset, scale, limit, tick
+    label and legend entry next to each figure, and that artifact does not
+    depend on the local font stack -- so a reviewer on Linux verifies the same
+    property the author verified on Windows, which the byte comparison below
+    cannot deliver and never could.
+    """
+    drifted: list[tuple[str, str]] = []
+    rebuilt_dir = fig_dir / CONTENT
+    checked = 0
+    for rebuilt in sorted(rebuilt_dir.glob("fig*.json")):
+        checked += 1
+        committed = FIGURES / CONTENT / rebuilt.name
+        if not committed.exists():
+            drifted.append((rebuilt.name, "no committed content to compare"))
+            continue
+        if committed.read_bytes() != rebuilt.read_bytes():
+            drifted.append((rebuilt.name, content_diff(committed, rebuilt)))
+    return drifted, checked
+
+
+def content_diff(committed: Path, rebuilt: Path) -> str:
+    """Name the first field that moved, so drift is diagnosable from the log
+    rather than only detectable."""
+    a = committed.read_text(encoding="utf-8").splitlines()
+    b = rebuilt.read_text(encoding="utf-8").splitlines()
+    for line in difflib.unified_diff(a, b, n=0, lineterm=""):
+        if line.startswith(("-", "+")) and not line.startswith(("---", "+++")):
+            return f"plots different data, first change: {line.strip()[:90]}"
+    return "plots different data"
+
+
+def renderer_note() -> tuple[bool, str]:
+    """Whether this machine rasterises the way the committed files were drawn.
+
+    The PDF/PNG comparison is exact and worth keeping where it applies, but it
+    only applies here. `figures.save()` uses bbox_inches="tight", which sizes
+    the output from rendered text extents, so a different font stack changes
+    every byte without changing a single plotted number.
+    """
+    stamp = FIGURES / CONTENT / "rendered_on.json"
+    here = version("matplotlib")
+    if not stamp.exists():
+        return False, "no renderer stamp"
+    info = json.loads(stamp.read_text(encoding="utf-8"))
+    there = info.get("matplotlib")
+    if info.get("platform") == sys.platform and there == here:
+        return True, f"same renderer: {sys.platform}, matplotlib {here}"
+    return False, (f"drawn on {info.get('platform')}/matplotlib {there}, "
+                   f"here {sys.platform}/matplotlib {here} -- not comparable")
 
 
 def compare_figures(fig_dir: Path) -> list[tuple[str, str]]:
@@ -365,16 +439,21 @@ def main() -> int:
     print("\n=== reproduction report ===")
     all_records = [r for r, _ in RECORDS] + [r for _, _, r in CAMPAIGN_RECORDS]
     width = max(len(r) for r in all_records)
-    matched = 0
+    matched, exact = 0, 0
     for record, _ in RECORDS:
         status = diff_record(record, out_dir)
         matched += status.startswith("MATCH")
+        exact += status == "MATCH (byte-identical)"
         print(f"  {record:<{width}} {status}")
     for _, _, record in CAMPAIGN_RECORDS:
         status = diff_record(record, out_dir)
         matched += status.startswith("MATCH")
+        exact += status == "MATCH (byte-identical)"
         print(f"  {record:<{width}} {status}")
-    print(f"  {'records':<{width}} {matched}/{len(all_records)} byte-identical")
+    print(f"  {'records':<{width}} {matched}/{len(all_records)} identical "
+          f"-- {exact} byte-for-byte, {matched - exact} differing only in "
+          f"line endings (Path.write_text emits CRLF on Windows; "
+          f".gitattributes checks out LF everywhere)")
     for record, err in failed_campaigns:
         print(f"    campaign script for {record} exited nonzero: "
               f"{' '.join(err) or 'see output above'}")
@@ -382,14 +461,36 @@ def main() -> int:
     rebuilt_figs = sorted(p.stem for p in fig_dir.glob("fig*.pdf"))
     committed_figs = sorted(p.stem for p in FIGURES.glob("fig*.pdf"))
     missing = [f for f in committed_figs if f not in rebuilt_figs]
-    fig_drift = compare_figures(fig_dir)
     print(f"  {'figures':<{width}} {len(rebuilt_figs)}/{len(committed_figs)} "
           f"rebuilt as vector PDF + 600-DPI PNG")
-    fig_matched = len(rebuilt_figs) * 2 - len(fig_drift)
+
+    # The gating check: what the figures plot. Platform-independent, so it
+    # fails in CI on Linux as readily as on the machine that drew them.
+    content_drift, content_n = compare_figure_content(fig_dir)
+    if rebuilt_figs and not content_n:
+        # Otherwise the dump mechanism could stop emitting entirely and
+        # this check would pass on an empty set -- which is the defect
+        # R8 found in the figure step it replaced.
+        content_drift.append(("figures/content",
+                              "no content dumps were produced at all"))
     print(f"  {'figure content':<{width}} "
-          f"{fig_matched}/{len(rebuilt_figs) * 2} identical to the committed "
-          f"file (PDF + PNG; the PDF without its creation timestamp)")
-    for name, why in fig_drift:
+          f"{content_n - len(content_drift)}/{content_n} plot identical data")
+    for name, why in content_drift:
+        print(f"    DRIFT: {name} ({why})")
+
+    # The strengthening check: the rendered files themselves. Exact where
+    # the renderer matches, meaningless where it does not, reported either
+    # way rather than quietly dropped.
+    fig_drift = compare_figures(fig_dir)
+    same_renderer, renderer = renderer_note()
+    fig_n = len(rebuilt_figs) * 2
+    print(f"  {'figure files':<{width}} "
+          f"{fig_n - len(fig_drift)}/{fig_n} byte-identical -- {renderer}")
+    if fig_drift and not same_renderer:
+        print(f"    {len(fig_drift)} rendered file(s) differ; not a failure "
+              f"on a different renderer, and the content check above is "
+              f"what holds these figures to their data")
+    for name, why in (fig_drift if same_renderer else []):
         print(f"    DRIFT: {name} ({why})")
     for f in missing:
         if tier == "git" or f == "fig09_adaptation_trace":
@@ -403,10 +504,13 @@ def main() -> int:
     # scripts/reproduce.py` saw green while every record drifted and every
     # campaign script crashed — the gate reported failure only in prose.
     drifted = len(all_records) - matched
-    if drifted or failed_campaigns or fig_drift:
+    raster_fail = fig_drift if same_renderer else []
+    if drifted or failed_campaigns or content_drift or raster_fail:
         print(f"\nFAILED: {drifted} record(s) not byte-identical, "
               f"{len(failed_campaigns)} campaign script(s) exited nonzero, "
-              f"{len(fig_drift)} figure file(s) not identical.")
+              f"{len(content_drift)} figure(s) plotting different data, "
+              f"{len(raster_fail)} figure file(s) not identical on a "
+              f"matching renderer.")
         return 1
     return 0
 

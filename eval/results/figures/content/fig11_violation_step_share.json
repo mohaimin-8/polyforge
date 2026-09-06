@@ -1,0 +1,258 @@
+{
+ "axes": [
+  {
+   "collections": [
+    {
+     "edgecolours": [
+      "#2a78d6ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.17418234761",
+        "5"
+       ],
+       [
+        "0.235602374613",
+        "5"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#1baf7aff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.146797819121",
+        "4"
+       ],
+       [
+        "0.210084125323",
+        "4"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#eda100ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.134193920896",
+        "3"
+       ],
+       [
+        "0.198938023548",
+        "3"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#008300ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.192021650751",
+        "2"
+       ],
+       [
+        "0.250228349249",
+        "2"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#4a3aa7ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.0179951538656",
+        "1"
+       ],
+       [
+        "0.0383451239122",
+        "1"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#e34948ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.0796926344104",
+        "0"
+       ],
+       [
+        "0.115689310034",
+        "0"
+       ]
+      ]
+     ]
+    }
+   ],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child1",
+     "marker": "o",
+     "points": [
+      [
+       "0.204892361111",
+       "5"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_child3",
+     "marker": "o",
+     "points": [
+      [
+       "0.178440972222",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "_child5",
+     "marker": "o",
+     "points": [
+      [
+       "0.166565972222",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "_child7",
+     "marker": "o",
+     "points": [
+      [
+       "0.221125",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_child9",
+     "marker": "o",
+     "points": [
+      [
+       "0.0281701388889",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_child11",
+     "marker": "o",
+     "points": [
+      [
+       "0.0976909722222",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    }
+   ],
+   "patches": [],
+   "texts": [],
+   "title": "",
+   "xlabel": "share of tenant-steps with any violation",
+   "xlim": [
+    "0.0063834940964",
+    "0.261840009018"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "0.00",
+    "0.05",
+    "0.10",
+    "0.15",
+    "0.20",
+    "0.25",
+    "0.30"
+   ],
+   "xticks": [
+    "0",
+    "0.05",
+    "0.1",
+    "0.15",
+    "0.2",
+    "0.25",
+    "0.3"
+   ],
+   "ylabel": "",
+   "ylim": [
+    "-0.25",
+    "5.25"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "PolyForge",
+    "HPA",
+    "KEDA",
+    "FIRM",
+    "Static",
+    "GPTCache"
+   ],
+   "yticks": [
+    "5",
+    "4",
+    "3",
+    "2",
+    "1",
+    "0"
+   ]
+  }
+ ],
+ "figure": "fig11_violation_step_share",
+ "size_inches": [
+  "3.6",
+  "2.2"
+ ],
+ "texts": []
+}

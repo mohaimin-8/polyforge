@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
+import figure_content  # noqa: E402  (platform-independent content dump)
 import stats  # noqa: E402  (research/analysis/stats.py)
 
 # POLYFORGE_FIG_DIR redirects output so scripts/reproduce.py can regenerate
@@ -95,6 +96,12 @@ def save(fig, name: str, caption: str):
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     fig.savefig(FIG_DIR / f"{name}.png", dpi=600, bbox_inches="tight")
     fig.savefig(FIG_DIR / f"{name}.pdf", bbox_inches="tight")
+    # After the saves, so tick labels are populated by the draw, and before
+    # close(), which discards the artists. The rendered files cannot be
+    # compared across platforms -- bbox_inches="tight" sizes them from local
+    # font metrics -- so what the figure PLOTS is dumped separately and that
+    # is what scripts/reproduce.py gates on.
+    figure_content.write(fig, name, FIG_DIR)
     plt.close(fig)
     CAPTIONS.append((name, caption))
     print(f"  wrote {name} (.png 600dpi, .pdf vector)")

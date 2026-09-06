@@ -1,0 +1,188 @@
+{
+ "axes": [
+  {
+   "collections": [],
+   "legend": [
+    "PolyForge",
+    "HPA",
+    "KEDA",
+    "FIRM",
+    "Static",
+    "GPTCache"
+   ],
+   "lines": [
+    {
+     "colour": "#2a78d6ff",
+     "label": "PolyForge",
+     "marker": "o",
+     "points": [
+      [
+       "0",
+       "2.21778777933"
+      ],
+      [
+       "1",
+       "2.39646932617"
+      ],
+      [
+       "2",
+       "2.49702005903"
+      ]
+     ],
+     "style": "-",
+     "width": "2"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "HPA",
+     "marker": "o",
+     "points": [
+      [
+       "0",
+       "3.69837051357"
+      ],
+      [
+       "1",
+       "3.71363859382"
+      ],
+      [
+       "2",
+       "3.7205278538"
+      ]
+     ],
+     "style": "-",
+     "width": "2"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "KEDA",
+     "marker": "o",
+     "points": [
+      [
+       "0",
+       "3.93919435539"
+      ],
+      [
+       "1",
+       "4.09823783575"
+      ],
+      [
+       "2",
+       "4.25558661736"
+      ]
+     ],
+     "style": "-",
+     "width": "2"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "FIRM",
+     "marker": "o",
+     "points": [
+      [
+       "0",
+       "3.75271651746"
+      ],
+      [
+       "1",
+       "3.9109194617"
+      ],
+      [
+       "2",
+       "4.02518393546"
+      ]
+     ],
+     "style": "-",
+     "width": "2"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "Static",
+     "marker": "o",
+     "points": [
+      [
+       "0",
+       "28.185388675"
+      ],
+      [
+       "1",
+       "28.6623131441"
+      ],
+      [
+       "2",
+       "29.4492252592"
+      ]
+     ],
+     "style": "-",
+     "width": "2"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "GPTCache",
+     "marker": "o",
+     "points": [
+      [
+       "0",
+       "72.8641842079"
+      ],
+      [
+       "1",
+       "70.9697654826"
+      ],
+      [
+       "2",
+       "68.4395979338"
+      ]
+     ],
+     "style": "-",
+     "width": "2"
+    }
+   ],
+   "patches": [],
+   "texts": [],
+   "title": "",
+   "xlabel": "cluster size",
+   "xlim": [
+    "-0.1",
+    "2.1"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "small",
+    "medium",
+    "large"
+   ],
+   "xticks": [
+    "0",
+    "1",
+    "2"
+   ],
+   "ylabel": "mean cost per run (USD, log)",
+   "ylim": [
+    "1.86247426275",
+    "86.7648485239"
+   ],
+   "yscale": "log",
+   "yticklabels": [
+    "$\\mathdefault{10^{-1}}$",
+    "$\\mathdefault{10^{0}}$",
+    "$\\mathdefault{10^{1}}$",
+    "$\\mathdefault{10^{2}}$",
+    "$\\mathdefault{10^{3}}$"
+   ],
+   "yticks": [
+    "0.1",
+    "1",
+    "10",
+    "100",
+    "1000"
+   ]
+  }
+ ],
+ "figure": "fig06_cost_by_cluster_size",
+ "size_inches": [
+  "3.8",
+  "2.6"
+ ],
+ "texts": []
+}

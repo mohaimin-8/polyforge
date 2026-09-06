@@ -1,0 +1,207 @@
+{
+ "axes": [
+  {
+   "collections": [],
+   "legend": [
+    "response-time padding",
+    "TTL jitter",
+    "no defense",
+    "per-tenant partition (PolyForge)"
+   ],
+   "lines": [
+    {
+     "colour": "#eda100ff",
+     "label": "response-time padding",
+     "marker": "o",
+     "points": [
+      [
+       "0.0012",
+       "0.8778"
+      ],
+      [
+       "0.0129",
+       "0.8778"
+      ],
+      [
+       "0.0515",
+       "0.8778"
+      ],
+      [
+       "0.1287",
+       "0.8778"
+      ],
+      [
+       "0.2831",
+       "0.7265"
+      ]
+     ],
+     "style": "-",
+     "width": "2"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "TTL jitter",
+     "marker": "s",
+     "points": [
+      [
+       "0.1",
+       "0.844"
+      ],
+      [
+       "0.25",
+       "0.7876"
+      ],
+      [
+       "0.5",
+       "0.6855"
+      ],
+      [
+       "0.75",
+       "0.58"
+      ],
+      [
+       "0.9",
+       "0.5273"
+      ]
+     ],
+     "style": "-",
+     "width": "2"
+    },
+    {
+     "colour": "#8a8a86ff",
+     "label": "no defense",
+     "marker": "P",
+     "points": [
+      [
+       "0",
+       "0.8772"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "per-tenant partition (PolyForge)",
+     "marker": "D",
+     "points": [
+      [
+       "0.24",
+       "0.4973"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_child6",
+     "marker": "None",
+     "points": [
+      [
+       "0",
+       "0.5"
+      ],
+      [
+       "1",
+       "0.5"
+      ]
+     ],
+     "style": "--",
+     "width": "1"
+    }
+   ],
+   "patches": [],
+   "texts": [
+    {
+     "colour": "#52514eff",
+     "text": "no defense",
+     "xy": [
+      "8",
+      "2"
+     ]
+    },
+    {
+     "colour": "#2a78d6ff",
+     "text": "PolyForge\npartition",
+     "xy": [
+      "8",
+      "-4"
+     ]
+    },
+    {
+     "colour": "#898781ff",
+     "text": "attacker at chance",
+     "xy": [
+      "0.62",
+      "0.515"
+     ]
+    }
+   ],
+   "title": "",
+   "xlabel": "share of cache latency benefit given up",
+   "xlim": [
+    "-0.03",
+    "0.95"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "\u22120.2",
+    "0.0",
+    "0.2",
+    "0.4",
+    "0.6",
+    "0.8",
+    "1.0"
+   ],
+   "xticks": [
+    "-0.2",
+    "0",
+    "0.2",
+    "0.4",
+    "0.6",
+    "0.8",
+    "1"
+   ],
+   "ylabel": "worst-case membership-inference AUC",
+   "ylim": [
+    "0.45",
+    "0.92"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "0.4",
+    "0.5",
+    "0.6",
+    "0.7",
+    "0.8",
+    "0.9",
+    "1.0"
+   ],
+   "yticks": [
+    "0.4",
+    "0.5",
+    "0.6",
+    "0.7",
+    "0.8",
+    "0.9",
+    "1"
+   ]
+  }
+ ],
+ "figure": "fig17_defense_frontier",
+ "size_inches": [
+  "4.4",
+  "3.2"
+ ],
+ "texts": [
+  {
+   "colour": "#000000ff",
+   "text": "Defense frontier: partitioning dominates the known mitigations",
+   "xy": [
+    "0.5",
+    "0.99"
+   ]
+  }
+ ]
+}
