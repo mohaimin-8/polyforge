@@ -30,6 +30,7 @@ jobs:
       # failure here rather than a skip. A skip prints `ok`, and this suite is
       # the only cover RLS tenant isolation has.
       POLYFORGE_REQUIRE_POSTGRES: "1"
+      POLYFORGE_REQUIRE_PLANNER: "1"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -53,6 +54,18 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.6.2
+      # TestLivePlannerContract and TestCellsScaleOnShippedPath skip without
+      # this URL, and CI never set it -- so the only check that crosses the
+      # Go/Python boundary to the shipped planner, and the only one that
+      # exercises the shipped cell-scaling path, both skipped on every run
+      # while `go test` printed ok. The planner is stdlib-only (ADR 0014),
+      # so starting it costs nothing but the port.
+      - name: Start the planner service the operator tests call
+        run: |
+          nohup python3 services/planner/planner.py --port 8090 > planner.log 2>&1 &
+          curl -sS --retry 30 --retry-all-errors --retry-delay 1 http://127.0.0.1:8090/healthz
+          echo "POLYFORGE_TEST_PLANNER_URL=http://127.0.0.1:8090" >> "$GITHUB_ENV"
+
       - name: Test (race detector + coverage)
         run: go test ./... -count=1 -race -covermode=atomic -coverprofile=coverage.out
       # Ordered directly after the step that writes coverage.out, and that is

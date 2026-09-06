@@ -16,6 +16,17 @@ import (
 func TestLivePlannerContract(t *testing.T) {
 	url := os.Getenv("POLYFORGE_TEST_PLANNER_URL")
 	if url == "" {
+		// POLYFORGE_REQUIRE_PLANNER=1 turns the skip into a failure, the same
+		// guard POLYFORGE_REQUIRE_POSTGRES gives the RLS suite. Until session
+		// 43 CI never set the URL, so this test skipped on every run and
+		// `go test` printed ok: the only check that crosses the Go/Python
+		// boundary to the shipped planner asserted nothing, silently.
+		if os.Getenv("POLYFORGE_REQUIRE_PLANNER") != "" {
+			t.Fatal("POLYFORGE_REQUIRE_PLANNER is set but " +
+				"POLYFORGE_TEST_PLANNER_URL is not: this is the only test that " +
+				"exercises the real planner service across the language " +
+				"boundary, and skipping it would report ok")
+		}
 		t.Skip("POLYFORGE_TEST_PLANNER_URL not set; live planner contract not exercised")
 	}
 
