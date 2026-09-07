@@ -264,8 +264,25 @@ cache and tier levers.
 ## 15. "You never tested cost sensitivity to the tier-price ratios."
 
 Now measured, and it holds. The matrix prices tiers at API ratios
-(1:10:100) while the GPU bench measured 1:1.516:16.64 (same ordering,
-compressed scale, disclosed). Two closures, pre-registered before either
+(1:10:100) while the GPU bench measures a far flatter ratio (same
+ordering, compressed scale, disclosed).
+
+**Correction, session 44 — the flattening is larger than first reported.**
+The figure previously quoted here, **1:1.516:16.64**, came from a run whose
+`large` row was CPU-offloaded: a 16 GB card could not hold the 7B, so that
+row measured the offload, not the tier. Re-measured on `GPU T4 x2` with
+**zero modules offloaded to cpu/disk**, the ratio is **1:1.475:1.518**
+(`tier_bench_t4.csv`). The mid/small ratio reproduces (1.516 → 1.475); the
+large/small ratio collapses from 16.64× to 1.518×, because "super-linear at
+large" was the signature of layers in host memory rather than a property of
+the tier. **This strengthens the answer below rather than weakening it** —
+the point is that measured serving ratios are far flatter than the
+1:10:100 price table, and the corrected measurement is flatter still.
+**One consequence is open and disclosed:** the frozen 60-vector grid's
+`r_large` values start at 5.0, so the corrected corner (1.518) lies outside
+the grid that was tested, and the analysis below therefore never evaluated
+the true hardware ratio. That is being closed under a new pre-registration
+with exactly one changed factor, not by re-running a frozen grid. Two closures, pre-registered before either
 ran (`PREREG_TIER_RATIO.md`, pushed at 7deb6a3): the *accounting* reading
 (`BREAKEVEN_TIER.md`, decisions frozen, exact re-pricing over 60 price
 vectors) finds no aggregate cost win reversed anywhere in the grid; the
@@ -545,7 +562,9 @@ rules as the Wave 2 economy reruns):
    −22.2% vs hpa), trims its cache posture (mean 362 → 329 MB, the
    declared abandonment-of-a-devalued-knob adaptation) — and jcac still
    violates *less* than hpa paired (−0.0078, 99% UB +0.0011).
-3. **Tier-scaled work units** (`RESULTS_TIER_WU.md`): the published model
+3. **Tier-scaled work units** (`RESULTS_TIER_WU.md`; its 16.64× multiplier
+   is the superseded offload-dominated measurement — see §15 — and is
+   reported here as the value the run actually used): the published model
    let a 16.64×-heavier model congest the pool for free (capacity was
    tier-blind while latency was tier-coupled). With the measured
    serving-time ratios as capacity multipliers: **TW-H1/H2 PASS 5/5

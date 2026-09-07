@@ -164,9 +164,11 @@ model GPT-3.5/4, request/response tokens).
       the assumed flat 1.4. Constants unchanged (bit-reproducibility).
 - [x] GPU path (Kaggle free kernel, deviation: transformers not vLLM — free
       pool's GPU arch not vLLM-guaranteed; documented): per-tier table in
-      `TIER_BENCH.md`/`tier_bench.csv` — ordering confirmed, 7B row is a
-      disclosed CPU-offload upper bound; 1:10:100 price table framed as
-      market pricing, not GPU-seconds.
+      `TIER_BENCH.md`/`tier_bench.csv` — ordering confirmed, 7B row was a
+      disclosed CPU-offload upper bound (**superseded session 44: re-run on
+      `GPU T4 x2` with zero modules offloaded, 20665.1 → 3171.5 ms, and the
+      tier ratio 1:1.516:16.64 → 1:1.475:1.518 — `tier_bench_t4.csv`**);
+      1:10:100 price table framed as market pricing, not GPU-seconds.
 - [x] Acceptance met: the calibration sentence is true and both measurement
       scripts + raw outputs are committed.
 
