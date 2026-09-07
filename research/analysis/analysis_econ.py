@@ -47,6 +47,24 @@ CAMPAIGNS = {
         "accounting": {"hpa": -0.402, "keda": -0.459, "firm": -0.431,
                         "static": -0.600, "gptcache": -0.830},
     },
+    # PREREG_TIER_RATIO_V2.md (session 44): same question, corrected corner.
+    # v1's `large` coordinate (16.64) came from a CPU-offloaded 7B row; the
+    # corrected ratios are 1:1.475:1.518 (tier_bench_t4.csv, 0 modules
+    # offloaded). Accounting figures below are BREAKEVEN_TIER_V2.md's
+    # aggregate rep-0 deltas AT THE CORRECTED CORNER, not v1's.
+    "tier2": {
+        "db": "raw_sim_gpu_econ_v2.duckdb",
+        "out": "RESULTS_TIER_RATIO_V2.md",
+        "title": "Tier-price ratio rerun at the CORRECTED GPU corner "
+                 "(1:1.475:1.518) — as measured",
+        "prereg": "PREREG_TIER_RATIO_V2.md",
+        "primary_metric": "total_cost_usd",
+        "primary_name": "TR2-H1 cost win vs every baseline",
+        "secondary_metric": "J",
+        "secondary_name": "TR2-H2 composite-J win vs every baseline",
+        "accounting": {"hpa": -0.403, "keda": -0.459, "firm": -0.431,
+                        "static": -0.591, "gptcache": -0.372},
+    },
     "hk": {
         "db": "raw_sim_hk.duckdb",
         "out": "RESULTS_HK_ADOPTION.md",
