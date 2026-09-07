@@ -43,10 +43,12 @@ Two consequences beyond B1:
 **Two ways forward, and the first needs the author.**
 
 1. **`GPU T4 x2`** -- Turing, sm_75, in the supported arch list. This is the
-   clean fix and it also gives two cards. It is **NOT selectable from
-   `kaggle kernels push`**, and that was RE-TESTED in session 42 rather than
-   taken from the old note, because the CLI has since grown an
-   `--accelerator` flag that looks like it should work:
+   clean fix and it also gives two cards. **It IS selectable from
+   `kaggle kernels push`. Session 42's finding that it is not was wrong, and
+   session 44 corrected it by measurement.**
+
+   Session 42 tested the `--accelerator` flag with four spellings and watched
+   the server normalise every one to the generic `Gpu`:
 
    | requested via `--accelerator` | server stored as |
    |---|---|
@@ -55,11 +57,52 @@ Two consequences beyond B1:
    | `gpu-t4-x2` | `Gpu` |
    | `TPU_OR_GPU_T4X2` | `Gpu` |
 
-   Every spelling normalises to the generic `Gpu` (`machine_shape` in the
-   server-side metadata, confirmed with `kaggle kernels pull -m`), and a run
-   pushed with `gpu-t4x2` still reported `device count: 1` and a P100. The flag
-   exists; the allocation does not follow it. **Only the notebook UI's
-   accelerator picker sets T4 x2, so an agent cannot do it.**
+   The inference drawn was "the flag exists; the allocation does not follow
+   it." The actual fault is that **all four spellings are invalid enum values**
+   -- they were guessed from the UI's label ("GPU T4 x2") rather than read off
+   the API -- and an unrecognised `machine_shape` is silently replaced by the
+   default `Gpu`. Four wrong guesses look exactly like a flag that does not
+   work.
+
+   `kagglesdk` documents the accepted values in
+   `kagglesdk/kernels/types/kernels_api_service.py`:
+
+   ```
+   machine_shape (str)
+     The machine shape to use for this session. Currently supported options:
+        * NvidiaTeslaT4
+        * NvidiaTeslaP100
+        * Tpu1VmV38
+   ```
+
+   `NvidiaTeslaT4` is Kaggle's two-card T4 shape -- the one the UI calls
+   "GPU T4 x2"; `NvidiaTeslaP100` is the single-card option. Set it in
+   `kernel-metadata.json` (durable across pushes) or pass
+   `--accelerator NvidiaTeslaT4` (one-off):
+
+   ```json
+   { "enable_gpu": true, "machine_shape": "NvidiaTeslaT4" }
+   ```
+
+   **Measured, session 44** (`polyforge-t4-probe`). The server stored the value
+   verbatim rather than normalising it -- `kaggle kernels pull -m` returned
+   `"machine_shape": "NvidiaTeslaT4"` -- and the allocation followed:
+
+   ```
+   torch 2.10.0+cu128
+   arch list: ['sm_70','sm_75','sm_80','sm_86','sm_90','sm_100','sm_120']
+   device count: 2
+   GPU0 Tesla T4 -- cuda capability 7.5
+   GPU1 Tesla T4 -- cuda capability 7.5
+   GPU0 matmul ok, trace=514.4395
+   GPU1 matmul ok, trace=199.1757
+   ```
+
+   sm_75 is in the arch list, and the matmuls confirm kernels actually execute
+   -- the probe deliberately runs one per card, because enumerating a device
+   was never the thing that failed. `cudaErrorNoKernelImageForDevice` is gone.
+   **No notebook UI, and no author action, was involved.** Option 2 below is
+   therefore unnecessary.
 2. **Pin an older torch in the kernel** (`pip install 'torch<2.7'`, the last
    line that shipped sm_60). Cheap to try, but it is a ~2.5 GB install into an
    image built around a newer CUDA, and it would make the substrate differ from
@@ -188,12 +231,46 @@ The wiring above was exercised end-to-end on the actual Codespace
 verdict: TUNNEL OK
 ```
 
-So on this host the budget is **~619 ms of tunnel round-trip** before the
-premium SLO saturates (amendment clause 3 voids the run past that), against
-~1319 ms before WL-H2's tier probe would fail. The SLO binds first, by
-roughly 2x — measured, not estimated. A cloudflared quick tunnel typically
-adds 50–300 ms, so the route has real margin, but it is not unlimited and
-step 2 is what checks it on the day.
+So on **that** host the budget was **~619 ms of tunnel round-trip** before
+the premium SLO saturates (amendment clause 3 voids the run past that),
+against ~1319 ms before WL-H2's tier probe would fail. The SLO binds first, by
+roughly 2x — measured, not estimated.
+
+**SUPERSEDED session 44 — that 1881 ms is a P100 number, and the route no
+longer runs on a P100.** The T4 x2 allocation that makes every *other* part of
+this route work is **slower per request** than the P100 it replaces (decode is
+memory-bandwidth-bound: HBM2 ~732 GB/s vs GDDR6 ~320 GB/s). Re-measured on
+T4 x2, same 48-token protocol:
+
+| `mid` placement | mean ms | clause 3 headroom |
+|---|---|---|
+| P100 (the number above) | 1881 | 619 ms |
+| **T4, pinned to one card** | **2310** | **190 ms** |
+| **T4 x2, `device_map="auto"`** | **3081** | **−581 ms — VOIDS THE RUN** |
+
+Two consequences, both binding:
+
+1. **`mid` must be pinned to a single card, never sharded.** Sharded it is
+   3081 ms and clause 3 voids the run *before any tunnel exists*. (Sharding is
+   still required for a `large` tier — see `TIER_BENCH.md` — so a three-tier
+   run must place tiers per-card deliberately, not with a blanket `"auto"`.)
+2. **The tunnel budget collapses from 619 ms to 190 ms.** This file says a
+   cloudflared quick tunnel "typically adds 50–300 ms". **That range now
+   straddles the entire budget**, so the tunnel alone can void the run. The
+   claim "the route has real margin" was true of the P100 and is not true
+   here.
+
+**And batching — the fix for throughput — spends the same budget.** Measured
+`mid` wall time on one T4: batch 1 = 2465 ms, batch 8 = 2425 ms, batch 32 =
+**3285 ms**, batch 64 = **4657 ms**. Every request in a batch completes with
+the batch, so batch >= 32 breaks clause 3 outright.
+
+**The squeeze, stated plainly.** The cell needs ~64 AI rps at base and ~110 at
+burst peak. Staying inside clause 3 caps `mid` at batch <= 8, which yields
+~3.3 rps on one card and ~4.1 rps on two. Reaching the throughput requires
+batch 32-64, which breaks clause 3. **There is no batch size that satisfies
+both**, and that is a measured statement about this hardware, not a tuning
+problem. See `TIER_BENCH.md` for the underlying numbers.
 
 Codespace gotchas met this session, on top of the session-19 list:
 

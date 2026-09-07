@@ -124,8 +124,15 @@ serves a request, and the prereg's Amendment already governs exactly that:
   batching breaks nothing the prereg pins.
 - **What must still hold** is WL-H2 materiality (the small/mid gap stays
   measurable) and **Amendment clause 3** (the slowest tier stays inside the
-  2500 ms premium AI SLO; `mid` benched 1881 ms, so **619 ms of headroom**).
-  Both are measured pre-run and both remain absolute veto gates.
+  2500 ms premium AI SLO). **The "`mid` benched 1881 ms, so 619 ms of
+  headroom" figure is a P100 number and is SUPERSEDED (session 44):** on the
+  T4 x2 this route now requires, `mid` is **2310 ms pinned to one card
+  (190 ms headroom)** and **3081 ms sharded (over target — clause 3 voids
+  the run)**. Batching past 8 spends what is left: batch 32 = 3285 ms, batch
+  64 = 4657 ms. **So batching is NOT free here** — it trades directly against
+  the clause-3 veto, and no batch size reaches ~64 rps while staying inside
+  2500 ms. Both gates are measured pre-run and both remain absolute vetoes.
+  See `WAVE4_FREE_ROUTE.md` and `TIER_BENCH.md`.
 - `docs/COMPLETION_ROADMAP.md` A4/A5 already lists "batched serving on the
   free pool" as route 2 and reserves the new-prereg requirement for route 3
   (shrinking the cell). Batching is prereg-neutral by the project's own
