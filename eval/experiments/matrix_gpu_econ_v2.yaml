@@ -1,0 +1,21 @@
+# PREREG_TIER_RATIO_V2.md (session 44): the v1 headline matrix under the
+# CORRECTED GPU-bench price corner. Exact mirror of matrix_gpu_econ.yaml
+# except `economy`. v1's corner priced `large` at 16.64x from a run whose 7B
+# row was CPU-offloaded; re-measured on GPU T4 x2 with zero modules offloaded
+# (tier_bench_t4.csv) the ratios are 1 : 1.475 : 1.518. small still anchors
+# the published 1.0e-4; 4 significant digits, as in v1.
+name: matrix_gpu_econ_v2
+backend: sim
+steps: 120
+reps: 5
+systems: [jcac, hpa, keda, firm, static, gptcache]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_gpu_econ_v2.duckdb
+retries: 2
+timeseries_reps: 1
+economy:
+  tier_cost_small: 1.0e-4
+  tier_cost_mid: 1.475e-4
+  tier_cost_large: 1.518e-4

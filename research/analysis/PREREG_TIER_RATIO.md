@@ -78,3 +78,34 @@ precedent). The campaign is valid only at 1,800/1,800 valid runs. No
 widening, no second attempt, no post-hoc grid of further price points in
 this campaign; further economies (e.g. the combined self-host corner in
 PREREG_HK_ADOPTION) require their own pre-registered files.
+
+
+---
+
+## Superseding note (POST-RUN, session 44 — not a pre-run amendment)
+
+This file and `RESULTS_TIER_RATIO.md` stand exactly as registered and
+executed. Nothing below changes what was declared, what was run, or what was
+found. What changed is an **input**: the corner this prereg calls "the
+measured self-hosting corner" was mis-measured.
+
+The `large` coordinate, 16.64, came from a `TIER_BENCH.md` run in which a
+16 GB card could not hold Qwen2.5-7B at fp16 (~15 GB) and `device_map="auto"`
+spilled layers to host memory. The 20665.1 ms behind it measured the CPU
+offload, not the tier. Re-run on `GPU T4 x2` under the identical protocol
+with **`modules offloaded to cpu/disk: 0` for all three tiers**, the corner is
+**1 : 1.475 : 1.518** (`research/calibration/tier_bench_t4.csv`). `mid`
+reproduces (1.516 -> 1.475); `large` collapses by a factor of 10.96.
+
+The question is re-asked at the corrected corner under
+**`PREREG_TIER_RATIO_V2.md`** (registered and pushed before that run), with
+exactly one changed factor. Its result: **TR2-H1 PASS 5/5 and TR2-H2 PASS
+5/5** — the cost win survives the correction (`RESULTS_TIER_RATIO_V2.md`).
+
+Read the two together. The mechanism is visible in the rerun's tier-posture
+table: `hpa`, `keda` and `firm` sit at **100% `small`** and `static` at
+**100% `mid`**, so repricing `large` cannot touch them; `gptcache` is the only
+baseline that uses `large` (15.9% of steps), and it is the only one whose
+margin moves — aggregate -82.6% -> -33.6%, a 9x reduction. Its effect size
+nonetheless *strengthens* (dz -0.67 -> -0.91, p 3.9e-26 -> 4.1e-41): smaller,
+but far more consistent once the offload-inflated tier bill is removed.

@@ -71,6 +71,7 @@ CAMPAIGN_RECORDS = [
     ("analysis_tenant_scale.py", [], "RESULTS_TENANT_SCALE.md"),
     ("analysis_chaos.py", [], "RESULTS_CHAOS_SIM.md"),
     ("analysis_econ.py", ["tier"], "RESULTS_TIER_RATIO.md"),
+    ("analysis_econ.py", ["tier2"], "RESULTS_TIER_RATIO_V2.md"),
     ("analysis_econ.py", ["hk"], "RESULTS_HK_ADOPTION.md"),
     ("analysis_econ.py", ["lm"], "RESULTS_LM_ADOPTION.md"),
     ("analysis_econ.py", ["mixp95"], "RESULTS_MIXTURE_P95.md"),
@@ -463,6 +464,10 @@ UNGATED = {
         "breakeven_tier.py needs its campaign DuckDB, which is archive tier "
         "with no committed aggregate; on a clean clone it fails opening the "
         "database rather than degrading, which is the right behaviour",
+    "BREAKEVEN_TIER_V2.md":
+        "as BREAKEVEN_TIER.md -- breakeven_tier_v2.py imports that script's "
+        "load_rows/reprice and reads the same archive-tier DuckDBs, so it has "
+        "exactly the same dependency and fails the same way on a clean clone",
     "OSF_REGISTRATION.md":
         "a registration document, not a measurement record",
     "THEORY_V2.md":

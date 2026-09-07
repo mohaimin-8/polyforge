@@ -73,3 +73,27 @@ As PREREG_HK_ADOPTION: results to `RESULTS_TIER_WU.md` as measured
 `raw_sim_tierwu.duckdb`, valid only at 1,800/1,800; crash-resume allowed;
 no widening. The exploratory all-forms arm is declared in
 PREREG_MIXTURE_P95.md and governed there.
+
+
+---
+
+## Superseding note (POST-RUN, session 44 — not a pre-run amendment)
+
+This file and `RESULTS_TIER_WU.md` stand as registered and executed. The
+work-unit multipliers declared here — mid 1.516x, large 16.64x, from
+`TIER_BENCH.md` — share an input with `PREREG_TIER_RATIO.md`, and that input
+was mis-measured: the `large` figure came from a 7B row that was CPU-offloaded
+on a 16 GB card, so it measured the offload rather than the tier. Re-measured
+on `GPU T4 x2` with **zero modules offloaded**, the serving-time ratios are
+**1 : 1.475 : 1.518** (`research/calibration/tier_bench_t4.csv`).
+
+**This campaign has NOT been re-run, and that is deliberate.**
+`PREREG_TIER_RATIO_V2.md` covers the *price* readings only and says so
+explicitly; re-running the work-unit reading at the corrected multipliers
+would need its own pre-registered file. Until such a file exists, the
+capacity-multiplier result here should be read as answering "what happens when
+a large model is ~16.6x heavier", which the corrected measurement says this
+hardware does not exhibit. The exposure is disclosed rather than closed.
+
+For the price reading, the corrected corner was run and the headline result
+survives: TR2-H1 PASS 5/5, TR2-H2 PASS 5/5 (`RESULTS_TIER_RATIO_V2.md`).
