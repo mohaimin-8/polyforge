@@ -196,7 +196,7 @@ special?" is a figure, not a paragraph. Desk-only, no prereg (descriptive).
 |---|---|---|
 | **L1** | Concurrent `tunnel_preflight` stage | **DONE session 42** — 16 tests green |
 | **L2** | Micro-batching tier server + batched-equals-serial exactness test | **DONE session 42** — per-tier lock replaced by a batching queue; mock-measured **22.57s -> 1.94s for 12 concurrent (11.6x)**; 11 tests pass, the real-model exactness check is gated on `POLYFORGE_TIER_TEST_MODEL` for the Kaggle smoke |
-| **L3** | **ATTEMPTED session 42 — BLOCKED, and not on throughput.** `kaggle_tier_bench_batched.py` was written (batch 1/8/32/64 x output 48/96, plus a batched-vs-serial exactness check on the real models) and pushed and run on Kaggle. **All 16 cells failed with `cudaErrorNoKernelImageForDevice`.** A probe kernel identified the cause: Kaggle's image now ships **torch 2.10 (arch list sm_70+)** and the free pool grants a **Tesla P100, sm_60** — PyTorch dropped Pascal, so no torch op runs at all. The same P100 served requests on 2026-08-30 17:54; the image moved under us. **Needs `GPU T4 x2`, which is UI-gated and cannot be set from `kaggle kernels push` — an agent cannot unblock this.** See `WAVE4_FREE_ROUTE.md` 0b. | **user: set T4 x2 in the notebook UI** |
+| **L3** | **ATTEMPTED session 42 — BLOCKED, and not on throughput.** `kaggle_tier_bench_batched.py` was written (batch 1/8/32/64 x output 48/96, plus a batched-vs-serial exactness check on the real models) and pushed and run on Kaggle. **All 16 cells failed with `cudaErrorNoKernelImageForDevice`.** A probe kernel identified the cause: Kaggle's image now ships **torch 2.10 (arch list sm_70+)** and the free pool grants a **Tesla P100, sm_60** — PyTorch dropped Pascal, so no torch op runs at all. The same P100 served requests on 2026-08-30 17:54; the image moved under us. **RESOLVED session 44 — `GPU T4 x2` is NOT UI-gated.** Session 42 re-tested `--accelerator` with four spellings (`gpu-t4x2`, `GpuT4x2`, `gpu-t4-x2`, `TPU_OR_GPU_T4X2`), watched the server normalise every one to the generic `Gpu`, and concluded an agent could not set it. The flaw was in the spellings, not the flag: **all four are invalid enum values**, and an invalid `machine_shape` falls back to `Gpu` silently. The value `kagglesdk` documents is **`NvidiaTeslaT4`** (`kagglesdk/kernels/types/kernels_api_service.py`, alongside `NvidiaTeslaP100` and `Tpu1VmV38`), it is stored verbatim by the server, and the allocator honours it. Probe `polyforge-t4-probe`: `device count: 2`, `GPU0/GPU1 Tesla T4 -- cuda capability 7.5`, matmul executing on both cards — the `cudaErrorNoKernelImageForDevice` that killed all 16 cells is gone. The bench was re-pushed on T4 x2. See `WAVE4_FREE_ROUTE.md` 0b. | — |
 | **L4** | Score B1 (frozen 4x4 matrix, WL-H1/H2/H3) | blocked behind L3 |
 
 See `docs/ZERO_COST_ROADMAP.md` for L1–L4 in full, including the pre-committed
@@ -591,8 +591,9 @@ M3  window characterisation DONE s42   the cost win and the SLO penalty are
                                        the same 45 windows
 C1  real embedder           WITHDRAWN  retrieval adds +0.047; the ceiling is
                                        response stochasticity
-L3  re-bench (~30 min GPU)  BLOCKED    P100 is sm_60, torch 2.10 dropped it
-L4  score B1 (2-4 h GPU)    BLOCKED    behind L3 --> USER: set GPU T4 x2
+L3  re-bench (~30 min GPU)  UNBLOCKED  s44: machine_shape=NvidiaTeslaT4 gets
+                                       T4 x2 from the API, no UI needed
+L4  score B1 (2-4 h GPU)    UNBLOCKED  behind L3, no longer behind the user
 L6  latency semantics       DONE s43   verified live; W5 gap +21% / +239%
 M1  p99 + TTFT/TPOT         WITHDRAWN  PREREG_LIVE_CHAOS_P99 Part B forbids it
 L5  trace-driven sitting    DONE s42   TL-H1 PASS, TL-H3 PASS
@@ -606,11 +607,12 @@ D1  Zenodo bundle built ------------------- USER: publish for the DOI
 §9  writing                 HELD
 ```
 
-**What is left that is not writing:** three things, none of them mine. Set
-`GPU T4 x2` in the Kaggle notebook UI (unblocks L3, then L4, then B1 — the only
-item that can still move the venue). Publish the Zenodo bundle. Make the GHCR
-packages public and set `PAGES_ENABLED=true` if the supplement should be
-reachable.
+**What is left that is not writing:** two things, and the GPU is no longer one
+of them. `GPU T4 x2` was never UI-gated — session 44 set it from the API with
+`machine_shape: NvidiaTeslaT4` (see `WAVE4_FREE_ROUTE.md` 0b), which unblocks
+L3, then L4, then B1. What still needs the author: publish the Zenodo bundle,
+and make the GHCR packages public / set `PAGES_ENABLED=true` if the supplement
+should be reachable.
 
 Rationale: the four desk items at the top need no external resource and two of
 them (T1, M3) can produce *positive* results. L3 is the cheapest thing that
@@ -633,8 +635,14 @@ Finishing everything above does **not** produce:
    zone failure or cross-host latency, and nothing killed a node.
 3. **Production scale.** SageServe's 10M served requests remains conceded; the
    10.63M-request demand-side replay is the analog.
-4. **Three model tiers**, on the free route. `large` needs VRAM the free pool
-   does not have.
+4. ~~**Three model tiers**, on the free route. `large` needs VRAM the free
+   pool does not have.~~ **RETIRED session 44.** The free pool does have the
+   VRAM — `GPU T4 x2` is 2 x 16 GB and the 7B at fp16 is ~15 GB. Re-run with
+   `machine_shape: NvidiaTeslaT4`, all three tiers reported
+   `modules offloaded to cpu/disk: 0` and `large` went 20665.1 ms -> 3171.5 ms
+   (6.52x, 2.32 -> 15.13 tok/s). What the item got right is that the *earlier
+   allocation* could not hold the model; what it got wrong is calling that a
+   property of the free route. `research/calibration/tier_bench_t4.csv`.
 5. **Attempt 10's SK-H1/SK-H3 FAILs.** Scored, closed, reported as measured.
 
 That residue is the paper's limitations section, and it is short and defensible.

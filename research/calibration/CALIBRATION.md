@@ -37,5 +37,21 @@ Scope and honesty:
   stay bit-reproducible. If a future campaign adopts a recalibrated g, it
   must do so as a new pre-registered experiment.
 
-GPU path (per-tier latency table): measured — see `TIER_BENCH.md`
-and `tier_bench.csv` (`kaggle_tier_bench.py`, free Kaggle GPU kernel).
+GPU path (per-tier latency table): measured — see `TIER_BENCH.md`, which
+now carries four runs. Read it, not any single CSV:
+
+- `tier_bench.csv` — the original P100 table. Its `large` row is
+  offload-dominated (2.32 tok/s) and **superseded**; small/mid stand.
+- `tier_bench_t4.csv` — all three tiers on GPU T4 x2, zero modules
+  offloaded. **The source for tier RATIOS** (one identical configuration
+  across all three) and for the `large` absolutes.
+- `tier_bench_1gpu.csv` — small/mid pinned to one card, plus a directly
+  measured TTFT. **The source for small/mid ABSOLUTES.**
+- `tier_bench_batched.csv` — batch 1/8/32/64 x 48/96, single card.
+
+The headline correction: normalised to `small`, the measured tier ratio is
+**1 : 1.475 : 1.518**, not the P100 table's 1 : 1.516 : 16.640. The
+super-linear `large` row was CPU offload, not a tier property. **No committed
+constant changes** — `TIER_COST_USD_PER_REQ`'s 1:10:100 is market pricing,
+not GPU-seconds, and adopting measured constants would need a new
+pre-registration, exactly as the paragraph above requires for `g`.

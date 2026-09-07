@@ -1,0 +1,4 @@
+tier,model,n,error,mean_ms,p95_ms,tokens_per_s
+small,Qwen/Qwen2.5-0.5B-Instruct,25,,2089.8,2128.3,22.97
+mid,Qwen/Qwen2.5-3B-Instruct,25,,3081.5,3125.5,15.58
+large,Qwen/Qwen2.5-7B-Instruct,25,,3171.5,3193.3,15.13
