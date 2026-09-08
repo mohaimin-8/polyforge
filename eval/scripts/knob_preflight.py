@@ -165,7 +165,14 @@ def main() -> int:
     ap.add_argument("--report", default=str(DEFAULT_REPORT))
     args = ap.parse_args()
 
-    tier_a, tier_b = (t.strip() for t in args.tiers.split(",", 1))
+    # split(",", 1) capped this at two and would hand tier_b the literal
+    # string "mid,large" the moment a third tier appeared. Take the whole
+    # ladder; probe the gap across its EXTREMES, which is the strongest form
+    # of the separation WL-H2 asserts, and check every tier routes to itself.
+    _all = [t.strip() for t in args.tiers.split(",") if t.strip()]
+    if len(_all) < 2:
+        raise SystemExit("need at least two tiers to probe the tier knob")
+    tier_a, tier_b = _all[0], _all[-1]
     gw = Gateway(args.gateway, args.tenant, args.api_key, args.admin_key)
 
     report = {"gateway": args.gateway, "tenant": args.tenant,
