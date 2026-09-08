@@ -21,8 +21,7 @@ pre-registered matrix rerun (`matrix_gpu_econ_v2.yaml`).
 
 from __future__ import annotations
 
-from pathlib import Path
-
+import stats
 from breakeven_tier import (  # frozen algebra, imported not reimplemented
     CAMPAIGNS,
     CELL,
@@ -42,7 +41,10 @@ LEVEL = [0.2, 1.0, 5.0]
 GPU_CORNER_V1 = (1.52, 16.6, 1.0)          # superseded: offload-dominated
 GPU_CORNER_CORRECTED = (1.475, 1.518, 1.0)  # tier_bench_t4.csv, 0 offloaded
 
-OUT = Path(__file__).resolve().parent / "BREAKEVEN_TIER_V2.md"
+# Written through stats.record_path so POLYFORGE_ANALYSIS_OUT can redirect
+# it; resolving against __file__ would overwrite the committed record and
+# leave the reproduction gate nothing to compare against.
+OUT = stats.record_path("BREAKEVEN_TIER_V2.md")
 
 
 def main() -> None:
