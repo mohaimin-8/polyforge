@@ -518,3 +518,79 @@ rented host), so re-running this bench there yields ratios that approach the
 capacity reading and can be quoted for both questions. **Until then, quote
 1 : 1.475 : 1.518 only as serving cost on this substrate, never as how much
 capacity a tier consumes.**
+
+
+---
+
+# Does vLLM rescue the free route? Measured: no, and the log says why
+
+Measured 2026-09-08, kernel `polyforge-vllm-probe`, script at
+`kernels/polyforge-vllm-probe/`, raw output `vllm_probe.csv`. Same protocol:
+48 new tokens, `min == max`, greedy, WARMUP 3 then RUNS 25 sequential for
+latency, then one 256-request batch for throughput.
+
+**Why this was worth measuring.** Session 44 declared the free route
+infeasible for B1's frozen cell — but every number behind that came from
+`transformers`, and the same session then showed **~28.7 ms of `mid`'s
+48.00 ms TPOT is fixed host overhead**, not GPU work. vLLM exists to remove
+that overhead, so the verdict might have been about the engine rather than the
+hardware. It was not, and the reason is specific.
+
+| tier | engine | p95 ms | clause 3 (<2500) | rps | vs 64 rps base |
+|---|---|---|---|---|---|
+| mid | transformers | 2310.2 | PASS | 26.54 | 41.5% |
+| **mid** | **vLLM 0.11.0** | **1901.9** | **PASS** | **6.84** | **10.7%** |
+| large | transformers | 3081.5 | FAIL | — | — |
+| **large** | **vLLM 0.11.0** | **2068.7** | **PASS** | **4.85** | **7.6%** |
+
+**vLLM improves latency and destroys throughput.** It clears clause 3 on both
+tiers — including `large`, which transformers could not — and is **3.9x worse
+than transformers on throughput** for `mid`. That is not a configuration
+accident; KV cache was ample (10.02 GiB, 875,296 tokens, *maximum concurrency
+427x*), so concurrency was never the limit.
+
+## The mechanism, read off the engine's own startup log
+
+```
+ERROR fa_utils.py:57] Cannot use FA version 2 ... FA2 is only supported on
+                      devices with compute capability >= 8
+WARN  topk_topp_sampler.py:66] FlashInfer is not available. Falling back to
+                      the PyTorch-native implementation
+INFO  cuda.py:372] Using FlexAttention backend on V1 engine.
+WARN  gpu_model_runner.py:3663] CUDAGraphMode.FULL_AND_PIECEWISE is not
+                      supported with FlexAttentionMetadataBuilder backend
+WARN  symm_mem.py:58] SymmMemCommunicator: Device capability 7.5 not supported
+```
+
+**Every fast path vLLM has is gated on sm_80+, and the T4 is sm_75.** It loses
+FlashAttention 2, FlashInfer, symmetric-memory tensor-parallel — and, decisively,
+**CUDA graphs**, which are disabled because the FlexAttention fallback does not
+support them.
+
+CUDA graphs are *exactly* the mechanism that removes per-step host launch
+overhead. So the hypothesis this probe tested — "vLLM removes the ~29 ms
+fixed overhead" — is **refuted on this hardware by construction**: the feature
+that would have removed it is unavailable on the only GPUs the free pool
+grants. TPOT fell from 48.00 to 37.57 ms, not to the ~19 ms bandwidth floor.
+
+## What this settles
+
+1. **The free route cannot serve B1's frozen cell.** Best measured throughput
+   is 26.54 rps (transformers) against ~64 rps at base and ~110 at peak. vLLM
+   makes that worse, not better. **This holds under both engines, which is a
+   stronger statement than session 44's original one.**
+2. **The rented-host recommendation is now mechanistically justified, not
+   merely "a faster card".** An sm_80+ GPU is where FlashAttention 2,
+   FlashInfer and CUDA graphs *exist*. The gain is a different code path, not
+   more FLOPs — which is also why a bigger T4 count would not have helped.
+3. **vLLM does run on the free pool**, with `vllm==0.11.0` +
+   `transformers==4.56.2` installed after removing the image's torch and
+   re-execing. That took five attempts and four distinct failure modes; the
+   working recipe is in the probe script. A substrate that fragile is a poor
+   place to score a pre-registered experiment even if it were fast enough.
+
+**Unresolved and disclosed:** the `small` tier died with `EngineDeadError`
+under vLLM and produced no numbers. It does not change the verdict — `mid`
+and `large` are the binding tiers and both were measured — but the free-route
+vLLM path is not fully characterised, and nothing here should be read as
+saying it is.

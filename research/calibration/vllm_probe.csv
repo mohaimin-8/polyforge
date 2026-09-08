@@ -1,0 +1,4 @@
+tier,mean_ms,p95_ms,tpot_ms,rps,error
+small,,,,,EngineDeadError: EngineCore encountered an issue. See stack trace (above) for the root cause.
+mid,1803.2,1901.9,37.57,6.84,
+large,1987.9,2068.7,41.41,4.85,
