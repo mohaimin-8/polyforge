@@ -54,11 +54,21 @@ MAX_NEW_TOKENS = 48
 TIERS = {
     "qwen2.5-0.5b-instruct": ("small", "Qwen/Qwen2.5-0.5B-Instruct"),
     "qwen2.5-3b-instruct": ("mid", "Qwen/Qwen2.5-3B-Instruct"),
+    # Third tier restored session 44. The session-33 amendment dropped it
+    # because a 16 GB card could not hold the 7B, and PREREG_WAVE4_LIVE_PLANE's
+    # session-44 amendment supersedes that: measured on 2 x 16 GB with
+    # `modules offloaded to cpu/disk: 0`.
+    "qwen2.5-7b-instruct": ("large", "Qwen/Qwen2.5-7B-Instruct"),
 }
 # Mock delays approximate TIER_BENCH.md's measured means, so --mock exercises
 # the same *shape* the WL-H2 tier probe looks for (a material small/mid gap)
 # without a GPU. They are not measurements and never enter a record.
-MOCK_DELAY_S = {"small": 1.24, "mid": 1.88}
+# `large` is only marginally above `mid` on purpose: the corrected tier
+# bench (tier_bench_t4.csv, zero modules offloaded) measures the ratio at
+# 1 : 1.475 : 1.518, not the 1 : 1.516 : 16.64 the offloaded P100 run
+# implied. A mock with a large 7B gap would rehearse a shape the hardware
+# does not have.
+MOCK_DELAY_S = {"small": 1.24, "mid": 1.88, "large": 1.90}
 
 # Micro-batching (docs/ZERO_COST_ROADMAP.md Phase 2). Frozen at whatever
 # TIER_BENCH_BATCHED.md certifies before the scored run; these are the
