@@ -1065,8 +1065,14 @@ def run_knob_preflight(gateway_base: str, tenant_id: str, api_key: str,
     # criterion failed on every run as an artefact of this line rather than as
     # a property of the substrate. model.TIERS is the canonical ladder.
     _ladder = {t: i for i, t in enumerate(MODEL_TIERS)}
+    # Every configured tier, not the first two. The [:2] here was a two-tier
+    # assumption from when the substrate was two-tier: with small/mid/large
+    # configured it passed "small,mid" and `large` entered the scored matrix
+    # having never been probed -- routed to by real traffic, verified by
+    # nothing. PREREG_WAVE4_LIVE_PLANE's session-44 amendment restores the
+    # third tier AND makes verifying it binding, so the gate has to see it.
     tiers = (sorted(json.loads(TIER_BACKENDS_JSON),
-                    key=lambda t: (_ladder.get(t, len(_ladder)), t))[:2]
+                    key=lambda t: (_ladder.get(t, len(_ladder)), t))
              if TIER_BACKENDS_JSON else [])
     if len(tiers) < 2:
         raise RuntimeError(
