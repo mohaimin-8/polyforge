@@ -241,3 +241,117 @@ Neither clause weakens a hypothesis or its falsifier. WL-H1 still fails
 loudly if the joint arm does not beat the best single-knob arm on cost at
 iso-fairness, and a WL-H2 or clause-3 failure still voids the comparison
 rather than producing a softened claim.
+
+---
+
+## Amendment (declared pre-run, session 44 — single host, three tiers, corrected latency metric)
+
+Declared and pushed **before any comparison number exists**, per §Outcome
+handling. Arms, cells, hypotheses, the iso-fairness margin (0.01) and the
+stopping rule are untouched. This amendment **narrows** the session-33
+amendment rather than adding to it.
+
+### 1. Single GPU host — session-33 clauses 2 and 3 are void by clause 4
+
+The substrate is one rented GPU host running **both** halves: the kind
+cluster (operator, planner, gateway) and the model tiers. Session-33 clause 4
+already fixes the consequence: *"If a single GPU host is provisioned instead
+(cloud credit, rented, or a GPU Codespace), only clause 1 applies and clauses
+2-3 are void."* So the split host, the `trycloudflare` tunnel, the inflated
+absolute latencies, and the tunnel-specific pre-run gate all fall away. **No
+new latitude is being taken here; a declared conditional is being satisfied.**
+
+This matters for one reason beyond tidiness. `WAVE4_FREE_ROUTE.md`'s
+clause-3 budget of "619 ms of tunnel round-trip" was computed from a P100
+`mid` of 1881 ms. Session 44 re-measured `mid` on the T4 x2 the free route
+now requires: **2310 ms pinned to one card (190 ms of headroom) and 3081 ms
+sharded (over target outright)**, while the cell needs ~64 AI rps at base and
+~110 at peak against a measured 26.5-46.5 rps, and the batching that would
+close that gap pushes `mid` to 3285 ms at batch 32. **No batch size satisfies
+both gates.** The free split-host route is therefore not merely inconvenient
+but *measurably infeasible* for this cell, which is why a host is being
+rented rather than the cell being shrunk.
+
+### 2. Three tiers — supersedes session-33 clause 1
+
+Session-33 clause 1 dropped the 7B `large` tier and justified it thus:
+*"`TIER_BENCH.md` measured 7B fp16 (~15.4 GB) spilling to CPU on a 16 GB card
+in two independent sessions... Note this constraint is not specific to the
+free host: any single-16 GB GPU forces it."*
+
+**That premise is now false, and it was falsified by measurement, not by
+argument.** Session 44 ran the identical tier-bench protocol on 2 x 16 GB and
+recorded `modules offloaded to cpu/disk: 0` for all three tiers, with `large`
+going 20665.1 ms -> 3171.5 ms (`research/calibration/tier_bench_t4.csv`,
+`TIER_BENCH.md`). The rented host has more VRAM again, so the constraint does
+not bind at all.
+
+The run is therefore a **three-tier run** — `small` = Qwen2.5-0.5B-Instruct,
+`mid` = Qwen2.5-3B-Instruct, `large` = Qwen2.5-7B-Instruct — which is what
+§Substrate specifies as its own default: *"a large tier (7B) included only if
+the host has the VRAM headroom the tier bench flagged"*. **The condition
+§Substrate itself names is now met.** This strengthens WL-H1: the tier knob
+has three positions to co-schedule instead of two.
+
+**Verification obligation, binding.** The pre-run WL-H2 gate must confirm on
+the provisioned host that `large` is resident in GPU memory with no CPU
+offload, by the same placement report used in session 44. If `large` offloads
+on the day, it is dropped and the run reverts to two tiers **declared as
+such** — a CPU-offloaded tier measures the offload, not the tier, and that
+rule is unchanged from §Substrate.
+
+### 3. Serving engine: vLLM — an implementation choice, not a deviation
+
+This file **does not pin a serving engine**; §Substrate requires only that
+each tier is a real model server so the tier knob bites. vLLM is used, behind
+its OpenAI-compatible endpoint, which the gateway already consumes
+(`kind: "openai"` in `POLYFORGE_TIER_BACKENDS`). Recorded because it is
+material to the numbers:
+
+* `V2_README`'s Phase 6 **originally specified vLLM serving**; transformers
+  was the documented deviation, taken because the free pool's GPU
+  architecture was not vLLM-guaranteed (`TIER_BENCH.md`). On a provisioned
+  host that reason expires, so this **returns to the originally specified
+  substrate** rather than introducing a new deviation.
+* It is also load-bearing rather than cosmetic. Session 44's two-GPU
+  measurement found replica scaling of only 1.15x-1.93x, and located the
+  ceiling in the **host-side Python decode loop** rather than the cards
+  (`mid` TPOT 48.00 ms/token of which only ~19 ms is weight bandwidth; the
+  second-card penalty is a near-constant ~1 s that collapses to 0.17 s
+  exactly where GPU work dominates). A faster card under transformers would
+  therefore not have cleared the throughput requirement; a native decode loop
+  with continuous batching is the part that does.
+
+### 4. Live latency metric: the corrected one is primary
+
+Live records to date quote `crud_p95` from `replay.go`, which stops its clock
+**before** the telemetry write (line 76 vs the write at line 94) — CPU
+service time, not service latency. The middleware histogram
+`polyforge_http_request_duration_seconds` times the whole handler and is the
+correct measurand; session 43 found nothing had ever scraped `/metrics`, and
+`scripts/soak_observer.sh` now does.
+
+**For this run the histogram is primary.** The replay number is carried
+alongside every reported figure, and the two are **never compared across that
+boundary** — the same rule §Ground rules already applies to absolutes across
+substrates.
+
+This is declared here, before any number exists, because it is **not
+cosmetic**: L6 measured the gap at **+21% mean and +239% p95**, and WL-H1 is
+cost *at iso-fairness*, where the Jain index is computed over SLO
+satisfaction. A p95 that more than triples moves the SLO term and therefore
+the fairness term that WL-H1's margin is defined against. Choosing the metric
+after seeing either arm's numbers would be exactly the degree of freedom
+pre-registration exists to remove.
+
+**Consequence accepted in advance:** live violation rates under the correct
+metric will look substantially worse than in every previously published live
+record. That difference is a measurement correction, not a regression, and it
+is not a reason to prefer the flattering number. Prior records stand as
+scored on the only metric that existed when they ran — attempt 10's histogram
+went with its cluster and cannot be recovered.
+
+Neither clause weakens a hypothesis or its falsifier. WL-H1 still fails
+loudly if the joint arm does not beat the best single-knob arm on cost at
+iso-fairness; WL-H2 still voids WL-H1; and a `large` tier that offloads on
+the day still costs the third tier rather than being quoted anyway.
