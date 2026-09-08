@@ -1,0 +1,124 @@
+# B1 on a rented GPU host — push-button runbook
+
+The route `PREREG_WAVE4_LIVE_PLANE.md`'s **session-44 amendment** declares:
+one host, three tiers, vLLM, corrected latency metric. Read that amendment
+before running; this file is only the mechanics.
+
+**Why not the free route.** Measured, session 44: the cell needs ~64 AI rps at
+base and ~110 at peak; `GPU T4 x2` delivers 26.5–46.5. Amendment clause 3
+vetoes a run whose slowest tier exceeds 2500 ms, and `mid` on a T4 is 2310 ms
+pinned (190 ms of headroom) or 3081 ms sharded (over target outright). The
+batching that would close the throughput gap pushes `mid` to 3285 ms at batch
+32. **No batch size satisfies both gates** — see `WAVE4_FREE_ROUTE.md` and
+`TIER_BENCH.md`. The free route is infeasible for this cell, not merely slow.
+
+---
+
+## 0. Host
+
+| requirement | value | why |
+|---|---|---|
+| GPU VRAM | **≥ 40 GB** (A100 40/80, L40S) | fp16 weights are ~1 + 6 + 15 = 22 GB before any KV cache; 24 GB cannot serve three tiers |
+| vCPU / RAM | ≥ 8 / ≥ 32 GB | the same box runs kind, the operator, the planner, the gateway and k6 |
+| Disk | ≥ 60 GB | three model downloads plus images |
+| Cost | ~$1–2/hr, **~$5–15 total** | setup plus 16 runs at `steps: 30` |
+
+Both halves run **on this one box**. That is what makes session-33 clauses 2–3
+void by its own clause 4, removing the tunnel and its latency inflation.
+
+## 1. Repo and dependencies
+
+```sh
+git clone <repo> && cd polyforge
+# docker, kind, helm, k6, go, python per docs/REPRODUCE.md
+```
+
+## 2. Tier substrate
+
+```sh
+./scripts/b1_tier_host.sh up
+```
+
+Installs vLLM if absent, serves `small`/`mid`/`large` on ports 9101–9103 with
+explicit `--gpu-memory-utilization` splits, waits for readiness, then
+**verifies**: `nvidia-smi` residency, and a real `chat/completions` decode per
+tier — not a `/v1/models` ping, because an endpoint that lists a model it
+cannot decode would pass a liveness check and void WL-H2. It exits non-zero
+and tells you not to score if any tier fails.
+
+It prints the `POLYFORGE_EVAL_TIER_BACKENDS` line. Export it.
+
+> **Binding obligation from the amendment.** If `large` cannot be held in GPU
+> memory on the day, it is **dropped and the run declared a two-tier run**. A
+> CPU-offloaded tier measures the offload, not the tier. Do not quote it.
+
+## 3. Cluster half
+
+```sh
+export POLYFORGE_EVAL_SHARED_PG=1     # per-pod SQLite reads ~empty under
+                                      # scaling and yields 0-latency metrics
+export POLYFORGE_EVAL_LIVE_AI=1
+export POLYFORGE_EVAL_TIER_BACKENDS='<the line step 2 printed>'
+```
+
+Install the operator chart with `--set planner.auth.enabled=false`, or export
+the chart's generated token as `POLYFORGE_PLANNER_TOKEN`. Either is fine; the
+protocol is untouched by the choice. Mechanics in
+`docs/WAVE3_LIVE_RUNBOOK.md`.
+
+## 4. The WL-H2 gate — **before** any comparison number
+
+```sh
+python eval/scripts/knob_preflight.py   --gateway http://127.0.0.1:18081   --tenant <tenant> --api-key <key> --admin-key <admin-key>   --tiers small,mid,large
+```
+
+> **`--tiers` defaults to `small,mid`.** On a three-tier run you MUST pass
+> `--tiers small,mid,large` explicitly, or the gate silently certifies only
+> two of the three tiers and the `large` tier enters the scored matrix
+> unverified. This is the one place the two-tier history is still wired in as
+> a default.
+
+WL-H2 must **pass** here. `tunnel_preflight.py` is not required on this route
+(there is no tunnel) and never substituted for this: only `knob_preflight.py`
+exercises the cache knob through the real gateway.
+
+**A WL-H2 failure voids WL-H1.** Report it; do not proceed and do not soften.
+
+## 5. Run
+
+```sh
+python -m harness.runner experiments/wave4_live_plane.yaml   # from eval/
+```
+
+4 arms × 4 cells × 1 rep = **16 runs**, `steps: 30`, `retries: 0`. The prereg's
+stopping rule is one execution per arm per cell — no second attempt.
+
+## 6. Export and score
+
+Read live p95/p99 from **`polyforge_http_request_duration_seconds`** — the
+amendment makes the histogram primary — and carry `replay.go`'s `crud_p95`
+alongside every figure. **Never compare the two across that boundary**, the
+same rule the ground rules already apply to absolutes across substrates.
+`scripts/soak_observer.sh` scrapes the histogram over the NodePort the load
+already uses (never a port-forward, which pinned all load to one pod of
+sixteen in attempt 4).
+
+Results to `RESULTS_WAVE4_LIVE_PLANE.md` **as measured**, WL-H1 failure
+included and headlined if it occurs.
+
+---
+
+## What voids the run
+
+1. **WL-H2 fails** — a knob is inert; WL-H1 is not interpretable.
+2. **`large` offloads to CPU** — drop it, declare a two-tier run, continue.
+3. **Any post-hoc change** to arms, cells, the 0.01 iso-fairness margin, or
+   the metric choice. All are frozen by the prereg and its amendments; the
+   metric was fixed in advance precisely so it could not be chosen after
+   seeing the arms.
+
+## Expected posture, stated before the run
+
+Session 44 measured `jcac` at 78.8% `small` / 14.1% `mid` / 0.0% `large` in
+sim, against `gptcache` at 15.9% `large`. If the live tier histogram is wildly
+different from that, suspect the tier knob before believing the result.
