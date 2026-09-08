@@ -47,6 +47,15 @@ from . import workloads
 from . import EVAL_DIR
 
 REQUIRED_TOOLS = ("docker", "kind", "kubectl", "helm", "k6")
+# Pinned rather than `latest`: see the side-load step in the plan below.
+METRICS_SERVER_VERSION = "v0.9.0"
+METRICS_SERVER_IMAGE = (
+    f"registry.k8s.io/metrics-server/metrics-server:{METRICS_SERVER_VERSION}")
+METRICS_SERVER_MANIFEST = (
+    "https://github.com/kubernetes-sigs/metrics-server/releases/download/"
+    f"{METRICS_SERVER_VERSION}/components.yaml")
+METRICS_SERVER_TAR = str(
+    Path(tempfile.gettempdir()) / f"metrics-server-{METRICS_SERVER_VERSION}.tar")
 CLUSTER_NAME = "polyforge-eval"  # fixed: teardown is idempotent by name
 NODES_BY_SIZE = {"small": 2, "medium": 4, "large": 6}
 
@@ -764,8 +773,32 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         # kind ships no metrics-server; without it the HPA arm reads no CPU
         # and silently never scales. --kubelet-insecure-tls is the standard
         # kind accommodation (kubelets use self-signed certs).
-        ["kubectl", "apply", "-f",
-         "https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml"],
+        #
+        # Side-loaded and PINNED (session 44). Two defects were fixed here at
+        # once, both found by a free rehearsal rather than a paid run:
+        #
+        #  * `latest/download` is a FLOATING reference. Every other image this
+        #    harness uses is pinned and side-loaded; this one silently tracked
+        #    whatever metrics-server released most recently, so a scored run's
+        #    substrate could change without a commit. Same class of defect that
+        #    cost five attempts on the vLLM probe the same day.
+        #  * The image was pulled from registry.k8s.io INSIDE the cluster while
+        #    `rollout status --timeout=180s` waited. On a slow link the pull
+        #    loses that race and the run dies with "timed out waiting for the
+        #    condition" -- observed, and it takes the whole cluster with it.
+        #    Side-loading removes the network from the critical path entirely.
+        # `kind load docker-image` fails against Docker 29's containerd image
+        # store -- it exports the multi-platform INDEX and ctr then wants blobs
+        # for platforms that were never pulled ("content digest ... not found").
+        # `docker save` writes a single-platform archive, which imports cleanly.
+        # --platform is load-bearing. Without it Docker 29 saves the whole
+        # multi-platform INDEX even for a single pulled image, and ctr then
+        # fails on blobs for platforms that were never fetched.
+        ["docker", "save", "--platform", "linux/amd64",
+         METRICS_SERVER_IMAGE, "-o", METRICS_SERVER_TAR],
+        ["kind", "load", "image-archive", METRICS_SERVER_TAR,
+         "--name", CLUSTER_NAME],
+        ["kubectl", "apply", "-f", METRICS_SERVER_MANIFEST],
         ["kubectl", "--namespace", "kube-system", "patch", "deployment",
          "metrics-server", "--type=json",
          "-p", '[{"op":"add","path":"/spec/template/spec/containers/0/args/-",'
