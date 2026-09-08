@@ -591,9 +591,11 @@ M3  window characterisation DONE s42   the cost win and the SLO penalty are
                                        the same 45 windows
 C1  real embedder           WITHDRAWN  retrieval adds +0.047; the ceiling is
                                        response stochasticity
-L3  re-bench (~30 min GPU)  UNBLOCKED  s44: machine_shape=NvidiaTeslaT4 gets
-                                       T4 x2 from the API, no UI needed
-L4  score B1 (2-4 h GPU)    UNBLOCKED  behind L3, no longer behind the user
+L3  re-bench (~30 min GPU)  DONE s44   T4 x2 set from the API; 16/16 cells,
+                                       0 errors, exactness True both tiers
+L4  score B1 (2-4 h GPU)    USER       free route MEASURED infeasible for the
+                                       frozen cell; needs a rented GPU (~$5-15)
+                                       -- substrate + amendment prepped, s44
 L6  latency semantics       DONE s43   verified live; W5 gap +21% / +239%
 M1  p99 + TTFT/TPOT         WITHDRAWN  PREREG_LIVE_CHAOS_P99 Part B forbids it
 L5  trace-driven sitting    DONE s42   TL-H1 PASS, TL-H3 PASS
@@ -607,12 +609,28 @@ D1  Zenodo bundle built ------------------- USER: publish for the DOI
 §9  writing                 HELD
 ```
 
-**What is left that is not writing:** two things, and the GPU is no longer one
-of them. `GPU T4 x2` was never UI-gated — session 44 set it from the API with
-`machine_shape: NvidiaTeslaT4` (see `WAVE4_FREE_ROUTE.md` 0b), which unblocks
-L3, then L4, then B1. What still needs the author: publish the Zenodo bundle,
-and make the GHCR packages public / set `PAGES_ENABLED=true` if the supplement
-should be reachable.
+**What is left that is not writing: three things, all the author's.**
+
+An earlier draft of this paragraph (written mid-session 44, before the
+measurements below existed) said the GPU was no longer one of them. That was
+half right and is corrected here. `GPU T4 x2` was indeed never UI-gated —
+session 44 set it from the API with `machine_shape: NvidiaTeslaT4` — and that
+**did** unblock L3, which is now DONE. It did **not** unblock B1.
+
+**B1's frozen cell is measurably out of reach on the free route**, which is a
+stronger statement than "slow": the cell needs ~64 AI rps at base and ~110 at
+peak against a measured 26.5–46.5 on T4 x2, while Amendment clause 3 vetoes a
+run whose slowest tier exceeds 2500 ms and `mid` measures 2310 ms pinned
+(190 ms of headroom, against a tunnel that costs 50–300 ms) or 3081 ms sharded
+(over target outright). The batching that would close the throughput gap
+pushes `mid` to 3285 ms at batch 32. **No batch size satisfies both gates** —
+see `WAVE4_FREE_ROUTE.md` and `TIER_BENCH.md`.
+
+So the three are: **rent a GPU host for B1** (~$5–15; substrate, pre-run
+amendment and runbook are prepped and committed — `WAVE4_RENTED_HOST_RUNBOOK.md`,
+`scripts/b1_tier_host.sh`), **publish the Zenodo bundle**, and **make the GHCR
+packages public / set `PAGES_ENABLED=true`** if the supplement should be
+reachable.
 
 Rationale: the four desk items at the top need no external resource and two of
 them (T1, M3) can produce *positive* results. L3 is the cheapest thing that
