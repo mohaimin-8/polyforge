@@ -10,15 +10,16 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 67 |
-| regenerated and compared | 50 |
-| outside the gate, reason stated | 17 |
+| records | 69 |
+| regenerated and compared | 51 |
+| outside the gate, reason stated | 18 |
 | outside the gate, no entry | 0 |
 
 | record | hypotheses it names | reproduced |
 |---|---|---|
 | `ADVANCED.md` | - | yes |
 | `BREAKEVEN_TIER.md` | - | no, reason stated |
+| `BREAKEVEN_TIER_V2.md` | - | no, reason stated |
 | `CACHE_PRECISION.md` | - | no, reason stated |
 | `CELLS_SHIPPED.md` | PF-H1, PS-H1 | yes |
 | `COORD_GAP.md` | CG-H1 | no, reason stated |
@@ -70,6 +71,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_STRUCTREAL.md` | - | no, reason stated |
 | `RESULTS_TENANT_SCALE.md` | TS-H1a, TS-H1b | yes |
 | `RESULTS_TIER_RATIO.md` | TR-H1, TR-H2 | yes |
+| `RESULTS_TIER_RATIO_V2.md` | TR2-H1, TR2-H2 | yes |
 | `RESULTS_TIER_WU.md` | TW-H1, TW-H2 | yes |
 | `RESULTS_TRACE.md` | - | no, reason stated |
 | `RESULTS_TRACE2.md` | - | no, reason stated |
