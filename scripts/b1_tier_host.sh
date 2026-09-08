@@ -30,9 +30,63 @@ PID_FILE="$LOG_DIR/pids"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "FATAL: $1 not found" >&2; exit 1; }; }
 
+# Fail fast, before three model loads burn paid minutes. Session 44 spent five
+# Kaggle attempts on install problems a ten-second check would have named: a
+# CUDA-13 wheel against a CUDA-12.8 runtime, a torch ABI mismatch, and a
+# transformers floor rather than a pin.
+preflight() {
+  echo "== preflight =="
+  python - <<'PY'
+import sys
+try:
+    import torch
+except Exception as e:
+    sys.exit(f"FATAL: torch will not import: {e}")
+if not torch.cuda.is_available():
+    sys.exit("FATAL: no CUDA device visible")
+n = torch.cuda.device_count()
+caps = [torch.cuda.get_device_capability(i) for i in range(n)]
+tot = 0.0
+for i, (maj, mn) in enumerate(caps):
+    g = torch.cuda.get_device_properties(i).total_memory / 2**30
+    tot += g
+    print(f"  gpu{i}: {torch.cuda.get_device_name(i)}  cc {maj}.{mn}  {g:.1f} GiB")
+if min(c[0] for c in caps) < 8:
+    print("")
+    print("  STOP: compute capability < 8.0. vLLM's fast paths (FlashAttention 2,")
+    print("  FlashInfer, CUDA graphs) are gated on sm_80+ and fall back silently.")
+    print("  Session 44 measured 6.84 rps on sm_75 T4s against the ~64 rps needed.")
+    print("  This host cannot serve B1's frozen cell. Pick an A100 or L40S.")
+    sys.exit(2)
+if tot < 38:
+    sys.exit(f"FATAL: {tot:.1f} GiB total VRAM. Three tiers need ~22 GiB of weights "
+             "plus KV cache; pick a 40 GiB+ host.")
+try:
+    import vllm
+    print(f"  vllm {vllm.__version__} imports OK")
+except Exception as e:
+    print(f"FATAL: vllm will not import: {e}")
+    print("  If this is a CUDA/ABI mismatch, install a build for THIS runtime and")
+    print("  pin transformers with it:")
+    print("    pip uninstall -y torch torchvision torchaudio")
+    print("    pip install vllm==0.11.0 transformers==4.56.2")
+    print("  then re-run. Evidence: research/calibration/kernels/polyforge-vllm-probe/")
+    sys.exit(1)
+PY
+  echo
+}
+
 serve_one() {
   local name="$1" model="$2" port="$3" util="$4"
   echo "  starting $name  $model  :$port  gpu-util=$util"
+  # `vllm serve` is the supported CLI; the module path is the older spelling
+  # and is absent from recent releases. Prefer the CLI, keep the fallback.
+  if command -v vllm >/dev/null 2>&1; then
+    nohup vllm serve "$model" --served-model-name "$name" \
+      --port "$port" --gpu-memory-utilization "$util" \
+      >"$LOG_DIR/$name.log" 2>&1 &
+    echo "$!" >>"$PID_FILE"; return
+  fi
   nohup python -m vllm.entrypoints.openai.api_server \
     --model "$model" --served-model-name "$name" \
     --port "$port" --gpu-memory-utilization "$util" \
@@ -102,6 +156,7 @@ case "${1:-up}" in
     need python; need curl
     mkdir -p "$LOG_DIR"; : >"$PID_FILE"
     python -c "import vllm" 2>/dev/null || { echo "installing vllm..."; pip install -q vllm; }
+    preflight
     echo "== starting three tiers =="
     serve_one small "$SMALL_MODEL" "$SMALL_PORT" "$SMALL_UTIL"
     serve_one mid   "$MID_MODEL"   "$MID_PORT"   "$MID_UTIL"
