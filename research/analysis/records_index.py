@@ -31,8 +31,14 @@ REPO_ROOT = stats.REPO_ROOT
 RESULTS = REPO_ROOT / "eval" / "results"
 RECORD = "RECORDS_INDEX.md"
 
-# A registered hypothesis looks like MN-H1, SK-H4, TL-H3a, BP-H2b.
-TAG = re.compile(r"\b([A-Z]{2,4}-H[0-9][a-z]?)\b")
+# A registered hypothesis looks like MN-H1, SK-H4, TL-H3a, BP-H2b -- and,
+# since session 44, TR2-H1: when a prereg is re-asked at a corrected input
+# the successor takes a versioned prefix. The optional digit was added
+# because TR2-H1/TR2-H2 were silently invisible here, which is worse than a
+# naming quibble -- a record whose hypotheses do not register reads as
+# naming none. Across all 157 records and preregs the digit adds exactly
+# those two tags and nothing else.
+TAG = re.compile(r"\b([A-Z]{2,4}[0-9]?-H[0-9][a-z]?)\b")
 # Documents that are protocol, index or narrative rather than measurement.
 NOT_A_RECORD = {"RECORDS_INDEX.md", "RESULTS_MASTER.md", "OSF_REGISTRATION.md",
                 "THEORY_V2.md"}
