@@ -96,9 +96,16 @@ def build() -> str:
       f"(delta {cache['delta']:.2f}) |")
     w(f"| cache live (margin {cache['margin']}) | **{rcache['live']}** | "
       f"**{cache['live']}** |")
-    w(f"| pinned `small` served | {rtier['tiers_seen_a']} | "
+    # Tier names come from the report, never hardcoded. The gate used to probe
+    # the ladder's first two rungs (small, mid); since session 44 it probes the
+    # EXTREMES, so tier_b is `large` on a three-tier substrate. Hardcoding
+    # "mid" here would have printed a row labelled `mid` for a probe that
+    # actually pinned `large` -- mislabelled evidence in a scored record.
+    _ta = tier.get("tier_a", rtier.get("tier_a", "tier_a"))
+    _tb = tier.get("tier_b", rtier.get("tier_b", "tier_b"))
+    w(f"| pinned `{_ta}` served | {rtier['tiers_seen_a']} | "
       f"**{tier['tiers_seen_a']}** |")
-    w(f"| pinned `mid` served | **{rtier['tiers_seen_b']}** | "
+    w(f"| pinned `{_tb}` served | **{rtier['tiers_seen_b']}** | "
       f"**{tier['tiers_seen_b']}** |")
     w(f"| `routing_moved` | **{rtier['routing_moved']}** | "
       f"**{tier['routing_moved']}** |")

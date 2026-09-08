@@ -1,0 +1,44 @@
+# REHEARSAL ONLY -- NOT A SCORED RUN. Session 44, Stage 0.
+#
+# Identical to wave4_live_plane.yaml except the output database. Driven
+# against kaggle_tier_server.py --mock, whose delays are fixed sleeps and
+# are explicitly "not measurements and never enter a record". Its purpose
+# is to execute all 16 arm x cell combinations once on free hardware, so
+# the paid sitting meets no untested code path. NOTHING HERE IS EVIDENCE.
+#
+# Wave 4 three-knob live plane (PREREG_WAVE4_LIVE_PLANE.md). The joint
+# controller's central novelty, exercised live with ALL THREE knobs active for
+# the first time. Four frozen arms x four frozen cells, one execution each
+# (the prereg's stopping rule).
+#
+# Arms (frozen, §Arms): jcac = the joint controller, all knobs live;
+# replica-only = the strongest reactive replica baseline (HPA), cache/tier held
+# fixed; cache-only / tier-only = ablations of jcac with two knobs pinned by
+# their Policy CRs, so the comparison isolates *jointness*.
+#
+# Cells (frozen, §Cells): ai_cacheable (cache load-bearing), tier_mixed (tier
+# load-bearing), crud_bursty (replica load-bearing), joint_stress (all three —
+# the WL-H1 primary cell).
+#
+# RUN REQUIREMENTS — this is the live-AI plane, not a sim run:
+#   POLYFORGE_EVAL_LIVE_AI=1     gateway deployed, AI traffic drives real
+#                                cache + tier knobs
+#   POLYFORGE_EVAL_SHARED_PG=1   (R5) shared telemetry, or every AI metric
+#                                reads zero under replica scaling
+#   POLYFORGE_EVAL_TIER_BACKENDS JSON of tier -> model-server URL (the GPU
+#                                host; the free split-host route supplies a
+#                                trycloudflare URL — docs/WAVE4_FREE_ROUTE.md)
+# Run the WL-H2 knob-liveness preflight (eval/scripts/knob_preflight.py) and,
+# on the split-host route, tunnel_preflight.py, BEFORE scoring — an inert knob
+# VOIDS WL-H1 (do not fake it; report). See docs/archive/Q1_EXECUTION_MAP.md T4.
+name: wave4_live_plane_rehearsal
+backend: cluster
+steps: 30
+reps: 1
+systems: [jcac, replica-only, cache-only, tier-only]
+workloads: [ai_cacheable, tier_mixed, crud_bursty, joint_stress]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/wave4_live_plane_REHEARSAL_MOCK.duckdb
+retries: 0
+timeseries_reps: 0
