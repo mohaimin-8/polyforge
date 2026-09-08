@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# B1 tier substrate on a rented GPU host (PREREG_WAVE4_LIVE_PLANE.md,
+# session-44 amendment: single host, three tiers, vLLM).
+#
+# Brings up small/mid/large as three vLLM servers behind OpenAI-compatible
+# endpoints, proves each is resident on the GPU with no CPU offload, and
+# prints the exact POLYFORGE_EVAL_TIER_BACKENDS line the harness needs.
+#
+#   ./scripts/b1_tier_host.sh up       # install, serve, verify, print export
+#   ./scripts/b1_tier_host.sh verify   # re-run the checks against live servers
+#   ./scripts/b1_tier_host.sh down     # stop the servers
+#
+# VRAM: fp16 weights are ~1 + 6 + 15 = 22 GB before any KV cache, so a 24 GB
+# card cannot hold all three with room to serve. 40 GB (A100) or better.
+set -euo pipefail
+
+SMALL_MODEL="${SMALL_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}"
+MID_MODEL="${MID_MODEL:-Qwen/Qwen2.5-3B-Instruct}"
+LARGE_MODEL="${LARGE_MODEL:-Qwen/Qwen2.5-7B-Instruct}"
+SMALL_PORT="${SMALL_PORT:-9101}"
+MID_PORT="${MID_PORT:-9102}"
+LARGE_PORT="${LARGE_PORT:-9103}"
+# Fractions of one card. They must sum below 1.0; vLLM preallocates KV cache
+# from its share, so the large tier needs the biggest slice.
+SMALL_UTIL="${SMALL_UTIL:-0.08}"
+MID_UTIL="${MID_UTIL:-0.24}"
+LARGE_UTIL="${LARGE_UTIL:-0.60}"
+LOG_DIR="${LOG_DIR:-/tmp/b1-tiers}"
+PID_FILE="$LOG_DIR/pids"
+
+need() { command -v "$1" >/dev/null 2>&1 || { echo "FATAL: $1 not found" >&2; exit 1; }; }
+
+serve_one() {
+  local name="$1" model="$2" port="$3" util="$4"
+  echo "  starting $name  $model  :$port  gpu-util=$util"
+  nohup python -m vllm.entrypoints.openai.api_server \
+    --model "$model" --served-model-name "$name" \
+    --port "$port" --gpu-memory-utilization "$util" \
+    --disable-log-requests \
+    >"$LOG_DIR/$name.log" 2>&1 &
+  echo "$!" >>"$PID_FILE"
+}
+
+wait_ready() {
+  local name="$1" port="$2" tries=0
+  printf "  waiting for %s " "$name"
+  until curl -sf "http://127.0.0.1:$port/v1/models" >/dev/null 2>&1; do
+    tries=$((tries + 1))
+    # 7B weights download on first run; allow a generous ceiling.
+    if [ "$tries" -gt 180 ]; then
+      echo " TIMEOUT"; echo "FATAL: $name never became ready; see $LOG_DIR/$name.log" >&2; exit 1
+    fi
+    printf "."; sleep 10
+  done
+  echo " ready"
+}
+
+# The amendment's binding obligation: a CPU-offloaded tier measures the
+# offload, not the tier. vLLM does not offload unless told to, so the check is
+# that every server is up, answers, and the card actually holds the weights.
+verify() {
+  echo "== placement / residency check =="
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi --query-gpu=name,memory.total,memory.used --format=csv
+    echo
+    nvidia-smi --query-compute-apps=pid,used_memory --format=csv
+  else
+    echo "  WARNING: nvidia-smi absent; cannot evidence GPU residency" >&2
+  fi
+  echo
+  local fail=0
+  for pair in "small:$SMALL_PORT" "mid:$MID_PORT" "large:$LARGE_PORT"; do
+    local name="${pair%%:*}" port="${pair##*:}"
+    local got
+    got=$(curl -sf "http://127.0.0.1:$port/v1/models" 2>/dev/null || true)
+    if [ -z "$got" ]; then echo "  $name: DOWN"; fail=1; continue; fi
+    # A real completion, not just a liveness ping: an endpoint that lists a
+    # model but cannot decode would pass a /v1/models check and void WL-H2.
+    local reply
+    reply=$(curl -sf "http://127.0.0.1:$port/v1/chat/completions" \
+      -H 'Content-Type: application/json' \
+      -d "{\"model\":\"$name\",\"messages\":[{\"role\":\"user\",\"content\":\"2 + 2 =\"}],\"max_tokens\":8,\"temperature\":0}" \
+      2>/dev/null || true)
+    if echo "$reply" | grep -q '"content"'; then
+      echo "  $name: OK (decoded)"
+    else
+      echo "  $name: LISTED BUT WILL NOT DECODE"; fail=1
+    fi
+    grep -iE "cpu offload|offloading|swap" "$LOG_DIR/$name.log" 2>/dev/null \
+      | head -3 | sed "s/^/    $name log: /" || true
+  done
+  [ "$fail" -eq 0 ] || { echo; echo "FATAL: substrate not adequate; do NOT score." >&2; exit 1; }
+  echo
+  echo "== export line for the harness =="
+  cat <<EXPORT
+export POLYFORGE_EVAL_TIER_BACKENDS='{"small":{"kind":"openai","base_url":"http://127.0.0.1:$SMALL_PORT/v1","model":"small"},"mid":{"kind":"openai","base_url":"http://127.0.0.1:$MID_PORT/v1","model":"mid"},"large":{"kind":"openai","base_url":"http://127.0.0.1:$LARGE_PORT/v1","model":"large"}}'
+EXPORT
+}
+
+case "${1:-up}" in
+  up)
+    need python; need curl
+    mkdir -p "$LOG_DIR"; : >"$PID_FILE"
+    python -c "import vllm" 2>/dev/null || { echo "installing vllm..."; pip install -q vllm; }
+    echo "== starting three tiers =="
+    serve_one small "$SMALL_MODEL" "$SMALL_PORT" "$SMALL_UTIL"
+    serve_one mid   "$MID_MODEL"   "$MID_PORT"   "$MID_UTIL"
+    serve_one large "$LARGE_MODEL" "$LARGE_PORT" "$LARGE_UTIL"
+    wait_ready small "$SMALL_PORT"; wait_ready mid "$MID_PORT"; wait_ready large "$LARGE_PORT"
+    echo; verify ;;
+  verify) verify ;;
+  down)
+    [ -f "$PID_FILE" ] && while read -r pid; do kill "$pid" 2>/dev/null || true; done <"$PID_FILE"
+    echo "stopped" ;;
+  *) echo "usage: $0 {up|verify|down}" >&2; exit 2 ;;
+esac
