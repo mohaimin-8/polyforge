@@ -87,13 +87,53 @@ on a 16 GB card, so it measured the offload rather than the tier. Re-measured
 on `GPU T4 x2` with **zero modules offloaded**, the serving-time ratios are
 **1 : 1.475 : 1.518** (`research/calibration/tier_bench_t4.csv`).
 
-**This campaign has NOT been re-run, and that is deliberate.**
-`PREREG_TIER_RATIO_V2.md` covers the *price* readings only and says so
-explicitly; re-running the work-unit reading at the corrected multipliers
-would need its own pre-registered file. Until such a file exists, the
-capacity-multiplier result here should be read as answering "what happens when
-a large model is ~16.6x heavier", which the corrected measurement says this
-hardware does not exhibit. The exposure is disclosed rather than closed.
+**This campaign has NOT been re-run, and after further measurement that is a
+positive decision rather than a deferral: a naive re-run at 1.518x would make
+this model LESS accurate, not more.**
+
+Work units are a *capacity* quantity. This file derives them from measured
+serving time, which is a good proxy only when serving time is dominated by the
+work the model actually does. Session 44 measured that it is not. Decomposing
+the single-card TPOT (`tier_bench_1gpu.csv`):
+
+| tier | fp16 weights | weights/bandwidth | measured TPOT | implied fixed overhead |
+|---|---|---|---|---|
+| small | 0.99 GB | 3.09 ms | 32.22 ms | **29.13 ms** |
+| mid | 6.17 GB | 19.28 ms | 48.00 ms | **28.72 ms** |
+
+The predicted TPOT gap from bandwidth alone is 16.19 ms against a measured
+15.78 ms — **97.5% agreement** — and the residual is a **constant ~29 ms per
+token that does not scale with model size**. That is the Python decode loop,
+independently identified as the two-GPU concurrency ceiling in the same
+session. A fixed per-token cost added to every tier alike **compresses all
+ratios toward 1**.
+
+So the three candidate multipliers for `large` are not equally good:
+
+| multiplier | source | vs intrinsic 15.43x |
+|---|---|---|
+| **16.640x** | committed here (P100, CPU-offloaded) | **off by 1.21** |
+| 1.518x | session 44 (T4 x2, transformers) | **off by 13.91** |
+| 15.43x | weights read per token, the capacity-bound reading | — |
+
+**The offload artifact happened to land within 8% of the physically correct
+capacity ratio**, because offload slows a model for a reason that scales with
+its weight size, whereas the transformers overhead flattens every tier alike.
+The committed 16.64x for `large` is therefore close to right *for this
+particular measurand*; the committed 1.516x for `mid` is the weaker figure
+(intrinsic 6.26x), and it is weak in the conservative direction — it
+under-charges mid-tier capacity, so it cannot manufacture the effect this
+campaign found.
+
+**What a correct re-run needs is a serving engine whose fixed overhead does
+not dominate**, which is exactly what the B1 substrate now provides
+(`PREREG_WAVE4_LIVE_PLANE.md` session-44 amendment: vLLM on a rented host).
+Re-measuring the tier bench there yields ratios that approach the capacity
+reading, and *those* are the multipliers a work-unit v2 should freeze. Until
+that measurement exists, this campaign stands with the caveat it already
+declared verbatim — that 16.64x is an upper bound — now sharpened: it is an
+upper bound that is nearly correct for capacity, and the number that looked
+like its correction is not.
 
 For the price reading, the corrected corner was run and the headline result
 survives: TR2-H1 PASS 5/5, TR2-H2 PASS 5/5 (`RESULTS_TIER_RATIO_V2.md`).
