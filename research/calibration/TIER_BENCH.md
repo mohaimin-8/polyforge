@@ -456,3 +456,65 @@ contention.
 - `mid` at batch 64 reaching 1.931× shows the *hardware* scales close to
   linearly once it is the bottleneck. That is the honest ceiling statement:
   the cards are fine, the harness is the limit.
+
+
+---
+
+# What the measured tier ratio is a ratio OF
+
+The corrected ratio above, **1 : 1.475 : 1.518**, is the right number for the
+question `PREREG_TIER_RATIO_V2.md` asks — *what does a request cost to serve
+on this substrate* — and it is what that re-run used. It is **not** the
+models' intrinsic capacity ratio, and using it as one is a mistake this file
+should stop before it happens.
+
+## The measurement
+
+Decode is memory-bandwidth-bound: each token reads the whole weight set once.
+If measured TPOT is `weights/bandwidth + fixed overhead`, the TPOT *gap*
+between two tiers should equal their weight-read gap, and the overhead should
+fall out as a constant. Against `tier_bench_1gpu.csv` on one T4 (320 GB/s):
+
+| tier | fp16 weights | weights/bandwidth | measured TPOT | residual |
+|---|---|---|---|---|
+| small | 0.99 GB | 3.09 ms | 32.22 ms | **29.13 ms** |
+| mid | 6.17 GB | 19.28 ms | 48.00 ms | **28.72 ms** |
+
+Predicted gap 16.19 ms, measured gap 15.78 ms — **97.5% agreement** — and the
+residual is a **constant ~29 ms per token, independent of model size**. That
+is the Python decode loop, and it is the same ceiling the two-GPU scaling
+measurement found from the opposite direction (a near-constant ~1 s
+second-card penalty that collapses to 0.17 s once GPU work dominates). Two
+independent measurements, one mechanism.
+
+## Why it matters
+
+A fixed per-token cost added to every tier alike **compresses all ratios
+toward 1**. The bandwidth-bound ratios are 1 : 6.26 : 15.43; measured under
+transformers they are 1 : 1.475 : 1.518.
+
+So there are three candidate numbers for `large`, and they answer different
+questions:
+
+| value | what it is | good for |
+|---|---|---|
+| 16.640x | P100, CPU-offloaded | nothing directly — but see below |
+| **1.518x** | T4 x2, transformers | **serving cost on this substrate** (what the price re-run needed) |
+| 15.43x | weights read per token | **capacity consumption** (what a work-unit reading needs) |
+
+**And an accident worth recording, because it reverses the obvious move.** The
+offload-dominated 16.64x sits **within 8%** of the capacity-bound 15.43x,
+because offload slows a model for a reason that scales with its weight size.
+The transformers-measured 1.518x is off by **13.91**. So for the *capacity*
+reading in `PREREG_TIER_WU.md`, "correcting" 16.64 to 1.518 would replace a
+nearly-right number with a badly wrong one. That re-run is **not** being done;
+see that file's superseding note.
+
+## What would settle it
+
+A serving engine whose fixed overhead does not dominate. The B1 substrate is
+exactly that (`PREREG_WAVE4_LIVE_PLANE.md` session-44 amendment: vLLM on a
+rented host), so re-running this bench there yields ratios that approach the
+capacity reading and can be quoted for both questions. **Until then, quote
+1 : 1.475 : 1.518 only as serving cost on this substrate, never as how much
+capacity a tier consumes.**
