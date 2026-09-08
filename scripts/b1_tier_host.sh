@@ -151,6 +151,58 @@ export POLYFORGE_EVAL_TIER_BACKENDS='{"small":{"kind":"openai","base_url":"http:
 EXPORT
 }
 
+
+# --- split-host support -------------------------------------------------
+# The runbook's single-host route needs no tunnel: the cluster and the tiers
+# share a box, which is what makes session-33 clauses 2-3 void by its own
+# clause 4. On the SPLIT-host route the cluster stays on the operator's own
+# machine and only the GPU is rented, so each tier needs a public URL.
+#
+# A cloudflared quick tunnel exposes ONE port, and vLLM serves ONE model per
+# server, so three tiers need three tunnels. Free, no account, no card.
+get_cloudflared() {
+  [ -x ./cloudflared ] && return 0
+  echo "  fetching cloudflared ..."
+  curl -sSL -o cloudflared     https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64     || { echo "FATAL: cloudflared download failed" >&2; return 1; }
+  chmod +x cloudflared
+}
+
+tunnel_one() {
+  local name="$1" port="$2" log="$LOG_DIR/tunnel-$name.log"
+  ./cloudflared tunnel --url "http://127.0.0.1:$port" --no-autoupdate     >"$log" 2>&1 &
+  echo "$!" >>"$PID_FILE"
+  local tries=0 url=""
+  while [ "$tries" -lt 60 ]; do
+    url=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$log" 2>/dev/null | head -1)
+    [ -n "$url" ] && { echo "$url"; return 0; }
+    tries=$((tries + 1)); sleep 2
+  done
+  echo "FATAL: no tunnel URL for $name after 120s; see $log" >&2
+  return 1
+}
+
+tunnels() {
+  get_cloudflared || return 1
+  echo "== opening one tunnel per tier =="
+  local us um ul
+  us=$(tunnel_one small "$SMALL_PORT") || return 1
+  um=$(tunnel_one mid   "$MID_PORT")   || return 1
+  ul=$(tunnel_one large "$LARGE_PORT") || return 1
+  echo "  small $us"
+  echo "  mid   $um"
+  echo "  large $ul"
+  echo
+  echo "== export line for the harness (SPLIT-HOST) =="
+  cat <<EXPORT
+export POLYFORGE_EVAL_TIER_BACKENDS='{"small":{"kind":"openai","base_url":"$us/v1","model":"small"},"mid":{"kind":"openai","base_url":"$um/v1","model":"mid"},"large":{"kind":"openai","base_url":"$ul/v1","model":"large"}}'
+EXPORT
+  echo
+  echo "  NOTE: session-33 clauses 2-3 APPLY on this route. Run"
+  echo "  eval/scripts/tunnel_preflight.py before the cluster half -- it checks"
+  echo "  the tier gap survives the round-trip AND that the slowest tier stays"
+  echo "  inside the 2500 ms premium SLO. Over target voids the run."
+}
+
 case "${1:-up}" in
   up)
     need python; need curl
@@ -163,9 +215,11 @@ case "${1:-up}" in
     serve_one large "$LARGE_MODEL" "$LARGE_PORT" "$LARGE_UTIL"
     wait_ready small "$SMALL_PORT"; wait_ready mid "$MID_PORT"; wait_ready large "$LARGE_PORT"
     echo; verify ;;
+  tunnels) tunnels ;;
+  up-split) "$0" up && tunnels ;;
   verify) verify ;;
   down)
     [ -f "$PID_FILE" ] && while read -r pid; do kill "$pid" 2>/dev/null || true; done <"$PID_FILE"
     echo "stopped" ;;
-  *) echo "usage: $0 {up|verify|down}" >&2; exit 2 ;;
+  *) echo "usage: $0 {up|up-split|tunnels|verify|down}" >&2; exit 2 ;;
 esac
