@@ -33,6 +33,54 @@ git clone <repo> && cd polyforge
 # docker, kind, helm, k6, go, python per docs/REPRODUCE.md
 ```
 
+## 1b. Which route — READ THIS FIRST
+
+Two shapes, and they need different hosts.
+
+| | rented box must be | clauses 2-3 | setup on the clock |
+|---|---|---|---|
+| **single-host** | real VM, root, **Docker** (kind needs a daemon), sm_80+, >=40 GB | **void** by session-33 clause 4 | more |
+| **split-host** | any GPU container, sm_80+, >=40 GB | **APPLY** | less |
+
+**Split-host is cheaper and opens up container-based providers**, because the
+rented box then runs only vLLM and never needs Docker. It is **already
+pre-registered** (session-33 amendment), so it costs nothing scientifically --
+but clauses 2 and 3 come back into force, which means `tunnel_preflight.py` is
+mandatory and an over-target slowest tier **voids the run**.
+
+On split-host the cluster half runs on your own machine. Rehearse it there
+first against `kaggle_tier_server.py --mock` before renting anything; session
+44 found seven defects that way at zero cost, including a WL-H2 gate that
+certified only two tiers of three.
+
+### Split-host: what changes
+
+```sh
+./scripts/b1_tier_host.sh up-split     # tiers + one cloudflared tunnel EACH
+```
+
+A quick tunnel exposes ONE port and vLLM serves ONE model per server, so three
+tiers need three tunnels. The script prints the `TIER_BACKENDS` line with the
+public URLs. Then, **before** the cluster half:
+
+```sh
+python eval/scripts/tunnel_preflight.py     # clauses 2-3 gate
+```
+
+It fails if the tier gap does not survive the round-trip, if the slowest tier
+exceeds the 2500 ms premium SLO, or if the failure rate under load exceeds 1%.
+**Do not start the matrix on a failure** -- that is what clause 3 means.
+
+Two traps measured in rehearsal, both specific to this route:
+
+* **`--no-tunnel` is for the LOCAL mock only.** The tier server opens a
+  cloudflared tunnel by default and dies on Windows (`WinError 193`, it fetches
+  a linux-amd64 binary). The flag you need locally is the opposite of the one
+  you need on the box.
+* **Model aliases differ between rehearsal and the real run.** The mock serves
+  `qwen2.5-0.5b-instruct`; vLLM's `--served-model-name` serves `small`. The
+  `TIER_BACKENDS` JSON is **not** copy-pasteable between them.
+
 ## 2. Tier substrate
 
 ```sh
@@ -90,7 +138,13 @@ exercises the cache knob through the real gateway.
 python -m harness.runner experiments/wave4_live_plane.yaml   # from eval/
 ```
 
-4 arms × 4 cells × 1 rep = **16 runs**, `steps: 30`, `retries: 0`. The prereg's
+4 arms × 4 cells × 1 rep = **16 runs**, `steps: 30`, `retries: 0`.
+
+**Budget ~3.2 hours, not 90 minutes.** Session 44 measured **708 s per
+run** against the ~300 s that `30 steps x 10 s` implies -- per-run cluster
+setup and teardown dominate. On split-host the GPU box is up for that
+whole window (~$4-6). The runner RESUMES: valid run_ids are skipped, so a
+crash costs only the run in flight, never the ones already banked. The prereg's
 stopping rule is one execution per arm per cell — no second attempt.
 
 ## 6. Export and score
