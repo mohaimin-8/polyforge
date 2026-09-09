@@ -162,6 +162,60 @@ included and headlined if it occurs.
 
 ---
 
+## `joint_stress` is the cell that decides this — measured
+
+A full 16-cell rehearsal against the mock (session 44, free, 2.8 h) came back
+**12 valid / 4 failed**, and the four failures were **every `joint_stress` run,
+on all four arms**. `joint_stress` is WL-H1's PRIMARY cell — the prereg calls it
+"the cell the joint claim most needs" — so on a paid box this would have burned
+the whole sitting and produced nothing on the central hypothesis.
+
+The failure is the harness's own guard, the same one that voided the multinode
+campaign:
+
+```
+RuntimeError: replica sampler covered 23% of the load window
+(7 samples, 0 failed attempts): infra cost would be under-counted
+```
+
+Sampler interval is 10 s, so a 300 s window expects 30 samples. It got 7, with
+**zero failed attempts** — `kubectl top pods` succeeded every time but took
+~33 s per call. The cluster was starved, not broken.
+
+**What starved it, and why this is good news.** Per-cell AI demand against the
+mock's `BATCH_MAX 64 / 1.88 s` ceiling of ~34 rps:
+
+| cell | AI rps | peak | CRUD rps | result |
+|---|---|---|---|---|
+| crud_bursty | 0 | 0 | **300** | valid |
+| tier_mixed | 36 | 90 | 40 | valid |
+| ai_cacheable | 56 | 140 | 40 | valid |
+| **joint_stress** | **64** | **160** | 64 | **FAILED x4** |
+
+`crud_bursty` pushed **300 rps of CRUD** through the same laptop and passed, so
+this is **not** host saturation — which matters, because host saturation is the
+one failure a rented GPU could not fix. It is the **tier-backend ceiling**:
+`joint_stress` has the highest AI demand *and* a 96-prompt reuse pool, so its
+cache hit rate is lower than `ai_cacheable`'s and more traffic reaches the
+backend. `ai_cacheable` survives 56 AI rps only because high reuse absorbs most
+of it first.
+
+**Therefore a fast GPU is the right fix, provided vLLM sustains ~64 rps at base
+and ~160 at peak** for this cell. `tunnel_preflight.py` drives 110 rps, which
+sits squarely in that band — so it is a genuine predictor. **If preflight
+clears, `joint_stress` is viable; if it does not, stop before the cluster half
+rather than finding out three hours in.**
+
+## Rehearse with the REHEARSAL experiment, never the scored one
+
+`eval/experiments/wave4_live_plane_rehearsal.yaml` exists because the scored
+experiment writes its evidence to `eval/results/wave4_live_plane_evidence/`,
+which is **committed evidence from the WP8b run** (`0036be3`). Running the
+scored yaml locally against a mock silently overwrites it — observed in session
+44 and restored with `git checkout`. The rehearsal yaml redirects both the
+database and the evidence directory, so mock output cannot be mistaken for, or
+overwrite, real evidence.
+
 ## What voids the run
 
 1. **WL-H2 fails** — a knob is inert; WL-H1 is not interpretable.
