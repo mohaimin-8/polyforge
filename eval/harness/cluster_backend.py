@@ -48,12 +48,22 @@ from . import EVAL_DIR
 
 REQUIRED_TOOLS = ("docker", "kind", "kubectl", "helm", "k6")
 # Pinned rather than `latest`: see the side-load step in the plan below.
+# Third-party images the eval manifests reference. kind builds fresh nodes for
+# EVERY run, so without side-loading these are pulled from Docker Hub inside
+# the cluster on every single run, racing the rollout waits below. Session 44
+# watched exactly that: nats sat ContainerCreating ~40 s, postgres over 100 s,
+# and the rollout timed out. It is network-dependent, so it looks like a flaky
+# cell rather than what it is.
+NATS_IMAGE = "nats:2.10-alpine"
+POSTGRES_IMAGE = "postgres:16-alpine"
 METRICS_SERVER_VERSION = "v0.9.0"
 METRICS_SERVER_IMAGE = (
     f"registry.k8s.io/metrics-server/metrics-server:{METRICS_SERVER_VERSION}")
 METRICS_SERVER_MANIFEST = (
     "https://github.com/kubernetes-sigs/metrics-server/releases/download/"
     f"{METRICS_SERVER_VERSION}/components.yaml")
+NATS_TAR = str(Path(tempfile.gettempdir()) / "nats-2.10-alpine.tar")
+POSTGRES_TAR = str(Path(tempfile.gettempdir()) / "postgres-16-alpine.tar")
 METRICS_SERVER_TAR = str(
     Path(tempfile.gettempdir()) / f"metrics-server-{METRICS_SERVER_VERSION}.tar")
 CLUSTER_NAME = "polyforge-eval"  # fixed: teardown is idempotent by name
@@ -811,6 +821,10 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         # calls events.Connect at startup and os.Exit(1)s if the broker is
         # unreachable, so ordering here is load-bearing rather than tidy.
         plan += [
+            ["docker", "save", "--platform", "linux/amd64",
+             NATS_IMAGE, "-o", NATS_TAR],
+            ["kind", "load", "image-archive", NATS_TAR,
+             "--name", CLUSTER_NAME],
             ["kubectl", "apply", "-f", str(NATS_MANIFEST)],
             ["kubectl", "--namespace", "polyforge", "rollout", "status",
              "deployment/nats", "--timeout=180s"],
@@ -819,6 +833,10 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
     # connects on startup and every replica writes one telemetry store.
     if EVAL_SHARED_PG:
         plan += [
+            ["docker", "save", "--platform", "linux/amd64",
+             POSTGRES_IMAGE, "-o", POSTGRES_TAR],
+            ["kind", "load", "image-archive", POSTGRES_TAR,
+             "--name", CLUSTER_NAME],
             ["kubectl", "apply", "-f", str(PG_MANIFEST)],
             ["kubectl", "--namespace", "polyforge", "rollout", "status",
              "deployment/postgres", "--timeout=240s"],
