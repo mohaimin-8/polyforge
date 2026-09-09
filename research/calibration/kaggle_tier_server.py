@@ -69,6 +69,14 @@ TIERS = {
 # implied. A mock with a large 7B gap would rehearse a shape the hardware
 # does not have.
 MOCK_DELAY_S = {"small": 1.24, "mid": 1.88, "large": 1.90}
+# Scale the mock delays to simulate a faster substrate. Session 44 used this to
+# test whether the tier-backend ceiling is what kills `joint_stress`: the
+# defaults above are P100/T4-era transformers timings, and BATCH_MAX/delay caps
+# the server near 34 rps, below joint_stress's 64 rps base. It is a knob for
+# DIAGNOSIS, not a measurement -- these delays never enter a record either way.
+_scale = float(os.environ.get("POLYFORGE_MOCK_DELAY_SCALE", "1.0"))
+if _scale != 1.0:
+    MOCK_DELAY_S = {k: v * _scale for k, v in MOCK_DELAY_S.items()}
 
 # Micro-batching (docs/ZERO_COST_ROADMAP.md Phase 2). Frozen at whatever
 # TIER_BENCH_BATCHED.md certifies before the scored run; these are the

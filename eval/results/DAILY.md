@@ -1373,3 +1373,15 @@ Appended by the runner every progress tick.
 | 2026-09-07 19:02 | matrix_gpu_econ_v2 | 1750/1800 | 0 | 6891 runs/h |
 | 2026-09-07 19:02 | matrix_gpu_econ_v2 | 1775/1800 | 0 | 6963 runs/h |
 | 2026-09-07 19:02 | matrix_gpu_econ_v2 | 1800/1800 | 0 | 7038 runs/h |
+| 2026-09-09 08:55 | wave4_jointstress_probe | 1/1 | 1 | 2523 runs/h |
+| 2026-09-09 09:13 | wave4_jointstress_probe | 1/1 | 1 | 7 runs/h |
+| 2026-09-09 09:20 | wave4_jointstress_probe | 1/1 | 1 | 12 runs/h |
+| 2026-09-09 09:25 | wave4_jointstress_probe | 1/1 | 1 | 100 runs/h |
+| 2026-09-09 09:33 | wave4_jointstress_probe | 1/1 | 1 | 10 runs/h |
+| 2026-09-09 09:43 | wave4_control_probe | 1/1 | 1 | 8 runs/h |
+| 2026-09-09 10:04 | wave4_control_probe | 1/1 | 0 | 5 runs/h |
+| 2026-09-09 10:09 | wave4_jointstress_probe | 1/1 | 1 | 13 runs/h |
+| 2026-09-09 10:15 | wave4_jointstress_probe | 1/1 | 1 | 14 runs/h |
+| 2026-09-09 10:22 | wave4_jointstress_probe | 1/1 | 1 | 10 runs/h |
+| 2026-09-09 10:44 | wave4_jointstress_probe | 1/1 | 1 | 11 runs/h |
+| 2026-09-09 10:51 | wave4_jointstress_probe | 1/1 | 1 | 11 runs/h |

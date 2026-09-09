@@ -200,11 +200,54 @@ cache hit rate is lower than `ai_cacheable`'s and more traffic reaches the
 backend. `ai_cacheable` survives 56 AI rps only because high reuse absorbs most
 of it first.
 
-**Therefore a fast GPU is the right fix, provided vLLM sustains ~64 rps at base
-and ~160 at peak** for this cell. `tunnel_preflight.py` drives 110 rps, which
-sits squarely in that band — so it is a genuine predictor. **If preflight
-clears, `joint_stress` is viable; if it does not, stop before the cluster half
-rather than finding out three hours in.**
+### CORRECTION — the above diagnosis was WRONG. A fast GPU does not fix this.
+
+The reasoning above (tier-backend ceiling, therefore rent a GPU) was tested and
+**refuted**. Re-running `joint_stress` against a mock at **150 ms** tier latency
+(a ~426 rps ceiling, 12x the slow mock) produced a **byte-identical failure**:
+same 23%, same 7 samples, same 0 failed attempts. Throughput is not the
+mechanism.
+
+**What actually happens**, from the k6 summary of the failed run — reproduced
+twice, 12.35% and 12.22%:
+
+```
+vus_max:            9600
+http_req_failed:    12.2-12.4%  (4840 of 5514)
+http_req_duration:  p(95) 186-190 ms, avg 32 ms
+dropped_iterations: 0
+k6: thresholds on 'http_req_failed' crossed; abortOnFail -> stopped prematurely
+```
+
+The tier backend is **comfortable** — p95 under 190 ms. What fails is the
+**cluster refusing ~12% of requests under 9,600 concurrent VUs**. k6 aborts at
+~70 s of a 300 s window, which stops the replica sampler, which trips the
+coverage guard. **`sampler covered 23%` is a symptom three layers downstream of
+the real failure.**
+
+`joint_stress` drives four request kinds across eight tenants, and that is what
+produces 9,600 VUs — the same shape that voided the multinode campaign
+("1200-1443 VUs per tenant across eight tenants and eight cores cannot serve
+it"). **The binding variable is CONCURRENCY, not throughput.** `crud_bursty`
+passing at 300 rps does not contradict this; it is a throughput number and says
+nothing about VU count.
+
+**Consequence for the route: split-host CANNOT fix this cell**, because the
+machine refusing the requests is the one running the cluster — the operator's
+own laptop — not the GPU. Renting a GPU buys a fast tier backend that was never
+the constraint.
+
+**Three options, all real:**
+
+1. **Single-host on a 16-32 core box** — cluster and tiers together, so the
+   cluster gets the cores. Keeps the frozen cell. Costs more than $10 and is
+   unproven at 9,600 VUs.
+2. **New prereg, smaller cell** — fewer tenants or lower per-tenant demand to
+   bring VU count into range. Free, now precisely quantifiable, but changes a
+   pre-registered protocol.
+3. **Report `joint_stress` as unevaluable on available hardware** and score the
+   other three cells, which all pass. WL-H1's primary cell then has a measured
+   reason for its absence rather than a gap.
 
 ## Rehearse with the REHEARSAL experiment, never the scored one
 
