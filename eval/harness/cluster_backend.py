@@ -121,6 +121,19 @@ EVAL_LIVE_AI = os.environ.get("POLYFORGE_EVAL_LIVE_AI") == "1"
 # relationship to have with a teardown race. Default stays delete-on-exit so
 # CI never leaks clusters.
 EVAL_KEEP_CLUSTER = os.environ.get("POLYFORGE_EVAL_KEEP_CLUSTER") == "1"
+# AI-gateway replicas for the live plane. DEFAULT 1 -- the chart's value, and
+# unchanged behaviour.
+#
+# Session 44 hypothesised the single gateway was saturating under
+# `joint_stress` (the only cell that bursts AI, ~160 rps at peak) and raised
+# this to 4. MEASURED: failures went UP, 12.22% -> 18.65%. On an 8-core host
+# already running the cluster, more gateway pods buy contention rather than
+# capacity, so the hypothesis is refuted and the default stays at 1.
+#
+# It remains overridable because the sign may flip on a host with cores to
+# spare: this is exactly the kind of thing to try on a 16-32 core box, where
+# adding pods is not taking cores from the cluster serving them.
+EVAL_GATEWAY_REPLICAS = int(os.environ.get("POLYFORGE_EVAL_GATEWAY_REPLICAS", "1"))
 # Marker file asserting a load window is open. WP14 attempt 4 had no such
 # rule: a `go test` run on the same laptop compiled the operator package
 # during the soak and triggered the first restart cascade. The soak has no
@@ -759,6 +772,24 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         values["gateway.enabled"] = "true"
         values["gateway.image.repository"] = "polyforge/ai-gateway"
         values["gateway.image.tag"] = "dev"
+        # Gateway replicas, session 44. The chart default is 1, and every AI
+        # request from every tenant funnels through it. That is fine for a
+        # `wave` cell and fails for a `bursty` one: `joint_stress` bursts AI to
+        # ~160 rps at peak and returned 12.2-12.4% http_req_failed on ONE
+        # gateway pod, twice, which trips k6's abortOnFail and voids the run.
+        # `ai_cacheable` (wave, ~70 AI rps peak) returned 0.00% over 30,937
+        # requests, and `crud_bursty` survives a HIGHER burst -- 750 rps -- with
+        # no AI at all. The gateway, not the tier backend and not the
+        # controller, is what saturates.
+        #
+        # This is the WP14 VU-pool argument applied one layer in: a bottleneck
+        # in the HARNESS converts a measurement into an aborted run. The
+        # gateway is substrate, not the system under test -- the replica knob
+        # the arms actuate is the control-plane's, never this -- and every arm
+        # gets the identical gateway, so the comparison stays like-for-like.
+        # What changes is that the plane can carry the demand the frozen cell
+        # specifies.
+        values["gateway.replicaCount"] = str(EVAL_GATEWAY_REPLICAS)
     if EVAL_SHARED_PG:
         # URLs go via a values file (-f) to avoid --set '=' escaping; drop the
         # SQLite-mode empties so they cannot override that file.
