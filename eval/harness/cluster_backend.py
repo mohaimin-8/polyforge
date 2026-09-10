@@ -779,6 +779,36 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
             ["kind", "load", "docker-image", OPERATOR_IMAGE, "--name", CLUSTER_NAME],
             ["kind", "load", "docker-image", PLANNER_IMAGE, "--name", CLUSTER_NAME],
         ]
+    # Third-party images are side-loaded HERE, with the polyforge ones, and not
+    # beside the manifests that use them. test_jcac_command_plan pins the
+    # invariant -- every `kind load` precedes the first `helm install` -- and it
+    # is the invariant that matters: an image that arrives after a pod has been
+    # scheduled is exactly the run-time pull this side-loading exists to remove.
+    #
+    # `docker save --platform` rather than `kind load docker-image`: Docker 29's
+    # containerd store exports the multi-platform INDEX, and ctr then fails on
+    # blobs for platforms that were never pulled ("content digest ... not
+    # found"). --platform narrows it to a single-platform archive.
+    plan += [
+        ["docker", "save", "--platform", "linux/amd64",
+         METRICS_SERVER_IMAGE, "-o", METRICS_SERVER_TAR],
+        ["kind", "load", "image-archive", METRICS_SERVER_TAR,
+         "--name", CLUSTER_NAME],
+    ]
+    if live_operator:
+        plan += [
+            ["docker", "save", "--platform", "linux/amd64",
+             NATS_IMAGE, "-o", NATS_TAR],
+            ["kind", "load", "image-archive", NATS_TAR,
+             "--name", CLUSTER_NAME],
+        ]
+    if EVAL_SHARED_PG:
+        plan += [
+            ["docker", "save", "--platform", "linux/amd64",
+             POSTGRES_IMAGE, "-o", POSTGRES_TAR],
+            ["kind", "load", "image-archive", POSTGRES_TAR,
+             "--name", CLUSTER_NAME],
+        ]
     plan += [
         # kind ships no metrics-server; without it the HPA arm reads no CPU
         # and silently never scales. --kubelet-insecure-tls is the standard
@@ -804,10 +834,6 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         # --platform is load-bearing. Without it Docker 29 saves the whole
         # multi-platform INDEX even for a single pulled image, and ctr then
         # fails on blobs for platforms that were never fetched.
-        ["docker", "save", "--platform", "linux/amd64",
-         METRICS_SERVER_IMAGE, "-o", METRICS_SERVER_TAR],
-        ["kind", "load", "image-archive", METRICS_SERVER_TAR,
-         "--name", CLUSTER_NAME],
         ["kubectl", "apply", "-f", METRICS_SERVER_MANIFEST],
         ["kubectl", "--namespace", "kube-system", "patch", "deployment",
          "metrics-server", "--type=json",
@@ -821,10 +847,6 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         # calls events.Connect at startup and os.Exit(1)s if the broker is
         # unreachable, so ordering here is load-bearing rather than tidy.
         plan += [
-            ["docker", "save", "--platform", "linux/amd64",
-             NATS_IMAGE, "-o", NATS_TAR],
-            ["kind", "load", "image-archive", NATS_TAR,
-             "--name", CLUSTER_NAME],
             ["kubectl", "apply", "-f", str(NATS_MANIFEST)],
             ["kubectl", "--namespace", "polyforge", "rollout", "status",
              "deployment/nats", "--timeout=180s"],
@@ -833,10 +855,6 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
     # connects on startup and every replica writes one telemetry store.
     if EVAL_SHARED_PG:
         plan += [
-            ["docker", "save", "--platform", "linux/amd64",
-             POSTGRES_IMAGE, "-o", POSTGRES_TAR],
-            ["kind", "load", "image-archive", POSTGRES_TAR,
-             "--name", CLUSTER_NAME],
             ["kubectl", "apply", "-f", str(PG_MANIFEST)],
             ["kubectl", "--namespace", "polyforge", "rollout", "status",
              "deployment/postgres", "--timeout=240s"],

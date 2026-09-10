@@ -338,10 +338,19 @@ class TestClusterBackend:
         plan = cluster_backend.command_plan(run, tmp_path)
         flat = [" ".join(c) for c in plan]
 
-        # Both extra images are side-loaded before any helm install.
+        # Every image is side-loaded before any helm install. The count grew
+        # from 3 to 5 in session 44: metrics-server and nats used to be PULLED
+        # FROM THE INTERNET inside the cluster while a rollout timeout counted
+        # down -- a race that loses on a slow link and kills the run. (Postgres
+        # is side-loaded too but its block is gated on EVAL_SHARED_PG, which is
+        # off here, so it does not appear in this plan.)
+        #
+        # The ORDERING is the invariant that matters and is unchanged: an image
+        # that arrives after its pod is scheduled defeats the point of loading
+        # it at all.
         loads = [i for i, c in enumerate(plan) if c[:2] == ["kind", "load"]]
         first_install = next(i for i, c in enumerate(plan) if c[:2] == ["helm", "install"])
-        assert len(loads) == 3 and max(loads) < first_install
+        assert len(loads) == 5 and max(loads) < first_install
 
         installs = [c for c in plan if c[:2] == ["helm", "install"]]
         assert len(installs) == 2, "control plane chart, then the operator chart"
