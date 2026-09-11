@@ -30,7 +30,8 @@ def test_run_instances_request_cannot_leave_a_billing_volume_behind():
     assert ab.run_instances_params("ami", "t", "sg", 1, az="us-east-1b")["Placement"] == \
         {"AvailabilityZone": "us-east-1b"}
     assert p["MetadataOptions"] == {"HttpTokens": "required"}
-    assert ab.run_instances_params("ami", "t", "sg", 1, root_device="/dev/xvda")         ["BlockDeviceMappings"][0]["DeviceName"] == "/dev/xvda"
+    xvda = ab.run_instances_params("ami", "t", "sg", 1, root_device="/dev/xvda")
+    assert xvda["BlockDeviceMappings"][0]["DeviceName"] == "/dev/xvda"
 
 
 def test_only_ssh_is_opened():
