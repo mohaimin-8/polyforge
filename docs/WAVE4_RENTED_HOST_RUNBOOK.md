@@ -36,6 +36,26 @@ docker info >/dev/null && nproc && nvidia-smi --query-gpu=name,memory.total --fo
 ./scripts/b1_images.sh                 # build 4 polyforge images, pull 3 third-party (~5 min)
 ```
 
+Two Linux-only settings that Windows rehearsals never exercised, both cheap:
+
+```sh
+# `docker info` above failed with "permission denied"? The harness calls
+# docker without sudo:
+sudo usermod -aG docker "$USER" && newgrp docker
+# kind's documented "too many open files" failure on Ubuntu defaults
+# (fs.inotify.max_user_instances=128); one 2-node cluster with ~25 pods
+# per run for 16 runs is exactly the case it names:
+sudo sysctl -w fs.inotify.max_user_watches=524288 fs.inotify.max_user_instances=512
+```
+
+k6 needs no `ulimit` change: it is a Go binary, and Go raises its own
+open-file soft limit to the hard limit at start (Go 1.19+), which on an
+Ubuntu 22.04 SSH session is 524288 -- far above the 9,600 sockets the
+`joint_stress` VU pool holds. Lambda's image is Ubuntu 22.04 / Python 3.10;
+every box-side script parses under 3.10 (checked with
+`ast.parse(feature_version=(3, 10))`, session 48), so the system Python is
+fine.
+
 The `docker info` line is the host check against §0: a daemon that answers, a
 core count of 16 or more, and a card with 40 GB or more. If any of the three
 is wrong, this is the moment to release the box.
