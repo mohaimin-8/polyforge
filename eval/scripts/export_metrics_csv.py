@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import io
 import sys
 from pathlib import Path
 
@@ -62,7 +63,15 @@ def main() -> None:
     columns = [d[0] for d in con.description]
     con.close()
 
-    with gzip.open(out, "wt", newline="", encoding="utf-8") as f:
+    # mtime=0, for the reason a8c4098 fixed in the aggregate exporter and
+    # missed here: gzip stamps the current time into its header, so
+    # re-running this script produced a new byte stream from identical
+    # data. "Re-export and diff" is the only check a committed export can
+    # carry, and a moving header defeats it. The exports already in git are
+    # not re-stamped: their DuckDBs are Zenodo-archived rather than in the
+    # tree, so they cannot be regenerated here.
+    raw = gzip.GzipFile(out, "wb", mtime=0)
+    with io.TextIOWrapper(raw, newline="", encoding="utf-8") as f:
         f.write(",".join(columns) + "\n")
         for row in rows:
             f.write(",".join(str(v) for v in row) + "\n")
