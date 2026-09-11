@@ -53,6 +53,8 @@ CSV_EXPORTS = {
     _RESULTS_DIR / "raw_sim_clamp.duckdb": _RESULTS_DIR / "metrics_matrix_clamp.csv.gz",
     # Wave 2 economy + Wave 5 structural-form reruns (analysis_econ.py).
     _RESULTS_DIR / "raw_sim_gpu_econ.duckdb": _RESULTS_DIR / "metrics_matrix_gpu_econ.csv.gz",
+    _RESULTS_DIR / "raw_sim_gpu_econ_v2.duckdb":
+        _RESULTS_DIR / "metrics_matrix_gpu_econ_v2.csv.gz",
     _RESULTS_DIR / "raw_sim_hk.duckdb": _RESULTS_DIR / "metrics_matrix_hk.csv.gz",
     _RESULTS_DIR / "raw_sim_lm.duckdb": _RESULTS_DIR / "metrics_matrix_lm.csv.gz",
     _RESULTS_DIR / "raw_sim_mixp95.duckdb": _RESULTS_DIR / "metrics_matrix_mixp95.csv.gz",
