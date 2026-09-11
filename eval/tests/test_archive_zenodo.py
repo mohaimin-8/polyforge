@@ -34,7 +34,13 @@ def _resolved() -> set[str]:
     records = [f"research/analysis/{n}" for n in az.gated_records()
                if (REPO_DIR / "research" / "analysis" / n).exists()]
     repo_files, repo_missing = az.collect(az.REPO_DIR, az.REPO_INCLUDE + records)
-    assert not missing and not repo_missing, (missing, repo_missing)
+    # The raw DuckDBs are gitignored and Zenodo-archived, so on a clean clone
+    # (CI) that glob is legitimately empty and the bundler would refuse to
+    # build -- correct for the bundler, since a deposit without them is not
+    # the deposit. These tests check what git carries; that one absence is
+    # tolerated and nothing else is.
+    tolerated = {"results/*.duckdb"}
+    assert set(missing) <= tolerated and not repo_missing, (missing, repo_missing)
     names = {str(p.relative_to(EVAL_DIR)).replace("\\", "/") for p in eval_files}
     names |= {str(p.relative_to(REPO_DIR)).replace("\\", "/") for p in repo_files}
     return names
