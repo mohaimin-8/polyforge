@@ -31,13 +31,21 @@ void by its own clause 4, removing the tunnel and its latency inflation.
 ```sh
 git clone <repo> && cd polyforge
 ./scripts/phase7_bootstrap.sh          # kind, k6, harness deps (idempotent)
-# docker (daemon, root), helm, go, python per docs/REPRODUCE.md
+# docker (daemon, root), helm, kubectl, python per docs/REPRODUCE.md
 docker info >/dev/null && nproc && nvidia-smi --query-gpu=name,memory.total --format=csv
+./scripts/b1_images.sh                 # build 4 polyforge images, pull 3 third-party (~5 min)
 ```
 
-The last line is the host check against §0: a daemon that answers, a core
-count of 16 or more, and a card with 40 GB or more. If any of the three is
-wrong, this is the moment to release the box.
+The `docker info` line is the host check against §0: a daemon that answers, a
+core count of 16 or more, and a card with 40 GB or more. If any of the three
+is wrong, this is the moment to release the box.
+
+**`b1_images.sh` is not optional.** The harness side-loads seven images into
+every per-run kind cluster with `docker save` / `kind load`, neither of which
+pulls or builds. On the laptop they have existed since phase 7; a fresh host
+has none, and until session 48 nothing in any runbook created them -- the
+run would have died at the side-load step, after the box was paid for, before
+the step-1c mock probe. `execute()` now refuses up front and names the script.
 
 ## 1b. Which route — READ THIS FIRST
 

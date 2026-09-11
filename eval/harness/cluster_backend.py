@@ -237,6 +237,30 @@ def preflight() -> list[str]:
     return [tool for tool in REQUIRED_TOOLS if shutil.which(tool) is None]
 
 
+def images_in_plan(plan: list[list[str]]) -> list[str]:
+    """Every image the plan side-loads into kind: `kind load docker-image X`
+    and `docker save ... X -o tar`. Read out of the plan rather than kept in a
+    list beside it, so the check and the plan cannot disagree."""
+    images: set[str] = set()
+    for step in plan:
+        if step[:3] == ["kind", "load", "docker-image"]:
+            images.add(step[3])
+        elif step[:2] == ["docker", "save"] and "-o" in step:
+            images.add(step[step.index("-o") - 1])
+    return sorted(images)
+
+
+def missing_images(images: list[str]) -> list[str]:
+    """Images the local Docker store does not hold. Neither `docker save` nor
+    `kind load docker-image` pulls or builds: on a fresh host every one of
+    these fails at the side-load step, after the box is paid for. The four
+    polyforge/* images are built and the third-party ones pulled by
+    scripts/b1_images.sh."""
+    return [img for img in images
+            if subprocess.run(["docker", "image", "inspect", img],
+                              capture_output=True).returncode != 0]
+
+
 def kind_config(cluster_size: str) -> str:
     nodes = NODES_BY_SIZE[cluster_size]
     lines = [
@@ -1763,6 +1787,13 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
             )
 
         plan = command_plan(run, workdir)
+        absent = missing_images(images_in_plan(plan))
+        if absent:
+            raise BackendUnavailable(
+                f"cluster backend side-loads {absent}, not in the local Docker "
+                "store; docker save / kind load do not pull or build -- run "
+                "scripts/b1_images.sh first"
+            )
         # WP14: diagnostics land here and survive the run (and the workdir).
         evidence_dir = evidence_dir_for(run)
         evidence_dir.mkdir(parents=True, exist_ok=True)

@@ -241,3 +241,46 @@ def test_wait_http_times_out_on_dead_endpoint():
     # An unroutable port must raise within the deadline, not hang forever.
     with pytest.raises(RuntimeError):
         cb._wait_http("http://127.0.0.1:9/healthz", deadline_s=1.0)
+
+
+# --- side-loaded images must exist before kind is touched ---------------
+
+def test_images_in_plan_reads_every_sideload_from_the_plan(tmp_path):
+    plan = cb.command_plan(_run(), tmp_path)
+    images = cb.images_in_plan(plan)
+    assert cb.CONTROL_PLANE_IMAGE in images
+    assert cb.NATS_IMAGE in images and cb.METRICS_SERVER_IMAGE in images
+    # postgres is side-loaded only on the shared-telemetry (R5) route
+    assert (cb.POSTGRES_IMAGE in images) == cb.EVAL_SHARED_PG
+    # and nothing that is not a kind-load / docker-save target
+    assert all(":" in img for img in images)
+
+
+def test_missing_images_names_exactly_the_absent_ones(monkeypatch):
+    present = {cb.NATS_IMAGE}
+
+    class _Done:
+        def __init__(self, rc):
+            self.returncode = rc
+
+    def fake_run(cmd, **_kw):
+        assert cmd[:3] == ["docker", "image", "inspect"]
+        return _Done(0 if cmd[3] in present else 1)
+
+    monkeypatch.setattr(cb.subprocess, "run", fake_run)
+    images = [cb.NATS_IMAGE, cb.POSTGRES_IMAGE, cb.GATEWAY_IMAGE]
+    assert cb.missing_images(images) == [cb.POSTGRES_IMAGE, cb.GATEWAY_IMAGE]
+
+
+def test_execute_refuses_before_kind_when_an_image_is_absent(monkeypatch):
+    """A fresh rented host has none of the images; the failure must name the
+    script, not surface as a `docker save` error mid-plan."""
+    monkeypatch.setattr(cb, "preflight", lambda: [])
+    monkeypatch.setattr(cb, "missing_images", lambda imgs: [cb.GATEWAY_IMAGE])
+    touched = []
+    monkeypatch.setattr(cb.subprocess, "run",
+                        lambda cmd, **kw: touched.append(cmd) or (_ for _ in ()).throw(AssertionError(cmd)))
+    with pytest.raises(cb.BackendUnavailable) as exc:
+        cb.execute(_run())
+    assert "b1_images.sh" in str(exc.value) and cb.GATEWAY_IMAGE in str(exc.value)
+    assert touched == [], "no subprocess may run before the image check"
