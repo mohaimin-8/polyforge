@@ -18,6 +18,8 @@ import importlib.util
 import re
 from pathlib import Path
 
+import pytest
+
 EVAL_DIR = Path(__file__).resolve().parents[1]
 REPO_DIR = EVAL_DIR.parent
 
@@ -92,3 +94,39 @@ def test_every_pre_registration_is_in_the_deposit():
     assert len(preregs) >= 45
     for p in preregs:
         assert f"research/analysis/{p.name}" in names, p.name
+
+
+def test_creators_come_from_the_tracked_file(tmp_path):
+    """deposit.json lives in a gitignored directory and is rewritten on every
+    build, so the names must come from somewhere the rebuild after B1 will
+    still find them."""
+    f = tmp_path / "zenodo_creators.json"
+    f.write_text('[{"name": "Doe, Jane", "affiliation": "RUET", '
+                 '"orcid": "0000-0002-1825-0097"}]', encoding="utf-8")
+    got = az.creators(f)
+    assert got == [{"name": "Doe, Jane", "affiliation": "RUET",
+                    "orcid": "0000-0002-1825-0097"}]
+    meta = az.deposit_metadata(got)["metadata"]
+    assert meta["creators"] == got
+    assert az.DEPOSIT_METADATA["metadata"]["creators"] is None, "template mutated"
+
+
+def test_missing_creators_file_yields_the_placeholder(tmp_path):
+    assert az.creators(tmp_path / "absent.json") is az.PLACEHOLDER_CREATORS
+
+
+def test_malformed_creators_refuse_the_build(tmp_path):
+    cases = {
+        "no comma": '[{"name": "Jane Doe"}]',
+        "empty given": '[{"name": "Doe,"}]',
+        "not json": '[{"name": "Doe, Jane"',
+        "bad orcid": '[{"name": "Doe, Jane", "orcid": "1234"}]',
+        "unknown field": '[{"name": "Doe, Jane", "email": "x@y"}]',
+        "empty": '[]',
+        "not a list": '{"name": "Doe, Jane"}',
+    }
+    for label, text in cases.items():
+        f = tmp_path / f"{label}.json"
+        f.write_text(text, encoding="utf-8")
+        with pytest.raises(SystemExit):
+            az.creators(f)

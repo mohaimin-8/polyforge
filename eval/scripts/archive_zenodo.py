@@ -11,6 +11,10 @@ Bundles exactly what the FGCS reproducibility checklist wants:
 Publishing needs a human with a Zenodo account (the DOI is minted on
 publish); this script stops at a ready-to-upload bundle.
 
+Creators are read from eval/zenodo_creators.json (tracked) when it exists:
+    [{"name": "Family, Given", "affiliation": "...", "orcid": "0000-0000-0000-0000"}]
+Without it the deposit carries a placeholder and the build says so.
+
 Usage (from eval/):  python scripts/archive_zenodo.py [--out results/zenodo]
 """
 
@@ -152,13 +156,57 @@ DEPOSIT_METADATA = {
             "committed copy in this deposit, byte for byte. See eval/README.md "
             "for the schema and replay instructions."
         ),
-        "creators": [{"name": "PolyForge author"}],  # fill in before upload
+        "creators": None,  # filled from creators() at build time
         "keywords": ["kubernetes", "autoscaling", "multi-tenancy", "LLM serving",
                      "semantic cache", "MPC", "reproducibility"],
         "license": "cc-by-4.0",
         "publication_date": str(date.today()),
     }
 }
+
+
+# Zenodo wants each creator as "Family, Given", optionally with an affiliation
+# and an ORCID. The names are not in the repository -- the thesis still has
+# placeholders for author and supervisor -- and results/zenodo/ is gitignored,
+# so a name typed into deposit.json is lost on the next rebuild. A rebuild is
+# due the moment B1 lands (its record and evidence belong in the deposit), so
+# the names live in a tracked file and are read at build time, once.
+CREATORS_FILE = EVAL_DIR / "zenodo_creators.json"
+PLACEHOLDER_CREATORS = [{"name": "PolyForge author"}]
+CREATOR_FIELDS = {"name", "affiliation", "orcid"}
+_ORCID = re.compile(r"^[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]$")
+
+
+def creators(path: Path = CREATORS_FILE) -> list[dict]:
+    """The deposit's creators from the tracked file. A malformed file refuses
+    the build; a missing one yields the placeholder, so a bundle can be built
+    and inspected before the names are final but never published with it
+    unnoticed (main() prints the warning)."""
+    if not path.exists():
+        return PLACEHOLDER_CREATORS
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"{path}: not valid JSON ({e})") from e
+    if not isinstance(data, list) or not data:
+        raise SystemExit(f"{path}: expected a non-empty JSON list of creators")
+    for i, c in enumerate(data):
+        family, _, given = str(c.get("name", "")).partition(",") if isinstance(c, dict) else ("", "", "")
+        if not family.strip() or not given.strip():
+            raise SystemExit(f"{path}: creator {i} needs 'name': 'Family, Given'")
+        unknown = set(c) - CREATOR_FIELDS
+        if unknown:
+            raise SystemExit(f"{path}: creator {i} has unknown field(s) {sorted(unknown)}")
+        orcid = c.get("orcid")
+        if orcid is not None and not _ORCID.match(str(orcid)):
+            raise SystemExit(f"{path}: creator {i} orcid {orcid!r} is not 0000-0000-0000-000X")
+    return data
+
+
+def deposit_metadata(creator_list: list[dict]) -> dict:
+    """DEPOSIT_METADATA with the creators filled in; a new dict, the template
+    is never written to."""
+    return {"metadata": {**DEPOSIT_METADATA["metadata"], "creators": creator_list}}
 
 
 def sha256(path: Path) -> str:
@@ -199,6 +247,10 @@ def main() -> None:
 
     out_dir = EVAL_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # A malformed creators file refuses the build here, before the 48 MB zip
+    # is written, not after it.
+    creator_list = creators()
 
     eval_files, missing = collect(EVAL_DIR, INCLUDE + evidence_dirs())
 
@@ -250,14 +302,19 @@ def main() -> None:
         z.write(manifest_path, arcname="MANIFEST.sha256.json")
 
     (out_dir / "deposit.json").write_text(
-        json.dumps(DEPOSIT_METADATA, indent=2), encoding="utf-8"
+        json.dumps(deposit_metadata(creator_list), indent=2), encoding="utf-8"
     )
 
     print(f"bundle:   {bundle}  ({bundle.stat().st_size / 1e6:.1f} MB, {len(entries)} files)")
     print(f"manifest: {manifest_path}")
     print(f"metadata: {out_dir / 'deposit.json'}")
+    if creator_list is PLACEHOLDER_CREATORS:
+        print(f"creators: PLACEHOLDER -- write {CREATORS_FILE.relative_to(REPO_DIR).as_posix()} "
+              "and rebuild before upload")
+    else:
+        print(f"creators: {len(creator_list)} from {CREATORS_FILE.relative_to(REPO_DIR).as_posix()}")
     print("next (human): create Zenodo deposit, attach the zip, paste deposit.json "
-          "metadata, fill in creators, publish -> DOI for paper §Reproducibility")
+          "metadata, publish -> DOI for paper §Reproducibility")
 
 
 if __name__ == "__main__":

@@ -135,6 +135,8 @@ python scripts/validate_results.py experiments/full.yaml
 python scripts/spot_check.py experiments/full.yaml --n 10
 python scripts/ks_check.py
 python scripts/archive_zenodo.py    # ready-to-upload Zenodo bundle
+#   creators come from eval/zenodo_creators.json ([{"name": "Family, Given", ...}]);
+#   without it the deposit carries a placeholder and the build says so
 ```
 
 Statistical analysis and figures: `research/analysis/` (W36).
