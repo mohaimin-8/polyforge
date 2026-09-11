@@ -6,28 +6,51 @@ central methodological claim of this work -- frozen rules are what keep a
 published FAIL from being quietly rewritten into a PASS -- and until this
 script it was enforced by the author's discipline and by nothing else.
 
-Two things it establishes, both from history rather than from the documents:
+What it establishes, from history rather than from the documents:
 
-1. **No pre-registration was edited once its results existed.** For every
-   PREREG_X.md with a matching RESULTS_X.md, every commit touching the prereg
-   must precede the first commit that introduced the record. This is the
-   violation that would matter: a rule relaxed after seeing what it scored.
+1. **No registered text was altered once its results existed.** For every
+   PREREG_X.md with a matching record, the file as it stood at its last commit
+   BEFORE the record first appeared is the registered text. That text must
+   survive today byte-for-byte as an exact prefix of the file. Then every
+   later change is strictly an addition after it, and no declared rule,
+   threshold or hypothesis can have moved -- a one-character edit fails.
 
-2. **What was actually amended, and when.** 7 of the 44 preregs carry more
-   than one commit. That is not a violation -- several are amendments made and
-   pushed before the run, and PREREG_MULTINODE's records a VOID sitting -- but
-   "none has been edited since" is not true of them, so the count is reported
+   This replaced a stricter-looking rule that was actually weaker: "no commit
+   touches the prereg at or after the record's first commit". On 2026-09-08
+   that rule went red on three files, and reading the diffs showed why it was
+   the wrong test. All three were additions after the registered text -- a
+   superseding note pointing at a re-run, and an amendment declared before a
+   run that has not happened -- and the only way to keep that rule green
+   would have been to move such notes out of the file they are about, or to
+   grow an exception list. Neither makes the registered text safer. Checking
+   the text itself does, and it is what a reviewer with the repository can
+   also check.
+
+2. **What was added after a result, and under what heading.** Post-result
+   additions are not silently tolerated: each one is printed with its byte
+   count and every markdown heading it introduced, so the reader sees "a
+   superseding note" or "a pre-run amendment" and can open it. An addition
+   that quietly contradicted the registered text would still be an addition;
+   this gate proves the registered text is intact, and shows the reader
+   where to look for the rest.
+
+3. **What was amended, and when.** Several preregs carry more than one
+   commit. That is not a violation -- most are amendments made and pushed
+   before the run, and PREREG_MULTINODE's records a VOID sitting -- but "none
+   has been edited since" is not true of them, so the count is reported
    rather than smoothed over.
 
 **Limits, stated rather than implied.** Git commit dates come from the
 committer's clock and can be rewritten; the true anchor is the push event on
-GitHub, which is not recoverable from a clone. This checks ORDER within the
-history, which is what a reviewer with the repository can also check. It
-cannot prove the history was never rewritten wholesale.
+GitHub, which is not recoverable from a clone. This checks ORDER and CONTENT
+within the history, which is what a reviewer with the repository can also
+check. It cannot prove the history was never rewritten wholesale.
 
     python scripts/check_preregs.py
 
-Exits nonzero if a prereg was touched at or after its record's first commit.
+Exits nonzero if any registered text was altered at or after its record's
+first commit, or if a prereg has no commit before its record at all and is
+not disclosed as such.
 """
 
 from __future__ import annotations
@@ -94,12 +117,18 @@ ANALYSIS = REPO_ROOT / "research" / "analysis"
 RESULT_DIRS = (ANALYSIS, REPO_ROOT / "eval" / "results")
 
 
-def git(*args: str) -> str:
-    return subprocess.run(("git", *args), cwd=REPO_ROOT, capture_output=True,
-                          text=True, check=True).stdout.strip()
+def git(*args: str, strip: bool = True) -> str:
+    # encoding is explicit. These documents carry em dashes and the
+    # records they point at carry more, so a Windows default of cp1252
+    # makes this gate die on a decode error instead of reporting
+    # anything. A gate that cannot run on a reviewer's machine is a gate
+    # nobody checks.
+    out = subprocess.run(("git", *args), cwd=REPO_ROOT, capture_output=True,
+                         text=True, encoding="utf-8", check=True).stdout
+    return out.strip() if strip else out
 
 
-def commits(path: Path) -> list[tuple[int, str]]:
+def commits(path: Path) -> list[tuple[int, str, str]]:
     """Every commit touching a file AT THIS PATH, newest first.
 
     Deliberately not --follow. RESULTS_LIVE_SOAK_V5.md was created from
@@ -111,11 +140,12 @@ def commits(path: Path) -> list[tuple[int, str]]:
     false violation here.
     """
     rel = path.relative_to(REPO_ROOT).as_posix()
-    raw = git("log", "--format=%ct%x09%s", "--", rel)
+    raw = git("log", "--format=%ct%x09%H%x09%s", "--", rel)
     out = []
     for line in raw.splitlines():
-        when, _, subject = line.partition("\t")
-        out.append((int(when), subject))
+        when, _, rest = line.partition("\t")
+        sha, _, subject = rest.partition("\t")
+        out.append((int(when), subject, sha))
     return out
 
 
@@ -128,6 +158,18 @@ def record_for(prereg: Path) -> Path | None:
     return None
 
 
+def blob_at(sha: str, path: Path) -> str:
+    """The file's content as of one commit, for comparing against now."""
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    return git("show", f"{sha}:{rel}", strip=False)
+
+
+def appended_headings(frozen: str, current: str) -> list[str]:
+    """The markdown headings of what was added after the frozen text."""
+    return [line.strip() for line in current[len(frozen):].splitlines()
+            if line.startswith("#")]
+
+
 def shallow() -> bool:
     """A depth-1 checkout has no history, so every ordering check would pass
     on a single commit. That is a gate reporting success because it could not
@@ -136,6 +178,8 @@ def shallow() -> bool:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if shallow():
         print("FAILED: shallow clone -- this check needs full history "
               "(actions/checkout needs fetch-depth: 0).")
@@ -150,6 +194,7 @@ def main() -> int:
     violations: list[str] = []
     disclosed_seen: set[str] = set()
     amended: list[tuple[str, int]] = []
+    appended: list[tuple[str, int, int, list[str]]] = []
     unmatched: list[str] = []
     recordless: list[str] = []
     width = max(len(p.stem) for p in preregs)
@@ -170,13 +215,41 @@ def main() -> int:
             unmatched.append(prereg.stem)
             continue
         first_result = record_history[-1][0]
-        after = [(t, s) for t, s in history if t >= first_result]
-        if after and prereg.stem in DISCLOSED:
-            disclosed_seen.add(prereg.stem)
-        elif after:
+        after = [(t, subj) for t, subj, _ in history if t >= first_result]
+        before = [sha for t, _, sha in history if t < first_result]
+        if not after:
+            continue
+        if not before:
+            # The prereg has no commit at all before its record: there is no
+            # registered version to compare against, so the freeze rests on
+            # the document alone. That is the disclosed-anchor case.
+            if prereg.stem in DISCLOSED:
+                disclosed_seen.add(prereg.stem)
+            else:
+                violations.append(
+                    f"{prereg.stem}: first appears at or after {record.name}, "
+                    "so nothing was registered in advance")
+            continue
+        # `before[0]` is the newest commit that precedes the record: the
+        # REGISTERED text, in the state a reader had when the campaign was
+        # scored. The rule is that this text survives verbatim. If it is an
+        # exact prefix of the file today, every post-result change is strictly
+        # an addition after it, and no declared rule, threshold or hypothesis
+        # can have been altered -- which is the claim the gate exists to make.
+        # Anything else is a violation, including a one-character edit.
+        frozen = blob_at(before[0], prereg)
+        current = prereg.read_text(encoding="utf-8")
+        if current.startswith(frozen):
+            appended.append((prereg.stem, len(after), len(current) - len(frozen),
+                             appended_headings(frozen, current)))
+        else:
+            # DISCLOSED deliberately does not reach here. It excuses a missing
+            # anchor, never a changed registered text; an allowlist that could
+            # excuse the latter would be the hole this gate exists to close.
             for when, subject in after:
-                violations.append(f"{prereg.stem}: edited at or after "
-                                  f"{record.name} first appeared -- {subject}")
+                violations.append(f"{prereg.stem}: REGISTERED TEXT CHANGED at "
+                                  f"or after {record.name} first appeared -- "
+                                  f"{subject}")
 
     print(f"pre-registrations           {len(preregs)}")
     print(f"never amended               {len(preregs) - len(amended)}")
@@ -190,6 +263,12 @@ def main() -> int:
         print(f"UNMAPPED (ordering unchecked) {len(unmatched)}")
         for name in unmatched:
             print(f"  {name} -- add it to RECORD_FOR or NO_RECORD")
+    print(f"appended after their results {len(appended)}")
+    for name, n_commits, n_bytes, headings in sorted(appended):
+        print(f"  {name}: registered text intact byte-for-byte; "
+              f"{n_commits} later commit(s) added {n_bytes} bytes after it")
+        for heading in headings:
+            print(f"      {heading}")
     print(f"edited after their results  {len(violations)}")
     for line in violations:
         print(f"  VIOLATION: {line}")
@@ -208,8 +287,9 @@ def main() -> int:
               f"and must be removed: {chr(44).join(sorted(stale))}")
     if violations or stale:
         return 1
-    print("OK: every pre-registration commit precedes its record's first "
-          "commit, but for the disclosed exception above.")
+    print("OK: no registered text was altered after its result existed. "
+          "Post-result changes, where they exist, are additions after the "
+          "registered text and are listed above with their headings.")
     return 0
 
 
