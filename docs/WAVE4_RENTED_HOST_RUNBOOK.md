@@ -51,10 +51,15 @@ sudo sysctl -w fs.inotify.max_user_watches=524288 fs.inotify.max_user_instances=
 k6 needs no `ulimit` change: it is a Go binary, and Go raises its own
 open-file soft limit to the hard limit at start (Go 1.19+), which on an
 Ubuntu 22.04 SSH session is 524288 -- far above the 9,600 sockets the
-`joint_stress` VU pool holds. Lambda's image is Ubuntu 22.04 / Python 3.10;
+`joint_stress` VU pool holds. The AWS Deep Learning Base OSS NVIDIA Driver
+GPU AMI (Ubuntu 22.04 / Python 3.10; driver, CUDA, Docker and the NVIDIA
+container toolkit preinstalled) is what `scripts/aws_box.py` launches;
 every box-side script parses under 3.10 (checked with
 `ast.parse(feature_version=(3, 10))`, session 48), so the system Python is
-fine.
+fine. The box named in session 48 is **g6e.4xlarge** (1x L40S 48 GB, 16 vCPU,
+128 GiB, ~$3.00/h us-east-1); **g6e.8xlarge** (32 vCPU, ~$4.53/h) is the
+step-up if step 1c fails at 16. Both need the "Running On-Demand G and VT
+instances" vCPU quota raised from a new account's 0 (`aws_box.py quota`).
 
 The `docker info` line is the host check against §0: a daemon that answers, a
 core count of 16 or more, and a card with 40 GB or more. If any of the three
