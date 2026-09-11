@@ -355,3 +355,104 @@ Neither clause weakens a hypothesis or its falsifier. WL-H1 still fails
 loudly if the joint arm does not beat the best single-knob arm on cost at
 iso-fairness; WL-H2 still voids WL-H1; and a `large` tier that offloads on
 the day still costs the third tier rather than being quoted anyway.
+
+---
+
+## Amendment (declared pre-run, session 47 — host capacity, a concurrency preflight, and what a voided primary cell means)
+
+Declared and pushed **before any comparison number exists**, per §Outcome
+handling. Arms, cells, hypotheses, the iso-fairness margin (0.01) and the
+stopping rule are untouched. This amendment adds **no latitude**; it declares
+in advance how two already-measured facts about the substrate are handled,
+so that neither is decided after a number has been seen.
+
+### 1. What was measured, and why this is declared now
+
+Sessions 45–46 rehearsed the full 16-cell matrix on this laptop (8 cores)
+against a mock tier server, free, 2.8 h: **12 valid, 4 failed — the four
+failures are every `joint_stress` run on all four arms**, and `joint_stress`
+is the cell WL-H1 is defined in. The failure is the harness's own validity
+guard (`check_sampler_coverage`: the replica sampler must cover ≥ 90% of the
+load window, else infra cost is under-counted and the run is invalid). Four
+hypotheses for the cause were raised and each refuted by its own test:
+
+| hypothesis | test | result |
+|---|---|---|
+| tier-backend throughput | mock 12x faster (150 ms tier latency) | **byte-identical failure** |
+| `kubectl top` polling cost | timed | ~130 ms, unchanged |
+| sampler speed | failed-attempt count | 0 |
+| gateway replicas | `replicaCount` 1 → 4 | **worse**: 12.22% → 18.65% refused |
+
+The mechanism, from k6, reproduced twice: `vus_max 9600`, `http_req_failed`
+12.2–12.4%, `http_req_duration p(95)` 186–190 ms. The tier backend is
+comfortable; the **cluster refuses ~12% of requests under 9,600 concurrent
+VUs**, which trips the harness's `rate<0.01` threshold, k6 aborts at ~70 s of
+the 300 s window with `abortOnFail`, the sampler dies with it, and the
+coverage guard fires. The binding variable is **host concurrency capacity**,
+the same shape that voided `PREREG_MULTINODE.md` sitting 2. Evidence:
+`eval/results/wave4_jointstress_probe_evidence/` (labelled NOT EVIDENCE — it
+is a mock probe, kept because it is the raw proof of the mechanism).
+
+**Consequence for the substrate.** The session-44 runbook's host floor of
+"≥ 8 vCPU" was wrong: 8 is measured insufficient. The single-host run
+requires **≥ 16 vCPU, preferably 32**, alongside the ≥ 40 GB VRAM clause 2
+already needs. Whether 16–32 cores serve 9,600 VUs is **untested**; clause 2
+below exists so that it is tested before the run rather than by the run.
+
+### 2. A concurrency preflight, gating, on the provisioned host — before any model is loaded
+
+Analogous to the WL-H2 knob-liveness gate and declared for the same reason: a
+substrate that cannot serve the cell must fail *before* the scored matrix,
+not three hours into it.
+
+* **What runs:** `eval/experiments/wave4_jointstress_probe.yaml` — the
+  `joint_stress` cell against the **mock** tier server
+  (`kaggle_tier_server.py --mock --no-tunnel`), on the provisioned host, with
+  its evidence and database redirected to the probe directories. The mock
+  reproduced the laptop failure byte-identically, so it isolates the host
+  capacity hypothesis from the tiers, and **it produces no comparison
+  number** — the mock's latencies are fixed sleeps that never enter a record.
+* **Pass:** the run is `valid` by the harness's existing guards — k6
+  `http_req_failed` under its frozen `rate<0.01` threshold for the full
+  window and sampler coverage ≥ 90%. Nothing about the guards changes.
+* **Fail:** **the scored matrix is not started.** The k6 summary is committed
+  under a NOT EVIDENCE label beside the session-45 one, and the choice
+  between a larger host and a smaller cell under a **new** pre-registration
+  is made with this run unspent. This file does not pre-authorise a smaller
+  cell; the cell is frozen and a different cell is a different prereg.
+
+Order on the clock, binding: bootstrap → **this preflight** → tier servers
+up → WL-H2 gate (`--tiers small,mid,large`, clause 2 of the session-44
+amendment) → the 16-cell matrix, once.
+
+### 3. What a voided `joint_stress` means for WL-H1 — declared before it can happen
+
+WL-H1 is defined *in the `joint_stress` cell* (§Hypotheses). Therefore:
+
+* **If `joint_stress` is voided on every arm by the harness's validity
+  guard**, WL-H1 is **NOT EVALUATED** — neither PASS nor FAIL. It is reported
+  as unevaluable on the provisioned host, with the k6 summary and the
+  coverage figure for each arm, and that sentence headlines
+  `RESULTS_WAVE4_LIVE_PLANE.md`'s WL-H1 entry. **It is not re-scored on the
+  other three cells** — the hypothesis names one cell, and reading it off a
+  different cell after seeing the numbers would be the degree of freedom this
+  document exists to remove. The three cells that ran are reported as
+  measured, descriptively, and WL-H3's ordinal comparison runs on whatever
+  cells produced valid runs on all four arms.
+* **If `joint_stress` is voided on some arms and not others**, WL-H1 is
+  likewise NOT EVALUATED: a cost comparison between arms that ran and arms
+  that did not is not a comparison. Which arms voided is reported.
+* **If `joint_stress` is valid on all four arms**, WL-H1 is scored exactly as
+  frozen. The preflight in clause 2 having passed is not evidence for WL-H1
+  and is not cited as such.
+* **WL-H2 is unaffected** by any of this; it is gated by its own preflight.
+
+A voided primary cell with its mechanism measured is a limitation the paper
+states. A primary cell quietly replaced by a friendlier one is not, and it
+does not happen under this file.
+
+Neither clause weakens a hypothesis or its falsifier. WL-H1 still fails
+loudly if the joint arm does not beat the best single-knob arm on cost at
+iso-fairness in `joint_stress`; a substrate that cannot run `joint_stress`
+leaves WL-H1 unevaluated rather than moving it; and no cell, arm, margin or
+metric changes.
