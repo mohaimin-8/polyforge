@@ -322,6 +322,11 @@ jobs:
       # 0.3166 in three places for a record that reports 0.3165.
       - name: Numbers the roadmap quotes still match their records
         run: python -m pytest scripts/test_roadmap_claims.py -q
+      # The B1 box is launched and terminated through Lambda's API by
+      # scripts/lambda_box.py; the key-file handling, the error path that must
+      # not echo the key, and the request shapes are testable without a meter.
+      - name: Rented-host driver never prints the key and builds the right requests
+        run: python -m pytest scripts/test_lambda_box.py -q
 
   # Phase 9: the trace pipelines must stay runnable — synthetic modes are
   # deterministic and dependency-light, so a broken ETL fails CI, not a
