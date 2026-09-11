@@ -27,6 +27,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import platform
 import sys
 import shutil
 import subprocess
@@ -1547,6 +1548,62 @@ def _operator_paused(run: RunSpec):
                        capture_output=True, timeout=240)
 
 
+def _cmd_line(cmd: list[str]) -> str | None:
+    """First line of a command's stdout, or None if it is absent or fails.
+    Never raises: host facts are evidence, not a gate."""
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    return out.stdout.strip().splitlines()[0] if out.stdout.strip() else None
+
+
+def _mem_total_gib() -> float | None:
+    try:
+        for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            if line.startswith("MemTotal:"):
+                return round(int(line.split()[1]) / 1024 / 1024, 1)
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
+def host_facts() -> dict:
+    """What the run ran on, as the record needs to state it. The B1 amendment
+    fixes a host FLOOR (>= 16 vCPU, >= 40 GB VRAM, one host); the tier script
+    printed nvidia-smi to the terminal and nothing wrote it down, so the floor
+    would have been a claim in the record rather than a file in the evidence.
+    Every field is best-effort; a laptop without nvidia-smi gets nulls."""
+    gpus = []
+    smi = _cmd_line(["nvidia-smi", "--query-gpu=name,memory.total,memory.used,"
+                     "driver_version", "--format=csv,noheader"])
+    if smi:
+        gpus = [dict(zip(("name", "memory_total", "memory_used", "driver"),
+                         (f.strip() for f in smi.split(","))))]
+    return {
+        "captured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "hostname": platform.node(),
+        "os": f"{platform.system()} {platform.release()}",
+        "machine": platform.machine(),
+        "cpu_count": os.cpu_count(),
+        "mem_total_gib": _mem_total_gib(),
+        "gpus": gpus,
+        "tools": {
+            "docker": _cmd_line(["docker", "--version"]),
+            "kind": _cmd_line(["kind", "--version"]),
+            "k6": _cmd_line(["k6", "version"]),
+            "kubectl": _cmd_line(["kubectl", "version", "--client", "--short"])
+                       or _cmd_line(["kubectl", "version", "--client"]),
+            "helm": _cmd_line(["helm", "version", "--short"]),
+        },
+        "env": {k: os.environ.get(k) for k in
+                ("POLYFORGE_EVAL_LIVE_AI", "POLYFORGE_EVAL_SHARED_PG",
+                 "POLYFORGE_EVAL_GATEWAY_REPLICAS")},
+    }
+
+
 def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
                        supervisor: "PortForwardSupervisor | None",
                        loadspread: "LoadDistributionSampler | None" = None) -> None:
@@ -1567,6 +1624,8 @@ def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
             src = workdir / name
             if src.exists():
                 shutil.copy2(src, evidence_dir / name)
+        (evidence_dir / "host_facts.json").write_text(
+            json.dumps(host_facts(), indent=2), encoding="utf-8")
         if supervisor is not None:
             (evidence_dir / "port_forward_summary.json").write_text(
                 json.dumps(supervisor.summary(), indent=2), encoding="utf-8")
