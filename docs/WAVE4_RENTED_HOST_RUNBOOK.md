@@ -207,6 +207,11 @@ sixteen in attempt 4).
 Results to `RESULTS_WAVE4_LIVE_PLANE.md` **as measured**, WL-H1 failure
 included and headlined if it occurs.
 
+Every run (the step-1c probe included) writes `host_facts.json` beside its
+k6 summary: GPU name / VRAM / driver from `nvidia-smi`, vCPU count, RAM,
+kernel, tool versions. That file, not the terminal, is how the record shows
+the §0 floor was met -- commit the evidence directory with it.
+
 ---
 
 ## `joint_stress` is the cell that decides this — measured

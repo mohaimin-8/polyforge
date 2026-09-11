@@ -284,3 +284,38 @@ def test_execute_refuses_before_kind_when_an_image_is_absent(monkeypatch):
         cb.execute(_run())
     assert "b1_images.sh" in str(exc.value) and cb.GATEWAY_IMAGE in str(exc.value)
     assert touched == [], "no subprocess may run before the image check"
+
+
+# --- the host the run ran on is evidence, not a claim ------------------
+
+def test_host_facts_survive_a_host_with_no_tools(monkeypatch):
+    def no_tool(cmd, **_kw):
+        raise FileNotFoundError(cmd[0])
+    monkeypatch.setattr(cb.subprocess, "run", no_tool)
+    facts = cb.host_facts()
+    assert facts["cpu_count"] == cb.os.cpu_count()
+    assert facts["gpus"] == [] and facts["tools"]["docker"] is None
+    assert facts["machine"] and facts["captured_at"].endswith("Z")
+
+
+def test_host_facts_parse_nvidia_smi(monkeypatch):
+    class _Done:
+        def __init__(self, out, rc=0):
+            self.stdout, self.returncode = out, rc
+
+    def fake_run(cmd, **_kw):
+        if cmd[0] == "nvidia-smi":
+            return _Done("NVIDIA A100-SXM4-40GB, 40960 MiB, 22811 MiB, 550.90.07")
+        return _Done("", rc=1)
+    monkeypatch.setattr(cb.subprocess, "run", fake_run)
+    gpu = cb.host_facts()["gpus"][0]
+    assert gpu == {"name": "NVIDIA A100-SXM4-40GB", "memory_total": "40960 MiB",
+                   "memory_used": "22811 MiB", "driver": "550.90.07"}
+
+
+def test_preserve_evidence_writes_host_facts(tmp_path, monkeypatch):
+    monkeypatch.setattr(cb, "host_facts", lambda: {"cpu_count": 30})
+    work = tmp_path / "work"; work.mkdir()
+    ev = tmp_path / "evidence"
+    cb._preserve_evidence(work, ev, None)
+    assert json.loads((ev / "host_facts.json").read_text()) == {"cpu_count": 30}
