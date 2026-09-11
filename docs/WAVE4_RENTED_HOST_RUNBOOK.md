@@ -19,9 +19,9 @@ batching that would close the throughput gap pushes `mid` to 3285 ms at batch
 | requirement | value | why |
 |---|---|---|
 | GPU VRAM | **≥ 40 GB** (A100 40/80, L40S) | fp16 weights are ~1 + 6 + 15 = 22 GB before any KV cache; 24 GB cannot serve three tiers |
-| vCPU / RAM | ≥ 8 / ≥ 32 GB | the same box runs kind, the operator, the planner, the gateway and k6 |
+| vCPU / RAM | **≥ 16, prefer 32** / ≥ 32 GB | the same box runs kind, the operator, the planner, the gateway and k6. **8 is measured insufficient**: `joint_stress` drives 9,600 concurrent VUs and an 8-core host refuses 12.2–12.4% of them (k6 aborts at ~70 s; see the CORRECTION under §Rehearsal below). 16–32 is the untested range that a single-host run would test; nothing smaller can score WL-H1's primary cell |
 | Disk | ≥ 60 GB | three model downloads plus images |
-| Cost | ~$1–2/hr, **~$5–15 total** | setup plus 16 runs at `steps: 30` |
+| Cost | ~$2–5/hr, **~$10–25 total** | setup plus 16 runs at ~708 s each (~3.2 h; cluster setup/teardown dominates, not the 300 s window). A 40 GB GPU with 16–32 vCPU on one box costs more per hour than the GPU alone |
 
 Both halves run **on this one box**. That is what makes session-33 clauses 2–3
 void by its own clause 4, removing the tunnel and its latency inflation.
