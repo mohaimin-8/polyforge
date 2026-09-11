@@ -33,20 +33,79 @@ def test_every_prereg_is_actually_examined():
         assert cp.commits(prereg), f"{prereg.name} has no history to check"
 
 
-def test_a_prereg_edited_after_its_record_is_caught(monkeypatch):
-    """The violation the gate exists for, injected rather than hoped for."""
-    real = cp.commits
-    victim = "PREREG_LIVE_SOAK_V8.md"
-
+def _post_result_commit(real_commits):
+    """A fake newest commit on one prereg, dated after every real one."""
     def fake(path: Path):
-        history = real(path)
-        if path.name == victim:            # push its newest commit far forward
-            newest = max(t for t, _ in history)
-            return [(newest + 10_000_000, "edited after the fact")] + history
+        history = real_commits(path)
+        if path.name == fake.victim:
+            newest = max(t for t, _, _ in history)
+            return [(newest + 10_000_000, "edited after the fact", "deadbeef")] + history
         return history
+    fake.victim = None
+    return fake
 
+
+def test_registered_text_altered_after_its_record_is_caught(monkeypatch, capsys):
+    """The violation the gate exists for, injected rather than hoped for:
+    a threshold in the registered text changed after the result existed."""
+    victim = "PREREG_LIVE_SOAK_V8.md"
+    fake = _post_result_commit(cp.commits)
+    fake.victim = victim
     monkeypatch.setattr(cp, "commits", fake)
-    assert cp.main() == 1, "a prereg edited after its record did not fail the gate"
+
+    # The registered text is what the gate reads at the frozen revision; make
+    # the file on disk differ from it by one character inside that text.
+    real_read = Path.read_text
+    def tampered(self, *a, **k):
+        text = real_read(self, *a, **k)
+        if self.name == victim:
+            # one character, well inside the registered text
+            i = 40
+            return text[:i] + ("X" if text[i] != "X" else "Y") + text[i + 1:]
+        return text
+    monkeypatch.setattr(Path, "read_text", tampered)
+
+    assert cp.main() == 1, "a registered text altered after its record did not fail the gate"
+    assert "REGISTERED TEXT CHANGED" in capsys.readouterr().out
+
+
+def test_a_post_result_commit_that_only_appends_is_reported_not_failed(monkeypatch, capsys):
+    """The other half of the rule. An addition after the registered text is
+    not a violation -- but it must be printed, with its heading, not absorbed."""
+    victim = "PREREG_LIVE_SOAK_V8.md"
+    fake = _post_result_commit(cp.commits)
+    fake.victim = victim
+    monkeypatch.setattr(cp, "commits", fake)
+
+    real_read = Path.read_text
+    def appended(self, *a, **k):
+        text = real_read(self, *a, **k)
+        if self.name == victim:
+            return text + "\n## Superseding note (TEST)\nappended text\n"
+        return text
+    monkeypatch.setattr(Path, "read_text", appended)
+
+    assert cp.main() == 0, "an append-only post-result change was treated as a violation"
+    out = capsys.readouterr().out
+    assert "PREREG_LIVE_SOAK_V8: registered text intact byte-for-byte" in out
+    assert "## Superseding note (TEST)" in out, "the appended heading was not disclosed"
+
+
+def test_the_three_real_appendices_keep_their_registered_text_intact():
+    """The cases that motivated the rule. If any of these ever stops being a
+    pure prefix, someone edited registered text, and this fails before the
+    gate does."""
+    for name in ("PREREG_TIER_RATIO", "PREREG_TIER_WU", "PREREG_WAVE4_LIVE_PLANE"):
+        prereg = cp.ANALYSIS / f"{name}.md"
+        record = cp.record_for(prereg)
+        assert record is not None, name
+        first_result = cp.commits(record)[-1][0]
+        before = [sha for t, _, sha in cp.commits(prereg) if t < first_result]
+        assert before, f"{name} has no commit before its record"
+        frozen = cp.blob_at(before[0], prereg)
+        current = prereg.read_text(encoding="utf-8")
+        assert current.startswith(frozen), f"{name}: registered text no longer intact"
+        assert len(current) > len(frozen), f"{name}: expected a post-result addition"
 
 
 def test_a_stale_disclosed_exception_fails(monkeypatch):
@@ -62,7 +121,7 @@ def test_the_known_exception_is_still_real():
     prereg = cp.ANALYSIS / "PREREG_EVICTION_PARITY.md"
     record = cp.record_for(prereg)
     assert record is not None
-    assert min(t for t, _ in cp.commits(prereg)) >= min(t for t, _ in cp.commits(record)), \
+    assert min(t for t, _, _ in cp.commits(prereg)) >= min(t for t, _, _ in cp.commits(record)), \
         "the prereg now predates its record; remove it from DISCLOSED"
 
 
