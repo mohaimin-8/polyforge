@@ -30,8 +30,14 @@ void by its own clause 4, removing the tunnel and its latency inflation.
 
 ```sh
 git clone <repo> && cd polyforge
-# docker, kind, helm, k6, go, python per docs/REPRODUCE.md
+./scripts/phase7_bootstrap.sh          # kind, k6, harness deps (idempotent)
+# docker (daemon, root), helm, go, python per docs/REPRODUCE.md
+docker info >/dev/null && nproc && nvidia-smi --query-gpu=name,memory.total --format=csv
 ```
+
+The last line is the host check against §0: a daemon that answers, a core
+count of 16 or more, and a card with 40 GB or more. If any of the three is
+wrong, this is the moment to release the box.
 
 ## 1b. Which route — READ THIS FIRST
 
@@ -80,6 +86,39 @@ Two traps measured in rehearsal, both specific to this route:
 * **Model aliases differ between rehearsal and the real run.** The mock serves
   `qwen2.5-0.5b-instruct`; vLLM's `--served-model-name` serves `small`. The
   `TIER_BACKENDS` JSON is **not** copy-pasteable between them.
+
+## 1c. Concurrency preflight — **before any model is loaded** (binding, session-47 amendment clause 2)
+
+`joint_stress` failed on every arm on an 8-core host for host concurrency,
+not tier throughput (§`joint_stress` is the cell that decides this, below).
+Whether 16–32 cores serve its 9,600 VUs is **untested**, so it is tested
+here, with the mock, in ~12 minutes, before a single model download.
+
+```sh
+# terminal 1 — the mock, no GPU, no tunnel
+python research/calibration/kaggle_tier_server.py --mock --no-tunnel
+
+# terminal 2 — the joint_stress probe against it (writes ONLY to *_PROBE_MOCK.*)
+cd eval
+export POLYFORGE_EVAL_SHARED_PG=1 POLYFORGE_EVAL_LIVE_AI=1
+export POLYFORGE_EVAL_TIER_BACKENDS='<the mock's printed line>'
+python -m harness.runner experiments/wave4_jointstress_probe.yaml
+```
+
+**Pass** = the run reports `valid` — k6 `http_req_failed` under its frozen
+`rate<0.01` for the full window and sampler coverage ≥ 90%. Nothing about
+those guards is relaxed for this step.
+
+**Fail** = **stop; do not proceed to step 2.** Copy the k6 summary from
+`eval/results/wave4_jointstress_probe_evidence/` into a dated subdirectory
+beside the session-45 one, with the same NOT EVIDENCE header, commit it, and
+release the box. The decision between a larger host and a smaller cell under
+a **new** prereg is then made with the run unspent. The prereg does not
+pre-authorise a smaller cell.
+
+This step produces **no comparison number**: the mock's delays are fixed
+sleeps that never enter a record, and only the `jcac` arm runs. It is a
+substrate gate, like WL-H2, and passing it is not evidence for WL-H1.
 
 ## 2. Tier substrate
 
@@ -245,9 +284,11 @@ the constraint.
 2. **New prereg, smaller cell** — fewer tenants or lower per-tenant demand to
    bring VU count into range. Free, now precisely quantifiable, but changes a
    pre-registered protocol.
-3. **Report `joint_stress` as unevaluable on available hardware** and score the
-   other three cells, which all pass. WL-H1's primary cell then has a measured
-   reason for its absence rather than a gap.
+3. **Report `joint_stress` as unevaluable on available hardware.** The
+   other three cells are reported as measured, descriptively, and WL-H3 runs
+   on them — but **WL-H1 is then NOT EVALUATED**, neither PASS nor FAIL,
+   because the hypothesis is defined in `joint_stress` and is not re-read off
+   a different cell. Declared in advance: session-47 amendment clause 3.
 
 ## Rehearse with the REHEARSAL experiment, never the scored one
 
@@ -261,6 +302,8 @@ overwrite, real evidence.
 
 ## What voids the run
 
+0. **The step-1c concurrency preflight fails** — the host cannot serve the
+   cell; the matrix is not started (session-47 amendment clause 2).
 1. **WL-H2 fails** — a knob is inert; WL-H1 is not interpretable.
 2. **`large` offloads to CPU** — drop it, declare a two-tier run, continue.
 3. **Any post-hoc change** to arms, cells, the 0.01 iso-fairness margin, or
