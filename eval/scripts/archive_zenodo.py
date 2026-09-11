@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
+import re
 import sys
 import zipfile
 from datetime import date
@@ -41,29 +43,14 @@ INCLUDE = [
     "results/DAILY.md",
     "results/security",
     "results/figures",
-    # Live-run evidence directories. Without these the deposit CANNOT deliver
-    # what its own description promises -- "reproduce.py then re-derives every
-    # published record byte-identically" -- because the live records are built
-    # from these trees, not from the DuckDB files. RESULTS_LIVE_SOAK_V2..V8 and
-    # RESULTS_WAVE4_LIVE_PLANE all read *_evidence/, and `results/*.duckdb` is
-    # a top-level glob that never descends into them. Found by checking the
-    # 2026-08-30 bundle against the records it claims to support: none of the
-    # attempt evidence was in it.
-    "results/live_soak_evidence",
-    "results/live_soak_attempt5_evidence",
-    "results/live_soak_attempt6_evidence",
-    "results/live_soak_attempt7_evidence",
-    "results/live_soak_attempt8_evidence",
-    "results/live_soak_attempt8b_evidence",
-    "results/live_soak_attempt9_evidence",
-    "results/live_soak_attempt10_evidence",
-    "results/wave4_live_plane_evidence",
-    "results/wp8b_substrate_evidence",
-    "results/ladder_for_v3_evidence",
-    "results/ladder_for_v45_evidence",
-    "results/soak_stage_a_evidence",
-    "results/soak_stage_b_evidence",
-    "results/wp14_attempt2",
+    # Live-run evidence directories are NOT listed here. They are derived
+    # below (see `evidence_dirs`) from what the analysis scripts actually
+    # read, because a hand-kept list drifted twice: the 2026-08-30 bundle had
+    # none of them, and the 2026-08-31 one -- built after that was fixed --
+    # still lacked five, including the trees behind RESULTS_TRACE_LIVE.md and
+    # RESULTS_MULTINODE.md, the records that close W4 and W7. A list that is
+    # maintained by hand next to a list of records maintained by hand will
+    # drift again; a list read out of the scripts cannot.
     "experiments",
     "baselines/tuned.yaml",
     "baselines/TUNING.md",
@@ -82,7 +69,13 @@ INCLUDE = [
 # auditable are absent entirely. Same class of omission as the live-evidence
 # one above, one directory level up.
 REPO_INCLUDE = [
-    "research/analysis/RESULTS_*.md",
+    # Every record is derived from scripts/reproduce.py below (`gated_records`)
+    # rather than globbed. The 2026-08-31 bundle used "RESULTS_*.md", which
+    # does not match RESULTS.md -- the headline record -- nor ADVANCED.md,
+    # FAIRNESS_V2.md, PHASE7_ORDINAL.md, RECORDS_INDEX.md, CELLS_SHIPPED.md or
+    # any older record without the prefix. Eight gated records were absent
+    # from a deposit whose description promises every one. Session 43 found
+    # and fixed the identical glob in build_pages.py; this file had it too.
     "research/analysis/PREREG_*.md",
     "docs/REPRODUCE.md",
     # RESULTS_SEPARATION_MT_V3.md reads its expensive rows from this artifact
@@ -91,6 +84,47 @@ REPO_INCLUDE = [
     # this INCLUDE list was extended to fix, one level down.
     "research/analysis/separation_mt_v3_walk.json",
 ]
+
+# Anything matching these is a mock or a probe: fixed sleeps that the tier
+# server documents as never entering a record, kept in the tree under NOT
+# EVIDENCE labels because they are the raw proof of a mechanism. They must
+# not travel in a deposit beside real evidence, which is exactly the
+# confusion session 45 had to undo once already inside the repository.
+NOT_EVIDENCE = ("PROBE_MOCK", "REHEARSAL_MOCK", "_probe_evidence", "_PROBE_")
+
+_EVIDENCE_TOKEN = re.compile(r"[a-z0-9_]+_evidence[a-z0-9_]*|wp14_attempt[0-9]+")
+
+
+def gated_records() -> list[str]:
+    """Every record scripts/reproduce.py knows about: the ones it regenerates
+    and the ones it lists as UNGATED with a reason. Read from the script, so
+    the deposit and the gate cannot disagree about what a record is."""
+    path = REPO_DIR / "scripts" / "reproduce.py"
+    spec = importlib.util.spec_from_file_location("polyforge_reproduce", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    names = {name for name, _ in module.RECORDS}
+    names |= {record for _, _, record in module.CAMPAIGN_RECORDS}
+    names |= set(module.UNGATED)
+    return sorted(names)
+
+
+def evidence_dirs() -> list[str]:
+    """Every results/ directory an analysis script or the gate reads, that
+    exists on disk and is not a mock. Derived, not listed."""
+    sources = list((REPO_DIR / "research" / "analysis").glob("analysis_*.py"))
+    sources.append(REPO_DIR / "scripts" / "reproduce.py")
+    tokens: set[str] = set()
+    for src in sources:
+        tokens |= set(_EVIDENCE_TOKEN.findall(src.read_text(encoding="utf-8")))
+    found = sorted(t for t in tokens
+                   if (EVAL_DIR / "results" / t).is_dir()
+                   and not any(m in t for m in NOT_EVIDENCE))
+    return [f"results/{t}" for t in found]
+
+
+def is_not_evidence(path: Path) -> bool:
+    return any(m in path.name or m in str(path) for m in NOT_EVIDENCE)
 
 DEPOSIT_METADATA = {
     "metadata": {
@@ -166,9 +200,32 @@ def main() -> None:
     out_dir = EVAL_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    eval_files, missing = collect(EVAL_DIR, INCLUDE)
-    repo_files, repo_missing = collect(REPO_DIR, REPO_INCLUDE)
+    eval_files, missing = collect(EVAL_DIR, INCLUDE + evidence_dirs())
+
+    # Records live in research/analysis/ except the live security record,
+    # which sits in eval/results/security/ and is already collected above.
+    # Resolve each name to where it is; an unresolvable one refuses the build.
+    records: list[str] = []
+    eval_set = set(eval_files)
+    for name in gated_records():
+        in_analysis = REPO_DIR / "research" / "analysis" / name
+        in_results = EVAL_DIR / "results" / "security" / name
+        if in_analysis.exists():
+            records.append(f"research/analysis/{name}")
+        elif in_results.exists() and in_results in eval_set:
+            continue
+        else:
+            missing.append(f"gated record {name} (not in research/analysis/ "
+                           "nor already collected from results/security/)")
+    repo_files, repo_missing = collect(REPO_DIR, REPO_INCLUDE + records)
     missing.extend(repo_missing)
+
+    swept = [p for p in eval_files if is_not_evidence(p)]
+    eval_files = [p for p in eval_files if not is_not_evidence(p)]
+    if swept:
+        print(f"excluded {len(swept)} mock/probe file(s) that are not evidence:")
+        for p in swept:
+            print("  " + str(p.relative_to(EVAL_DIR)).replace("\\", "/"))
 
     # Archive names stay relative to the root each group was collected from, so
     # eval/ files keep the results/... layout docs/REPRODUCE.md tells the
