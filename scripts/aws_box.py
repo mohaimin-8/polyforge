@@ -19,6 +19,7 @@ Usage (from the repo root):
     python scripts/aws_box.py status [ID]            # instances tagged polyforge-b1: state, ip
     python scripts/aws_box.py wait ID                # poll until running + status checks ok, print ip
     python scripts/aws_box.py terminate ID           # stop the meter; confirms the terminal state
+    python scripts/aws_box.py budget 30 EMAIL        # monthly cost alert at 80%/100% (free)
 """
 
 from __future__ import annotations
@@ -73,7 +74,7 @@ def die(err: Exception, what: str) -> None:
 
 def run_instances_params(ami: str, instance_type: str, sg_id: str, disk_gib: int,
                          key_name: str = KEY_NAME, az: str | None = None,
-                         root_device: str = "/dev/sda1") -> dict:
+                         root_device: str = "/dev/sda1", subnet_id: str | None = None) -> dict:
     """The exact RunInstances request. Shutdown from inside the box terminates
     it (never a stopped instance quietly billing its EBS); the root volume is
     gp3 and deleted with the instance; one instance, ever. `root_device` must
@@ -91,6 +92,8 @@ def run_instances_params(ami: str, instance_type: str, sg_id: str, disk_gib: int
     }
     if az:
         params["Placement"] = {"AvailabilityZone": az}
+    if subnet_id:
+        params["SubnetId"] = subnet_id
     return params
 
 
@@ -130,6 +133,31 @@ def ensure_security_group(ec2) -> str:
                                    VpcId=vpc[0]["VpcId"])
     ec2.authorize_security_group_ingress(GroupId=sg["GroupId"], IpPermissions=ssh_ingress())
     return sg["GroupId"]
+
+
+def offered_azs(ec2, instance_type: str) -> list[str]:
+    """AZs in the region that offer the type. g6e is not in every AZ, and a
+    launch without a subnet lands in an arbitrary one."""
+    offs = ec2.describe_instance_type_offerings(
+        LocationType="availability-zone",
+        Filters=[{"Name": "instance-type", "Values": [instance_type]}])["InstanceTypeOfferings"]
+    return sorted(o["Location"] for o in offs)
+
+
+def pick_subnet(ec2, instance_type: str, az: str | None) -> tuple[str, str]:
+    """(subnet_id, az): the default-VPC subnet in `az` if given, else in the
+    first AZ that offers the type. Refuses with the offering list otherwise."""
+    azs = offered_azs(ec2, instance_type)
+    if az and az not in azs:
+        raise SystemExit(f"{instance_type} is not offered in {az}; offered in {azs}")
+    subs = ec2.describe_subnets(
+        Filters=[{"Name": "default-for-az", "Values": ["true"]}])["Subnets"]
+    by_az = {s["AvailabilityZone"]: s["SubnetId"] for s in subs}
+    for cand in ([az] if az else azs):
+        if cand in by_az:
+            return by_az[cand], cand
+    raise SystemExit(f"no default subnet in an AZ offering {instance_type}; "
+                     f"offered in {azs}, default subnets in {sorted(by_az)}")
 
 
 def cmd_quota(a) -> None:
@@ -190,8 +218,10 @@ def cmd_launch(a) -> None:
         ami, _ = resolve_ami(client("ssm", region))
         sg_id = ensure_security_group(ec2)
         root = ec2.describe_images(ImageIds=[ami])["Images"][0]["RootDeviceName"]
-        params = run_instances_params(ami, a.type, sg_id, a.disk, az=a.az, root_device=root)
-        print(f"launching {a.type} in {region}{' ' + a.az if a.az else ''} from {ami}, "
+        subnet, az = pick_subnet(ec2, a.type, a.az)
+        params = run_instances_params(ami, a.type, sg_id, a.disk, az=az,
+                                      root_device=root, subnet_id=subnet)
+        print(f"launching {a.type} in {az} ({subnet}) from {ami}, "
               f"{a.disk} GiB gp3 -- BILLING STARTS NOW", flush=True)
         inst = ec2.run_instances(**params)["Instances"][0]
     except (ClientError, BotoCoreError, NoCredentialsError) as e:
@@ -251,6 +281,29 @@ def cmd_terminate(a) -> None:
     raise SystemExit("still not terminated after 10 min; check the console")
 
 
+def cmd_budget(a) -> None:
+    """A monthly cost budget that emails at 80% and 100% of `usd`. Belt and
+    braces beside terminate-on-shutdown: a student's debit card should never
+    learn about a leak from the statement."""
+    sts = client("sts", "us-east-1")
+    budgets = client("budgets", "us-east-1")   # Budgets is a global service
+    try:
+        account = sts.get_caller_identity()["Account"]
+        budgets.create_budget(
+            AccountId=account,
+            Budget={"BudgetName": "polyforge-b1", "BudgetType": "COST",
+                    "TimeUnit": "MONTHLY",
+                    "BudgetLimit": {"Amount": str(a.usd), "Unit": "USD"}},
+            NotificationsWithSubscribers=[
+                {"Notification": {"NotificationType": "ACTUAL", "ComparisonOperator": "GREATER_THAN",
+                                  "Threshold": float(pct), "ThresholdType": "PERCENTAGE"},
+                 "Subscribers": [{"SubscriptionType": "EMAIL", "Address": a.email}]}
+                for pct in (80, 100)])
+    except (ClientError, BotoCoreError, NoCredentialsError) as e:
+        die(e, "budget")
+    print(f"budget polyforge-b1: ${a.usd}/month, alerts at 80% and 100% to {a.email}")
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -278,6 +331,10 @@ def main(argv: list[str] | None = None) -> None:
     t = sub.add_parser("terminate")
     t.add_argument("id")
     t.set_defaults(fn=cmd_terminate)
+    b = sub.add_parser("budget")
+    b.add_argument("usd", type=int)
+    b.add_argument("email")
+    b.set_defaults(fn=cmd_budget)
     a = ap.parse_args(argv)
     a.fn(a)
 

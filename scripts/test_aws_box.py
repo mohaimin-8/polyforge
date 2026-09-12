@@ -84,3 +84,26 @@ def test_wait_stops_on_a_dead_instance(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         ab.cmd_wait(type("A", (), {"id": "i-1", "region": None})())
     assert "terminated" in str(exc.value)
+
+
+def test_subnet_is_picked_in_an_az_that_offers_the_type():
+    ec2 = boto3.client("ec2", region_name="us-east-1",
+                       aws_access_key_id="x", aws_secret_access_key="y")
+    offerings = {"InstanceTypeOfferings": [
+        {"InstanceType": "g6e.4xlarge", "LocationType": "availability-zone", "Location": "us-east-1d"},
+        {"InstanceType": "g6e.4xlarge", "LocationType": "availability-zone", "Location": "us-east-1b"}]}
+    subnets = {"Subnets": [
+        {"SubnetId": "subnet-a", "AvailabilityZone": "us-east-1a", "VpcId": "vpc-1"},
+        {"SubnetId": "subnet-d", "AvailabilityZone": "us-east-1d", "VpcId": "vpc-1"}]}
+    with Stubber(ec2) as stub:
+        stub.add_response("describe_instance_type_offerings", offerings)
+        stub.add_response("describe_subnets", subnets)
+        # 1a has a subnet but no offering; 1b an offering but no subnet; 1d both
+        assert ab.pick_subnet(ec2, "g6e.4xlarge", None) == ("subnet-d", "us-east-1d")
+    with Stubber(ec2) as stub:
+        stub.add_response("describe_instance_type_offerings", offerings)
+        with pytest.raises(SystemExit) as exc:
+            ab.pick_subnet(ec2, "g6e.4xlarge", "us-east-1a")
+        assert "not offered in us-east-1a" in str(exc.value)
+    p = ab.run_instances_params("ami", "g6e.4xlarge", "sg", 120, az="us-east-1d", subnet_id="subnet-d")
+    assert p["SubnetId"] == "subnet-d" and p["Placement"] == {"AvailabilityZone": "us-east-1d"}
