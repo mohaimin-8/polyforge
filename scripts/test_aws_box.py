@@ -107,3 +107,12 @@ def test_subnet_is_picked_in_an_az_that_offers_the_type():
         assert "not offered in us-east-1a" in str(exc.value)
     p = ab.run_instances_params("ami", "g6e.4xlarge", "sg", 120, az="us-east-1d", subnet_id="subnet-d")
     assert p["SubnetId"] == "subnet-d" and p["Placement"] == {"AvailabilityZone": "us-east-1d"}
+
+
+def test_spot_is_one_time_and_terminates_on_interruption():
+    p = ab.run_instances_params("ami", "g6e.4xlarge", "sg", 120, spot=True)
+    assert p["InstanceMarketOptions"] == {
+        "MarketType": "spot",
+        "SpotOptions": {"SpotInstanceType": "one-time",
+                        "InstanceInterruptionBehavior": "terminate"}}
+    assert "InstanceMarketOptions" not in ab.run_instances_params("ami", "g6e.4xlarge", "sg", 120)
