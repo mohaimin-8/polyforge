@@ -15,7 +15,7 @@ Usage (from the repo root):
     python scripts/aws_box.py quota-request 32       # ask for the increase (free)
     python scripts/aws_box.py ami                    # resolve the DL Base OSS NVIDIA GPU AMI (free)
     python scripts/aws_box.py key-add PUBFILE        # import the public key as key pair polyforge-b1 (free)
-    python scripts/aws_box.py launch [--type g6e.4xlarge] [--disk 120] [--az us-east-1a]   # BILLABLE
+    python scripts/aws_box.py launch [--type g6e.4xlarge] [--disk 120] [--az us-east-1a] [--spot]   # BILLABLE
     python scripts/aws_box.py status [ID]            # instances tagged polyforge-b1: state, ip
     python scripts/aws_box.py wait ID                # poll until running + status checks ok, print ip
     python scripts/aws_box.py terminate ID           # stop the meter; confirms the terminal state
@@ -74,7 +74,8 @@ def die(err: Exception, what: str) -> None:
 
 def run_instances_params(ami: str, instance_type: str, sg_id: str, disk_gib: int,
                          key_name: str = KEY_NAME, az: str | None = None,
-                         root_device: str = "/dev/sda1", subnet_id: str | None = None) -> dict:
+                         root_device: str = "/dev/sda1", subnet_id: str | None = None,
+                         spot: bool = False) -> dict:
     """The exact RunInstances request. Shutdown from inside the box terminates
     it (never a stopped instance quietly billing its EBS); the root volume is
     gp3 and deleted with the instance; one instance, ever. `root_device` must
@@ -94,6 +95,15 @@ def run_instances_params(ami: str, instance_type: str, sg_id: str, disk_gib: int
         params["Placement"] = {"AvailabilityZone": az}
     if subnet_id:
         params["SubnetId"] = subnet_id
+    if spot:
+        # One-time Spot request; an interruption TERMINATES (never stops) the
+        # instance, so nothing lingers billing. The harness runner resumes
+        # banked run_ids after a relaunch; the tier host must be brought up
+        # again by hand (runbook section 2).
+        params["InstanceMarketOptions"] = {
+            "MarketType": "spot",
+            "SpotOptions": {"SpotInstanceType": "one-time",
+                            "InstanceInterruptionBehavior": "terminate"}}
     return params
 
 
@@ -220,8 +230,8 @@ def cmd_launch(a) -> None:
         root = ec2.describe_images(ImageIds=[ami])["Images"][0]["RootDeviceName"]
         subnet, az = pick_subnet(ec2, a.type, a.az)
         params = run_instances_params(ami, a.type, sg_id, a.disk, az=az,
-                                      root_device=root, subnet_id=subnet)
-        print(f"launching {a.type} in {az} ({subnet}) from {ami}, "
+                                      root_device=root, subnet_id=subnet, spot=a.spot)
+        print(f"launching {a.type}{' SPOT' if a.spot else ''} in {az} ({subnet}) from {ami}, "
               f"{a.disk} GiB gp3 -- BILLING STARTS NOW", flush=True)
         inst = ec2.run_instances(**params)["Instances"][0]
     except (ClientError, BotoCoreError, NoCredentialsError) as e:
@@ -321,6 +331,8 @@ def main(argv: list[str] | None = None) -> None:
     l.add_argument("--type", default=DEFAULT_TYPE)
     l.add_argument("--disk", type=int, default=DEFAULT_DISK_GIB)
     l.add_argument("--az", default=None)
+    l.add_argument("--spot", action="store_true",
+                   help="one-time Spot request (needs the Spot G/VT quota, L-3819A6DF)")
     l.set_defaults(fn=cmd_launch)
     s = sub.add_parser("status")
     s.add_argument("id", nargs="?")
