@@ -13,14 +13,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Image names come from the harness constants, not a copy kept here.
+# Image names come from the harness constants, not a copy kept here. The
+# tr strips the CR that Python's stdout carries on Windows, where this script
+# is rehearsed; without it every tag ends in a carriage return and docker
+# refuses it as an invalid reference.
 readarray -t IMAGES < <(cd eval && python -c "
 from harness import cluster_backend as cb
 for img in (cb.CONTROL_PLANE_IMAGE, cb.GATEWAY_IMAGE, cb.OPERATOR_IMAGE,
             cb.PLANNER_IMAGE, cb.NATS_IMAGE, cb.POSTGRES_IMAGE,
             cb.METRICS_SERVER_IMAGE):
     print(img)
-")
+" | tr -d '\r')
 CONTROL_PLANE="${IMAGES[0]}"; GATEWAY="${IMAGES[1]}"
 OPERATOR="${IMAGES[2]}";      PLANNER="${IMAGES[3]}"
 THIRD_PARTY=("${IMAGES[@]:4}")
