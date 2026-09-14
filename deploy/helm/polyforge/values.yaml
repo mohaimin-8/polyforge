@@ -73,6 +73,11 @@ gateway:
   # Fallback single backend for requests with no tier pin (unset tiers).
   llmBaseURL: ""
   embedDims: 256
+  # Per-tenant admission budget on every AI route (token bucket). Zero keeps
+  # the binary's default, which mirrors the control plane's: 600 RPM / 60.
+  rateLimit:
+    requestsPerMinute: 0
+    burst: 0
   service:
     port: 80
   resources:

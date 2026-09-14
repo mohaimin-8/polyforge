@@ -319,6 +319,18 @@ func (s *Server) pickProvider(ctx context.Context, w http.ResponseWriter, tenant
 			return provider, "tier:" + tier, tier
 		}
 	}
+	// Unpinned in a tier-provider deployment: the configured default tier,
+	// not the external default provider. The eval install configures no
+	// external provider, so the fallback was a dial to a phantom Ollama on
+	// 127.0.0.1:11434 -- 89 of 37,270 requests in the session-48 EC2 probe
+	// answered 502 for that reason, on tenants the controller had (yet) left
+	// unpinned. ModelTier exists to name this default; use it.
+	if provider, ok := s.tierProviders[s.modelTier]; ok && len(s.tierProviders) > 0 {
+		w.Header().Set("X-PolyForge-Backend", "tier:"+s.modelTier)
+		w.Header().Set("X-PolyForge-Tier", s.modelTier)
+		w.Header().Set("X-PolyForge-Route-Reason", "default-tier")
+		return provider, "tier:" + s.modelTier, s.modelTier
+	}
 	if s.router == nil {
 		return s.provider, "", s.modelTier
 	}

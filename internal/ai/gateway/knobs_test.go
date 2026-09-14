@@ -274,3 +274,44 @@ func TestTierPinIsExclusiveAcrossManyRequests(t *testing.T) {
 		}
 	}
 }
+
+// An unpinned tenant in a tier-provider deployment is served by the default
+// tier, never by the external default provider. Session 48: with no external
+// provider configured, unpinned requests dialled a phantom Ollama and answered
+// 502 -- 89 of 37,270 in the EC2 probe.
+func TestUnpinnedTenantUsesDefaultTierNotExternalProvider(t *testing.T) {
+	small := &scriptedProvider{response: gateway.ChatResponse{Model: "small-model", Message: gateway.Message{Role: "assistant", Content: "small"}}}
+	mid := &scriptedProvider{response: gateway.ChatResponse{Model: "mid-model", Message: gateway.Message{Role: "assistant", Content: "mid"}}}
+	ts, key, _ := newKnobsServer(t, map[string]gateway.Provider{"small": small, "mid": mid})
+
+	// Never pinned: no knobs written for acme at all. Config.ModelTier is
+	// unset in the fixture, so NewServer's default ("mid") applies.
+	resp := postJSON(t, ts.URL+"/v1/tenants/acme/ai/chat", key.Secret, map[string]any{
+		"messages": []map[string]string{{"role": "user", "content": "unpinned prompt"}},
+	})
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if got := resp.Header.Get("X-PolyForge-Backend"); got != "tier:mid" {
+		t.Fatalf("backend header = %q, want tier:mid", got)
+	}
+	if got := resp.Header.Get("X-PolyForge-Route-Reason"); got != "default-tier" {
+		t.Fatalf("route reason = %q, want default-tier", got)
+	}
+	if mid.calls != 1 || small.calls != 0 {
+		t.Fatalf("backend calls mid=%d small=%d, want 1/0", mid.calls, small.calls)
+	}
+
+	// "none" -- the sim's unpinned value -- behaves the same.
+	if r := putKnobs(t, ts.URL, testAdminKey, "acme", gateway.TenantKnobs{ModelTier: "none", CacheSizeMB: 0}); r.StatusCode != http.StatusOK {
+		t.Fatalf("put none: %d", r.StatusCode)
+	}
+	again := postJSON(t, ts.URL+"/v1/tenants/acme/ai/chat", key.Secret, map[string]any{
+		"messages": []map[string]string{{"role": "user", "content": "unpinned prompt two"}},
+	})
+	defer func() { _ = again.Body.Close() }()
+	if got := again.Header.Get("X-PolyForge-Backend"); got != "tier:mid" || mid.calls != 2 {
+		t.Fatalf("after none: backend=%q mid.calls=%d, want tier:mid / 2", got, mid.calls)
+	}
+}
