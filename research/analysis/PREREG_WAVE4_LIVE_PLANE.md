@@ -456,3 +456,41 @@ loudly if the joint arm does not beat the best single-knob arm on cost at
 iso-fairness in `joint_stress`; a substrate that cannot run `joint_stress`
 leaves WL-H1 unevaluated rather than moving it; and no cell, arm, margin or
 metric changes.
+
+## Pre-run note (session 48, 2026-09-15 — the host-floor attribution was wrong; the substrate, not the host, refused the cell)
+
+Declared before any scored run, superseding the **factual claim** in the
+session-47 amendment's clause 1 (host floor ≥ 16 vCPU) and leaving every
+hypothesis, arm, cell, margin, metric and gate exactly as registered.
+
+**What was measured.** The concurrency preflight of clause 2 was executed
+five times on a fresh 8-vCPU EC2 host (`c6i.2xlarge`, AWS DLAMI Ubuntu 22.04)
+with k6 emitting every request's HTTP status and, from the third run, the
+gateway pod's log followed. Evidence: `eval/results/wave4_jointstress_probe_evidence/2026-09-15_ec2_ladder/`
+(NOT EVIDENCE for any hypothesis; the raw proof of a mechanism), commit
+`4e499ef`.
+
+* The 12.2–12.4% `http_req_failed` that sessions 45–47 read as the cluster
+  refusing 9,600 concurrent VUs was **734 of 740 failures answering HTTP 429**
+  from the AI gateway's own per-tenant token bucket, hard-coded at 600
+  requests/minute with burst 60 and not configurable. `joint_stress` bursts a
+  tenant to ~20 AI rps = 1,200 RPM. Active VUs peaked at 96; `vus_max` 9,600
+  is the pre-allocated pool. The CRUD path had no failures in any run.
+* With that limiter lifted — exactly as the eval install already lifts the
+  control plane's, and for the reason that install documents — the residue
+  was three substrate defects: unpinned tenants routed to an external default
+  provider absent from the eval install (HTTP 502); the AI load path entering
+  through `kubectl port-forward`, which dropped streams (EOF, no gateway-side
+  error); and a Python-3.10-only crash in the harness after the load window.
+* With those fixed the frozen cell is **valid on 8 vCPU**: 37,269 requests,
+  1 failure, 0 dropped iterations, WL-H2 PASS, full window.
+
+**Consequence.** The substrate for this campaign is one host with ≥ 40 GB
+VRAM on sm_80+ and **≥ 8 vCPU** (measured sufficient; the amendment's clause
+2 preflight still runs on the provisioned host and still gates). The four
+substrate changes are configuration and harness, disclosed here: gateway
+admission limiter lifted for the eval install; unpinned tenants served by
+the configured default tier; AI load path on a NodePort; sampler thread
+fixed. None touches the controller, the arms, the cells or the metrics.
+Clause 3 (a voided `joint_stress` leaves WL-H1 NOT EVALUATED) stands
+unchanged; it is simply no longer expected to fire.

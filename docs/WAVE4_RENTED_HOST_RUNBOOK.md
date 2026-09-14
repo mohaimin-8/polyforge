@@ -19,7 +19,7 @@ batching that would close the throughput gap pushes `mid` to 3285 ms at batch
 | requirement | value | why |
 |---|---|---|
 | GPU VRAM | **≥ 40 GB** (A100 40/80, L40S) | fp16 weights are ~1 + 6 + 15 = 22 GB before any KV cache; 24 GB cannot serve three tiers |
-| vCPU / RAM | **≥ 16, prefer 32** / ≥ 32 GB | the same box runs kind, the operator, the planner, the gateway and k6. **8 is measured insufficient**: `joint_stress` drives 9,600 concurrent VUs and an 8-core host refuses 12.2–12.4% of them (k6 aborts at ~70 s; see the CORRECTION under §Rehearsal below). 16–32 is the untested range that a single-host run would test; nothing smaller can score WL-H1's primary cell |
+| vCPU / RAM | **≥ 8** / ≥ 16 GB | the same box runs kind, the operator, the planner, the gateway and k6. **8 is measured sufficient** (session 48): the 12.2–12.4% that sessions 45–47 attributed to host concurrency was the AI gateway's hard-coded 600 RPM per-tenant limiter answering 429, plus three substrate defects — with those fixed (`4e499ef`) the frozen cell ran `valid` on an 8-vCPU `c6i.2xlarge`, 37,269 requests, 1 failure. See the prereg's session-48 pre-run note and `wave4_jointstress_probe_evidence/2026-09-15_ec2_ladder/` |
 | Disk | ≥ 60 GB | three model downloads plus images |
 | Cost | ~$2–5/hr, **~$10–25 total** | setup plus 16 runs at ~708 s each (~3.2 h; cluster setup/teardown dominates, not the 300 s window). A 40 GB GPU with 16–32 vCPU on one box costs more per hour than the GPU alone |
 
@@ -62,10 +62,10 @@ GPU AMI (Ubuntu 22.04 / Python 3.10; driver, CUDA, Docker and the NVIDIA
 container toolkit preinstalled) is what `scripts/aws_box.py` launches;
 every box-side script parses under 3.10 (checked with
 `ast.parse(feature_version=(3, 10))`, session 48), so the system Python is
-fine. The box named in session 48 is **g6e.4xlarge** (1x L40S 48 GB, 16 vCPU,
-128 GiB, ~$3.00/h us-east-1); **g6e.8xlarge** (32 vCPU, ~$4.53/h) is the
-step-up if step 1c fails at 16. Both need the "Running On-Demand G and VT
-instances" vCPU quota raised from a new account's 0 (`aws_box.py quota`).
+fine. The box is **g6e.2xlarge** (1x L40S 44 GB, 8 vCPU, 64 GiB, ~$2.24/h
+us-east-1), which the 8-vCPU "Running On-Demand G and VT instances" quota AWS
+granted this account allows; **g6e.4xlarge** (16 vCPU) is the step-up if
+step 1c ever fails at 8, and needs that quota at 16 (`aws_box.py quota`).
 
 The `docker info` line is the host check against §0: a daemon that answers, a
 core count of 16 or more, and a card with 40 GB or more. If any of the three
