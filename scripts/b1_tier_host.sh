@@ -27,6 +27,14 @@ MID_UTIL="${MID_UTIL:-0.24}"
 LARGE_UTIL="${LARGE_UTIL:-0.60}"
 LOG_DIR="${LOG_DIR:-/tmp/b1-tiers}"
 PID_FILE="$LOG_DIR/pids"
+# The address the AI gateway will dial. The gateway is a POD inside kind, and
+# from a pod 127.0.0.1 is the pod itself -- so the export line must carry the
+# host's own address, which kind's nodes route to over the docker bridge.
+# Measured in the session-48 dry run on an EC2 host: the mock was reachable
+# from a container on the host's primary IP and on nothing else. The servers
+# bind 0.0.0.0 for the same reason (uvicorn's default is loopback only).
+ADVERTISE_HOST="${ADVERTISE_HOST:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
+ADVERTISE_HOST="${ADVERTISE_HOST:-127.0.0.1}"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "FATAL: $1 not found" >&2; exit 1; }; }
 
@@ -83,13 +91,13 @@ serve_one() {
   # and is absent from recent releases. Prefer the CLI, keep the fallback.
   if command -v vllm >/dev/null 2>&1; then
     nohup vllm serve "$model" --served-model-name "$name" \
-      --port "$port" --gpu-memory-utilization "$util" \
+      --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$util" \
       >"$LOG_DIR/$name.log" 2>&1 &
     echo "$!" >>"$PID_FILE"; return
   fi
   nohup python -m vllm.entrypoints.openai.api_server \
     --model "$model" --served-model-name "$name" \
-    --port "$port" --gpu-memory-utilization "$util" \
+    --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$util" \
     --disable-log-requests \
     >"$LOG_DIR/$name.log" 2>&1 &
   echo "$!" >>"$PID_FILE"
@@ -147,7 +155,7 @@ verify() {
   echo
   echo "== export line for the harness =="
   cat <<EXPORT
-export POLYFORGE_EVAL_TIER_BACKENDS='{"small":{"kind":"openai","base_url":"http://127.0.0.1:$SMALL_PORT/v1","model":"small"},"mid":{"kind":"openai","base_url":"http://127.0.0.1:$MID_PORT/v1","model":"mid"},"large":{"kind":"openai","base_url":"http://127.0.0.1:$LARGE_PORT/v1","model":"large"}}'
+export POLYFORGE_EVAL_TIER_BACKENDS='{"small":{"kind":"openai","base_url":"http://$ADVERTISE_HOST:$SMALL_PORT/v1","model":"small"},"mid":{"kind":"openai","base_url":"http://$ADVERTISE_HOST:$MID_PORT/v1","model":"mid"},"large":{"kind":"openai","base_url":"http://$ADVERTISE_HOST:$LARGE_PORT/v1","model":"large"}}'
 EXPORT
 }
 

@@ -389,6 +389,19 @@ def make_handler(models: TierModels, auth_token: str | None = None):
     return Handler
 
 
+def primary_host_ip() -> str:
+    """The address this host has on its default route -- what a kind pod can
+    dial to reach a server bound here on 0.0.0.0. A UDP socket to a public
+    address is never sent; connect() only selects the local interface."""
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.0.2.1", 9))   # TEST-NET-1: nothing is sent
+            return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+
+
 def start_tunnel(port: int) -> str | None:
     """Free cloudflared quick tunnel — no account, no card. Returns the public
     URL, or None if cloudflared could not be obtained (the run can still
@@ -455,6 +468,11 @@ def main() -> None:
                     help="skip model loading; canned replies with tier-shaped "
                          "delays, for checking the HTTP contract off-GPU")
     ap.add_argument("--no-tunnel", action="store_true")
+    ap.add_argument("--advertise-host", default="",
+                    help="with --no-tunnel: the address the AI gateway should "
+                         "dial. The gateway is a pod inside kind, where "
+                         "127.0.0.1 is the pod itself, so this defaults to the "
+                         "host's primary IP (session-48 dry run)")
     ap.add_argument("--hours", type=float, default=8.0,
                     help="serve for this long, then exit cleanly (Kaggle "
                          "kernels are time-boxed; leaving early frees quota)")
@@ -476,6 +494,20 @@ def main() -> None:
     print(f"tier server listening on :{args.port}", flush=True)
 
     public = None if args.no_tunnel else start_tunnel(args.port)
+    if args.no_tunnel:
+        # Single-host route: the export line was never printed here, so the
+        # runbook's "export the mock's printed line" had nothing to copy, and
+        # a hand-written 127.0.0.1 would not reach the host from a pod.
+        host = args.advertise_host or primary_host_ip()
+        backends = {
+            tier: {"kind": "openai", "base_url": f"http://{host}:{args.port}/v1",
+                   "model": alias}
+            for alias, (tier, _) in TIERS.items()
+        }
+        print("\nExport this on the SAME host, then run the step-1c probe:\n", flush=True)
+        print(f"export POLYFORGE_EVAL_TIER_BACKENDS='{json.dumps(backends)}'",
+              flush=True)
+        print(f"(advertising {host}; override with --advertise-host)\n", flush=True)
     if public:
         backends = {
             tier: {"kind": "openai", "base_url": f"{public}/v1", "model": alias}

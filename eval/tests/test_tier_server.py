@@ -273,3 +273,14 @@ def test_batched_generation_matches_serial_exactly():
     batched = [out[i][width:].tolist() for i in range(len(texts))]
 
     assert batched == serial, "batched decode diverged from serial decode"
+
+
+def test_primary_host_ip_is_a_routable_ipv4_not_loopback():
+    """The --no-tunnel export line must carry an address a kind pod can dial;
+    127.0.0.1 from a pod is the pod. Session-48 dry run."""
+    import ipaddress
+    ip = ipaddress.ip_address(kts.primary_host_ip())
+    assert ip.version == 4
+    # A host with no route at all falls back to loopback and says so; any
+    # connected host must not.
+    assert not ip.is_loopback or kts.primary_host_ip() == "127.0.0.1"
