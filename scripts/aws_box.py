@@ -34,14 +34,14 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 
 DEFAULT_REGION = "us-east-1"
-DEFAULT_TYPE = "g6e.4xlarge"
-STEP_UP_TYPE = "g6e.8xlarge"
+DEFAULT_TYPE = "g6e.2xlarge"    # 8 vCPU: measured sufficient, session 48
+STEP_UP_TYPE = "g6e.4xlarge"
 DEFAULT_DISK_GIB = 120          # three models (~22 GB) + images + docker layers
 KEY_NAME = "polyforge-b1"
 SG_NAME = "polyforge-b1-ssh"
 TAG = {"Key": "Name", "Value": "polyforge-b1"}
 # "Running On-Demand G and VT instances" -- the quota is in vCPUs; a fresh
-# account has 0 and g6e.4xlarge needs 16, g6e.8xlarge 32.
+# account has 0; g6e.2xlarge needs 8, g6e.4xlarge 16.
 G_QUOTA_CODE = "L-DB2E81BA"
 # Deep Learning Base OSS NVIDIA Driver GPU AMI: driver + CUDA + Docker +
 # NVIDIA Container Toolkit preinstalled, Ubuntu 22.04 (Python 3.10, which
@@ -177,7 +177,7 @@ def cmd_quota(a) -> None:
     except (ClientError, BotoCoreError, NoCredentialsError) as e:
         die(e, "get quota")
     v = q["Value"]
-    need = {DEFAULT_TYPE: 16, STEP_UP_TYPE: 32}
+    need = {DEFAULT_TYPE: 8, STEP_UP_TYPE: 16}
     print(f"{region_of(a)}  {q['QuotaName']}: {v:g} vCPUs")
     for t, n in need.items():
         print(f"  {t:<12} needs {n:>2}: {'OK' if v >= n else 'BLOCKED -- run: quota-request ' + str(n)}")
