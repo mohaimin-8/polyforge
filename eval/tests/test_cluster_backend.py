@@ -319,3 +319,59 @@ def test_preserve_evidence_writes_host_facts(tmp_path, monkeypatch):
     ev = tmp_path / "evidence"
     cb._preserve_evidence(work, ev, None)
     assert json.loads((ev / "host_facts.json").read_text()) == {"cpu_count": 30}
+
+
+def test_live_ai_install_lifts_the_gateway_limiter_like_the_control_planes(monkeypatch, tmp_path):
+    """joint_stress bursts a tenant to ~1,200 AI RPM; the gateway's default
+    budget is 600. Session 48's per-request k6 CSV put 734 of 740 failures
+    on HTTP 429 from that limiter -- the '8 cores cannot serve the cell'
+    reading was this policy. The eval install must lift it exactly as it
+    lifts the control plane's, on the same helm install."""
+    _live_ai(monkeypatch)
+    plan = cb.command_plan(_run(), tmp_path)
+    installs = [" ".join(c) for c in plan if c[:2] == ["helm", "install"]]
+    gw = [c for c in installs if "gateway.enabled=true" in c]
+    assert gw, "no helm install enables the gateway on the live-AI plane"
+    for c in gw:
+        assert "--set=gateway.rateLimit.requestsPerMinute=1000000" in c
+        assert "--set=gateway.rateLimit.burst=100000" in c
+        # and the control plane's, which was already lifted
+        assert "--set=rateLimit.requestsPerMinute=1000000" in c
+
+
+def test_no_thread_subclass_shadows_thread_stop():
+    """Thread.join() on Python 3.10 calls self._stop(); a subclass that stores
+    an Event under that name breaks join() with "'Event' object is not
+    callable" -- after the load window, on the rented host, every run. CI's
+    3.13 never calls it, so this test checks the name, not the behaviour."""
+    import inspect, threading
+    for name, cls in inspect.getmembers(cb, inspect.isclass):
+        if issubclass(cls, threading.Thread) and cls is not threading.Thread:
+            src = inspect.getsource(cls)
+            assert "self._stop =" not in src and "self._stop=" not in src, name
+
+
+def test_load_distribution_sampler_joins_after_stop():
+    s = cb.LoadDistributionSampler.__new__(cb.LoadDistributionSampler)
+    threading_thread_init = cb.threading.Thread.__init__
+    threading_thread_init(s, daemon=True)
+    s._halt = cb.threading.Event(); s.samples = 0; s.failures = 0
+    s._sample = lambda: None
+    s.start(); s.stop(); s.join(timeout=5)
+    assert not s.is_alive()
+
+
+def test_ai_gateway_load_path_is_a_nodeport_not_a_port_forward(monkeypatch, tmp_path):
+    """Session 48: 127-220 EOFs per run between k6 and the gateway pod with
+    no gateway-side error -- kubectl port-forward dropping streams, the WP14
+    attempt-4 defect on the AI path. Both load paths now enter through kind
+    host-port mappings and kube-proxy."""
+    _live_ai(monkeypatch)
+    import inspect
+    src = inspect.getsource(cb.execute)
+    assert 'port-forward",' not in src, "execute() still spawns a kubectl port-forward"
+    cfg = cb.kind_config("small")
+    assert f"containerPort: {cb.NODE_PORT}" in cfg and f"containerPort: {cb.GATEWAY_NODE_PORT}" in cfg
+    svc = cb.nodeport_service()
+    assert "polyforge-ai-gateway-nodeport" in svc and f"nodePort: {cb.GATEWAY_NODE_PORT}" in svc
+    assert "app.kubernetes.io/name: polyforge-ai-gateway" in svc

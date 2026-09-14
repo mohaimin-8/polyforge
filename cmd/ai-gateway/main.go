@@ -210,6 +210,7 @@ func main() {
 			CacheShared:   os.Getenv("POLYFORGE_CACHE_SHARED") == "1",
 			TierProviders: tierProviders,
 			AdminKey:      os.Getenv("POLYFORGE_ADMIN_KEY"),
+			RateLimit:     rateLimitFromEnv(),
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
@@ -280,6 +281,21 @@ func duckDuckGoSearch(ctx context.Context, query string) ([]agent.SearchResult, 
 		})
 	}
 	return results, nil
+}
+
+// rateLimitFromEnv reads the per-tenant admission budget. Unset or zero
+// keeps gateway.DefaultRateLimit (600 RPM / burst 60). The eval harness
+// raises both to the same values it already sets on the control plane's
+// limiter, because a run's arrival rates are the experiment, not a policy
+// under test: `joint_stress` bursts one tenant to 1,200 AI RPM, twice the
+// default, and every session-45..48 "12.3% failed" was this limiter's 429.
+func rateLimitFromEnv() gateway.RateLimit {
+	rpm, _ := strconv.Atoi(os.Getenv("POLYFORGE_RATE_LIMIT_RPM"))
+	burst, _ := strconv.Atoi(os.Getenv("POLYFORGE_RATE_LIMIT_BURST"))
+	if rpm <= 0 || burst <= 0 {
+		return gateway.RateLimit{}
+	}
+	return gateway.RateLimit{RequestsPerMinute: rpm, Burst: burst}
 }
 
 func envOr(name, fallback string) string {

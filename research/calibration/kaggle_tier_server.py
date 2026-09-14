@@ -389,6 +389,17 @@ def make_handler(models: TierModels, auth_token: str | None = None):
     return Handler
 
 
+class TierHTTPServer(ThreadingHTTPServer):
+    """socketserver's listen backlog is 5. The gateway keeps two idle upstream
+    connections per host (Go's default) and opens fresh ones for the rest, so
+    at ~100 AI rps the accept queue overflowed and the gateway answered 502
+    in 2 ms -- 98 times in the session-48 rung-1 probe, the substrate
+    stand-in failing a guard meant for the cluster. vLLM (uvicorn) listens
+    with a backlog of 2048; the mock must not be the weaker of the two."""
+    request_queue_size = 2048
+    daemon_threads = True
+
+
 def primary_host_ip() -> str:
     """The address this host has on its default route -- what a kind pod can
     dial to reach a server bound here on 0.0.0.0. A UDP socket to a public
@@ -488,8 +499,8 @@ def main() -> None:
 
     auth_token = args.auth_token.strip() or None
     models = TierModels(mock=args.mock)
-    server = ThreadingHTTPServer(("0.0.0.0", args.port),
-                                 make_handler(models, auth_token))
+    server = TierHTTPServer(("0.0.0.0", args.port),
+                            make_handler(models, auth_token))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     print(f"tier server listening on :{args.port}", flush=True)
 

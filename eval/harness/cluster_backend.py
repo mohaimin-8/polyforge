@@ -178,7 +178,13 @@ EVAL_FINE_BUCKET_SECONDS = int(
     os.environ.get("POLYFORGE_EVAL_FINE_BUCKET_SECONDS", "60"))
 TIER_BACKENDS_JSON = os.environ.get("POLYFORGE_EVAL_TIER_BACKENDS", "")
 GATEWAY_IMAGE = "polyforge/ai-gateway:dev"
-GATEWAY_LOCAL_PORT = 18081
+GATEWAY_LOCAL_PORT = 18081  # retained for tools that still dial it; the load path uses the NodePort
+# The AI load path was the one place still on `kubectl port-forward`. The
+# session-48 EC2 probe (per-request k6 CSV + the gateway's own log) showed
+# 127-220 requests per run dying with EOF between k6 and the pod with no
+# gateway-side error at all -- the proxy dropping streams under ~100 rps,
+# the WP14 attempt-4 defect one path over. Same cure as the CRUD path.
+GATEWAY_NODE_PORT = 30081
 # WP14 attempt 5: the CRUD load path is a NodePort published on a kind host
 # port, NOT `kubectl port-forward`. Attempt 4 lost a full 24 h sitting to the
 # forward, which resolves to ONE pod when it starts and never follows the
@@ -277,6 +283,9 @@ def kind_config(cluster_size: str) -> str:
         f"      - containerPort: {NODE_PORT}",
         f"        hostPort: {NODE_PORT}",
         "        protocol: TCP",
+        f"      - containerPort: {GATEWAY_NODE_PORT}",
+        f"        hostPort: {GATEWAY_NODE_PORT}",
+        "        protocol: TCP",
     ]
     lines += ["  - role: worker"] * (nodes - 1)
     return "\n".join(lines) + "\n"
@@ -311,6 +320,30 @@ spec:
       port: 80
       targetPort: http
       nodePort: {NODE_PORT}
+""" + (gateway_nodeport_service() if EVAL_LIVE_AI else "")
+
+
+def gateway_nodeport_service() -> str:
+    """The AI gateway's NodePort, same scaffolding rules as the control
+    plane's. Selector mirrors deploy/helm/polyforge/templates/gateway.yaml."""
+    return f"""---
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyforge-ai-gateway-nodeport
+  namespace: polyforge
+  labels:
+    app.kubernetes.io/managed-by: polyforge-eval
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: polyforge-ai-gateway
+    app.kubernetes.io/instance: polyforge
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: {GATEWAY_NODE_PORT}
 """
 
 
@@ -797,6 +830,17 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         values["gateway.enabled"] = "true"
         values["gateway.image.repository"] = "polyforge/ai-gateway"
         values["gateway.image.tag"] = "dev"
+        # The gateway's OWN per-tenant admission limiter, lifted to the same
+        # values as the control plane's above and for the same reason. It was
+        # not configurable until session 48, so every live-AI run kept the
+        # binary's 600 RPM / burst 60. `joint_stress` bursts a tenant to
+        # ~20 AI rps = 1,200 RPM, twice that budget, and the per-request k6
+        # CSV from the session-48 EC2 probe attributed 734 of 740 failures to
+        # HTTP 429 from this limiter on /ai/chat -- zero on the CRUD path.
+        # The "8 cores cannot serve the cell" reading of sessions 45-47 was
+        # this policy, not host capacity.
+        values["gateway.rateLimit.requestsPerMinute"] = "1000000"
+        values["gateway.rateLimit.burst"] = "100000"
         # Gateway replicas, session 44. The chart default is 1, and every AI
         # request from every tenant funnels through it. That is fine for a
         # `wave` cell and fails for a `bursty` one: `joint_stress` bursts AI to
@@ -1320,15 +1364,20 @@ class LoadDistributionSampler(threading.Thread):
         self.node_of: dict[str, str] = {}
         self.samples = 0
         self.failures = 0
-        self._stop = threading.Event()
+        # `_halt`, like the other two samplers -- NOT `_stop`, which shadows
+        # threading.Thread's private _stop() method. Python 3.10's join() calls
+        # self._stop() and raised "'Event' object is not callable" AFTER the
+        # load window, on every run of the session-48 EC2 dry run; 3.13 (the
+        # laptop, CI) never calls it, which is how it survived 48 sessions.
+        self._halt = threading.Event()
 
     def stop(self) -> None:
-        self._stop.set()
+        self._halt.set()
 
     def run(self) -> None:
-        while not self._stop.is_set():
+        while not self._halt.is_set():
             self._sample()
-            self._stop.wait(self.INTERVAL_S)
+            self._halt.wait(self.INTERVAL_S)
 
     def _sample(self) -> None:
         try:
@@ -1882,11 +1931,8 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                     env = dict(os.environ, POLYFORGE_URL=base,
                                **{f"TOKEN_{tid}": tok for tid, tok in tokens.items()})
                     if EVAL_LIVE_AI:
-                        gw_portforward = subprocess.Popen(
-                            ["kubectl", "--namespace", "polyforge", "port-forward",
-                             "service/polyforge-ai-gateway", f"{GATEWAY_LOCAL_PORT}:80"],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                        gw_base = f"http://127.0.0.1:{GATEWAY_LOCAL_PORT}"
+                        # NodePort, never a port-forward -- see GATEWAY_NODE_PORT.
+                        gw_base = f"http://127.0.0.1:{GATEWAY_NODE_PORT}"
                         _wait_http(gw_base + "/healthz")
                         if run.system not in OPERATOR_SYSTEMS:
                             push_default_knobs(gw_base, tenant_ids)
