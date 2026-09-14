@@ -29,9 +29,15 @@ void by its own clause 4, removing the tunnel and its latency inflation.
 ## 1. Repo and dependencies
 
 ```sh
-git clone <repo> && cd polyforge
-./scripts/phase7_bootstrap.sh          # kind, k6, harness deps (idempotent)
-# docker (daemon, root), helm, kubectl, python per docs/REPRODUCE.md
+# The repository is PRIVATE: a fresh host has no GitHub credential, and none
+# should be put on it. Ship the tree from the operator's machine instead
+# (the session-48 dry run did exactly this; evidence comes back by scp and
+# is committed from the operator's machine):
+#   git archive --format=tar.gz -o /tmp/polyforge-tree.tar.gz HEAD
+#   scp /tmp/polyforge-tree.tar.gz ubuntu@<ip>:~/
+# then on the box:
+mkdir polyforge && tar -xzf polyforge-tree.tar.gz -C polyforge && cd polyforge
+./scripts/phase7_bootstrap.sh          # python, kubectl, helm, kind, k6, harness deps (idempotent)
 docker info >/dev/null && nproc && nvidia-smi --query-gpu=name,memory.total --format=csv
 ./scripts/b1_images.sh                 # build 4 polyforge images, pull 3 third-party (~5 min)
 ```
@@ -137,6 +143,17 @@ export POLYFORGE_EVAL_SHARED_PG=1 POLYFORGE_EVAL_LIVE_AI=1
 export POLYFORGE_EVAL_TIER_BACKENDS='<the mock's printed line>'
 python -m harness.runner experiments/wave4_jointstress_probe.yaml
 ```
+
+The printed line advertises the host's **primary IP** (e.g. `172.31.2.13`),
+never `127.0.0.1`. The AI gateway that dials it is a pod inside kind, and from
+a pod `127.0.0.1` is the pod itself; the host is reachable over the docker
+bridge on its own address. Measured in the session-48 dry run on EC2: a
+container completed a chat request against the mock on the primary IP.
+`b1_tier_host.sh` prints its export line the same way for the real servers,
+which it binds on `0.0.0.0` for the same reason (uvicorn's default is
+loopback only). Until session 48 both printed `127.0.0.1` -- and the mock
+printed nothing at all on `--no-tunnel` -- so the single-host route would have
+failed WL-H2 with an unreachable substrate after the models were loaded.
 
 **Pass** = the run reports `valid` — k6 `http_req_failed` under its frozen
 `rate<0.01` for the full window and sampler coverage ≥ 90%. Nothing about
