@@ -90,7 +90,7 @@ func TestEvalExportPostgresScalesToSoakVolume(t *testing.T) {
 	// 3600 is the soak's bucket width: 24 hourly windows, the granularity
 	// SK-H3 is frozen on.
 	started := time.Now()
-	doc, err := evalAggregatePostgres(budget, adminURL, 3600)
+	doc, err := evalAggregatePostgres(budget, adminURL, 3600, time.Time{})
 	elapsed := time.Since(started)
 	if err != nil {
 		t.Fatalf("export of %d events failed after %s: %v", evalScaleEvents, elapsed.Round(time.Millisecond), err)
