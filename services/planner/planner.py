@@ -101,6 +101,7 @@ class PlannerCore:
                  headroom_calibration: bool = False,
                  headroom_cap: float = 4.0,
                  switch_penalty: float | None = None,
+                 replica_dwell_steps: int = 0,
                  state_file: str | None = None) -> None:
         # The live planner always runs the published physics; a stray
         # sensitivity override in a module global would silently corrupt
@@ -120,6 +121,8 @@ class PlannerCore:
         self._headroom_calibration = bool(headroom_calibration)
         self._headroom_cap = float(headroom_cap)
         self._switch_penalty = None if switch_penalty is None else float(switch_penalty)
+        # Replica dwell (B1' follow-up): off = every registered arm.
+        self._replica_dwell_steps = int(replica_dwell_steps)
         # ThreadingHTTPServer serves each request on its own thread; the
         # controller and its forecast state are shared and not re-entrant.
         # One operator calling every 10 s never contends, but a second
@@ -277,6 +280,7 @@ class PlannerCore:
                 headroom_calibration=self._headroom_calibration,
                 headroom_cap=self._headroom_cap,
                 switch_penalty=self._switch_penalty,
+                replica_dwell_steps=self._replica_dwell_steps,
             )
             self._signature = signature
             if old is not None:
@@ -481,6 +485,11 @@ def main() -> None:
                     help="hysteresis per changed knob in objective units; "
                          "unset = the published 0.05. The corrected arm passes "
                          "half a replica-step (SWITCH_PENALTY_HALF_REPLICA)")
+    ap.add_argument("--replica-dwell-steps", type=int, default=0,
+                    help="control cycles a tenant's replica move may not be "
+                         "reversed within (B1' follow-up: damping for the "
+                         "corrected arm's replica oscillation); 0 = off = "
+                         "every registered arm")
     ap.add_argument("--auth-token-file", default=None,
                     help="path to a file holding the shared bearer token that "
                          "guards /v1/plan and /v1/state; overrides the "
@@ -496,6 +505,7 @@ def main() -> None:
         headroom_calibration=args.headroom_calibration,
         headroom_cap=args.headroom_cap,
         switch_penalty=args.switch_penalty,
+        replica_dwell_steps=args.replica_dwell_steps,
     )
     server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(core, auth_token))
     print(f"jcac planner ({SOLVER_NAME}) listening on :{args.port}")

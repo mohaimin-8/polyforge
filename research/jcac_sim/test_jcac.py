@@ -1668,3 +1668,63 @@ class AILatencyOffsetTests(unittest.TestCase):
         for _ in range(60):
             ctl.observe_realized({"a": RealizedStep(st, demand({"chat": 5.0}), 0.0, 0.001)})
         self.assertGreaterEqual(ctl.ai_latency_offset_ms["a"], ctl.AI_OFFSET_FLOOR_MS)
+
+
+class ReplicaDwellTests(unittest.TestCase):
+    """B1' follow-up: the corrected arm oscillated its replica count on the
+    live plane (CHURN_WAVE4_CALIBRATED.md). A dwell forbids REVERSING a
+    tenant's replica move within N control cycles; off, nothing changes."""
+
+    def test_off_by_default_and_bit_identical(self):
+        from controller import RealizedStep, SWITCH_PENALTY_HALF_REPLICA
+        cfg = {"a": TenantConfig(tenant_id="a", replica_min=1, replica_max=6)}
+        rps = {"crud_read": 20.0, "chat": 12.5, "embed": 5.0, "agent": 2.5}
+        st = TenantState(replicas=5, cache_mb=128, tier="small")
+        paths = []
+        for dwell in (0, None):
+            kw = {} if dwell is None else {"replica_dwell_steps": dwell}
+            ctl = JCACController(dict(cfg), headroom_calibration=True, headroom_cap=4.0,
+                                 switch_penalty=SWITCH_PENALTY_HALF_REPLICA, **kw)
+            self.assertEqual(ctl.replica_dwell_steps, 0)
+            state, path = st, []
+            for _ in range(12):
+                ctl.observe_realized({"a": RealizedStep(state, demand(rps), 1.0, 1300.0)})
+                state = ctl.plan({"a": state}, {"a": demand(rps)})["a"].state
+                path.append(state)
+            paths.append(path)
+        self.assertEqual(paths[0], paths[1])
+
+    def test_reversal_is_blocked_inside_the_dwell_and_free_after(self):
+        cfg = {"a": TenantConfig(tenant_id="a", replica_min=1, replica_max=8)}
+        ctl = JCACController(cfg, replica_dwell_steps=3)
+        ctl._cycle = 10
+        ctl._replica_move["a"] = (10, -1)          # shed replicas at cycle 10
+        self.assertTrue(ctl._dwell_blocks("a", +1))   # cannot grow back at once
+        self.assertFalse(ctl._dwell_blocks("a", -1))  # may keep shedding
+        ctl._cycle = 12
+        self.assertTrue(ctl._dwell_blocks("a", +2))   # still inside 3 cycles
+        ctl._cycle = 13
+        self.assertFalse(ctl._dwell_blocks("a", +1))  # the dwell has elapsed
+        self.assertFalse(ctl._dwell_blocks("b", +1))  # a tenant with no move is free
+
+    def test_plan_records_the_move_and_the_snapshot_carries_it(self):
+        from controller import RealizedStep, SWITCH_PENALTY_HALF_REPLICA
+        cfg = {"a": TenantConfig(tenant_id="a", replica_min=1, replica_max=6)}
+        rps = {"crud_read": 20.0, "chat": 12.5, "embed": 5.0, "agent": 2.5}
+        st = TenantState(replicas=5, cache_mb=128, tier="small")
+        ctl = JCACController(dict(cfg), headroom_calibration=True, headroom_cap=4.0,
+                             switch_penalty=SWITCH_PENALTY_HALF_REPLICA, replica_dwell_steps=3)
+        state = st
+        for _ in range(6):
+            ctl.observe_realized({"a": RealizedStep(state, demand(rps), 1.0, 1300.0)})
+            state = ctl.plan({"a": state}, {"a": demand(rps)})["a"].state
+        self.assertLess(state.replicas, 5)            # it walked down, as the calibrated arm does
+        self.assertIn("a", ctl._replica_move)
+        self.assertEqual(ctl._replica_move["a"][1], -1)
+        snap = ctl.snapshot()
+        other = JCACController(dict(cfg), replica_dwell_steps=3)
+        other.restore(snap)
+        self.assertEqual(other._cycle, ctl._cycle)
+        self.assertEqual(other._replica_move, ctl._replica_move)
+        # and, restored, an immediate reversal is still blocked
+        self.assertTrue(other._dwell_blocks("a", +1))

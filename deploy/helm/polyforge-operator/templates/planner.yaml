@@ -53,6 +53,9 @@ spec:
             {{- if .Values.planner.switchPenalty }}
             - --switch-penalty={{ .Values.planner.switchPenalty }}
             {{- end }}
+            {{- if .Values.planner.replicaDwellSteps }}
+            - --replica-dwell-steps={{ .Values.planner.replicaDwellSteps }}
+            {{- end }}
             - --state-file=/var/lib/polyforge/planner-state.json
           {{- if .Values.planner.auth.enabled }}
           # Defence in depth for /v1/plan and /v1/state, which steer every
