@@ -100,7 +100,7 @@ class PlannerCore:
                  forecast_method: str = "trend",
                  headroom_calibration: bool = False,
                  headroom_cap: float = 4.0,
-                 reversal_hysteresis: bool = False,
+                 switch_penalty: float | None = None,
                  state_file: str | None = None) -> None:
         # The live planner always runs the published physics; a stray
         # sensitivity override in a module global would silently corrupt
@@ -119,7 +119,7 @@ class PlannerCore:
         # carries per kind. Off = the published jcac arm, bit-identical.
         self._headroom_calibration = bool(headroom_calibration)
         self._headroom_cap = float(headroom_cap)
-        self._reversal_hysteresis = bool(reversal_hysteresis)
+        self._switch_penalty = None if switch_penalty is None else float(switch_penalty)
         # ThreadingHTTPServer serves each request on its own thread; the
         # controller and its forecast state are shared and not re-entrant.
         # One operator calling every 10 s never contends, but a second
@@ -276,7 +276,7 @@ class PlannerCore:
                 forecast_method=self._forecast_method,
                 headroom_calibration=self._headroom_calibration,
                 headroom_cap=self._headroom_cap,
-                reversal_hysteresis=self._reversal_hysteresis,
+                switch_penalty=self._switch_penalty,
             )
             self._signature = signature
             if old is not None:
@@ -477,10 +477,10 @@ def main() -> None:
                          "jcac arm")
     ap.add_argument("--headroom-cap", type=float, default=4.0,
                     help="upper bound on the learned capacity scale")
-    ap.add_argument("--reversal-hysteresis", action="store_true",
-                    help="charge the switching penalty only to moves that "
-                         "reverse the previous interval's move on the same "
-                         "knob (B1 follow-up); off = the published jcac arm")
+    ap.add_argument("--switch-penalty", type=float, default=None,
+                    help="hysteresis per changed knob in objective units; "
+                         "unset = the published 0.05. The corrected arm passes "
+                         "half a replica-step (SWITCH_PENALTY_HALF_REPLICA)")
     ap.add_argument("--auth-token-file", default=None,
                     help="path to a file holding the shared bearer token that "
                          "guards /v1/plan and /v1/state; overrides the "
@@ -495,7 +495,7 @@ def main() -> None:
         state_file=args.state_file,
         headroom_calibration=args.headroom_calibration,
         headroom_cap=args.headroom_cap,
-        reversal_hysteresis=args.reversal_hysteresis,
+        switch_penalty=args.switch_penalty,
     )
     server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(core, auth_token))
     print(f"jcac planner ({SOLVER_NAME}) listening on :{args.port}")

@@ -222,6 +222,10 @@ HELM_VALUES_BY_SYSTEM = {
     # by push_default_knobs, exactly like hpa.
     "cache-only": {"planner.enabled": "true", "classifier.enabled": "true"},
     "tier-only": {"planner.enabled": "true", "classifier.enabled": "true"},
+    # Session 48: jcac with the planner's two corrections; the control-plane
+    # chart is identical, the difference lives in the operator chart's planner
+    # flags (see the helm install for the operator).
+    "jcac-calibrated": {"planner.enabled": "true", "classifier.enabled": "true"},
     "replica-only": {"planner.enabled": "false", "autoscaling.hpa.enabled": "true"},
     "hpa": {"planner.enabled": "false", "autoscaling.hpa.enabled": "true"},
     "keda": {"planner.enabled": "false", "autoscaling.keda.enabled": "true"},
@@ -789,7 +793,7 @@ def operator_install_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
          # for this arm only so `jcac` stays the published controller.
          *(["--set=planner.headroomCalibration=true",
             "--set=planner.headroomCap=4.0",
-            "--set=planner.reversalHysteresis=true"]
+            "--set=planner.switchPenalty=0.006667"]
            if run.system == "jcac-calibrated" else []),
          # Live-AI plane: the operator pushes each Policy's cache/tier knobs
          # to the gateway, and the Applied actuation gate covers them.

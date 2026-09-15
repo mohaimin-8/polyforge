@@ -334,13 +334,15 @@ SYSTEMS: dict[str, SystemSpec] = {
     # served 1 ms, and its flat switching penalty exceeded the cost of the
     # replicas it could shed, so replicas ratcheted up and never came down.
     # This arm is jcac with both corrected: capacity calibrated from realized
-    # latency headroom, and hysteresis charged to reversals only. Same knobs,
-    # same objective, same lattice; `jcac` itself is untouched.
+    # CRUD headroom (plus a learned tier-latency offset), and a switching
+    # penalty of half a replica-step. Same knobs, same objective, same
+    # lattice; `jcac` itself is untouched.
     "jcac-calibrated": SystemSpec(
         "jcac", params={"headroom_calibration": True, "headroom_cap": 4.0,
-                        "reversal_hysteresis": True},
+                        "switch_penalty": 0.5 * 0.048 * 10 / 3600 / 0.01},
         description="Wave 4 follow-up: the joint MPC with headroom-calibrated "
-                    "capacity and reversal-only hysteresis",
+                    "capacity, a learned tier-latency offset, and a half-replica "
+                    "switching penalty",
     ),
     # --- W34 baselines ---------------------------------------------------
     "hpa": SystemSpec(

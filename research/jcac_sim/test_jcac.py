@@ -1601,41 +1601,70 @@ class HeadroomCalibrationTests(unittest.TestCase):
         self.assertAlmostEqual(planned.rps["crud_read"], 12.0, delta=0.2)
 
 
-class ReversalHysteresisTests(unittest.TestCase):
-    def test_off_by_default_counts_every_changed_knob(self):
+class CalibratedHysteresisTests(unittest.TestCase):
+    def test_published_penalty_by_default(self):
+        from controller import SWITCH_PENALTY, SWITCH_PENALTY_HALF_REPLICA
         ctl = JCACController({"a": TenantConfig(tenant_id="a")})
-        self.assertFalse(ctl.reversal_hysteresis)
-
-    def test_reversals_counted_only_against_the_last_move(self):
-        ctl = JCACController({"a": TenantConfig(tenant_id="a")}, reversal_hysteresis=True)
-        base = TenantState(replicas=3, cache_mb=128, tier="small")
-        up = TenantState(replicas=5, cache_mb=128, tier="mid")
-        self.assertEqual(ctl._reversals("a", base, up), 0)          # first move is free
-        ctl._last_move["a"] = ctl._move_signs(base, up)              # replicas +, tier +
-        down = TenantState(replicas=4, cache_mb=128, tier="small")   # both reverse
-        self.assertEqual(ctl._reversals("a", up, down), 2)
-        more = TenantState(replicas=6, cache_mb=256, tier="large")   # all continue / new
-        self.assertEqual(ctl._reversals("a", up, more), 0)
+        self.assertEqual(ctl.switch_penalty, SWITCH_PENALTY)
+        # half a replica-step: 0.5 * 0.048 $/h * 10 s / 3600 / 0.01
+        self.assertAlmostEqual(SWITCH_PENALTY_HALF_REPLICA, 0.5 * 0.048 * 10 / 3600 / 0.01, places=12)
+        self.assertLess(SWITCH_PENALTY_HALF_REPLICA, SWITCH_PENALTY / 5)
 
     def test_scales_down_on_cost_once_the_model_agrees_with_the_plant(self):
         # The published controller ratchets: at the live operating point it
         # holds 5 replicas because the flat switch penalty (0.05) exceeds
-        # the saving of shedding two (2 x 0.0133). With reversal hysteresis
-        # and a calibrated model it walks to the floor.
-        from controller import RealizedStep
+        # the saving of shedding two (2 x 0.0133). With the half-replica
+        # penalty and a calibrated model it walks down.
+        from controller import RealizedStep, SWITCH_PENALTY_HALF_REPLICA
         cfg = {"a": TenantConfig(tenant_id="a", replica_min=1, replica_max=6)}
         rps = {"crud_read": 20.0, "chat": 12.5, "embed": 5.0, "agent": 2.5}
         st = TenantState(replicas=5, cache_mb=128, tier="small")
         traj = {}
-        for flag in (False, True):
+        for penalty in (None, SWITCH_PENALTY_HALF_REPLICA):
             ctl = JCACController(dict(cfg), headroom_calibration=True, headroom_cap=4.0,
-                                 reversal_hysteresis=flag)
+                                 switch_penalty=penalty)
             state = st
             path = []
             for _ in range(20):
-                ctl.observe_realized({"a": RealizedStep(state, demand(rps), 1.0, 1.0)})
+                ctl.observe_realized({"a": RealizedStep(state, demand(rps), 1.0, 1300.0)})
                 state = ctl.plan({"a": state}, {"a": demand(rps)})["a"].state
                 path.append(state.replicas)
-            traj[flag] = path
-        self.assertLessEqual(traj[True][-1], 2, traj[True])   # down from 5: the ratchet is broken
-        self.assertGreaterEqual(min(traj[False]), 4, traj[False])  # the ratchet, for the record
+            traj[penalty] = path
+        self.assertLessEqual(traj[SWITCH_PENALTY_HALF_REPLICA][-1], 2, traj)
+        self.assertGreaterEqual(min(traj[None]), 4, traj)  # the ratchet, for the record
+
+
+class AILatencyOffsetTests(unittest.TestCase):
+    def test_ai_family_never_touches_capacity_and_learns_an_offset(self):
+        # The mock served chat in ~1.3 s where the model's small tier says
+        # ~0.3 s. A first attempt read that as a weak replica; now it must
+        # leave capacity_scale alone and learn a positive latency offset.
+        from controller import RealizedStep
+        cfg = {"a": TenantConfig(tenant_id="a")}
+        ctl = JCACController(cfg, headroom_calibration=True)
+        st = TenantState(replicas=2, cache_mb=128, tier="small")
+        rps = {"chat": 5.0}   # no CRUD traffic at all
+        for _ in range(10):
+            ctl.observe_realized({"a": RealizedStep(st, demand(rps), 0.0, 1300.0)})
+        self.assertEqual(ctl.capacity_scale["a"], 1.0)
+        self.assertGreater(ctl.ai_latency_offset_ms["a"], 500.0)
+        # and the projection now carries it: predicted AI p95 rises accordingly
+        pred = evaluate_step(cfg["a"], st, demand(rps)).ai_p95_ms
+        _, _, _ = ctl._project("a", st, [demand(rps)])
+        m = evaluate_step(cfg["a"], st, demand(rps), extra_ai_latency_ms=ctl.ai_latency_offset_ms["a"])
+        self.assertGreater(m.ai_p95_ms, pred + 500.0)
+
+    def test_offset_is_bounded_and_off_by_default(self):
+        from controller import RealizedStep
+        cfg = {"a": TenantConfig(tenant_id="a")}
+        ctl = JCACController(cfg)
+        st = TenantState(replicas=2, cache_mb=128, tier="small")
+        ctl.observe_realized({"a": RealizedStep(st, demand({"chat": 5.0}), 0.0, 99999.0)})
+        self.assertEqual(ctl.ai_latency_offset_ms["a"], 0.0)
+        ctl = JCACController(cfg, headroom_calibration=True)
+        for _ in range(30):
+            ctl.observe_realized({"a": RealizedStep(st, demand({"chat": 5.0}), 0.0, 1e9)})
+        self.assertLessEqual(ctl.ai_latency_offset_ms["a"], ctl.AI_OFFSET_CAP_MS)
+        for _ in range(60):
+            ctl.observe_realized({"a": RealizedStep(st, demand({"chat": 5.0}), 0.0, 0.001)})
+        self.assertGreaterEqual(ctl.ai_latency_offset_ms["a"], ctl.AI_OFFSET_FLOOR_MS)

@@ -61,7 +61,8 @@ planner:
   # the `jcac-calibrated` arm only.
   headroomCalibration: false
   headroomCap: 4.0
-  reversalHysteresis: false
+  # Hysteresis per changed knob; empty = the binary's published 0.05.
+  switchPenalty: ""
   # Shared bearer token guarding /v1/plan and /v1/state. On by default: those
   # routes steer every tenant's capacity and export/overwrite per-tenant demand
   # history, and the NetworkPolicy below is inert on CNIs that do not enforce

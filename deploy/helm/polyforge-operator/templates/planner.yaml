@@ -50,8 +50,8 @@ spec:
             - --headroom-calibration
             - --headroom-cap={{ .Values.planner.headroomCap }}
             {{- end }}
-            {{- if .Values.planner.reversalHysteresis }}
-            - --reversal-hysteresis
+            {{- if .Values.planner.switchPenalty }}
+            - --switch-penalty={{ .Values.planner.switchPenalty }}
             {{- end }}
             - --state-file=/var/lib/polyforge/planner-state.json
           {{- if .Values.planner.auth.enabled }}
