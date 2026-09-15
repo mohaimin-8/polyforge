@@ -27,6 +27,7 @@ type featureRow struct {
 	Service      string  `json:"service"`
 	AvgRPSWindow float64 `json:"avg_rps_window"`
 	AvgLatencyMS float64 `json:"avg_latency_ms"`
+	P95LatencyMS float64 `json:"p95_latency_ms"`
 }
 
 type featureSet struct {
@@ -139,6 +140,16 @@ func (f *FeatureDemandSource) TenantDemand(ctx context.Context, tenantID string)
 		demand.RPS[kind] += row.AvgRPSWindow
 		latencySum += row.AvgLatencyMS * row.AvgRPSWindow
 		latencyWeight += row.AvgRPSWindow
+		// Realized p95 per kind: the worst of the rows that fold into the
+		// kind (conservative: a smaller headroom is the safe error).
+		if row.P95LatencyMS > 0 && row.AvgRPSWindow > 0 {
+			if demand.RealizedP95Ms == nil {
+				demand.RealizedP95Ms = map[string]float64{}
+			}
+			if row.P95LatencyMS > demand.RealizedP95Ms[kind] {
+				demand.RealizedP95Ms[kind] = row.P95LatencyMS
+			}
+		}
 	}
 	if latencyWeight > 0 {
 		demand.CrudBaseMs = latencySum / latencyWeight

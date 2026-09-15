@@ -72,7 +72,7 @@ def _ensure_jcac_sim_importable() -> None:
 _ensure_jcac_sim_importable()
 
 import model  # noqa: E402
-from controller import ClusterLimits, Forecast, JCACController, Weights  # noqa: E402
+from controller import ClusterLimits, Forecast, JCACController, RealizedStep, Weights  # noqa: E402
 from model import TIERS, Demand, TenantConfig, TenantState  # noqa: E402
 
 SOLVER_NAME = "jcac-lattice-v1"
@@ -98,6 +98,9 @@ class PlannerCore:
 
     def __init__(self, default_weights: dict | None = None,
                  forecast_method: str = "trend",
+                 headroom_calibration: bool = False,
+                 headroom_cap: float = 4.0,
+                 reversal_hysteresis: bool = False,
                  state_file: str | None = None) -> None:
         # The live planner always runs the published physics; a stray
         # sensitivity override in a module global would silently corrupt
@@ -111,6 +114,12 @@ class PlannerCore:
         # previously only run the controller default, so the live planner
         # was unable to exploit the measured forecasting results at all.
         self._forecast_method = forecast_method
+        # Headroom calibration (B1 follow-up, session 48): the controller
+        # learns the plant's capacity from the realized p95 the operator now
+        # carries per kind. Off = the published jcac arm, bit-identical.
+        self._headroom_calibration = bool(headroom_calibration)
+        self._headroom_cap = float(headroom_cap)
+        self._reversal_hysteresis = bool(reversal_hysteresis)
         # ThreadingHTTPServer serves each request on its own thread; the
         # controller and its forecast state are shared and not re-entrant.
         # One operator calling every 10 s never contends, but a second
@@ -196,6 +205,7 @@ class PlannerCore:
             raise ValueError("tenants must be a non-empty list")
 
         configs, states, demands, interference = {}, {}, {}, {}
+        realized: dict[str, RealizedStep] = {}
         for entry in tenants:
             if not isinstance(entry, dict):
                 raise ValueError("each tenant must be a JSON object")
@@ -241,6 +251,9 @@ class PlannerCore:
                 crud_base_ms=float(demand_obj.get("crud_base_ms", 50.0)),
             )
             interference[tid] = float(entry.get("interference", 0.0))
+            p95 = demand_obj.get("realized_p95_ms") or {}
+            if isinstance(p95, dict) and p95:
+                realized[tid] = _realized_step(states[tid], demands[tid], p95)
 
         # Weights/limits only: the tenant *set* is deliberately not part of
         # the rebuild signature. Multi-tenant platforms churn tenants, and a
@@ -261,6 +274,9 @@ class PlannerCore:
                 weights=Weights(alpha=signature[0], beta=signature[1], gamma=signature[2]),
                 limits=ClusterLimits(cache_mb=signature[3], replicas=signature[4]),
                 forecast_method=self._forecast_method,
+                headroom_calibration=self._headroom_calibration,
+                headroom_cap=self._headroom_cap,
+                reversal_hysteresis=self._reversal_hysteresis,
             )
             self._signature = signature
             if old is not None:
@@ -294,6 +310,10 @@ class PlannerCore:
         # a failover already reflects the pre-failover demand history.
         self._apply_pending()
 
+        # What the plant served last interval, before deciding the next.
+        # No-op on a controller without headroom calibration.
+        if realized:
+            self._controller.observe_realized(realized)
         plans = self._controller.plan(states, demands, interference=interference)
         return {
             "solver": SOLVER_NAME,
@@ -308,6 +328,20 @@ class PlannerCore:
                 for tid, p in plans.items()
             },
         }
+
+
+CRUD_FAMILY = ("crud_read", "crud_write", "batch")
+AI_FAMILY = ("chat", "embed", "agent")
+
+
+def _realized_step(state: TenantState, demand: Demand, p95: dict) -> RealizedStep:
+    """Fold the operator's per-kind realized p95 into the two families the
+    plant model predicts (worst kind per family; a family with no
+    observation reads 0, which the controller treats as unobserved)."""
+    def worst(kinds) -> float:
+        vals = [float(p95[k]) for k in kinds if k in p95 and float(p95[k]) > 0.0]
+        return max(vals) if vals else 0.0
+    return RealizedStep(state, demand, worst(CRUD_FAMILY), worst(AI_FAMILY))
 
 
 def resolve_auth_token(cli_token_file: str | None = None) -> str | None:
@@ -437,6 +471,16 @@ def main() -> None:
                          "boot and atomically rewritten after each plan, so a "
                          "restart or a PVC-backed replacement pod resumes "
                          "demand history instead of cold-starting")
+    ap.add_argument("--headroom-calibration", action="store_true",
+                    help="learn the plant's capacity from the realized p95 the "
+                         "operator reports (B1 follow-up); off = the published "
+                         "jcac arm")
+    ap.add_argument("--headroom-cap", type=float, default=4.0,
+                    help="upper bound on the learned capacity scale")
+    ap.add_argument("--reversal-hysteresis", action="store_true",
+                    help="charge the switching penalty only to moves that "
+                         "reverse the previous interval's move on the same "
+                         "knob (B1 follow-up); off = the published jcac arm")
     ap.add_argument("--auth-token-file", default=None,
                     help="path to a file holding the shared bearer token that "
                          "guards /v1/plan and /v1/state; overrides the "
@@ -449,6 +493,9 @@ def main() -> None:
         default_weights={"alpha": args.alpha, "beta": args.beta, "gamma": args.gamma},
         forecast_method=args.forecast,
         state_file=args.state_file,
+        headroom_calibration=args.headroom_calibration,
+        headroom_cap=args.headroom_cap,
+        reversal_hysteresis=args.reversal_hysteresis,
     )
     server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(core, auth_token))
     print(f"jcac planner ({SOLVER_NAME}) listening on :{args.port}")

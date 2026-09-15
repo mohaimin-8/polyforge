@@ -1506,3 +1506,136 @@ class BeliefScaleTests(unittest.TestCase):
             self._ctl({"tier_price": 1.5})
         with self.assertRaises(ValueError):
             self._ctl({"tier_cost": 0.0})
+
+
+class HeadroomCalibrationTests(unittest.TestCase):
+    """B1 follow-up (session 48): the controller learns the plant's capacity
+    from realized latency headroom. Published behaviour (flag off) is inert."""
+
+    def _obs(self, state, rps, crud_ms, ai_ms):
+        from controller import RealizedStep
+        return RealizedStep(state, demand(rps), crud_ms, ai_ms)
+
+    def test_off_by_default_and_inert(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = JCACController(configs)
+        st = TenantState(replicas=5, cache_mb=128, tier="small")
+        ctl.observe_realized({"a": self._obs(st, {"crud_read": 20.0, "chat": 12.0}, 1.0, 1.0)})
+        self.assertEqual(ctl.capacity_scale["a"], 1.0)
+        # and planning demand is the published path
+        d = demand({"crud_read": 20.0})
+        self.assertEqual(ctl._planning_demand("a", d).rps, d.rps)
+
+    def test_plant_outperforming_the_model_raises_scale_slowly_to_the_cap(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = JCACController(configs, headroom_calibration=True, headroom_cap=4.0)
+        st = TenantState(replicas=5, cache_mb=128, tier="small")
+        rps = {"crud_read": 20.0, "chat": 12.5, "embed": 5.0, "agent": 2.5}
+        pred = evaluate_step(configs["a"], st, demand(rps))
+        self.assertGreater(pred.crud_p95_ms, 100.0)  # the model expects real latency here
+        # the live cluster served this point at 1 ms
+        ctl.observe_realized({"a": self._obs(st, rps, 1.0, 1.0)})
+        first = ctl.capacity_scale["a"]
+        self.assertGreater(first, 1.0)
+        self.assertAlmostEqual(first, 1.0 + ctl.HEADROOM_LEARN_UP * (4.0 - 1.0))  # a tenth of the gap
+        for _ in range(60):
+            ctl.observe_realized({"a": self._obs(st, rps, 1.0, 1.0)})
+        self.assertAlmostEqual(ctl.capacity_scale["a"], 4.0, delta=0.01)  # 1 - 0.9^61 of the gap
+        # and the plan now deflates demand by the learned scale
+        planned = ctl._planning_demand("a", demand(rps))
+        self.assertAlmostEqual(planned.rps["crud_read"], 20.0 / ctl.capacity_scale["a"], places=6)
+
+    def test_plant_underperforming_lowers_scale_fast_to_the_floor(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = JCACController(configs, headroom_calibration=True)
+        st = TenantState(replicas=2, cache_mb=128, tier="small")
+        rps = {"crud_read": 4.0}
+        pred = evaluate_step(configs["a"], st, demand(rps))
+        # the plant is much worse than the model at this point
+        ctl.observe_realized({"a": self._obs(st, rps, pred.crud_p95_ms * 40.0, 0.0)})
+        first = ctl.capacity_scale["a"]
+        self.assertLess(first, 1.0)
+        self.assertAlmostEqual(first, 1.0 + ctl.HEADROOM_LEARN_DOWN * (0.5 - 1.0))  # half the gap
+        for _ in range(20):
+            ctl.observe_realized({"a": self._obs(st, rps, pred.crud_p95_ms * 40.0, 0.0)})
+        self.assertAlmostEqual(ctl.capacity_scale["a"], ctl.HEADROOM_FLOOR, places=6)
+
+    def test_true_model_is_a_fixed_point(self):
+        # When the plant IS the model, the realized p95 equals the projection
+        # at scale 1 and nothing moves: the sim campaigns stay put.
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = JCACController(configs, headroom_calibration=True)
+        st = TenantState(replicas=3, cache_mb=128, tier="small")
+        rps = {"crud_read": 12.0, "chat": 3.0}
+        m = evaluate_step(configs["a"], st, demand(rps))
+        for _ in range(5):
+            ctl.observe_realized({"a": self._obs(st, rps, m.crud_p95_ms, m.ai_p95_ms)})
+        self.assertAlmostEqual(ctl.capacity_scale["a"], 1.0, places=4)
+
+    def test_zero_or_absent_observations_teach_nothing(self):
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = JCACController(configs, headroom_calibration=True)
+        st = TenantState(replicas=2, cache_mb=128, tier="small")
+        # a realized p95 of 0 (cache-served AI in the live export) and no CRUD traffic
+        ctl.observe_realized({"a": self._obs(st, {"chat": 5.0}, 0.0, 0.0)})
+        self.assertEqual(ctl.capacity_scale["a"], 1.0)
+        ctl.observe_realized({"zzz": self._obs(st, {"crud_read": 5.0}, 1.0, 0.0)})  # unknown tenant
+        self.assertEqual(ctl.capacity_scale["a"], 1.0)
+
+    def test_corrects_a_pessimistic_replica_belief(self):
+        # PREREG_MODEL_MISMATCH's belief_scale: the controller believes a
+        # replica delivers a quarter of its capacity. The plant is the true
+        # model. Calibration must drive capacity_scale toward 1/belief so the
+        # effective scale returns to 1 -- the composition _planning_demand
+        # documents.
+        configs = {"a": TenantConfig(tenant_id="a")}
+        ctl = JCACController(configs, headroom_calibration=True, headroom_cap=8.0,
+                             belief_scale={"replica_capacity": 0.25})
+        st = TenantState(replicas=3, cache_mb=128, tier="small")
+        rps = {"crud_read": 12.0, "chat": 3.0}
+        truth = evaluate_step(configs["a"], st, demand(rps))
+        for _ in range(80):
+            ctl.observe_realized({"a": self._obs(st, rps, truth.crud_p95_ms, truth.ai_p95_ms)})
+        self.assertAlmostEqual(ctl.capacity_scale["a"], 4.0, delta=0.05)
+        planned = ctl._planning_demand("a", demand(rps))
+        self.assertAlmostEqual(planned.rps["crud_read"], 12.0, delta=0.2)
+
+
+class ReversalHysteresisTests(unittest.TestCase):
+    def test_off_by_default_counts_every_changed_knob(self):
+        ctl = JCACController({"a": TenantConfig(tenant_id="a")})
+        self.assertFalse(ctl.reversal_hysteresis)
+
+    def test_reversals_counted_only_against_the_last_move(self):
+        ctl = JCACController({"a": TenantConfig(tenant_id="a")}, reversal_hysteresis=True)
+        base = TenantState(replicas=3, cache_mb=128, tier="small")
+        up = TenantState(replicas=5, cache_mb=128, tier="mid")
+        self.assertEqual(ctl._reversals("a", base, up), 0)          # first move is free
+        ctl._last_move["a"] = ctl._move_signs(base, up)              # replicas +, tier +
+        down = TenantState(replicas=4, cache_mb=128, tier="small")   # both reverse
+        self.assertEqual(ctl._reversals("a", up, down), 2)
+        more = TenantState(replicas=6, cache_mb=256, tier="large")   # all continue / new
+        self.assertEqual(ctl._reversals("a", up, more), 0)
+
+    def test_scales_down_on_cost_once_the_model_agrees_with_the_plant(self):
+        # The published controller ratchets: at the live operating point it
+        # holds 5 replicas because the flat switch penalty (0.05) exceeds
+        # the saving of shedding two (2 x 0.0133). With reversal hysteresis
+        # and a calibrated model it walks to the floor.
+        from controller import RealizedStep
+        cfg = {"a": TenantConfig(tenant_id="a", replica_min=1, replica_max=6)}
+        rps = {"crud_read": 20.0, "chat": 12.5, "embed": 5.0, "agent": 2.5}
+        st = TenantState(replicas=5, cache_mb=128, tier="small")
+        traj = {}
+        for flag in (False, True):
+            ctl = JCACController(dict(cfg), headroom_calibration=True, headroom_cap=4.0,
+                                 reversal_hysteresis=flag)
+            state = st
+            path = []
+            for _ in range(20):
+                ctl.observe_realized({"a": RealizedStep(state, demand(rps), 1.0, 1.0)})
+                state = ctl.plan({"a": state}, {"a": demand(rps)})["a"].state
+                path.append(state.replicas)
+            traj[flag] = path
+        self.assertLessEqual(traj[True][-1], 2, traj[True])   # down from 5: the ratchet is broken
+        self.assertGreaterEqual(min(traj[False]), 4, traj[False])  # the ratchet, for the record

@@ -15,9 +15,17 @@ import (
 )
 
 // Demand is one tenant's observed request mix over the last control window.
+//
+// RealizedP95Ms is the realized p95 latency per request kind over the same
+// window -- the feedback the planner's headroom calibration reads (session
+// 48: the controller planned open-loop on its plant model, which predicted
+// 3,500 ms where the cluster served 1 ms, and bought replicas that bought
+// nothing). Omitted when the window carried no traffic; the planner treats
+// an absent map as "nothing observed", never as zero latency.
 type Demand struct {
-	RPS        map[string]float64 `json:"rps"`
-	CrudBaseMs float64            `json:"crud_base_ms"`
+	RPS           map[string]float64 `json:"rps"`
+	CrudBaseMs    float64            `json:"crud_base_ms"`
+	RealizedP95Ms map[string]float64 `json:"realized_p95_ms,omitempty"`
 }
 
 // State mirrors the knobs the Policy CRD controls.

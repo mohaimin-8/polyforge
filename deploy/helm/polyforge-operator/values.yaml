@@ -56,6 +56,12 @@ planner:
   # persistence | trend | holt | seasonal | seasonal_mr (multi-resolution,
   # can see day-scale cycles live — Wave 5).
   forecast: holt
+  # B1 follow-up (session 48): the two controller corrections the live plane
+  # exposed. Off = the published jcac arm. The eval harness turns both on for
+  # the `jcac-calibrated` arm only.
+  headroomCalibration: false
+  headroomCap: 4.0
+  reversalHysteresis: false
   # Shared bearer token guarding /v1/plan and /v1/state. On by default: those
   # routes steer every tenant's capacity and export/overwrite per-tenant demand
   # history, and the NetworkPolicy below is inert on CNIs that do not enforce

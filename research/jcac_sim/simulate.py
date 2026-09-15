@@ -25,7 +25,7 @@ from pathlib import Path
 
 import baselines
 import model
-from controller import ClusterLimits, JCACController, Weights
+from controller import ClusterLimits, JCACController, RealizedStep, Weights
 from model import (
     AI_KINDS,
     CACHEABLE_FRACTION,
@@ -367,6 +367,7 @@ def run(
         )
         satisfactions = []
         realized: dict[str, float] = {}
+        realized_steps: dict[str, RealizedStep] = {}
         for tid in tenant_ids:
             nominal = states[tid]
             serving = nominal
@@ -399,6 +400,7 @@ def run(
             tenant_steps += 1
             satisfactions.append(1.0 - m.violation)
             realized[tid] = m.violation
+            realized_steps[tid] = RealizedStep(serving, actual[tid], m.crud_p95_ms, m.ai_p95_ms)
 
             demand = actual[tid]
             if sum(demand.rps.get(k, 0.0) for k in CRUD_KINDS) > 0.0:
@@ -429,6 +431,8 @@ def run(
         result.steps += 1
         if hasattr(ctl, "observe_feedback") and not planner_down:
             ctl.observe_feedback(realized)
+        if hasattr(ctl, "observe_realized") and not planner_down:
+            ctl.observe_realized(realized_steps)
 
     if tenant_steps:
         result.mean_violation = viol_sum / tenant_steps

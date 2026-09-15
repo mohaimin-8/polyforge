@@ -96,3 +96,45 @@ func TestUnknownServiceStillMapsToCrudRead(t *testing.T) {
 		t.Errorf("unknown service rps = %v, want 7.0 under crud_read", demand.RPS["crud_read"])
 	}
 }
+
+// The planner's headroom calibration reads realized p95 per kind from the
+// same feature rows demand comes from. Two rows folding into one kind keep
+// the worse p95; a row with no traffic or no p95 contributes nothing; a
+// window with no p95 at all leaves the map absent (not zero).
+func TestRealizedP95IsCarriedPerKindConservatively(t *testing.T) {
+	srv := featuresServer(t, []map[string]any{
+		{"service": "crud_read", "avg_rps_window": 10.0, "avg_latency_ms": 1.0, "p95_latency_ms": 1.2},
+		{"service": "orders", "avg_rps_window": 5.0, "avg_latency_ms": 2.0, "p95_latency_ms": 3.4}, // folds into crud_read
+		{"service": "chat", "avg_rps_window": 3.0, "avg_latency_ms": 400.0, "p95_latency_ms": 900.0},
+		{"service": "embed", "avg_rps_window": 0.0, "avg_latency_ms": 0.0, "p95_latency_ms": 50.0}, // no traffic
+	})
+	defer srv.Close()
+
+	demand, _, err := NewFeatureDemandSource(srv.URL, "tok").
+		TenantDemand(context.Background(), "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := demand.RealizedP95Ms["crud_read"]; got != 3.4 {
+		t.Errorf("crud_read realized p95 = %v, want 3.4 (the worse of the two rows)", got)
+	}
+	if got := demand.RealizedP95Ms["chat"]; got != 900.0 {
+		t.Errorf("chat realized p95 = %v, want 900", got)
+	}
+	if _, ok := demand.RealizedP95Ms["embed"]; ok {
+		t.Errorf("embed carried a p95 with no traffic")
+	}
+
+	quiet := featuresServer(t, []map[string]any{
+		{"service": "crud_read", "avg_rps_window": 1.0, "avg_latency_ms": 1.0},
+	})
+	defer quiet.Close()
+	demand, _, err = NewFeatureDemandSource(quiet.URL, "tok").
+		TenantDemand(context.Background(), "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if demand.RealizedP95Ms != nil {
+		t.Errorf("realized map should be absent when no row carries a p95, got %v", demand.RealizedP95Ms)
+	}
+}

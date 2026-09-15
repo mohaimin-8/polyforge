@@ -46,6 +46,13 @@ spec:
             - --beta={{ .Values.planner.beta }}
             - --gamma={{ .Values.planner.gamma }}
             - --forecast={{ .Values.planner.forecast }}
+            {{- if .Values.planner.headroomCalibration }}
+            - --headroom-calibration
+            - --headroom-cap={{ .Values.planner.headroomCap }}
+            {{- end }}
+            {{- if .Values.planner.reversalHysteresis }}
+            - --reversal-hysteresis
+            {{- end }}
             - --state-file=/var/lib/polyforge/planner-state.json
           {{- if .Values.planner.auth.enabled }}
           # Defence in depth for /v1/plan and /v1/state, which steer every

@@ -327,6 +327,21 @@ SYSTEMS: dict[str, SystemSpec] = {
         description="Wave 4 tier-only ablation: the joint MPC with replicas "
                     "and cache pinned, so only the tier knob actuates",
     ),
+    # B1 follow-up (session 48). The live plane showed the published joint
+    # controller losing WL-H1 to its own tier-only ablation on cost, for two
+    # reasons that are the controller's, not the design's: it planned
+    # open-loop on a plant model that predicted 3,500 ms where the cluster
+    # served 1 ms, and its flat switching penalty exceeded the cost of the
+    # replicas it could shed, so replicas ratcheted up and never came down.
+    # This arm is jcac with both corrected: capacity calibrated from realized
+    # latency headroom, and hysteresis charged to reversals only. Same knobs,
+    # same objective, same lattice; `jcac` itself is untouched.
+    "jcac-calibrated": SystemSpec(
+        "jcac", params={"headroom_calibration": True, "headroom_cap": 4.0,
+                        "reversal_hysteresis": True},
+        description="Wave 4 follow-up: the joint MPC with headroom-calibrated "
+                    "capacity and reversal-only hysteresis",
+    ),
     # --- W34 baselines ---------------------------------------------------
     "hpa": SystemSpec(
         "hpa", lru_eviction=True,

@@ -83,7 +83,7 @@ PLANNER_IMAGE = "polyforge/planner:dev"
 # — the ablations differ only in which knobs their Policy CRs pin (see
 # operator_crs / _arm_knob_bounds). The Wave 4 replica-only arm is NOT here: it
 # is reactive HPA with cache/tier held by push_default_knobs, like hpa.
-OPERATOR_SYSTEMS = {"jcac", "cache-only", "tier-only"}
+OPERATOR_SYSTEMS = {"jcac", "cache-only", "tier-only", "jcac-calibrated"}
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADMIN_SECRET_NAME = "polyforge-admin"  # carries ADMIN_KEY for the operator
@@ -785,6 +785,12 @@ def operator_install_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
          f"--set=features.adminKeySecret.name={ADMIN_SECRET_NAME}",
          f"--set=planner.limits.replicas={size.limits_replicas}",
          f"--set=planner.limits.cacheMB={size.limits_cache_mb}",
+         # jcac-calibrated (session 48): the planner's two corrections, on
+         # for this arm only so `jcac` stays the published controller.
+         *(["--set=planner.headroomCalibration=true",
+            "--set=planner.headroomCap=4.0",
+            "--set=planner.reversalHysteresis=true"]
+           if run.system == "jcac-calibrated" else []),
          # Live-AI plane: the operator pushes each Policy's cache/tier knobs
          # to the gateway, and the Applied actuation gate covers them.
          *([f"--set=gateway.adminURL=http://polyforge-ai-gateway.polyforge.svc:80"]
