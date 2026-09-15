@@ -13,6 +13,11 @@
 # VRAM: fp16 weights are ~1 + 6 + 15 = 22 GB before any KV cache, so a 24 GB
 # card cannot hold all three with room to serve. 40 GB (A100) or better.
 set -euo pipefail
+# pip installs the vllm CLI into ~/.local/bin, which a fresh host's PATH does
+# not include; without this `command -v vllm` fails and the script falls to
+# the module path. Session 48 on g6e.2xlarge: six paid hours of "small never
+# became ready" for exactly that.
+export PATH="$HOME/.local/bin:$PATH"
 
 SMALL_MODEL="${SMALL_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}"
 MID_MODEL="${MID_MODEL:-Qwen/Qwen2.5-3B-Instruct}"
@@ -98,7 +103,6 @@ serve_one() {
   nohup python -m vllm.entrypoints.openai.api_server \
     --model "$model" --served-model-name "$name" \
     --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$util" \
-    --disable-log-requests \
     >"$LOG_DIR/$name.log" 2>&1 &
   echo "$!" >>"$PID_FILE"
 }
