@@ -1225,6 +1225,37 @@ class TestLoadDistributionGate:
         with pytest.raises(RuntimeError, match="never held still"):
             check_load_distribution(s)
 
+    def test_pinning_is_judged_per_sample_when_samples_were_recorded(self):
+        """Session 48: an HPA arm scaling 1 -> 20 inside the window has a
+        starter pod alone for the first samples; its cumulative share (30% in
+        the voided B1' run) fails a whole-window ceiling that a static
+        Deployment defined. Per sample the same run is healthy once the
+        joiners carry their share -- and attempt 4's pinned pod is caught in
+        every sample, as before."""
+        from harness.cluster_backend import check_load_distribution
+
+        # HPA scale-out: 2 samples alone, then 20 pods sharing evenly-ish.
+        cpu = {"starter": 100.0 * 30 * 12}
+        cpu.update({f"j{i}": 100.0 * 30 * 10 for i in range(19)})
+        s = self._sampler(cpu, samples=12)
+        s.presence = {"starter": 12, **{f"j{i}": 10 for i in range(19)}}
+        s.series = [{"starter": 1500.0}] * 2 + [{"starter": 110.0, **{f"j{i}": 100.0 for i in range(19)}}] * 10
+        check_load_distribution(s)  # must not raise: the starter never exceeds 4x fair share among pods present
+
+        # attempt 4: one pod at 1571m and fifteen at 8-16m, in every sample
+        cpu = {"pod-hot": 1571.0 * 30 * 12}
+        cpu.update({f"pod-{i}": 12.0 * 30 * 12 for i in range(15)})
+        s = self._sampler(cpu, samples=12)
+        s.presence = {p: 12 for p in cpu}
+        s.series = [{"pod-hot": 1571.0, **{f"pod-{i}": 12.0 for i in range(15)}}] * 12
+        with pytest.raises(RuntimeError, match="pinned in 12 of 12 samples"):
+            check_load_distribution(s)
+
+        # a pin for a minority of samples (a rollout blip) is not a pinned run
+        s.series = [{"pod-hot": 1571.0, **{f"pod-{i}": 12.0 for i in range(15)}}] * 3 +                    [{"pod-hot": 100.0, **{f"pod-{i}": 100.0 for i in range(15)}}] * 9
+        s.cpu_ms = {p: sum(snap.get(p, 0.0) * 30 for snap in s.series) for p in cpu}
+        check_load_distribution(s)
+
     def test_sampler_counts_presence_per_pod(self, monkeypatch):
         """presence is what the filter and the record read; it must count
         the samples a pod appeared in, not the CPU it burned."""
@@ -1241,6 +1272,7 @@ class TestLoadDistributionGate:
         s._sample(); s._sample()
         assert s.presence == {"a": 2, "b": 1}
         assert s.samples == 2
+        assert s.series == [{"a": 100.0, "b": 1.0}, {"a": 100.0}]
 
 
 class TestObservabilityAndTeardown:
