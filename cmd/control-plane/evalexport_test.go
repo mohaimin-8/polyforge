@@ -245,3 +245,31 @@ func TestComputeEvalExportBucketTierCostSumsToTotal(t *testing.T) {
 		t.Fatalf("bucket 1 tier requests = %v, want mid:1", doc.Buckets[1].TierRequests)
 	}
 }
+
+// Session 48: --since scopes the export to the load window, so the WL-H2
+// preflight's requests -- sent before it as the first scored tenant -- are
+// neither priced nor timed into the run. Events before the instant vanish
+// from every scalar; events at or after it stay.
+func TestEventsSinceDropsThePreflight(t *testing.T) {
+	window := time.Date(2026, 9, 15, 11, 26, 0, 0, time.UTC)
+	tenants := []tenant.Tenant{{ID: "t1", Plan: "standard"}}
+	events := map[string][]telemetry.Event{"t1": {
+		{Service: "chat", LatencyMS: 2400, Timestamp: window.Add(-30 * time.Second), ModelTier: "large"}, // preflight
+		{Service: "chat", LatencyMS: 300, Timestamp: window, ModelTier: "small"},
+		{Service: "crud_read", LatencyMS: 2, Timestamp: window.Add(5 * time.Second)},
+	}}
+	all, err := computeEvalExport(tenants, events, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scoped, err := computeEvalExport(tenants, eventsSince(events, window), 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scoped.CostTierUSD >= all.CostTierUSD || scoped.TierRequests["large"] != 0 || scoped.TierRequests["small"] != 1 {
+		t.Fatalf("scoped export still carries the preflight: %+v vs all %+v", scoped.TierRequests, all.TierRequests)
+	}
+	if got := eventsSince(events, time.Time{}); len(got["t1"]) != 3 {
+		t.Fatalf("a zero since must keep every event, got %d", len(got["t1"]))
+	}
+}

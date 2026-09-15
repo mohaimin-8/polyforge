@@ -431,3 +431,14 @@ def test_export_buckets_are_priced_from_timed_replica_samples():
     # unparseable / bucketless documents pass through untouched
     assert cb.price_export_buckets("not json", s, 60) == "not json"
     assert cb.price_export_buckets('{"buckets": []}', s, 60) == '{"buckets": []}'
+
+
+def test_export_is_scoped_to_the_scored_window():
+    """Session 48: the WL-H2 gate's own requests, sent before the window as
+    the first scored tenant, were priced into every run (~$0.13). The export
+    is told where the window opened; a run that never opened one scores the
+    whole store as before."""
+    assert cb.export_since_args(None) == []
+    args = cb.export_since_args(1789471560.7)  # 2026-09-15T11:26:00Z
+    assert args == ["--since=2026-09-15T11:26:00Z"]
+    assert "execute" in cb.__dict__ and "export_since_args(window_start)" in __import__("inspect").getsource(cb.execute)

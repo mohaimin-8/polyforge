@@ -127,11 +127,14 @@ type evalExportDoc struct {
 	// Buckets is populated only when --bucket-seconds is set, so every
 	// existing consumer and every committed record is byte-identical without
 	// it (omitempty). 3600 for a soak, 60 for a short validation stage.
-	Buckets             []evalBucket `json:"buckets,omitempty"`
-	NEvents             int          `json:"n_events"`
-	NTenants            int          `json:"n_tenants"`
-	GeneratedAtUTC      string       `json:"generated_at_utc"`
-	CostInfraSourceNote string       `json:"cost_infra_source_note"`
+	Buckets        []evalBucket `json:"buckets,omitempty"`
+	NEvents        int          `json:"n_events"`
+	NTenants       int          `json:"n_tenants"`
+	GeneratedAtUTC string       `json:"generated_at_utc"`
+	// ScoredSinceUTC is the instant the harness passed as --since: only
+	// events at or after it were scored. Empty when the whole store was.
+	ScoredSinceUTC      string `json:"scored_since_utc,omitempty"`
+	CostInfraSourceNote string `json:"cost_infra_source_note"`
 }
 
 func evalExport(args []string) int {
@@ -145,8 +148,24 @@ func evalExport(args []string) int {
 		"emit per-window buckets alongside the scalars (0 = off; 3600 for a soak, 60 for a short stage)")
 	timeout := fs.Duration("timeout", evalExportTimeout,
 		"ceiling on the whole export; a soak-sized store takes minutes to reduce")
+	// Session 48: the WL-H2 knob-liveness gate sends its own requests through
+	// the gateway as the first scored tenant before the load window opens --
+	// eleven of them pinned to the largest tier, about $0.13, over half of a
+	// cheap cell's total -- and every metric of the run carried them. The
+	// harness passes the load window's start; nothing before it is scored.
+	sinceFlag := fs.String("since", "",
+		"RFC3339 instant; only telemetry at or after it is scored (the harness passes the load window's start)")
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	var since time.Time
+	if *sinceFlag != "" {
+		parsed, err := time.Parse(time.RFC3339, *sinceFlag)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "eval-export: --since must be RFC3339: %v\n", err)
+			return 2
+		}
+		since = parsed.UTC()
 	}
 	if *format != "json" || *out == "" {
 		fmt.Fprintln(os.Stderr, "usage: control-plane eval-export --format=json --out=PATH|- [--infra-cost-usd=X] [--bucket-seconds=N] [--timeout=D]")
@@ -162,7 +181,7 @@ func evalExport(args []string) int {
 
 	var doc evalExportDoc
 	if adminURL := os.Getenv("POLYFORGE_POSTGRES_ADMIN_URL"); adminURL != "" {
-		aggDoc, err := evalAggregatePostgres(ctx, adminURL, *bucketSeconds)
+		aggDoc, err := evalAggregatePostgres(ctx, adminURL, *bucketSeconds, since)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
 			return 1
@@ -176,11 +195,14 @@ func evalExport(args []string) int {
 			fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
 			return 1
 		}
-		doc, err = computeEvalExport(tenants, events, *infraCost, *bucketSeconds)
+		doc, err = computeEvalExport(tenants, eventsSince(events, since), *infraCost, *bucketSeconds)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "eval-export: %v\n", err)
 			return 1
 		}
+	}
+	if !since.IsZero() {
+		doc.ScoredSinceUTC = since.Format(time.RFC3339)
 	}
 	payload, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
@@ -211,7 +233,27 @@ func evalExport(args []string) int {
 // A 24 h run produces ~25M events, twenty-five times more, which is almost
 // certainly why WP14 attempt 4 recorded no eval-export.json and therefore no
 // metrics at all. See internal/storage/postgres/evalagg.go.
-func evalAggregatePostgres(ctx context.Context, adminURL string, bucketSeconds int) (evalExportDoc, error) {
+// eventsSince drops every event before `since` (a zero `since` keeps all).
+// The in-memory twin of the Postgres path's timestamp predicate, so both
+// exports score the same window.
+func eventsSince(events map[string][]telemetry.Event, since time.Time) map[string][]telemetry.Event {
+	if since.IsZero() {
+		return events
+	}
+	out := make(map[string][]telemetry.Event, len(events))
+	for tenantID, evs := range events {
+		kept := make([]telemetry.Event, 0, len(evs))
+		for _, e := range evs {
+			if !e.Timestamp.Before(since) {
+				kept = append(kept, e)
+			}
+		}
+		out[tenantID] = kept
+	}
+	return out
+}
+
+func evalAggregatePostgres(ctx context.Context, adminURL string, bucketSeconds int, since time.Time) (evalExportDoc, error) {
 	var doc evalExportDoc
 	store, err := postgresstore.Open(ctx, postgresstore.Config{
 		AdminURL: adminURL,
@@ -228,6 +270,7 @@ func evalAggregatePostgres(ctx context.Context, adminURL string, bucketSeconds i
 		ClassScale:       evalSLOClassScale,
 		StepSeconds:      evalStepSeconds,
 		BucketSeconds:    bucketSeconds,
+		Since:            since,
 	})
 	if err != nil {
 		return doc, err

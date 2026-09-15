@@ -1616,6 +1616,24 @@ class ReplicaSampler(threading.Thread):
         return out
 
 
+def export_since_args(window_start: float | None) -> list[str]:
+    """`--since=<RFC3339>` for eval-export, so only telemetry at or after the
+    scored window's opening is priced and timed into the run.
+
+    Session 48: the WL-H2 knob-liveness gate sends its own requests through
+    the gateway before the window as the first scored tenant -- eleven of
+    them pinned to the largest tier in the B1' sitting's first run, about
+    $0.13, more than half of a cheap cell's total -- and the export scored
+    them into cost, latency, violation and cache-hit alike. Every arm paid
+    the same offset, so no comparison flipped, but every percentage was
+    compressed. Nothing without a window (a run that never opened one) is
+    filtered: the export then scores the whole store, as before."""
+    if window_start is None:
+        return []
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(window_start)))
+    return [f"--since={stamp}"]
+
+
 def price_export_buckets(text: str, sampler: "ReplicaSampler", width: int) -> str:
     """Add `cost_infra_usd` and `cost_usd` to every bucket of an eval-export
     document. The control plane prices tier spend per bucket (it sees the
@@ -2076,6 +2094,7 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
         hist_start = hist_end = None
         hist_error = "scored window never opened"
         infra_cost = 0.0
+        window_start: float | None = None
         try:
             for cmd in plan:
                 env = None
@@ -2125,6 +2144,11 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                         hist_start = histogram.scrape()
                     except Exception as exc:  # noqa: BLE001
                         hist_start, hist_error = None, f"start scrape failed: {exc}"
+                    # The scored window opens here. Everything the store holds
+                    # from before this instant -- above all the WL-H2 gate's
+                    # own requests, sent as the first scored tenant -- is
+                    # excluded from the export (session 48; see export_since_args).
+                    window_start = time.time()
                     try:
                         SOAK_MARKER.write_text(
                             f"run_id={run.run_id}\n"
@@ -2140,7 +2164,7 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                 # first and the run would silently keep one granularity.
                 export_name = "eval-export.json"
                 if exporting:
-                    cmd = cmd + [f"--infra-cost-usd={infra_cost:.6f}"]
+                    cmd = cmd + [f"--infra-cost-usd={infra_cost:.6f}"] + export_since_args(window_start)
                     if f"--bucket-seconds={EVAL_FINE_BUCKET_SECONDS}" in cmd                             and EVAL_FINE_BUCKET_SECONDS != EVAL_BUCKET_SECONDS:
                         export_name = "eval-export-fine.json"
                 # Only the load generator streams: every other step's stdout

@@ -157,7 +157,7 @@ func evalParitySeed(t *testing.T, ctx context.Context, store *postgresstore.Stor
 // evalParityInMemory reproduces what evalLoadStore does, then scores it the old
 // way: read every row, aggregate in Go.
 func evalParityInMemory(t *testing.T, ctx context.Context, store *postgresstore.Store,
-	infraCost float64, bucketSeconds int) evalExportDoc {
+	infraCost float64, bucketSeconds int, since ...time.Time) evalExportDoc {
 	t.Helper()
 	tenants, err := store.ListTenants(ctx)
 	if err != nil {
@@ -170,6 +170,9 @@ func evalParityInMemory(t *testing.T, ctx context.Context, store *postgresstore.
 			t.Fatalf("read telemetry for %s: %v", tn.ID, err)
 		}
 		events[tn.ID] = rows
+	}
+	if len(since) > 0 {
+		events = eventsSince(events, since[0])
 	}
 	doc, err := computeEvalExport(tenants, events, infraCost, bucketSeconds)
 	if err != nil {
@@ -206,12 +209,32 @@ func TestEvalExportPostgresMatchesInMemoryScoring(t *testing.T) {
 	t.Setenv("POLYFORGE_POSTGRES_ADMIN_URL", adminURL)
 	t.Setenv("POLYFORGE_POSTGRES_APP_URL", appURL)
 
+	// Session 48: --since scopes both paths to the scored window. The
+	// seed's first minute holds part of the events; scoring from 10:01:00
+	// must drop exactly those on both paths and leave the two in parity.
+	t.Run("since_second_minute", func(t *testing.T) {
+		since := time.Date(2026, 8, 23, 10, 1, 0, 0, time.UTC)
+		memory := evalParityInMemory(t, ctx, store, 0, 60, since)
+		all := evalParityInMemory(t, ctx, store, 0, 60)
+		if memory.NEvents == 0 || memory.NEvents >= all.NEvents {
+			t.Fatalf("since did not scope the in-memory path: %d of %d events", memory.NEvents, all.NEvents)
+		}
+		server, err := evalAggregatePostgres(ctx, adminURL, 60, since)
+		if err != nil {
+			t.Fatalf("evalAggregatePostgres(since): %v", err)
+		}
+		server.TotalCostUSD = server.CostTierUSD + server.CostInfraUSD
+		if got, want := evalParityJSON(t, server), evalParityJSON(t, memory); got != want {
+			t.Fatalf("the two scoring paths disagree under --since.\nserver-side:\n%s\n\nin-memory:\n%s", got, want)
+		}
+	})
+
 	for _, bucketSeconds := range []int{0, 60} {
 		t.Run(fmt.Sprintf("bucket_seconds_%d", bucketSeconds), func(t *testing.T) {
 			const infraCost = 1.5
 			memory := evalParityInMemory(t, ctx, store, infraCost, bucketSeconds)
 
-			server, err := evalAggregatePostgres(ctx, adminURL, bucketSeconds)
+			server, err := evalAggregatePostgres(ctx, adminURL, bucketSeconds, time.Time{})
 			if err != nil {
 				t.Fatalf("evalAggregatePostgres: %v", err)
 			}
@@ -287,7 +310,7 @@ func TestEvalExportPostgresRejectsUnknownPlanLikeInMemory(t *testing.T) {
 	}
 
 	t.Setenv("POLYFORGE_POSTGRES_APP_URL", appURL)
-	if _, err := evalAggregatePostgres(ctx, adminURL, 0); err == nil {
+	if _, err := evalAggregatePostgres(ctx, adminURL, 0, time.Time{}); err == nil {
 		t.Fatal("server-side path accepted an unrecognised plan: its JOIN would " +
 			"silently drop the tenant's events instead of failing the export")
 	}

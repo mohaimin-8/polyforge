@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Server-side aggregation for `control-plane eval-export`.
@@ -34,6 +35,10 @@ type EvalAggSpec struct {
 	ClassScale       map[string]float64
 	StepSeconds      int
 	BucketSeconds    int // 0 disables bucketing
+	// Since scores only events at or after this instant (zero = all). The
+	// harness passes the load window's start so the WL-H2 preflight's own
+	// requests, sent before the window, are not priced or timed into the run.
+	Since time.Time
 }
 
 // EvalAggWindow is one scored time window (or the whole run).
@@ -77,6 +82,11 @@ func (s *Store) baseCTE(spec EvalAggSpec) (string, []any) {
 		args = append(args, plan, scale)
 		i += 2
 	}
+	where := ""
+	if !spec.Since.IsZero() {
+		args = append(args, spec.Since)
+		where = fmt.Sprintf("\n  WHERE e.timestamp >= $%d::timestamptz", i+1)
+	}
 	return `
 WITH scale(plan, s) AS (VALUES ` + strings.Join(pairs, ", ") + `),
 base AS (
@@ -91,7 +101,7 @@ base AS (
               ELSE $1::float8 * sc.s END            AS target
   FROM telemetry_events e
   JOIN tenants t  ON t.id = e.tenant_id
-  JOIN scale  sc  ON sc.plan = btrim(t.plan)
+  JOIN scale  sc  ON sc.plan = btrim(t.plan)` + where + `
 )`, args
 }
 
