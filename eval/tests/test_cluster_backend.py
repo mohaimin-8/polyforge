@@ -392,3 +392,16 @@ def test_every_run_keeps_its_own_evidence(tmp_path, monkeypatch):
     cb._preserve_evidence(work, ev, None, per_run=per)
     for name in ("k6-summary.json", "metrics_histogram.json", "host_facts.json"):
         assert (ev / name).exists() and (per / name).exists(), name
+
+
+def test_every_operator_arm_has_chart_values():
+    """jcac-calibrated was registered in systems.py and OPERATOR_SYSTEMS but
+    not in HELM_VALUES_BY_SYSTEM, and the first run of it failed at
+    command_plan with a KeyError -- on a paid box. Every arm the cluster
+    backend can be asked to run must carry its chart values."""
+    from harness.systems import SYSTEMS
+    for name in cb.OPERATOR_SYSTEMS:
+        assert name in cb.HELM_VALUES_BY_SYSTEM, name
+        assert name in SYSTEMS, name
+    for name in ("jcac", "replica-only", "cache-only", "tier-only", "jcac-calibrated"):
+        assert name in cb.HELM_VALUES_BY_SYSTEM, name

@@ -575,8 +575,8 @@ class HeadroomCalibrationServiceTests(unittest.TestCase):
 
     PEAK = {"rps": {"crud_read": 20.0, "chat": 12.5, "embed": 5.0, "agent": 2.5},
             "crud_base_ms": 50.0,
-            # the live cluster: 1 ms CRUD, cache-served AI reads 0 (unobserved)
-            "realized_p95_ms": {"crud_read": 1.0, "chat": 0.0}}
+            # the live cluster: 1 ms CRUD; the mock's chat ~1.3 s
+            "realized_p95_ms": {"crud_read": 1.0, "chat": 1300.0}}
 
     def test_flag_off_ignores_realized_p95(self):
         core = PlannerCore()
@@ -585,7 +585,7 @@ class HeadroomCalibrationServiceTests(unittest.TestCase):
         self.assertEqual(core._controller.capacity_scale["a"], 1.0)
 
     def test_flag_on_learns_headroom_and_plans_fewer_replicas(self):
-        core = PlannerCore(headroom_calibration=True, headroom_cap=4.0, reversal_hysteresis=True)
+        core = PlannerCore(headroom_calibration=True, headroom_cap=4.0, switch_penalty=0.00667)
         t = tenant("a", state={"replicas": 5, "cache_mb": 128, "tier": "small"}, demand=self.PEAK)
         first = core.plan({"tenants": [t]})
         self.assertGreater(core._controller.capacity_scale["a"], 1.0)

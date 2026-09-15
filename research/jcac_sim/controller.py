@@ -56,6 +56,10 @@ COST_SCALE_USD = 0.01
 CARBON_SCALE_G = 10.0
 
 SWITCH_PENALTY = 0.05  # objective units per changed knob (hysteresis)
+# Half of one replica-step in objective units: the hysteresis a corrected
+# controller charges per changed knob (see JCACController.__init__).
+SWITCH_PENALTY_HALF_REPLICA = 0.5 * (
+    model.REPLICA_COST_USD_HR * model.CONTROL_INTERVAL_S / 3600.0) / COST_SCALE_USD
 DELTA_REPLICAS = (-2, -1, 0, 1, 2)
 
 
@@ -368,6 +372,10 @@ class JCACController:
     HEADROOM_LEARN_DOWN = 0.5  # toward a smaller scale: half the gap per step
     HEADROOM_LEARN_UP = 0.1    # toward a larger scale: a tenth of the gap
     HEADROOM_BISECT = 24       # bisection steps; 2^-24 of the bracket
+    AI_OFFSET_LEARN_UP = 0.5   # plant slower than the tier table: half the gap
+    AI_OFFSET_LEARN_DOWN = 0.1 # plant faster: a tenth of the gap
+    AI_OFFSET_FLOOR_MS = -500.0  # never believe a tier is >0.5 s faster than its table
+    AI_OFFSET_CAP_MS = 30000.0
 
     def __init__(
         self,
@@ -386,7 +394,7 @@ class JCACController:
         belief_scale: dict | None = None,
         headroom_calibration: bool = False,
         headroom_cap: float = 4.0,
-        reversal_hysteresis: bool = False,
+        switch_penalty: float | None = None,
     ):
         self.configs = configs
         # B1 follow-up (session 48), the second defect: SWITCH_PENALTY is a
@@ -396,12 +404,14 @@ class JCACController:
         # controller scales replicas UP on a projected violation and never
         # back DOWN on cost alone -- a ratchet, visible as `4455555...` in the
         # sim trace and as replicas nobody needed on the live bill. Hysteresis
-        # exists to stop oscillation, not convergence: with
-        # `reversal_hysteresis` the penalty applies only to a move that
-        # reverses the previous interval's move on the same knob. Default off:
-        # the published campaigns replay bit-identically (R4).
-        self.reversal_hysteresis = reversal_hysteresis
-        self._last_move: dict[str, dict[str, int]] = {}
+        # exists to damp chatter between near-equal plans, not to block
+        # convergence, so the corrected arm sets the penalty to HALF the cost
+        # of the smallest economic move (SWITCH_PENALTY_HALF_REPLICA): a
+        # one-replica scale-down always clears it, a coin-flip never does.
+        # (A first attempt charged only move REVERSALS; on the live plant that
+        # let a wrong shrink of the cache go free and penalised the correcting
+        # grow -- a one-way trap. Rejected on measurement.) None = published.
+        self.switch_penalty = SWITCH_PENALTY if switch_penalty is None else float(switch_penalty)
         # B1 follow-up (session 48): learn the plant's capacity from realized
         # latency HEADROOM, not only from realized violation. The published
         # `adaptive_capacity` can make the model humbler (capacity_scale <= 1)
@@ -521,6 +531,18 @@ class JCACController:
         self.enforce_budget = enforce_budget
         self._order_cache: list[str] | None = None
         self.capacity_scale = {tid: 1.0 for tid in configs}
+        # Headroom calibration's second dial. Capacity (replicas) is learned
+        # from the CRUD family only: on the live plane AI latency is served by
+        # the gateway and the tier, not by replicas, and a first attempt that
+        # folded the AI family into the capacity target read a slow tier as a
+        # weak replica, halved the believed capacity and bought replicas and
+        # mid-tier routing that cost 2.7x (measured on the mock probe, session
+        # 48). The AI family instead calibrates an ADDITIVE per-tenant latency
+        # offset at the executed tier -- what the model's tier table misses on
+        # this plant -- applied through evaluate_step's extra_ai_latency_ms in
+        # every projection. Fast upward (the plant is slower), slow downward,
+        # never below AI_OFFSET_FLOOR_MS.
+        self.ai_latency_offset_ms = {tid: 0.0 for tid in configs}
         self._projected: dict[str, float] = {}
         # WP5: within-cycle projection memo. `_project` is a pure function of
         # (tenant, state, horizon) for the duration of one `plan()` -- the
@@ -544,7 +566,7 @@ class JCACController:
         return {
             "forecasts": {tid: f.snapshot() for tid, f in self.forecasts.items()},
             "capacity_scale": dict(self.capacity_scale),
-            "last_move": {tid: dict(m) for tid, m in self._last_move.items()},
+            "ai_latency_offset_ms": dict(self.ai_latency_offset_ms),
         }
 
     def restore(self, data: dict) -> None:
@@ -558,9 +580,9 @@ class JCACController:
         for tid, scale in (data.get("capacity_scale") or {}).items():
             if tid in self.capacity_scale:
                 self.capacity_scale[tid] = float(scale)
-        for tid, move in (data.get("last_move") or {}).items():
-            if tid in self.configs and isinstance(move, dict):
-                self._last_move[tid] = {k: int(v) for k, v in move.items()}
+        for tid, off in (data.get("ai_latency_offset_ms") or {}).items():
+            if tid in self.ai_latency_offset_ms:
+                self.ai_latency_offset_ms[tid] = float(off)
 
     def observe_feedback(self, realized_violation: dict[str, float]) -> None:
         """Self-calibration hook the replay engine calls with what each
@@ -581,27 +603,6 @@ class JCACController:
                 scale = min(1.0, scale + self.CAP_RECOVER)
             self.capacity_scale[tid] = scale
 
-    @staticmethod
-    def _move_signs(before: TenantState, after: TenantState) -> dict[str, int]:
-        """Direction of each knob's move, -1/0/+1; tiers ordered by TIERS."""
-        def sign(a, b):
-            return (b > a) - (b < a)
-        return {
-            "replicas": sign(before.replicas, after.replicas),
-            "cache": sign(before.cache_mb, after.cache_mb),
-            "tier": sign(TIERS.index(before.tier), TIERS.index(after.tier)),
-        }
-
-    def _reversals(self, tid: str, base: TenantState, candidate: TenantState) -> int:
-        """How many knobs this candidate would move AGAINST the direction they
-        moved last interval -- the oscillation hysteresis is there to damp.
-        A first move, or a move continuing the last one, is free."""
-        last = self._last_move.get(tid)
-        if not last:
-            return 0
-        now = self._move_signs(base, candidate)
-        return sum(1 for k in now if now[k] != 0 and last[k] != 0 and now[k] == -last[k])
-
     def observe_realized(self, realized: dict[str, "RealizedStep"]) -> None:
         """Headroom calibration hook: what each tenant's plant actually served
         last interval, at which state, under which demand. No-op unless
@@ -612,19 +613,35 @@ class JCACController:
             if tid not in self.configs:
                 continue
             target = self._headroom_target(tid, obs)
-            if target is None:
-                continue
-            scale = self.capacity_scale[tid]
-            rate = self.HEADROOM_LEARN_DOWN if target < scale else self.HEADROOM_LEARN_UP
-            scale = scale + rate * (target - scale)
-            self.capacity_scale[tid] = min(self.headroom_cap, max(self.HEADROOM_FLOOR, scale))
+            if target is not None:
+                scale = self.capacity_scale[tid]
+                rate = self.HEADROOM_LEARN_DOWN if target < scale else self.HEADROOM_LEARN_UP
+                scale = scale + rate * (target - scale)
+                self.capacity_scale[tid] = min(self.headroom_cap, max(self.HEADROOM_FLOOR, scale))
+            gap = self._ai_offset_target(tid, obs)
+            if gap is not None:
+                cur = self.ai_latency_offset_ms[tid]
+                rate = self.AI_OFFSET_LEARN_UP if gap > cur else self.AI_OFFSET_LEARN_DOWN
+                cur = cur + rate * (gap - cur)
+                self.ai_latency_offset_ms[tid] = min(self.AI_OFFSET_CAP_MS, max(self.AI_OFFSET_FLOOR_MS, cur))
+
+    def _ai_offset_target(self, tid: str, obs: "RealizedStep") -> float | None:
+        """realized AI p95 minus the model's projection of the executed point
+        (with the current capacity scale, without any offset): the additive
+        correction that would have made the projection right. None without
+        AI traffic or with a zero realized p95 (cache-served, unobserved)."""
+        ai_rps = sum(obs.demand.rps.get(k, 0.0) for k in model.AI_KINDS)
+        if ai_rps <= 0.0 or obs.ai_p95_ms <= 0.0:
+            return None
+        planned = self._planning_demand(tid, obs.demand)
+        believed = self._believed_state(obs.state) if self.belief_scale else obs.state
+        predicted = evaluate_step(self.configs[tid], believed, planned).ai_p95_ms
+        return obs.ai_p95_ms - predicted
 
     def _headroom_target(self, tid: str, obs: "RealizedStep") -> float | None:
         """The capacity scale at which the controller's own projection of the
-        executed point reproduces the realized p95 -- per traffic family,
-        combined conservatively (the smaller scale wins). None when nothing
-        was observed (no traffic, or a realized p95 of zero, which the live
-        export emits for cache-served AI and which carries no load signal)."""
+        executed point reproduces the realized CRUD p95. None when nothing
+        was observed (no CRUD traffic, or a realized p95 of zero)."""
         config = self.configs[tid]
         belief = (self.belief_scale or {}).get("replica_capacity", 1.0)
         believed = self._believed_state(obs.state) if self.belief_scale else obs.state
@@ -635,13 +652,12 @@ class JCACController:
                        crud_base_ms=obs.demand.crud_base_ms)
             return evaluate_step(config, believed, d)
 
+        # CRUD only: replicas serve CRUD; AI latency is the tier's and is
+        # calibrated separately (see _ai_offset_target).
         families = []
         crud_rps = sum(obs.demand.rps.get(k, 0.0) for k in model.CRUD_KINDS)
-        ai_rps = sum(obs.demand.rps.get(k, 0.0) for k in model.AI_KINDS)
         if crud_rps > 0.0 and obs.crud_p95_ms > 0.0:
             families.append(("crud_p95_ms", obs.crud_p95_ms))
-        if ai_rps > 0.0 and obs.ai_p95_ms > 0.0:
-            families.append(("ai_p95_ms", obs.ai_p95_ms))
         if not families:
             return None
 
@@ -733,10 +749,6 @@ class JCACController:
                 chosen[tid] = self._best_for_tenant(tid, chosen, horizons, origin,
                                                     cost_horizons)
 
-        if self.reversal_hysteresis:
-            for tid, state in chosen.items():
-                self._last_move[tid] = self._move_signs(states[tid], state)
-
         plans = {}
         for tid, state in chosen.items():
             cost, violation, _ = self._project(tid, state, horizons[tid])
@@ -773,18 +785,25 @@ class JCACController:
             # belief branch with neutral multipliers: `cost_usd` and
             # `cost_infra + cost_tier` are equal in real arithmetic but need
             # not be equal in floating point, and R4 is a byte-identity gate.
+            # extra_ai_latency_ms is the learned tier-latency correction;
+            # 0.0 (the default and the published path) leaves evaluate_step's
+            # arithmetic untouched, so R4 holds.
+            offset = self.ai_latency_offset_ms.get(tid, 0.0) if self.headroom_calibration else 0.0
             for demand in horizon:
                 m = evaluate_step(self.configs[tid], state,
-                                  self._planning_demand(tid, demand))
+                                  self._planning_demand(tid, demand),
+                                  extra_ai_latency_ms=offset)
                 cost += m.cost_usd
                 violation += m.violation
                 obj += math.log1p(m.excess)
         else:
             believed = self._believed_state(state)
             tier_belief = self.belief_scale.get("tier_cost", 1.0)
+            offset = self.ai_latency_offset_ms.get(tid, 0.0) if self.headroom_calibration else 0.0
             for demand in horizon:
                 m = evaluate_step(self.configs[tid], believed,
-                                  self._planning_demand(tid, demand))
+                                  self._planning_demand(tid, demand),
+                                  extra_ai_latency_ms=offset)
                 cost += m.cost_infra_usd + tier_belief * m.cost_tier_usd
                 violation += m.violation
                 obj += math.log1p(m.excess)
@@ -916,14 +935,11 @@ class JCACController:
                     # bit-identically (R4).
                     if self.enforce_budget and cost > budget_per_step:
                         continue
-                    if self.reversal_hysteresis:
-                        switches = self._reversals(tid, base, candidate)
-                    else:
-                        switches = (
-                            (candidate.replicas != base.replicas)
-                            + (candidate.cache_mb != base.cache_mb)
-                            + (candidate.tier != base.tier)
-                        )
+                    switches = (
+                        (candidate.replicas != base.replicas)
+                        + (candidate.cache_mb != base.cache_mb)
+                        + (candidate.tier != base.tier)
+                    )
                     fairness = 1.0 - jain_index(other_satisfaction + [1.0 - viol])
                     # W32: a tenant flagged noisy pays for expansion in
                     # proportion to its interference score — the planner
@@ -941,7 +957,7 @@ class JCACController:
                         + self.weights.beta * (other_obj + obj)
                         + self.weights.gamma * (0.5 + config.fairness_weight) * fairness
                         + self.weights.gamma * noise * resource_share
-                        + SWITCH_PENALTY * switches
+                        + self.switch_penalty * switches
                     )
                     # M4 / T18: guarded rather than multiplied by zero, so with
                     # the knob off the score is the published expression to the
