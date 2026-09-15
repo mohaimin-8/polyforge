@@ -1,0 +1,1 @@
+export POLYFORGE_EVAL_TIER_BACKENDS='{"small":{"kind":"openai","base_url":"http://172.31.92.31:9101/v1","model":"small"},"mid":{"kind":"openai","base_url":"http://172.31.92.31:9102/v1","model":"mid"},"large":{"kind":"openai","base_url":"http://172.31.92.31:9103/v1","model":"large"}}'

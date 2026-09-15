@@ -1,0 +1,38 @@
+.== preflight ==
+  gpu0: NVIDIA L40S  cc 8.9  44.4 GiB
+  vllm 0.29.0 imports OK
+== starting three tiers (sequentially) ==
+  starting small  Qwen/Qwen2.5-0.5B-Instruct  :9101  gpu-util=0.12
+  waiting for small ....... ready
+  waiting for mid . ready
+  starting mid  Qwen/Qwen2.5-3B-Instruct  :9102  gpu-util=0.26
+  waiting for mid ....... ready
+  waiting for large . ready
+  starting large  Qwen/Qwen2.5-7B-Instruct  :9103  gpu-util=0.58
+  waiting for large ....... ready
+== placement / residency check ==
+name, memory.total [MiB], memory.used [MiB]
+NVIDIA L40S, 46068 MiB, 45385 MiB
+pid, used_gpu_memory [MiB]
+54716, 6118 MiB
+55050, 12418 MiB
+55371, 26830 MiB
+  small: OK (decoded)
+  mid: OK (decoded)
+  large: OK (decoded)
+== export line for the harness ==
+export POLYFORGE_EVAL_TIER_BACKENDS='{"small":{"kind":"openai","base_url":"http://172.31.92.31:9101/v1","model":"small"},"mid":{"kind":"openai","base_url":"http://172.31.92.31:9102/v1","model":"mid"},"large":{"kind":"openai","base_url":"http://172.31.92.31:9103/v1","model":"large"}}'
+./scripts/b1_tier_host.sh: line 245: _one: command not found
+ ready
+== placement / residency check ==
+name, memory.total [MiB], memory.used [MiB]
+NVIDIA L40S, 46068 MiB, 45385 MiB
+pid, used_gpu_memory [MiB]
+54716, 6118 MiB
+55050, 12418 MiB
+55371, 26830 MiB
+  small: OK (decoded)
+  mid: OK (decoded)
+  large: OK (decoded)
+== export line for the harness ==
+export POLYFORGE_EVAL_TIER_BACKENDS='{"small":{"kind":"openai","base_url":"http://172.31.92.31:9101/v1","model":"small"},"mid":{"kind":"openai","base_url":"http://172.31.92.31:9102/v1","model":"mid"},"large":{"kind":"openai","base_url":"http://172.31.92.31:9103/v1","model":"large"}}'

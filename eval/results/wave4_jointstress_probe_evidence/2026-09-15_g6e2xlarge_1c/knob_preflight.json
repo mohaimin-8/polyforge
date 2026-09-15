@@ -1,7 +1,7 @@
 {
   "gateway": "http://127.0.0.1:30081",
   "tenant": "t00",
-  "generated_at": "2026-09-15T06:07:30Z",
+  "generated_at": "2026-09-14T21:03:03Z",
   "cache": {
     "hit_rate_budgeted": 1.0,
     "hit_rate_zero": 0.0,
@@ -11,16 +11,16 @@
   },
   "tier": {
     "tier_a": "small",
-    "mean_ms_a": 209.17126891678586,
+    "mean_ms_a": 1334.9856366666206,
     "tiers_seen_a": [
       "small"
     ],
     "tier_b": "large",
-    "mean_ms_b": 2068.2085339994956,
+    "mean_ms_b": 1995.7260166666895,
     "tiers_seen_b": [
       "large"
     ],
-    "delta_ms": 1859.0372650827096,
+    "delta_ms": 660.7403800000689,
     "rel_margin": 0.25,
     "abs_margin_ms": 20.0,
     "routing_moved": true,

@@ -1,0 +1,61 @@
+{
+  "samples": 11,
+  "failures": 0,
+  "cpu_ms": {
+    "polyforge-control-plane-65c8857764-459wq": 3300.0,
+    "polyforge-control-plane-65c8857764-8jpwf": 3390.0,
+    "polyforge-control-plane-65c8857764-94spn": 3390.0,
+    "polyforge-control-plane-65c8857764-9vnc7": 3420.0,
+    "polyforge-control-plane-65c8857764-bhjj2": 3540.0,
+    "polyforge-control-plane-65c8857764-cfxw6": 3300.0,
+    "polyforge-control-plane-65c8857764-d8q2w": 3060.0,
+    "polyforge-control-plane-65c8857764-dt6jb": 3450.0,
+    "polyforge-control-plane-65c8857764-gbz9r": 3360.0,
+    "polyforge-control-plane-65c8857764-gv7n8": 3060.0,
+    "polyforge-control-plane-65c8857764-krq45": 3120.0,
+    "polyforge-control-plane-65c8857764-m8j69": 3330.0,
+    "polyforge-control-plane-65c8857764-nsqbl": 3450.0,
+    "polyforge-control-plane-65c8857764-szjfp": 3540.0,
+    "polyforge-control-plane-65c8857764-t5782": 3120.0,
+    "polyforge-control-plane-65c8857764-tgtjz": 3510.0
+  },
+  "shares": {
+    "polyforge-control-plane-65c8857764-459wq": 0.06186726659167604,
+    "polyforge-control-plane-65c8857764-8jpwf": 0.06355455568053993,
+    "polyforge-control-plane-65c8857764-94spn": 0.06355455568053993,
+    "polyforge-control-plane-65c8857764-9vnc7": 0.06411698537682789,
+    "polyforge-control-plane-65c8857764-bhjj2": 0.06636670416197975,
+    "polyforge-control-plane-65c8857764-cfxw6": 0.06186726659167604,
+    "polyforge-control-plane-65c8857764-d8q2w": 0.05736782902137233,
+    "polyforge-control-plane-65c8857764-dt6jb": 0.06467941507311586,
+    "polyforge-control-plane-65c8857764-gbz9r": 0.06299212598425197,
+    "polyforge-control-plane-65c8857764-gv7n8": 0.05736782902137233,
+    "polyforge-control-plane-65c8857764-krq45": 0.05849268841394826,
+    "polyforge-control-plane-65c8857764-m8j69": 0.06242969628796401,
+    "polyforge-control-plane-65c8857764-nsqbl": 0.06467941507311586,
+    "polyforge-control-plane-65c8857764-szjfp": 0.06636670416197975,
+    "polyforge-control-plane-65c8857764-t5782": 0.05849268841394826,
+    "polyforge-control-plane-65c8857764-tgtjz": 0.06580427446569179
+  },
+  "node_of": {
+    "polyforge-control-plane-65c8857764-459wq": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-8jpwf": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-94spn": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-9vnc7": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-bhjj2": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-cfxw6": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-d8q2w": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-dt6jb": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-gbz9r": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-gv7n8": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-krq45": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-m8j69": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-nsqbl": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-szjfp": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-t5782": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-tgtjz": "polyforge-eval-worker"
+  },
+  "node_shares": {
+    "polyforge-eval-worker": 1.0
+  }
+}
