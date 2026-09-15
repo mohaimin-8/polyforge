@@ -1086,6 +1086,24 @@ def check_k6_delivery(summary_path: Path) -> None:
             "demand this cell specifies")
 
 
+def _pinned_samples(series: list[dict[str, float]], max_share: float) -> list[tuple[int, str, float, int]]:
+    """The samples (index, hottest pod, its share of the sample's CPU, pods
+    present) in which one pod exceeded four times the fair share among the
+    pods present. Samples with fewer than four pods are not judged: at one
+    to three replicas the fair share is 25% or more and the ceiling is 100%."""
+    out = []
+    for i, snap in enumerate(series):
+        n = len(snap)
+        total = sum(snap.values())
+        if n < 4 or total <= 0:
+            continue
+        pod, cpu = max(snap.items(), key=lambda kv: kv[1])
+        frac = cpu / total
+        if frac > min(1.0, max(max_share, 4.0 / n)):
+            out.append((i, pod, frac, n))
+    return out
+
+
 def check_load_distribution(sampler: "LoadDistributionSampler",
                             max_share: float = 0.25,
                             min_active_fraction: float = 0.8) -> None:
@@ -1139,7 +1157,29 @@ def check_load_distribution(sampler: "LoadDistributionSampler",
     # sixteen replicas -- the attempt-4 detection is unchanged where it was
     # calibrated -- and stays meaningful below that.
     ceiling = min(1.0, max(max_share, 4.0 / len(shares)))
-    if share > ceiling:
+    series = getattr(sampler, "series", None) or []
+    if series:
+        # Per SAMPLE, not over the window (session 48). A Deployment that
+        # grows during the window -- an HPA arm from one replica to twenty --
+        # has a starter pod that is alone for the first samples and so
+        # carries far more of the window's cumulative CPU than a static fair
+        # share allows; B1' voided one such run at 30% cumulative. Pinning
+        # is a property of each sample: the hottest pod's share of THAT
+        # sample's CPU against four times the fair share among the pods
+        # present in it. It must hold in a majority of the samples with
+        # enough pods to spread over; attempt 4's pinned pod would fail
+        # every one of them.
+        pinned = [(i, pod, frac, n) for i, pod, frac, n in _pinned_samples(series, max_share)]
+        judged = sum(1 for snap in series if len(snap) >= 4)
+        if judged and len(pinned) > judged / 2:
+            i, pod, frac, n = pinned[0]
+            raise RuntimeError(
+                f"load was pinned in {len(pinned)} of {judged} samples: e.g. "
+                f"sample {i} pod {pod} took {frac:.1%} of that sample's CPU "
+                f"(ceiling {min(1.0, max(max_share, 4.0 / n)):.0%} across {n} "
+                "replicas present). This is the WP14 attempt-4 failure mode "
+                "-- one replica carrying the run until it OOMs")
+    elif share > ceiling:
         raise RuntimeError(
             f"load was pinned: pod {hottest} took {share:.1%} of the work "
             f"(ceiling {ceiling:.0%}, fair share {1 / len(shares):.1%} "
@@ -1406,6 +1446,10 @@ class LoadDistributionSampler(threading.Thread):
         # How many samples each pod appeared in: the guard's lifetime filter
         # (MIN_PRESENCE_SAMPLES) and the record's evidence of replica churn.
         self.presence: dict[str, int] = {}
+        # One snapshot per usable sample, pod -> millicores: what the
+        # per-sample pinning test judges and what the record can plot as a
+        # time-course (cumulative shares cannot show a scale-out).
+        self.series: list[dict[str, float]] = []
         self.samples = 0
         self.failures = 0
         # `_halt`, like the other two samplers -- NOT `_stop`, which shadows
@@ -1434,6 +1478,7 @@ class LoadDistributionSampler(threading.Thread):
                 self.failures += 1
                 return
             seen = False
+            snapshot: dict[str, float] = {}
             for line in proc.stdout.splitlines():
                 parts = line.split()
                 if len(parts) < 2 or not parts[1].endswith("m"):
@@ -1445,9 +1490,11 @@ class LoadDistributionSampler(threading.Thread):
                 # the run and idle for the rest is weighted accordingly.
                 self.cpu_ms[pod] = self.cpu_ms.get(pod, 0.0) + cpu * self.INTERVAL_S
                 self.presence[pod] = self.presence.get(pod, 0) + 1
+                snapshot[pod] = cpu
                 seen = True
             if seen:
                 self.samples += 1
+                self.series.append(snapshot)
         except Exception:
             self.failures += 1
 
@@ -1798,6 +1845,7 @@ def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
                                   "failures": loadspread.failures,
                                   "cpu_ms": loadspread.cpu_ms,
                                   "presence": loadspread.presence,
+                                  "series": loadspread.series,
                                   "shares": loadspread.shares(),
                                   "node_of": loadspread.node_of,
                                   "node_shares": loadspread.node_shares()}, indent=2)
