@@ -254,6 +254,10 @@ CAMPAIGN_RECORDS = [
     # is not edited after the run): the figure sheet is the "record" the gate
     # compares, and the figure's content fingerprint is gated with the rest.
     ("fig_wave4_calibrated.py", [], "FIGURE_WAVE4_CALIBRATED.md"),
+    # The registered i.i.d. bootstrap beside a moving-block bootstrap (lag-1
+    # ACF of the paired deltas reaches +0.81): every WL-H1' comparison still
+    # excludes 0 at block 5 and 10. Adds no hypothesis; changes no verdict.
+    ("sensitivity_wave4_calibrated.py", [], "SENSITIVITY_WAVE4_CALIBRATED.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
