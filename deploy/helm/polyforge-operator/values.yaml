@@ -63,6 +63,10 @@ planner:
   headroomCap: 4.0
   # Hysteresis per changed knob; empty = the binary's published 0.05.
   switchPenalty: ""
+  # Control cycles a tenant's replica move may not be reversed within
+  # (B1' follow-up: damping for the corrected arm's replica oscillation).
+  # 0 = off = every registered arm.
+  replicaDwellSteps: 0
   # Shared bearer token guarding /v1/plan and /v1/state. On by default: those
   # routes steer every tenant's capacity and export/overwrite per-tenant demand
   # history, and the NetworkPolicy below is inert on CNIs that do not enforce

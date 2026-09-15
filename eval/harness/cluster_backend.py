@@ -89,7 +89,7 @@ PLANNER_IMAGE = "polyforge/planner:dev"
 # — the ablations differ only in which knobs their Policy CRs pin (see
 # operator_crs / _arm_knob_bounds). The Wave 4 replica-only arm is NOT here: it
 # is reactive HPA with cache/tier held by push_default_knobs, like hpa.
-OPERATOR_SYSTEMS = {"jcac", "cache-only", "tier-only", "jcac-calibrated"}
+OPERATOR_SYSTEMS = {"jcac", "cache-only", "tier-only", "jcac-calibrated", "jcac-calibrated-dwell"}
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ADMIN_SECRET_NAME = "polyforge-admin"  # carries ADMIN_KEY for the operator
@@ -237,6 +237,7 @@ HELM_VALUES_BY_SYSTEM = {
     # chart is identical, the difference lives in the operator chart's planner
     # flags (see the helm install for the operator).
     "jcac-calibrated": {"planner.enabled": "true", "classifier.enabled": "true"},
+    "jcac-calibrated-dwell": {"planner.enabled": "true", "classifier.enabled": "true"},
     "replica-only": {"planner.enabled": "false", "autoscaling.hpa.enabled": "true"},
     "hpa": {"planner.enabled": "false", "autoscaling.hpa.enabled": "true"},
     "keda": {"planner.enabled": "false", "autoscaling.keda.enabled": "true"},
@@ -805,7 +806,10 @@ def operator_install_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
          *(["--set=planner.headroomCalibration=true",
             "--set=planner.headroomCap=4.0",
             "--set=planner.switchPenalty=0.006667"]
-           if run.system == "jcac-calibrated" else []),
+           if run.system in ("jcac-calibrated", "jcac-calibrated-dwell") else []),
+         # ... plus the replica dwell, for the damped arm only (unscored).
+         *(["--set=planner.replicaDwellSteps=3"]
+           if run.system == "jcac-calibrated-dwell" else []),
          # Live-AI plane: the operator pushes each Policy's cache/tier knobs
          # to the gateway, and the Applied actuation gate covers them.
          *([f"--set=gateway.adminURL=http://polyforge-ai-gateway.polyforge.svc:80"]

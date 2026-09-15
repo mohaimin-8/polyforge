@@ -395,8 +395,22 @@ class JCACController:
         headroom_calibration: bool = False,
         headroom_cap: float = 4.0,
         switch_penalty: float | None = None,
+        replica_dwell_steps: int = 0,
     ):
         self.configs = configs
+        # B1' follow-up (session 48): the corrected controller oscillated its
+        # replica count on the live plane -- 8 to 24 replicas in tier_mixed
+        # with single-step jumps of 9-11, changes at 21-24 of 30 steps
+        # (CHURN_WAVE4_CALIBRATED.md). The half-replica switching penalty
+        # holds no plan still once the plant estimate moves every step. A
+        # dwell time is the damping a control engineer reaches for first: a
+        # tenant that changed its replica count may not REVERSE that change
+        # for `replica_dwell_steps` control cycles (same-direction moves and
+        # the other knobs stay free). 0 = off = every registered arm,
+        # bit-identical. Scoring it needs its own pre-registration.
+        self.replica_dwell_steps = max(0, int(replica_dwell_steps))
+        self._cycle = 0
+        self._replica_move: dict[str, tuple[int, int]] = {}  # tid -> (cycle, direction)
         # B1 follow-up (session 48), the second defect: SWITCH_PENALTY is a
         # flat 0.05 objective units per changed knob, while one replica costs
         # 0.048 $/h = 0.0133 units per 10 s step. Dropping the maximum two
@@ -567,6 +581,8 @@ class JCACController:
             "forecasts": {tid: f.snapshot() for tid, f in self.forecasts.items()},
             "capacity_scale": dict(self.capacity_scale),
             "ai_latency_offset_ms": dict(self.ai_latency_offset_ms),
+            "cycle": self._cycle,
+            "replica_move": {tid: list(mv) for tid, mv in self._replica_move.items()},
         }
 
     def restore(self, data: dict) -> None:
@@ -583,6 +599,10 @@ class JCACController:
         for tid, off in (data.get("ai_latency_offset_ms") or {}).items():
             if tid in self.ai_latency_offset_ms:
                 self.ai_latency_offset_ms[tid] = float(off)
+        self._cycle = int(data.get("cycle", self._cycle) or 0)
+        for tid, mv in (data.get("replica_move") or {}).items():
+            if tid in self.configs and len(mv) == 2:
+                self._replica_move[tid] = (int(mv[0]), int(mv[1]))
 
     def observe_feedback(self, realized_violation: dict[str, float]) -> None:
         """Self-calibration hook the replay engine calls with what each
@@ -723,6 +743,7 @@ class JCACController:
         resource expansion, so the planner throttles it rather than feeding
         the interference."""
         self._interference = interference or {}
+        self._cycle += 1
         # WP5: the memo is per cycle. Clearing here (not in __init__)
         # is what makes cross-cycle state impossible.
         self._project_memo.clear()
@@ -749,6 +770,12 @@ class JCACController:
                 chosen[tid] = self._best_for_tenant(tid, chosen, horizons, origin,
                                                     cost_horizons)
 
+        if self.replica_dwell_steps:
+            for tid, state in chosen.items():
+                delta = state.replicas - states[tid].replicas
+                if delta:
+                    self._replica_move[tid] = (self._cycle, 1 if delta > 0 else -1)
+
         plans = {}
         for tid, state in chosen.items():
             cost, violation, _ = self._project(tid, state, horizons[tid])
@@ -758,6 +785,17 @@ class JCACController:
             self._projected[tid] = violation  # feedback baseline (adaptive)
             plans[tid] = PlanEntry(state=state, projected_cost_usd=cost, projected_violation=violation)
         return plans
+
+    def _dwell_blocks(self, tid: str, delta: int) -> bool:
+        """True when `delta` would reverse this tenant's last replica move
+        inside the dwell window. Off (0) blocks nothing."""
+        if not self.replica_dwell_steps:
+            return False
+        last = self._replica_move.get(tid)
+        if last is None:
+            return False
+        cycle, direction = last
+        return (delta > 0) != (direction > 0) and (self._cycle - cycle) < self.replica_dwell_steps
 
     def _project(self, tid: str, state: TenantState, horizon: list[Demand],
                  tag: int = 0) -> tuple[float, float, float]:
@@ -907,6 +945,8 @@ class JCACController:
 
         best_state, best_score = current, float("inf")
         for delta in DELTA_REPLICAS:
+            if delta and self._dwell_blocks(tid, delta):
+                continue
             for cache_mb in neighbor_cache_levels(base.cache_mb):
                 for tier in TIERS:
                     # Per-tenant knob bounds: a pinned (min==max) cache or tier

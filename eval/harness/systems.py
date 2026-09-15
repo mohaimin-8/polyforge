@@ -344,6 +344,16 @@ SYSTEMS: dict[str, SystemSpec] = {
                     "capacity, a learned tier-latency offset, and a half-replica "
                     "switching penalty",
     ),
+    # B1' follow-up (session 48): the calibrated arm plus a replica dwell of
+    # three control cycles (30 s) -- a tenant's replica move may not be
+    # reversed within it. Damping for the oscillation CHURN_WAVE4_CALIBRATED.md
+    # shows; unscored until a pre-registered sitting scores it.
+    "jcac-calibrated-dwell": SystemSpec(
+        "jcac", params={"headroom_calibration": True, "headroom_cap": 4.0,
+                        "switch_penalty": 0.5 * 0.048 * 10 / 3600 / 0.01,
+                        "replica_dwell_steps": 3},
+        description="jcac-calibrated with a three-cycle replica dwell",
+    ),
     # --- W34 baselines ---------------------------------------------------
     "hpa": SystemSpec(
         "hpa", lru_eviction=True,
