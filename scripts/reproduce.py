@@ -262,6 +262,11 @@ CAMPAIGN_RECORDS = [
     # infra cost: the corrected controller oscillates (8-24 replicas in
     # tier_mixed, changes at most steps) -- printed beside its cost win.
     ("churn_wave4_calibrated.py", [], "CHURN_WAVE4_CALIBRATED.md"),
+    # WL-H3' (PREREG_WAVE4_SIM_TRANSFER): the simulator with its plant fitted
+    # from the B1' evidence under a frozen rule, five arms x four cells x 3
+    # reps, against a five-arm published-plant control. Rebuilds from the
+    # committed export wave4_sim_transfer_runs.csv and the live B1' export.
+    ("analysis_wave4_sim_transfer.py", [], "RESULTS_WAVE4_SIM_TRANSFER.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
