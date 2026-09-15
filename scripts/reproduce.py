@@ -258,6 +258,10 @@ CAMPAIGN_RECORDS = [
     # ACF of the paired deltas reaches +0.81): every WL-H1' comparison still
     # excludes 0 at block 5 and 10. Adds no hypothesis; changes no verdict.
     ("sensitivity_wave4_calibrated.py", [], "SENSITIVITY_WAVE4_CALIBRATED.md"),
+    # How each arm ran the replica knob, recovered exactly from the per-bucket
+    # infra cost: the corrected controller oscillates (8-24 replicas in
+    # tier_mixed, changes at most steps) -- printed beside its cost win.
+    ("churn_wave4_calibrated.py", [], "CHURN_WAVE4_CALIBRATED.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
