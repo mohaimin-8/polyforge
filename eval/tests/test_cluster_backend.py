@@ -375,3 +375,20 @@ def test_ai_gateway_load_path_is_a_nodeport_not_a_port_forward(monkeypatch, tmp_
     svc = cb.nodeport_service()
     assert "polyforge-ai-gateway-nodeport" in svc and f"nodePort: {cb.GATEWAY_NODE_PORT}" in svc
     assert "app.kubernetes.io/name: polyforge-ai-gateway" in svc
+
+
+def test_every_run_keeps_its_own_evidence(tmp_path, monkeypatch):
+    """The 2026-09-15 sitting overwrote 15 of 16 per-run exports. Each run
+    now also lands in <experiment>_evidence/runs/<arm>__<cell>__<mix>__<size>__repN/."""
+    run = _run(system="jcac", workload="joint_stress")
+    sub = cb.run_evidence_dir(run)
+    assert sub.parent.name == "runs" and sub.name == "jcac__joint_stress__uniform__small__rep0"
+    assert sub.parent.parent == cb.evidence_dir_for(run)
+    monkeypatch.setattr(cb, "host_facts", lambda: {"cpu_count": 8})
+    work = tmp_path / "work"; work.mkdir()
+    (work / "k6-summary.json").write_text("{}", encoding="utf-8")
+    (work / "metrics_histogram.json").write_text('{"metric": "x"}', encoding="utf-8")
+    ev = tmp_path / "evidence"; per = ev / "runs" / "jcac__joint_stress"
+    cb._preserve_evidence(work, ev, None, per_run=per)
+    for name in ("k6-summary.json", "metrics_histogram.json", "host_facts.json"):
+        assert (ev / name).exists() and (per / name).exists(), name
