@@ -1,0 +1,11 @@
+== placement / residency check ==
+name, memory.total [MiB], memory.used [MiB]
+NVIDIA L40S, 46068 MiB, 0 MiB
+
+pid, used_gpu_memory [MiB]
+
+  small: DOWN
+  mid: DOWN
+  large: DOWN
+
+FATAL: substrate not adequate; do NOT score.

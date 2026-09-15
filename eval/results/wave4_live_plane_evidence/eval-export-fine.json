@@ -1,0 +1,94 @@
+{
+  "total_cost_usd": 0.295967,
+  "cost_tier_usd": 0.22769999999999999,
+  "cost_infra_usd": 0.068267,
+  "mean_violation": 0.000027137042062415198,
+  "violation_step_share": 0,
+  "mean_jain": 0.9999999956578451,
+  "cache_hit_rate": 0.9525347110106555,
+  "crud_p95_ms": 1.005985,
+  "ai_p95_ms": 0.236,
+  "crud_p99_ms": 1.017837,
+  "ai_p99_ms": 538.555,
+  "tier_requests": {
+    "large": 12,
+    "mid": 23,
+    "small": 847
+  },
+  "buckets": [
+    {
+      "bucket_start_utc": "2026-09-15T06:07:00Z",
+      "n_events": 112,
+      "crud_p95_ms": 0,
+      "crud_p99_ms": 0,
+      "ai_p95_ms": 530.029,
+      "ai_p99_ms": 1709.14,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T06:08:00Z",
+      "n_events": 2317,
+      "crud_p95_ms": 1.006123,
+      "crud_p99_ms": 1.035965,
+      "ai_p95_ms": 614.185,
+      "ai_p99_ms": 1892.473,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T06:09:00Z",
+      "n_events": 5801,
+      "crud_p95_ms": 1.005906,
+      "crud_p99_ms": 1.020645,
+      "ai_p95_ms": 316.171,
+      "ai_p99_ms": 911.816,
+      "mean_violation": 0.00017238407171177384,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T06:10:00Z",
+      "n_events": 6379,
+      "crud_p95_ms": 1.005855,
+      "crud_p99_ms": 1.017427,
+      "ai_p95_ms": 0.139,
+      "ai_p99_ms": 311.735,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T06:11:00Z",
+      "n_events": 11772,
+      "crud_p95_ms": 1.006086,
+      "crud_p99_ms": 1.015917,
+      "ai_p95_ms": 0.128,
+      "ai_p99_ms": 0.174,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T06:12:00Z",
+      "n_events": 6770,
+      "crud_p95_ms": 1.005938,
+      "crud_p99_ms": 1.017837,
+      "ai_p95_ms": 0.123,
+      "ai_p99_ms": 0.145,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T06:13:00Z",
+      "n_events": 3699,
+      "crud_p95_ms": 1.005757,
+      "crud_p99_ms": 1.008377,
+      "ai_p95_ms": 0.12,
+      "ai_p99_ms": 0.147,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    }
+  ],
+  "n_events": 36850,
+  "n_tenants": 8,
+  "generated_at_utc": "2026-09-15T06:13:42Z",
+  "cost_infra_source_note": "infra component injected via --infra-cost-usd; replica-hours are not visible in-pod"
+}
