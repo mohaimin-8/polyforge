@@ -1,0 +1,23 @@
+# REHEARSAL ONLY -- NOT A SCORED RUN. Session 48, B1 follow-up.
+#
+# The joint controller's two corrections (jcac-calibrated: headroom-calibrated
+# capacity, reversal-only hysteresis) against the published jcac and the
+# tier-only ablation that beat it live, in the WL-H1 cell, on a real kind
+# cluster with the MOCK tier server. The mock's delays are fixed sleeps that
+# never enter a record, so NOTHING HERE IS EVIDENCE; what is real is the
+# controller's replica and tier decisions against the cluster's actual CRUD
+# latency, which is exactly what the corrections act on. Its purpose is to
+# see the mechanism on the live plant structure before pre-registering a
+# paid sitting. Output database and evidence directory are PROBE-named so
+# the bundler excludes them.
+name: wave4_calibrated_probe
+backend: cluster
+steps: 30
+reps: 1
+systems: [jcac, jcac-calibrated, tier-only]
+workloads: [joint_stress]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/wave4_calibrated_PROBE_MOCK.duckdb
+retries: 0
+timeseries_reps: 0
