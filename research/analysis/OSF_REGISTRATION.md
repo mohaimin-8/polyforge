@@ -48,6 +48,7 @@ listed for the user exactly as the Zenodo/GHCR/video items are in
 | `PREREG_DEGRADE.md` | gap 4.4 (graceful-degradation policy) | `3e66253` | 2026-07-19T03:27:44+06:00 | yes (session 25, DEGRADE_PROBE.md) | _pending_ |
 | `PREREG_WAVE4_LIVE_PLANE.md` | DEFENSE_QA #21 (three-knob live plane) | `821274d` | 2026-07-17T21:40:46+06:00 | yes (session 48, RESULTS_WAVE4_LIVE_PLANE.md: WL-H1 FAIL as scored, WL-H2 PASS x16) | _pending_ |
 | `PREREG_WAVE4_CALIBRATED.md` | DEFENSE_QA #21 (follow-up: one changed factor, the corrected controller; 4 dated amendments after the registered text) | `6b2de57` | 2026-09-15T15:43:55+06:00 | yes (session 48, RESULTS_WAVE4_CALIBRATED.md: WL-H1' PASS, WL-H4 PASS x4) | _pending_ |
+| `PREREG_WAVE4_SIM_TRANSFER.md` | DEFENSE_QA #21 (does the simulator transfer once its plant is fitted to the live evidence; frozen fit rule) | `10febd3` | 2026-09-16T04:49:30+06:00 | yes (session 48, RESULTS_WAVE4_SIM_TRANSFER.md: WL-H3' PASS 3 of 4, control 1 of 4) | _pending_ |
 | `PREREG_TRACE_AZURE.md` | DEFENSE_QA #12 (second real trace) | `527a1b0` | 2026-07-19T16:11:38+06:00 | yes (session 27, RESULTS_TRACE_AZURE.md) | _pending_ |
 | `PREREG_CONCURRENCY.md` | DEFENSE_QA #22 (2026-stack reactive arm) | `ff84846` | 2026-07-19T16:19:52+06:00 | yes (session 27, RESULTS_CONCURRENCY.md) | _pending_ |
 | `PREREG_TENANT_SCALE.md` | DEFENSE_QA #13 (end-to-end width) | `37d36ae` | 2026-07-19T16:24:11+06:00 | yes (session 27, RESULTS_TENANT_SCALE.md) | _pending_ |
