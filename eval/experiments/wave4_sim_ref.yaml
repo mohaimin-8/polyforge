@@ -1,0 +1,19 @@
+# WL-H3's simulator reference for the Wave 4 live plane
+# (PREREG_WAVE4_LIVE_PLANE.md, WL-H3: descriptive, ordinal only). The same
+# four arms and four cells as wave4_live_plane.yaml, on the sim backend, at
+# the live run's step count. Executed AFTER the live sitting (2026-09-15)
+# with the frozen tuned parameters and deterministic seeds; nothing in it is
+# tuned to the live numbers, and the record says when it ran. Three reps for
+# a spread check, as phase7_sim_ref.yaml; absolutes are never compared
+# across substrates (ground rule 3).
+name: wave4_sim_ref
+backend: sim
+steps: 30
+reps: 3
+systems: [jcac, replica-only, cache-only, tier-only]
+workloads: [ai_cacheable, tier_mixed, crud_bursty, joint_stress]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/wave4_sim_ref.duckdb
+retries: 0
+timeseries_reps: 0
