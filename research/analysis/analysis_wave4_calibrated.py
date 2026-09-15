@@ -54,6 +54,7 @@ TREATMENT = "jcac-calibrated"
 MARGIN = 0.01
 N_BOOT = 10_000
 SEED = 20260915
+WINDOW_EVENT_FRACTION = 0.5  # see window_costs (Amendment 2)
 
 COLS = ["system", "workload", "rep", "total_cost_usd", "mean_violation", "mean_jain",
         "cache_hit_rate", "crud_p95_ms", "ai_p95_ms", "crud_p99_ms", "ai_p99_ms"]
@@ -104,13 +105,48 @@ def histogram_p95(arm: str, cell: str, rep: int) -> dict:
     return {k: (v["p95_ms"], v["p99_ms"]) for k, v in (doc.get("routes") or {}).items()}
 
 
+def window_costs(arm: str, cell: str, rep: int) -> list[float] | None:
+    """cost_usd of the buckets INSIDE the k6 load window, in order.
+
+    Amendment 2 (2026-09-15, during the sitting, before any other arm's number
+    was read): the fine export spans the WL-H2 preflight seconds before the
+    window and the teardown seconds after it -- 37 buckets for a 30-step
+    window in the first run -- and the registered pairing is "by position
+    within the window". The window is the longest contiguous run of buckets
+    carrying at least WINDOW_EVENT_FRACTION of the run's median per-bucket
+    event count: the preflight's few requests and the two partial edge buckets
+    fall below it, the thirty full buckets sit far above. Exports without
+    n_events (synthetic) are taken whole."""
+    p = run_dir(arm, cell, rep) / "eval-export-fine.json"
+    if not p.exists():
+        return None
+    doc = json.loads(p.read_text(encoding="utf-8"))
+    b = doc.get("buckets") or []
+    if not b or "cost_usd" not in b[0]:
+        return None
+    if "n_events" not in b[0]:
+        return [float(x["cost_usd"]) for x in b]
+    counts = sorted(int(x["n_events"]) for x in b)
+    floor = WINDOW_EVENT_FRACTION * counts[len(counts) // 2]
+    best, cur = [], []
+    for x in b:
+        if int(x["n_events"]) >= floor:
+            cur.append(float(x["cost_usd"]))
+        else:
+            best, cur = (cur if len(cur) > len(best) else best), []
+    best = cur if len(cur) > len(best) else best
+    return best or None
+
+
 def paired_deltas(cell: str, a: str, b: str, reps: list[int]) -> list[float]:
-    """Per-bucket cost deltas a - b, paired by bucket position, reps pooled.
-    A rep contributes only if both arms carry priced buckets of equal count."""
+    """Per-bucket cost deltas a - b, paired by position from the window's
+    first bucket, reps pooled. Where the two windows differ in length by a
+    bucket (the window edges fall differently against the 10-s grid) the
+    pairing runs to the shorter one; n_pairs is reported with every CI."""
     out = []
     for rep in reps:
-        ca, cb = bucket_costs(a, cell, rep), bucket_costs(b, cell, rep)
-        if ca and cb and len(ca) == len(cb):
+        ca, cb = window_costs(a, cell, rep), window_costs(b, cell, rep)
+        if ca and cb:
             out.extend(x - y for x, y in zip(ca, cb))
     return out
 
@@ -247,23 +283,33 @@ def build() -> str:
     L.append("")
     L.append("## Every run — means over reps (replay-clock latencies) and the histogram's route p95 / p99")
     L.append("")
-    L.append("| cell | arm | cost $ | Jain | violation | cache hit | AI p95 ms (replay) | CRUD p95 ms (replay) | histogram replay-route p95 / p99 ms |")
-    L.append("|---|---|---|---|---|---|---|---|---|")
+    L.append("| cell | arm | cost $ | Jain | violation | cache hit | AI p95 ms (replay) | CRUD p95 ms (replay) | histogram replay-route p95 / p99 ms | window buckets (rep 0 ; rep 1) |")
+    L.append("|---|---|---|---|---|---|---|---|---|---|")
     order = {c: i for i, c in enumerate(CELLS)}; aorder = {a: i for i, a in enumerate(ARMS)}
     for _, r in m.assign(_c=m.workload.map(order), _a=m.system.map(aorder)).sort_values(["_c", "_a"]).iterrows():
-        hp = []
+        hp, wb = [], []
         for rep in sorted(df.rep.unique()):
             routes = histogram_p95(r.system, r.workload, int(rep))
             replay = next((v for k, v in routes.items() if "replay" in k), None)
             if replay:
                 hp.append(f"{replay[0]:.1f}/{replay[1]:.1f}")
+            w = window_costs(r.system, r.workload, int(rep))
+            wb.append(str(len(w)) if w else "none")
         L.append(f"| {r.workload} | {r.system} | {r.total_cost_usd:.4f} | {r.mean_jain:.3f} | {r.mean_violation:.4f} | "
-                 f"{r.cache_hit_rate:.2f} | {r.ai_p95_ms:.0f} | {r.crud_p95_ms:.1f} | {' ; '.join(hp) or 'not captured'} |")
+                 f"{r.cache_hit_rate:.2f} | {r.ai_p95_ms:.0f} | {r.crud_p95_ms:.1f} | {' ; '.join(hp) or 'not captured'} | {' ; '.join(wb)} |")
     L.append("")
     L.append("## Notes")
     L.append("")
     L.append("* Histogram p95/p99 are route-level (the metric has no tenant label) and are never compared to the replay clock.")
     L.append("* Missing bucket costs (a run whose fine export lacks `cost_usd`) drop that rep from the pairing; `pairs` says how many buckets each CI rests on.")
+    L.append("* **Window (Amendment 2).** The fine export spans the WL-H2 preflight and the teardown seconds around the 300-s "
+             "window; the pairing uses the longest contiguous run of buckets carrying at least half the run's median "
+             f"per-bucket event count (`window buckets` above; 30 is the design), paired by position from the window's "
+             "first bucket and truncated to the shorter window of a pair.")
+    L.append("* **Preflight spend is inside `total_cost_usd`.** The WL-H2 knob-liveness gate sends its own requests through the "
+             "gateway before the window (eleven of them pinned to `large` in the first run, about $0.128 of every run's "
+             "tier spend), and the run-level export prices them. The gate is identical for every arm, so the offset is "
+             "common to all run-level costs and absent from the per-bucket pairing.")
     L.append("")
     return "\n".join(L) + "\n"
 

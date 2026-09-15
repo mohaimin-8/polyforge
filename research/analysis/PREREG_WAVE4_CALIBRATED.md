@@ -183,3 +183,37 @@ What was seen before the restart and is disclosed here: the calibrated arm
 churns replicas in `ai_cacheable` (23 distinct pods in a 300-s window). No
 cost, fairness or latency number of any arm was seen. No arm, cell, margin,
 cap, penalty, metric or reading changes.
+
+## Amendment 2 (session 48, 2026-09-15 11:50 UTC — after the first run of the restarted sitting, before any other arm's number was read)
+
+Appended after the registered text and Amendment 1; nothing above changed.
+
+**What was seen.** The first run of the restart (`jcac-calibrated`,
+`ai_cacheable`, rep 0) is valid and carries both exports. Its fine export has
+**37** ten-second buckets for a 30-step window: five buckets of WL-H2
+preflight traffic before the window (a few dozen requests, eleven of them
+pinned to `large`), a partial edge bucket, thirty full buckets, a partial
+tail bucket. The one number read from it is that run's total cost
+($0.2307); no other arm has completed.
+
+**What was wrong in the scorer.** `paired_deltas` paired the *whole* export
+and dropped a rep whenever the two arms' bucket counts differed — so a
+one-second difference in where a window fell against the 10-s grid could
+leave WL-H1′ with no pairs and score a FAIL for a bookkeeping reason. The
+registered text says "buckets paired by position **within the window**";
+the implementation did not find the window.
+
+**What changed** (scorer only; commit noted in the record). `window_costs`
+takes the longest contiguous run of buckets carrying at least half the run's
+median per-bucket event count — the preflight and the two partial edge
+buckets fall far below it, the thirty full buckets far above — and
+`paired_deltas` pairs by position from the window's first bucket, truncating
+to the shorter window where the two differ by a bucket; `n_pairs` is
+reported with every CI and the per-run window bucket count is printed in
+the record. `bootstrap_ci`, the seed, the resample count, the margin, the
+"beats" rule and every run-level reading are untouched. Tests added.
+
+**Disclosed with it.** `total_cost_usd` per run — the registered run-level
+cost — includes the WL-H2 preflight's own requests (about $0.128 of tier
+spend in that first run). The gate is identical for every arm, so the offset
+is common to every run-level cost; it is absent from the per-bucket pairing.

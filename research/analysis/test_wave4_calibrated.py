@@ -64,3 +64,42 @@ def test_missing_bucket_costs_drop_the_rep_not_the_record(tmp_path, monkeypatch)
     _write_run(tmp_path, "jcac-calibrated", "tier_mixed", 0, [0.01] * 5)
     assert aw.paired_deltas("tier_mixed", "jcac-calibrated", "jcac", [0, 1]) == []
     assert aw.bucket_costs("jcac", "tier_mixed", 0) is None
+
+
+def _write_shaped_run(root: Path, arm: str, cell: str, rep: int, window: list[float], lead_edge: int = 497) -> None:
+    """A fine export shaped like the first live run: five preflight buckets
+    with a handful of events (two of them expensive), a partial edge bucket,
+    the window at ~1000 events a bucket, a partial tail bucket."""
+    d = root / "runs" / f"{arm}__{cell}__uniform__small__rep{rep}"
+    d.mkdir(parents=True)
+    pre = [(16, 0.0016), (64, 0.004), (29, 0.0128), (5, 0.05), (6, 0.06)]
+    rows = [{"n_events": n, "cost_usd": c} for n, c in pre]
+    rows.append({"n_events": lead_edge, "cost_usd": 0.02})
+    rows += [{"n_events": 1000 + i, "cost_usd": c} for i, c in enumerate(window)]
+    rows.append({"n_events": 443, "cost_usd": 0.002})
+    for i, r in enumerate(rows):
+        r["bucket_start_utc"] = f"2026-09-15T11:25:{i:02d}Z"
+    (d / "eval-export-fine.json").write_text(json.dumps({"buckets": rows}))
+
+
+def test_window_is_the_full_buckets_not_the_preflight_or_the_edges(tmp_path, monkeypatch):
+    """Amendment 2: 37 buckets in the export, 30 in the window. The preflight's
+    eleven `large` requests (0.05 + 0.06) must not enter the pairing."""
+    monkeypatch.setattr(aw, "EVIDENCE", tmp_path)
+    _write_shaped_run(tmp_path, "jcac-calibrated", "joint_stress", 0, [0.010] * 30)
+    w = aw.window_costs("jcac-calibrated", "joint_stress", 0)
+    assert w == [0.010] * 30
+    assert len(aw.bucket_costs("jcac-calibrated", "joint_stress", 0)) == 37
+
+
+def test_windows_a_bucket_apart_pair_to_the_shorter_and_synthetic_exports_pair_whole(tmp_path, monkeypatch):
+    monkeypatch.setattr(aw, "EVIDENCE", tmp_path)
+    _write_shaped_run(tmp_path, "jcac-calibrated", "joint_stress", 0, [0.010] * 30)
+    # the other arm's window edge landed inside the grid: its lead bucket is full
+    _write_shaped_run(tmp_path, "tier-only", "joint_stress", 0, [0.012] * 30, lead_edge=980)
+    assert len(aw.window_costs("tier-only", "joint_stress", 0)) == 31
+    deltas = aw.paired_deltas("joint_stress", "jcac-calibrated", "tier-only", [0])
+    assert len(deltas) == 30 and all(abs(d - (0.010 - 0.02)) < 1e-12 for d in deltas[:1])
+    # exports without n_events (the synthetic ones above) are taken whole
+    _write_run(tmp_path, "jcac", "tier_mixed", 0, [0.01] * 12)
+    assert aw.window_costs("jcac", "tier_mixed", 0) == [0.01] * 12
