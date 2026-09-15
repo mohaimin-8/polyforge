@@ -405,3 +405,29 @@ def test_every_operator_arm_has_chart_values():
         assert name in SYSTEMS, name
     for name in ("jcac", "replica-only", "cache-only", "tier-only", "jcac-calibrated"):
         assert name in cb.HELM_VALUES_BY_SYSTEM, name
+
+
+def test_export_buckets_are_priced_from_timed_replica_samples():
+    """Session 48: the registered paired bootstrap needs a cost per bucket.
+    The control plane now exports tier cost per bucket; the harness adds the
+    infra share from timestamped replica samples, UTC-correct, and a total."""
+    import calendar, time as _t
+    s = cb.ReplicaSampler(interval_s=10.0)
+    t0 = calendar.timegm(_t.strptime("2026-09-15T06:07:00Z", "%Y-%m-%dT%H:%M:%SZ"))
+    # 3 samples in bucket 0 (2 replicas), 3 in bucket 1 (4 replicas), one before any bucket
+    s.timed = [(t0 - 5, 9), (t0 + 1, 2), (t0 + 11, 2), (t0 + 21, 2), (t0 + 61, 4), (t0 + 71, 4), (t0 + 81, 4)]
+    s.samples = [r for _, r in s.timed]
+    doc = {"cost_tier_usd": 0.5, "buckets": [
+        {"bucket_start_utc": "2026-09-15T06:07:00Z", "cost_tier_usd": 0.2},
+        {"bucket_start_utc": "2026-09-15T06:08:00Z", "cost_tier_usd": 0.3}]}
+    out = json.loads(cb.price_export_buckets(json.dumps(doc), s, 60))
+    per_sample = 10.0 / 3600.0 * cb.REPLICA_COST_USD_HR
+    assert abs(out["buckets"][0]["cost_infra_usd"] - 3 * 2 * per_sample) < 1e-9
+    assert abs(out["buckets"][1]["cost_infra_usd"] - 3 * 4 * per_sample) < 1e-9
+    assert abs(out["buckets"][1]["cost_usd"] - (0.3 + 3 * 4 * per_sample)) < 1e-9
+    assert out["bucket_seconds"] == 60
+    # the stray sample before the first bucket stays in the run total only
+    assert abs(s.infra_cost_usd() - sum(r for _, r in s.timed) * per_sample) < 1e-9
+    # unparseable / bucketless documents pass through untouched
+    assert cb.price_export_buckets("not json", s, 60) == "not json"
+    assert cb.price_export_buckets('{"buckets": []}', s, 60) == '{"buckets": []}'

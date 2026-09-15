@@ -90,6 +90,12 @@ type evalBucket struct {
 	AIP99MS            float64 `json:"ai_p99_ms"`
 	MeanViolation      float64 `json:"mean_violation"`
 	ViolationStepShare float64 `json:"violation_step_share"`
+	// Per-bucket tier spend (session 48): the paired bootstrap the Wave 4
+	// pre-registration commits to needs a cost per bucket, and the export
+	// carried only the run total. Same pricing as CostTierUSD, per bucket;
+	// the harness adds the bucket's infra share from its replica sampler.
+	CostTierUSD  float64        `json:"cost_tier_usd"`
+	TierRequests map[string]int `json:"tier_requests,omitempty"`
 }
 
 // evalBucketAcc accumulates one bucket while the events are walked once.
@@ -97,6 +103,7 @@ type evalBucketAcc struct {
 	crud, ai          []float64
 	violations, total int
 	steps             map[int64][2]int
+	tierCounts        map[string]int
 }
 
 type evalExportDoc struct {
@@ -273,6 +280,17 @@ func evalAggregatePostgres(ctx context.Context, adminURL string, bucketSeconds i
 		if w.StepsTotal > 0 {
 			b.ViolationStepShare = float64(w.StepsMissed) / float64(w.StepsTotal)
 		}
+		for tier, n := range w.TierCounts {
+			cost, ok := evalTierCostUSD[tier]
+			if !ok {
+				return doc, fmt.Errorf("unrecognised model tier %q in a bucket: cannot price the AI request", tier)
+			}
+			b.CostTierUSD += cost * float64(n)
+			if b.TierRequests == nil {
+				b.TierRequests = map[string]int{}
+			}
+			b.TierRequests[tier] = n
+		}
 		doc.Buckets = append(doc.Buckets, b)
 	}
 	return doc, nil
@@ -423,6 +441,12 @@ func computeEvalExport(tenants []tenant.Tenant, events map[string][]telemetry.Ev
 				}
 				if isAI {
 					acc.ai = append(acc.ai, e.LatencyMS)
+					if !e.CacheHit {
+						if acc.tierCounts == nil {
+							acc.tierCounts = map[string]int{}
+						}
+						acc.tierCounts[strings.TrimSpace(e.ModelTier)]++
+					}
 				} else {
 					acc.crud = append(acc.crud, e.LatencyMS)
 				}
@@ -513,6 +537,14 @@ func evalFinishBuckets(accs map[int64]*evalBucketAcc, bucketSeconds int) []evalB
 		}
 		if acc.total > 0 {
 			b.MeanViolation = float64(acc.violations) / float64(acc.total)
+		}
+		for tier, n := range acc.tierCounts {
+			// Unknown tiers were rejected while the events were walked.
+			b.CostTierUSD += evalTierCostUSD[tier] * float64(n)
+			if b.TierRequests == nil {
+				b.TierRequests = map[string]int{}
+			}
+			b.TierRequests[tier] = n
 		}
 		if len(acc.steps) > 0 {
 			missed := 0
