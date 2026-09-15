@@ -186,6 +186,11 @@ GATEWAY_LOCAL_PORT = 18081  # retained for tools that still dial it; the load pa
 # gateway-side error at all -- the proxy dropping streams under ~100 rps,
 # the WP14 attempt-4 defect one path over. Same cure as the CRUD path.
 GATEWAY_NODE_PORT = 30081
+# A replica the load-distribution guard may judge must have been seen by at
+# least this many of the sampler's 30-s `kubectl top` samples (three: alive
+# and an endpoint for over a minute). Fewer means a pod the controller
+# created and shed inside a control step or two -- see check_load_distribution.
+MIN_PRESENCE_SAMPLES = 3
 # WP14 attempt 5: the CRUD load path is a NodePort published on a kind host
 # port, NOT `kubectl port-forward`. Attempt 4 lost a full 24 h sitting to the
 # forward, which resolves to ONE pod when it starts and never follows the
@@ -1088,6 +1093,18 @@ def check_load_distribution(sampler: "LoadDistributionSampler",
 
     This runs in EVERY stage including the 10-minute smoke, which is the
     point: pinning must never again be discoverable only at hour 24.
+
+    The population is the replicas that LIVED long enough to be reached.
+    Session 48, first run of the B1' sitting: the calibrated controller
+    scaled replicas up and back down within one 10-s control step, so nine of
+    the twenty-three pods `kubectl top` ever saw appeared in exactly one 30-s
+    sample at 1 millicore -- created, never an endpoint long enough to be
+    routed to, gone. The guard read them as "not reached" and voided a run
+    whose fourteen long-lived pods all carried traffic. A pod seen in fewer
+    than MIN_PRESENCE_SAMPLES samples is excluded from both tests here (a
+    pod alive through three samples has been a Service endpoint for over a
+    minute: if it served nothing, that IS the defect). Samplers that record
+    no presence (test stubs) exclude nothing.
     """
     shares = sampler.shares()
     if not shares:
@@ -1095,6 +1112,14 @@ def check_load_distribution(sampler: "LoadDistributionSampler",
             f"load distribution unmeasured: {sampler.samples} usable samples, "
             f"{sampler.failures} failed. The gate that would catch a pinned "
             "load path is itself blind, so the run cannot be trusted")
+    presence = getattr(sampler, "presence", None) or {}
+    short_lived = {pod for pod, n in presence.items() if n < MIN_PRESENCE_SAMPLES}
+    shares = {pod: s for pod, s in shares.items() if pod not in short_lived}
+    if not shares:
+        raise RuntimeError(
+            f"no replica lived through {MIN_PRESENCE_SAMPLES} samples "
+            f"({len(short_lived)} short-lived pods seen): the Deployment never "
+            "held still long enough to be measured, so the run cannot be trusted")
     hottest, share = max(shares.items(), key=lambda kv: kv[1])
     active = sum(1 for s in shares.values() if s > 0.001)
     # The ceiling has to scale with the replica count, or it contradicts its
@@ -1118,8 +1143,8 @@ def check_load_distribution(sampler: "LoadDistributionSampler",
     if active < min_active_fraction * len(shares):
         raise RuntimeError(
             f"only {active} of {len(shares)} replicas served any traffic "
-            f"(floor {min_active_fraction:.0%}): the load path is not "
-            "reaching the whole Deployment")
+            f"(floor {min_active_fraction:.0%}; {len(short_lived)} short-lived "
+            "pods excluded): the load path is not reaching the whole Deployment")
 
 
 def check_audit_stream(namespace: str = "polyforge") -> int:
@@ -1373,6 +1398,9 @@ class LoadDistributionSampler(threading.Thread):
         # so far reports per-POD spread and nothing about NODES -- see
         # node_shares() for why that matters to W7.
         self.node_of: dict[str, str] = {}
+        # How many samples each pod appeared in: the guard's lifetime filter
+        # (MIN_PRESENCE_SAMPLES) and the record's evidence of replica churn.
+        self.presence: dict[str, int] = {}
         self.samples = 0
         self.failures = 0
         # `_halt`, like the other two samplers -- NOT `_stop`, which shadows
@@ -1411,6 +1439,7 @@ class LoadDistributionSampler(threading.Thread):
                 # Accumulate CPU-milli-seconds, so a pod that is hot for half
                 # the run and idle for the rest is weighted accordingly.
                 self.cpu_ms[pod] = self.cpu_ms.get(pod, 0.0) + cpu * self.INTERVAL_S
+                self.presence[pod] = self.presence.get(pod, 0) + 1
                 seen = True
             if seen:
                 self.samples += 1
@@ -1763,6 +1792,7 @@ def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
             payload = json.dumps({"samples": loadspread.samples,
                                   "failures": loadspread.failures,
                                   "cpu_ms": loadspread.cpu_ms,
+                                  "presence": loadspread.presence,
                                   "shares": loadspread.shares(),
                                   "node_of": loadspread.node_of,
                                   "node_shares": loadspread.node_shares()}, indent=2)

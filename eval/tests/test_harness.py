@@ -1162,6 +1162,66 @@ class TestLoadDistributionGate:
         s.cpu_ms = {"a": 300.0, "b": 100.0}
         assert s.shares() == {"a": 0.75, "b": 0.25}
 
+    def test_replicas_shed_within_a_control_step_are_not_unreached(self):
+        """Session 48, B1' run 1 (jcac-calibrated, ai_cacheable): nine of the
+        twenty-three pods `kubectl top` ever saw appeared in ONE 30-s sample
+        at 1 millicore -- scaled up and back down inside a 10-s control step,
+        never an endpoint long enough to be routed to. The fourteen pods that
+        lived all carried traffic; the run was voided anyway. A pod seen in
+        fewer than MIN_PRESENCE_SAMPLES samples is not a replica the load
+        path could have failed to reach."""
+        from harness.cluster_backend import check_load_distribution
+
+        cpu = {f"steady-{i}": 3600.0 for i in range(9)}
+        cpu.update({f"partial-{i}": 1200.0 for i in range(5)})
+        cpu.update({f"blink-{i}": 30.0 for i in range(9)})
+        s = self._sampler(cpu, samples=12)
+        s.presence = {p: 12 for p in cpu if p.startswith("steady")}
+        s.presence.update({p: 4 for p in cpu if p.startswith("partial")})
+        s.presence.update({p: 1 for p in cpu if p.startswith("blink")})
+        check_load_distribution(s)  # must not raise
+
+    def test_a_long_lived_idle_replica_still_fails(self):
+        """The filter removes pods that could not have been reached, not pods
+        that were not reached: a replica alive for the whole window that
+        served nothing is exactly the defect."""
+        from harness.cluster_backend import check_load_distribution
+
+        cpu = {f"pod-{i}": 100.0 for i in range(4)}
+        cpu.update({f"pod-idle-{i}": 0.0 for i in range(12)})
+        s = self._sampler(cpu)
+        s.presence = {p: 20 for p in cpu}
+        with pytest.raises(RuntimeError, match="served any traffic"):
+            check_load_distribution(s, max_share=0.30)
+
+    def test_nothing_but_churn_fails_loudly(self):
+        """If no pod lived through MIN_PRESENCE_SAMPLES samples the guard is
+        blind, and a blind guard fails the run rather than passing it."""
+        from harness.cluster_backend import check_load_distribution
+
+        cpu = {f"blink-{i}": 30.0 for i in range(6)}
+        s = self._sampler(cpu, samples=12)
+        s.presence = {p: 1 for p in cpu}
+        with pytest.raises(RuntimeError, match="never held still"):
+            check_load_distribution(s)
+
+    def test_sampler_counts_presence_per_pod(self, monkeypatch):
+        """presence is what the filter and the record read; it must count
+        the samples a pod appeared in, not the CPU it burned."""
+        from harness import cluster_backend as cb
+
+        s = cb.LoadDistributionSampler()
+        s._resolve_node = lambda pod: None
+        outputs = iter(["a 100m 10Mi\nb 1m 5Mi\n", "a 100m 10Mi\n"])
+
+        class _P:
+            returncode = 0
+            def __init__(self, out): self.stdout = out
+        monkeypatch.setattr(cb.subprocess, "run", lambda *a, **k: _P(next(outputs)))
+        s._sample(); s._sample()
+        assert s.presence == {"a": 2, "b": 1}
+        assert s.samples == 2
+
 
 class TestObservabilityAndTeardown:
     """WP14 Phase 2: the run must be readable while it runs, and its evidence
