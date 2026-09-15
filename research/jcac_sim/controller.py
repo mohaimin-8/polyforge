@@ -789,10 +789,13 @@ class JCACController:
             # 0.0 (the default and the published path) leaves evaluate_step's
             # arithmetic untouched, so R4 holds.
             offset = self.ai_latency_offset_ms.get(tid, 0.0) if self.headroom_calibration else 0.0
+            # The published call is made verbatim when there is no offset:
+            # tests stub evaluate_step with the published signature, and
+            # R4 is a byte-identity gate on the published path.
+            extra = {"extra_ai_latency_ms": offset} if offset else {}
             for demand in horizon:
                 m = evaluate_step(self.configs[tid], state,
-                                  self._planning_demand(tid, demand),
-                                  extra_ai_latency_ms=offset)
+                                  self._planning_demand(tid, demand), **extra)
                 cost += m.cost_usd
                 violation += m.violation
                 obj += math.log1p(m.excess)
@@ -800,10 +803,10 @@ class JCACController:
             believed = self._believed_state(state)
             tier_belief = self.belief_scale.get("tier_cost", 1.0)
             offset = self.ai_latency_offset_ms.get(tid, 0.0) if self.headroom_calibration else 0.0
+            extra = {"extra_ai_latency_ms": offset} if offset else {}
             for demand in horizon:
                 m = evaluate_step(self.configs[tid], believed,
-                                  self._planning_demand(tid, demand),
-                                  extra_ai_latency_ms=offset)
+                                  self._planning_demand(tid, demand), **extra)
                 cost += m.cost_infra_usd + tier_belief * m.cost_tier_usd
                 violation += m.violation
                 obj += math.log1p(m.excess)

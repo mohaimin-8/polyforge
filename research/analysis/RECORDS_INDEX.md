@@ -80,7 +80,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_TRACE_PARITY.md` | TP-H1, TP-H1a, TP-H1b, TP-H2, TP-H3a, TP-H3b | yes |
 | `RESULTS_V2.md` | - | yes |
 | `RESULTS_V3.md` | - | yes |
-| `RESULTS_WAVE4_LIVE_PLANE.md` | WL-H1, WL-H2 | yes |
+| `RESULTS_WAVE4_LIVE_PLANE.md` | WL-H1, WL-H2, WL-H3 | yes |
 | `RESULTS_WINDOW_CHARACTER.md` | BP-H1, TP-H1 | yes |
 | `SEMANTIC_CACHE.md` | - | no, reason stated |
 | `SENSITIVITY_J.md` | - | yes |
