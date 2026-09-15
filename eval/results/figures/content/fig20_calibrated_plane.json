@@ -1,0 +1,848 @@
+{
+ "axes": [
+  {
+   "collections": [],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#1baf7aff",
+     "label": "_child0",
+     "marker": "|",
+     "points": [
+      [
+       "0.230667",
+       "3.3"
+      ],
+      [
+       "0.232167",
+       "3.3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "PolyForge (calibrated)",
+     "marker": "o",
+     "points": [
+      [
+       "0.231417",
+       "3.3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child2",
+     "marker": "|",
+     "points": [
+      [
+       "0.268433",
+       "3.15"
+      ],
+      [
+       "0.2604",
+       "3.15"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "PolyForge (published)",
+     "marker": "o",
+     "points": [
+      [
+       "0.2644165",
+       "3.15"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "_child4",
+     "marker": "|",
+     "points": [
+      [
+       "23.194467",
+       "3"
+      ],
+      [
+       "22.233933",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "replica-only",
+     "marker": "o",
+     "points": [
+      [
+       "22.7142",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "_child6",
+     "marker": "|",
+     "points": [
+      [
+       "0.249267",
+       "2.85"
+      ],
+      [
+       "0.249567",
+       "2.85"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "cache-only",
+     "marker": "o",
+     "points": [
+      [
+       "0.249417",
+       "2.85"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_child8",
+     "marker": "|",
+     "points": [
+      [
+       "0.248867",
+       "2.7"
+      ],
+      [
+       "0.249367",
+       "2.7"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "tier-only",
+     "marker": "o",
+     "points": [
+      [
+       "0.249117",
+       "2.7"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_child10",
+     "marker": "|",
+     "points": [
+      [
+       "0.971667",
+       "2.3"
+      ],
+      [
+       "0.9373",
+       "2.3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_child11",
+     "marker": "o",
+     "points": [
+      [
+       "0.9544835",
+       "2.3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child12",
+     "marker": "|",
+     "points": [
+      [
+       "1.0115",
+       "2.15"
+      ],
+      [
+       "1.0262",
+       "2.15"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child13",
+     "marker": "o",
+     "points": [
+      [
+       "1.01885",
+       "2.15"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "_child14",
+     "marker": "|",
+     "points": [
+      [
+       "13.151333",
+       "2"
+      ],
+      [
+       "17.043833",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "_child15",
+     "marker": "o",
+     "points": [
+      [
+       "15.097583",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "_child16",
+     "marker": "|",
+     "points": [
+      [
+       "1.017767",
+       "1.85"
+      ],
+      [
+       "0.992867",
+       "1.85"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "_child17",
+     "marker": "o",
+     "points": [
+      [
+       "1.005317",
+       "1.85"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_child18",
+     "marker": "|",
+     "points": [
+      [
+       "1.014367",
+       "1.7"
+      ],
+      [
+       "1.022267",
+       "1.7"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_child19",
+     "marker": "o",
+     "points": [
+      [
+       "1.018317",
+       "1.7"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_child20",
+     "marker": "|",
+     "points": [
+      [
+       "0.1636",
+       "1.3"
+      ],
+      [
+       "0.1636",
+       "1.3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_child21",
+     "marker": "o",
+     "points": [
+      [
+       "0.1636",
+       "1.3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child22",
+     "marker": "|",
+     "points": [
+      [
+       "0.196667",
+       "1.15"
+      ],
+      [
+       "0.196667",
+       "1.15"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child23",
+     "marker": "o",
+     "points": [
+      [
+       "0.196667",
+       "1.15"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "_child24",
+     "marker": "|",
+     "points": [
+      [
+       "0.2096",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "_child25",
+     "marker": "o",
+     "points": [
+      [
+       "0.2096",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "_child26",
+     "marker": "|",
+     "points": [
+      [
+       "0.196667",
+       "0.85"
+      ],
+      [
+       "0.196667",
+       "0.85"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "_child27",
+     "marker": "o",
+     "points": [
+      [
+       "0.196667",
+       "0.85"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_child28",
+     "marker": "|",
+     "points": [
+      [
+       "0.196667",
+       "0.7"
+      ],
+      [
+       "0.196667",
+       "0.7"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_child29",
+     "marker": "o",
+     "points": [
+      [
+       "0.196667",
+       "0.7"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_child30",
+     "marker": "|",
+     "points": [
+      [
+       "0.266033",
+       "0.3"
+      ],
+      [
+       "0.263933",
+       "0.3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_child31",
+     "marker": "o",
+     "points": [
+      [
+       "0.264983",
+       "0.3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child32",
+     "marker": "|",
+     "points": [
+      [
+       "0.335333",
+       "0.15"
+      ],
+      [
+       "0.331067",
+       "0.15"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child33",
+     "marker": "o",
+     "points": [
+      [
+       "0.3332",
+       "0.15"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "_child34",
+     "marker": "|",
+     "points": [
+      [
+       "29.976533",
+       "0"
+      ],
+      [
+       "23.432833",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "_child35",
+     "marker": "o",
+     "points": [
+      [
+       "26.704683",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "_child36",
+     "marker": "|",
+     "points": [
+      [
+       "1.492067",
+       "-0.15"
+      ],
+      [
+       "1.531867",
+       "-0.15"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "_child37",
+     "marker": "o",
+     "points": [
+      [
+       "1.511967",
+       "-0.15"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_child38",
+     "marker": "|",
+     "points": [
+      [
+       "0.319667",
+       "-0.3"
+      ],
+      [
+       "0.324367",
+       "-0.3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_child39",
+     "marker": "o",
+     "points": [
+      [
+       "0.322017",
+       "-0.3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    }
+   ],
+   "patches": [],
+   "texts": [],
+   "title": "",
+   "xlabel": "total cost per run (USD, log)",
+   "xlim": [
+    "0.12607628236",
+    "38.8983614285"
+   ],
+   "xscale": "log",
+   "xticklabels": [
+    "$\\mathdefault{10^{-2}}$",
+    "$\\mathdefault{10^{-1}}$",
+    "$\\mathdefault{10^{0}}$",
+    "$\\mathdefault{10^{1}}$",
+    "$\\mathdefault{10^{2}}$",
+    "$\\mathdefault{10^{3}}$"
+   ],
+   "xticks": [
+    "0.01",
+    "0.1",
+    "1",
+    "10",
+    "100",
+    "1000"
+   ],
+   "ylabel": "",
+   "ylim": [
+    "-0.48",
+    "3.48"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "ai_cacheable",
+    "tier_mixed",
+    "crud_bursty",
+    "joint_stress (primary)"
+   ],
+   "yticks": [
+    "3",
+    "2",
+    "1",
+    "0"
+   ]
+  },
+  {
+   "collections": [
+    {
+     "edgecolours": [
+      "#2a78d6ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-46.2147607061",
+        "3"
+       ],
+       [
+        "-25.5448624293",
+        "3"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#eda100ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-125.418462759",
+        "2"
+       ],
+       [
+        "-75.7027111937",
+        "2"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#008300ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-102.321482852",
+        "1"
+       ],
+       [
+        "-78.6915564452",
+        "1"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#4a3aa7ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-44.8849017634",
+        "0"
+       ],
+       [
+        "-15.0562190154",
+        "0"
+       ]
+      ]
+     ]
+    }
+   ],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#2a78d6ff",
+     "label": "_child1",
+     "marker": "o",
+     "points": [
+      [
+       "-35.4320287042",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#eda100ff",
+     "label": "_child3",
+     "marker": "o",
+     "points": [
+      [
+       "-99.4973870337",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#008300ff",
+     "label": "_child5",
+     "marker": "o",
+     "points": [
+      [
+       "-90.4858159647",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_child7",
+     "marker": "o",
+     "points": [
+      [
+       "-29.0338951142",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#52514eff",
+     "label": "_child8",
+     "marker": "None",
+     "points": [
+      [
+       "0",
+       "0"
+      ],
+      [
+       "0",
+       "1"
+      ]
+     ],
+     "style": "--",
+     "width": "0.8"
+    }
+   ],
+   "patches": [],
+   "texts": [],
+   "title": "",
+   "xlabel": "joint_stress, calibrated \u2212 arm:\n\u0394 cost per bucket (% of arm's)",
+   "xlim": [
+    "-131.689385897",
+    "6.27092313794"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "\u2212150",
+    "\u2212100",
+    "\u221250",
+    "0",
+    "50"
+   ],
+   "xticks": [
+    "-150",
+    "-100",
+    "-50",
+    "0",
+    "50"
+   ],
+   "ylabel": "",
+   "ylim": [
+    "-0.15",
+    "3.15"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "vs PolyForge (published)",
+    "vs replica-only",
+    "vs cache-only",
+    "vs tier-only"
+   ],
+   "yticks": [
+    "3",
+    "2",
+    "1",
+    "0"
+   ]
+  }
+ ],
+ "figure": "fig20_calibrated_plane",
+ "size_inches": [
+  "7.4",
+  "3"
+ ],
+ "texts": []
+}

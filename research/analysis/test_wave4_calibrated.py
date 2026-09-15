@@ -103,3 +103,19 @@ def test_windows_a_bucket_apart_pair_to_the_shorter_and_synthetic_exports_pair_w
     # exports without n_events (the synthetic ones above) are taken whole
     _write_run(tmp_path, "jcac", "tier_mixed", 0, [0.01] * 12)
     assert aw.window_costs("jcac", "tier_mixed", 0) == [0.01] * 12
+
+
+def test_a_trough_inside_the_window_stays_inside_it(tmp_path, monkeypatch):
+    """Amendment 4: joint_stress dips to 342 events a bucket mid-window (floor
+    481). The span keeps the trough; Amendment 2's contiguous rule returned
+    the longer fragment, whose first pair then sat mid-window."""
+    monkeypatch.setattr(aw, "EVIDENCE", tmp_path)
+    d = tmp_path / "runs" / "jcac__joint_stress__uniform__small__rep0"
+    d.mkdir(parents=True)
+    counts = [60, 39, 12, 5, 4] + [900] * 12 + [300, 350] + [900] * 16 + [200]
+    rows = [{"bucket_start_utc": f"t{i}", "n_events": n, "cost_usd": 0.001 * (i + 1)} for i, n in enumerate(counts)]
+    (d / "eval-export-fine.json").write_text(json.dumps({"buckets": rows}))
+    span = aw.window_costs("jcac", "joint_stress", 0)
+    frag = aw.window_costs_contiguous("jcac", "joint_stress", 0)
+    assert len(span) == 30 and span[0] == 0.001 * 6 and span[-1] == 0.001 * 35
+    assert len(frag) == 16 and frag[0] == 0.001 * 20  # the fragment after the trough

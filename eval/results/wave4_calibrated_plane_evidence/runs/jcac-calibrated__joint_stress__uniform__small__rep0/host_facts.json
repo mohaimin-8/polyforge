@@ -1,0 +1,28 @@
+{
+  "captured_at": "2026-09-15T12:30:27Z",
+  "hostname": "ip-172-31-92-158",
+  "os": "Linux 6.8.0-1063-aws",
+  "machine": "x86_64",
+  "cpu_count": 8,
+  "mem_total_gib": 61.9,
+  "gpus": [
+    {
+      "name": "NVIDIA L40S",
+      "memory_total": "46068 MiB",
+      "memory_used": "43239 MiB",
+      "driver": "595.91.07"
+    }
+  ],
+  "tools": {
+    "docker": "Docker version 29.8.0, build 88096ef",
+    "kind": "kind version 0.29.0",
+    "k6": "k6 v0.57.0 (commit/50afd82c18, go1.23.6, linux/amd64)",
+    "kubectl": "Client Version: v1.37.0",
+    "helm": "v3.22.0+g144ca65"
+  },
+  "env": {
+    "POLYFORGE_EVAL_LIVE_AI": "1",
+    "POLYFORGE_EVAL_SHARED_PG": "1",
+    "POLYFORGE_EVAL_GATEWAY_REPLICAS": null
+  }
+}

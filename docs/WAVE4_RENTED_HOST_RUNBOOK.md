@@ -254,6 +254,60 @@ k6 summary: GPU name / VRAM / driver from `nvidia-smi`, vCPU count, RAM,
 kernel, tool versions. That file, not the terminal, is how the record shows
 the §0 floor was met -- commit the evidence directory with it.
 
+## 7. B1′ — the calibrated-controller matrix (executed 2026-09-15, 39/40 valid)
+
+Same host class, same tiers, same steps 1–4. Differences from B1 (all
+disclosed in `PREREG_WAVE4_CALIBRATED.md` and its amendments):
+
+```sh
+export POLYFORGE_EVAL_SHARED_PG=1 POLYFORGE_EVAL_LIVE_AI=1
+export POLYFORGE_EVAL_FINE_BUCKET_SECONDS=10      # one export bucket per control step
+export POLYFORGE_EVAL_TIER_BACKENDS='<the line b1_tier_host.sh printed>'
+python -u -m harness.runner experiments/wave4_calibrated_plane.yaml   # from eval/
+```
+
+5 arms × 4 cells × 2 reps = **40 runs, ~10 min each, 6 h 14 min** on
+`g6e.2xlarge` (the whole sitting, tiers and setup included, 10.5 h ≈ $23.5).
+Per-run evidence lands under `wave4_calibrated_plane_evidence/runs/<arm>__<cell>__uniform__small__rep<N>/`
+(both exports, the in-run histogram, the k6 summary, the load distribution
+with per-pod presence, host facts). Score with
+`research/analysis/analysis_wave4_calibrated.py`; `fig_wave4_calibrated.py`
+draws fig20 from the same functions.
+
+Three things this sitting taught, each of which cost a restart or a
+re-scoring pass:
+
+1. **`python -u`.** The runner's `[k/N]` progress lines are block-buffered
+   into a file and appear only every ten runs or at exit; the failures are
+   in the DuckDB, not the log. Read progress from the database (copy the
+   `.duckdb` and its `.wal`, open the copy read-only — the runner holds the
+   lock) and read a failed run's `error` column **before** anything can
+   overwrite it. A resume re-executes every non-valid run and replaces the
+   row.
+2. **The load-distribution guard judges replicas that lived.** A controller
+   that sheds replicas inside a 10-s control step leaves pods that
+   `kubectl top` sees once at 1 millicore; the guard's population now
+   excludes pods seen in fewer than `MIN_PRESENCE_SAMPLES` (3) samples
+   (commit `86c29c5`). The pinning ceiling is still calibrated on a static
+   Deployment: an HPA arm whose first pod is alone for the early window can
+   trip it (one `replica-only` run did, both attempts) — that is a void, not
+   a bug to repair after the fact.
+3. **The metrics-server manifest is fetched from GitHub on every run.**
+   One run of forty died at zero seconds on an HTTP 500 from
+   `github.com/kubernetes-sigs/metrics-server/releases/...`. The runner's
+   resume re-executed it. Vendoring that manifest (Apache-2.0, ~200 lines)
+   into `eval/` removes the dependency; it is the one hardening item left
+   open by this sitting.
+
+The fine export spans the WL-H2 preflight (five buckets, ~$0.13 of `large`
+tier spend that every arm pays identically inside `total_cost_usd`) and the
+teardown seconds; the scorer pairs buckets inside the load window (the span
+from the first to the last bucket at ≥ half the run's median event count,
+troughs included). A dead-man `sudo shutdown -h +N` on the box, re-armed
+as the run outlasts it, is what makes an operator-side outage cost the box
+and not the evidence: copy and hash-verify the evidence **before**
+terminating, never the other way round.
+
 ---
 
 ## `joint_stress` is the cell that decides this — measured

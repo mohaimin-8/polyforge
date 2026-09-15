@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 69 |
-| regenerated and compared | 51 |
+| records | 70 |
+| regenerated and compared | 52 |
 | outside the gate, reason stated | 18 |
 | outside the gate, no entry | 0 |
 
@@ -80,6 +80,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_TRACE_PARITY.md` | TP-H1, TP-H1a, TP-H1b, TP-H2, TP-H3a, TP-H3b | yes |
 | `RESULTS_V2.md` | - | yes |
 | `RESULTS_V3.md` | - | yes |
+| `RESULTS_WAVE4_CALIBRATED.md` | WL-H1, WL-H2, WL-H4, WL-H5 | yes |
 | `RESULTS_WAVE4_LIVE_PLANE.md` | WL-H1, WL-H2, WL-H3 | yes |
 | `RESULTS_WINDOW_CHARACTER.md` | BP-H1, TP-H1 | yes |
 | `SEMANTIC_CACHE.md` | - | no, reason stated |

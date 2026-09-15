@@ -1,0 +1,23 @@
+{
+  "samples": 11,
+  "failures": 0,
+  "cpu_ms": {
+    "polyforge-control-plane-65c8857764-scx6c": 16590.0,
+    "polyforge-control-plane-65c8857764-zjb7r": 13770.0
+  },
+  "presence": {
+    "polyforge-control-plane-65c8857764-scx6c": 11,
+    "polyforge-control-plane-65c8857764-zjb7r": 9
+  },
+  "shares": {
+    "polyforge-control-plane-65c8857764-scx6c": 0.5464426877470355,
+    "polyforge-control-plane-65c8857764-zjb7r": 0.4535573122529644
+  },
+  "node_of": {
+    "polyforge-control-plane-65c8857764-scx6c": "polyforge-eval-worker",
+    "polyforge-control-plane-65c8857764-zjb7r": "polyforge-eval-worker"
+  },
+  "node_shares": {
+    "polyforge-eval-worker": 1.0
+  }
+}

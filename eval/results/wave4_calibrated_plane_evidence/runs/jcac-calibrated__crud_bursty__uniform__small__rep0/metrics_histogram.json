@@ -1,0 +1,106 @@
+{
+  "labels": [
+    "method",
+    "route"
+  ],
+  "metric": "polyforge_http_request_duration_seconds",
+  "note": "route-level; no tenant label, so no per-tenant fairness from this source. Buckets are the scored window (end minus start), summed over every control-plane pod present at each scrape.",
+  "pods_at_end": 8,
+  "pods_at_start": 16,
+  "pods_lost_in_window": [
+    "polyforge-control-plane-65c8857764-6czgw",
+    "polyforge-control-plane-65c8857764-7lqgk",
+    "polyforge-control-plane-65c8857764-jmwzx",
+    "polyforge-control-plane-65c8857764-jnf2d",
+    "polyforge-control-plane-65c8857764-ndxgq",
+    "polyforge-control-plane-65c8857764-rfkj5",
+    "polyforge-control-plane-65c8857764-sh52q",
+    "polyforge-control-plane-65c8857764-z966d"
+  ],
+  "routes": {
+    "GET /healthz": {
+      "buckets": {
+        "+Inf": 750.0,
+        "0.005": 750.0,
+        "0.01": 750.0,
+        "0.025": 750.0,
+        "0.05": 750.0,
+        "0.1": 750.0,
+        "0.25": 750.0,
+        "0.5": 750.0,
+        "1.0": 750.0,
+        "10.0": 750.0,
+        "2.5": 750.0,
+        "5.0": 750.0
+      },
+      "count": 750.0,
+      "mean_ms": 0.034041527999999995,
+      "p50_ms": 2.5,
+      "p95_ms": 4.75,
+      "p99_ms": 4.949999999999999
+    },
+    "GET /metrics": {
+      "buckets": {
+        "+Inf": 8.0,
+        "0.005": 8.0,
+        "0.01": 8.0,
+        "0.025": 8.0,
+        "0.05": 8.0,
+        "0.1": 8.0,
+        "0.25": 8.0,
+        "0.5": 8.0,
+        "1.0": 8.0,
+        "10.0": 8.0,
+        "2.5": 8.0,
+        "5.0": 8.0
+      },
+      "count": 8.0,
+      "mean_ms": 0.243126125,
+      "p50_ms": 2.5,
+      "p95_ms": 4.75,
+      "p99_ms": 4.95
+    },
+    "GET /v1/tenants/{tenant_id}/telemetry/features": {
+      "buckets": {
+        "+Inf": 240.0,
+        "0.005": 239.0,
+        "0.01": 240.0,
+        "0.025": 240.0,
+        "0.05": 240.0,
+        "0.1": 240.0,
+        "0.25": 240.0,
+        "0.5": 240.0,
+        "1.0": 240.0,
+        "10.0": 240.0,
+        "2.5": 240.0,
+        "5.0": 240.0
+      },
+      "count": 240.0,
+      "mean_ms": 1.8561651166666666,
+      "p50_ms": 2.510460251046025,
+      "p95_ms": 4.769874476987448,
+      "p99_ms": 4.97071129707113
+    },
+    "POST /v1/tenants/{tenant_id}/workloads/replay": {
+      "buckets": {
+        "+Inf": 92911.0,
+        "0.005": 89178.0,
+        "0.01": 92865.0,
+        "0.025": 92910.0,
+        "0.05": 92911.0,
+        "0.1": 92911.0,
+        "0.25": 92911.0,
+        "0.5": 92911.0,
+        "1.0": 92911.0,
+        "10.0": 92911.0,
+        "2.5": 92911.0,
+        "5.0": 92911.0
+      },
+      "count": 92911.0,
+      "mean_ms": 2.752500014131801,
+      "p50_ms": 2.6046502500616744,
+      "p95_ms": 4.948835475117181,
+      "p99_ms": 8.80240032546786
+    }
+  }
+}

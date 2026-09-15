@@ -1,0 +1,41 @@
+{
+  "total_cost_usd": 0.232167,
+  "cost_tier_usd": 0.1819,
+  "cost_infra_usd": 0.050267,
+  "mean_violation": 0,
+  "violation_step_share": 0,
+  "mean_jain": 1,
+  "cache_hit_rate": 0.9641558736650762,
+  "crud_p95_ms": 1.005462,
+  "ai_p95_ms": 0.107,
+  "crud_p99_ms": 1.008004,
+  "ai_p99_ms": 373.66,
+  "tier_requests": {
+    "large": 12,
+    "small": 619
+  },
+  "buckets": [
+    {
+      "bucket_start_utc": "2026-09-15T11:00:00Z",
+      "n_events": 30111,
+      "crud_p95_ms": 1.005462,
+      "crud_p99_ms": 1.008004,
+      "ai_p95_ms": 0.107,
+      "ai_p99_ms": 373.66,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.1819,
+      "tier_requests": {
+        "large": 12,
+        "small": 619
+      },
+      "cost_infra_usd": 0.050267,
+      "cost_usd": 0.232167
+    }
+  ],
+  "n_events": 30111,
+  "n_tenants": 8,
+  "generated_at_utc": "2026-09-15T11:41:10Z",
+  "cost_infra_source_note": "infra component injected via --infra-cost-usd; replica-hours are not visible in-pod",
+  "bucket_seconds": 3600
+}
