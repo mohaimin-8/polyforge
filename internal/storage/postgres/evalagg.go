@@ -49,6 +49,11 @@ type EvalAggWindow struct {
 	AIP99       float64
 	StepsTotal  int
 	StepsMissed int
+	// TierCounts prices the window's AI requests that reached a backend
+	// (cache hits belong to no tier), per tier -- the per-bucket cost the
+	// paired bootstrap needs. Nil for the Overall window; see TierCounts on
+	// EvalAgg for that.
+	TierCounts map[string]int
 }
 
 // EvalAgg is everything the exporter needs, already reduced.
@@ -263,6 +268,7 @@ GROUP BY b.bucket ORDER BY b.bucket`,
 		return fmt.Errorf("aggregate buckets: %w", err)
 	}
 	defer rows.Close()
+	index := map[int64]int{}
 	for rows.Next() {
 		var w EvalAggWindow
 		if err := rows.Scan(&w.StartUnix, &w.NEvents, &w.AITotal, &w.CacheHits,
@@ -270,7 +276,36 @@ GROUP BY b.bucket ORDER BY b.bucket`,
 			&w.StepsTotal, &w.StepsMissed); err != nil {
 			return err
 		}
+		index[w.StartUnix] = len(out.Buckets)
 		out.Buckets = append(out.Buckets, w)
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	// Per-bucket serving-tier histogram, same predicate as the run-level one.
+	tierSQL := base + fmt.Sprintf(`
+SELECT floor(extract(epoch FROM timestamp) / %d)::bigint * %d, tier, count(*)
+FROM base WHERE is_ai AND NOT cache_hit AND tier IS NOT NULL
+GROUP BY 1, tier`, spec.BucketSeconds, spec.BucketSeconds)
+	trows, err := s.admin.Query(ctx, tierSQL, args...)
+	if err != nil {
+		return fmt.Errorf("aggregate bucket tiers: %w", err)
+	}
+	defer trows.Close()
+	for trows.Next() {
+		var start int64
+		var tier string
+		var n int
+		if err := trows.Scan(&start, &tier, &n); err != nil {
+			return err
+		}
+		if i, ok := index[start]; ok {
+			if out.Buckets[i].TierCounts == nil {
+				out.Buckets[i].TierCounts = map[string]int{}
+			}
+			out.Buckets[i].TierCounts[tier] = n
+		}
+	}
+	return trows.Err()
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -208,5 +209,39 @@ func TestComputeEvalExportBucketsOffByDefault(t *testing.T) {
 	}
 	if bytes.Contains(blob, []byte("buckets")) {
 		t.Fatalf("disabled buckets must not appear in the JSON at all:\n%s", blob)
+	}
+}
+
+// Session 48: the Wave 4 pre-registration's paired bootstrap needs a cost
+// per bucket; the export carried only the total. Bucket tier costs must sum
+// to the document's tier cost, and cache hits must price nothing anywhere.
+func TestComputeEvalExportBucketTierCostSumsToTotal(t *testing.T) {
+	base := time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC)
+	tenants := []tenant.Tenant{{ID: "t1", Plan: "standard"}}
+	events := map[string][]telemetry.Event{"t1": {
+		{Service: "chat", LatencyMS: 300, Timestamp: base, ModelTier: "small", CacheHit: false},
+		{Service: "chat", LatencyMS: 5, Timestamp: base.Add(10 * time.Second), ModelTier: "small", CacheHit: true},
+		{Service: "chat", LatencyMS: 900, Timestamp: base.Add(70 * time.Second), ModelTier: "mid", CacheHit: false},
+		{Service: "crud_read", LatencyMS: 2, Timestamp: base.Add(75 * time.Second)},
+	}}
+	doc, err := computeEvalExport(tenants, events, 0, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Buckets) != 2 {
+		t.Fatalf("buckets = %d, want 2", len(doc.Buckets))
+	}
+	var sum float64
+	for _, b := range doc.Buckets {
+		sum += b.CostTierUSD
+	}
+	if math.Abs(sum-doc.CostTierUSD) > 1e-12 || doc.CostTierUSD <= 0 {
+		t.Fatalf("bucket tier costs %v do not sum to the document's %v", sum, doc.CostTierUSD)
+	}
+	if doc.Buckets[0].TierRequests["small"] != 1 || doc.Buckets[0].TierRequests["mid"] != 0 {
+		t.Fatalf("bucket 0 tier requests = %v, want small:1 only (the hit prices nothing)", doc.Buckets[0].TierRequests)
+	}
+	if doc.Buckets[1].TierRequests["mid"] != 1 {
+		t.Fatalf("bucket 1 tier requests = %v, want mid:1", doc.Buckets[1].TierRequests)
 	}
 }

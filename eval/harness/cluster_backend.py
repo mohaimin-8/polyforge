@@ -24,6 +24,7 @@ cluster session should execute.
 
 from __future__ import annotations
 
+import calendar
 import contextlib
 import json
 import os
@@ -1476,6 +1477,10 @@ class ReplicaSampler(threading.Thread):
         super().__init__(daemon=True)
         self.interval_s = interval_s
         self.samples: list[int] = []
+        # (unix seconds, replicas) per sample -- what prices infra per bucket
+        # for the paired bootstrap (session 48). `samples` stays as the
+        # run-level count every existing reader uses.
+        self.timed: list[tuple[float, int]] = []
         self.failures = 0  # sampling attempts that produced no reading
         self._halt = threading.Event()
 
@@ -1487,7 +1492,9 @@ class ReplicaSampler(threading.Thread):
                      "deployment/polyforge-control-plane", "-o", "jsonpath={.status.replicas}"],
                     capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
                 if proc.returncode == 0 and proc.stdout.strip().isdigit():
-                    self.samples.append(int(proc.stdout.strip()))
+                    replicas = int(proc.stdout.strip())
+                    self.samples.append(replicas)
+                    self.timed.append((time.time(), replicas))
                 else:
                     self.failures += 1
             except Exception:
@@ -1512,6 +1519,47 @@ class ReplicaSampler(threading.Thread):
     def infra_cost_usd(self) -> float:
         replica_seconds = sum(self.samples) * self.interval_s
         return replica_seconds / 3600.0 * REPLICA_COST_USD_HR
+
+    def infra_cost_by_bucket(self, bucket_starts_unix: list[int], bucket_seconds: int) -> list[float]:
+        """The infra dollars each export bucket carries: every sample prices
+        interval_s replica-seconds and lands in the bucket its timestamp
+        falls in. Samples outside every bucket (the seconds before the first
+        event or after the last) are not lost from the run total, only from
+        the buckets -- the run total stays infra_cost_usd()."""
+        out = [0.0] * len(bucket_starts_unix)
+        for t, replicas in self.timed:
+            for i, start in enumerate(bucket_starts_unix):
+                if start <= t < start + bucket_seconds:
+                    out[i] += replicas * self.interval_s / 3600.0 * REPLICA_COST_USD_HR
+                    break
+        return out
+
+
+def price_export_buckets(text: str, sampler: "ReplicaSampler", width: int) -> str:
+    """Add `cost_infra_usd` and `cost_usd` to every bucket of an eval-export
+    document. The control plane prices tier spend per bucket (it sees the
+    events) but cannot see replicas; the sampler can. `width` is the bucket
+    size the harness asked the export for. Leaves the document untouched when
+    it has no buckets or cannot be parsed, so the export is never lost to its
+    own annotation."""
+    try:
+        doc = json.loads(text)
+    except ValueError:
+        return text
+    buckets = doc.get("buckets")
+    if not isinstance(buckets, list) or not buckets:
+        return text
+    try:
+        starts = [calendar.timegm(time.strptime(b["bucket_start_utc"], "%Y-%m-%dT%H:%M:%SZ"))
+                  for b in buckets]
+    except (KeyError, ValueError, TypeError):
+        return text
+    infra = sampler.infra_cost_by_bucket(starts, width)
+    for b, usd in zip(buckets, infra):
+        b["cost_infra_usd"] = round(usd, 6)
+        b["cost_usd"] = round(usd + float(b.get("cost_tier_usd", 0.0)), 6)
+    doc["bucket_seconds"] = width
+    return json.dumps(doc, indent=2)
 
 
 def evidence_dir_for(run: RunSpec) -> Path:
@@ -2021,7 +2069,12 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                     if (_is_scored_load(cmd) and evidence_dir) else None,
                 )
                 if exporting and proc.returncode == 0:
-                    (workdir / export_name).write_text(proc.stdout, encoding="utf-8")
+                    text = proc.stdout
+                    if sampler is not None:
+                        width = (EVAL_FINE_BUCKET_SECONDS if export_name == "eval-export-fine.json"
+                                 else EVAL_BUCKET_SECONDS)
+                        text = price_export_buckets(text, sampler, width)
+                    (workdir / export_name).write_text(text, encoding="utf-8")
                 if _is_scored_load(cmd):
                     # ... and at its close, before anything is torn down.
                     try:
