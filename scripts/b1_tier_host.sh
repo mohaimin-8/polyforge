@@ -26,10 +26,16 @@ SMALL_PORT="${SMALL_PORT:-9101}"
 MID_PORT="${MID_PORT:-9102}"
 LARGE_PORT="${LARGE_PORT:-9103}"
 # Fractions of one card. They must sum below 1.0; vLLM preallocates KV cache
-# from its share, so the large tier needs the biggest slice.
-SMALL_UTIL="${SMALL_UTIL:-0.08}"
-MID_UTIL="${MID_UTIL:-0.24}"
-LARGE_UTIL="${LARGE_UTIL:-0.60}"
+# from its share, so the large tier needs the biggest slice. Measured on an
+# L40S (44.4 GiB), session 48: 0.08/0.24 left small and mid with "No
+# available memory for the cache blocks" -- weights plus the activation
+# profile for vLLM's default 32k context ate the whole share. The eval's
+# prompts are tens of tokens, so the context is capped (SERVE_ARGS) and the
+# shares rebalanced; all three tiers run with the same serving arguments.
+SMALL_UTIL="${SMALL_UTIL:-0.12}"
+MID_UTIL="${MID_UTIL:-0.26}"
+LARGE_UTIL="${LARGE_UTIL:-0.58}"
+SERVE_ARGS="${SERVE_ARGS:---max-model-len 4096 --max-num-seqs 128}"
 LOG_DIR="${LOG_DIR:-/tmp/b1-tiers}"
 PID_FILE="$LOG_DIR/pids"
 # The address the AI gateway will dial. The gateway is a POD inside kind, and
@@ -95,14 +101,15 @@ serve_one() {
   # `vllm serve` is the supported CLI; the module path is the older spelling
   # and is absent from recent releases. Prefer the CLI, keep the fallback.
   if command -v vllm >/dev/null 2>&1; then
+    # shellcheck disable=SC2086  # SERVE_ARGS is a word list by design
     nohup vllm serve "$model" --served-model-name "$name" \
-      --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$util" \
+      --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$util" $SERVE_ARGS \
       >"$LOG_DIR/$name.log" 2>&1 &
     echo "$!" >>"$PID_FILE"; return
   fi
   nohup python -m vllm.entrypoints.openai.api_server \
     --model "$model" --served-model-name "$name" \
-    --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$util" \
+    --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$util" $SERVE_ARGS \
     >"$LOG_DIR/$name.log" 2>&1 &
   echo "$!" >>"$PID_FILE"
 }
@@ -221,11 +228,15 @@ case "${1:-up}" in
     mkdir -p "$LOG_DIR"; : >"$PID_FILE"
     python -c "import vllm" 2>/dev/null || { echo "installing vllm..."; pip install -q vllm; }
     preflight
-    echo "== starting three tiers =="
-    serve_one small "$SMALL_MODEL" "$SMALL_PORT" "$SMALL_UTIL"
-    serve_one mid   "$MID_MODEL"   "$MID_PORT"   "$MID_UTIL"
-    serve_one large "$LARGE_MODEL" "$LARGE_PORT" "$LARGE_UTIL"
-    wait_ready small "$SMALL_PORT"; wait_ready mid "$MID_PORT"; wait_ready large "$LARGE_PORT"
+    echo "== starting three tiers (sequentially) =="
+    # One at a time, each ready before the next starts. Started together on
+    # one card (session 48, L40S), every engine's memory profile counted the
+    # other two's growing allocations as its own overhead and refused with
+    # "No available memory for the cache blocks" -- at 0.58 of the card for a
+    # 15 GiB model. Whichever finished profiling first survived.
+    serve_one small "$SMALL_MODEL" "$SMALL_PORT" "$SMALL_UTIL"; wait_ready small "$SMALL_PORT"
+    serve_one mid   "$MID_MODEL"   "$MID_PORT"   "$MID_UTIL";   wait_ready mid   "$MID_PORT"
+    serve_one large "$LARGE_MODEL" "$LARGE_PORT" "$LARGE_UTIL"; wait_ready large "$LARGE_PORT"
     echo; verify ;;
   tunnels) tunnels ;;
   up-split) "$0" up && tunnels ;;
