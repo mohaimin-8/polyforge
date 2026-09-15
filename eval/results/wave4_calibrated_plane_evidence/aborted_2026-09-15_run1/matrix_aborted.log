@@ -1,0 +1,7 @@
+experiment=wave4_calibrated_plane backend=cluster total=40 already-valid=0 pending=40 db=/home/ubuntu/polyforge/eval/results/wave4_calibrated_plane.duckdb
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 317.3 ms vs large 2392.3 ms (delta 2074.9 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-a594aaa0dfdec462-me3ee9j4/knob_preflight.json)
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 310.4 ms vs large 2047.1 ms (delta 1736.7 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-b84e17912e687fe4-vfb0u851/knob_preflight.json)

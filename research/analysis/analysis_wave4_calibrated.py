@@ -105,18 +105,7 @@ def histogram_p95(arm: str, cell: str, rep: int) -> dict:
     return {k: (v["p95_ms"], v["p99_ms"]) for k, v in (doc.get("routes") or {}).items()}
 
 
-def window_costs(arm: str, cell: str, rep: int) -> list[float] | None:
-    """cost_usd of the buckets INSIDE the k6 load window, in order.
-
-    Amendment 2 (2026-09-15, during the sitting, before any other arm's number
-    was read): the fine export spans the WL-H2 preflight seconds before the
-    window and the teardown seconds after it -- 37 buckets for a 30-step
-    window in the first run -- and the registered pairing is "by position
-    within the window". The window is the longest contiguous run of buckets
-    carrying at least WINDOW_EVENT_FRACTION of the run's median per-bucket
-    event count: the preflight's few requests and the two partial edge buckets
-    fall below it, the thirty full buckets sit far above. Exports without
-    n_events (synthetic) are taken whole."""
+def _priced_buckets(arm: str, cell: str, rep: int) -> list[dict] | None:
     p = run_dir(arm, cell, rep) / "eval-export-fine.json"
     if not p.exists():
         return None
@@ -124,10 +113,50 @@ def window_costs(arm: str, cell: str, rep: int) -> list[float] | None:
     b = doc.get("buckets") or []
     if not b or "cost_usd" not in b[0]:
         return None
+    return b
+
+
+def _floor(b: list[dict]) -> float:
+    counts = sorted(int(x["n_events"]) for x in b)
+    return WINDOW_EVENT_FRACTION * counts[len(counts) // 2]
+
+
+def window_costs(arm: str, cell: str, rep: int) -> list[float] | None:
+    """cost_usd of the buckets INSIDE the k6 load window, in order.
+
+    The fine export spans the WL-H2 preflight seconds before the window and
+    the teardown seconds after it (37-38 buckets for a 30-step window), and
+    the registered pairing is "by position within the window". The window
+    is the SPAN from the first to the last bucket carrying at least
+    WINDOW_EVENT_FRACTION of the run's median per-bucket event count,
+    troughs included (Amendment 4): the preflight's few dozen requests and
+    the partial edge buckets fall below the floor; a trough in a cell whose
+    demand varies by design -- joint_stress's dip to 342 events a bucket,
+    crud_bursty's to 720 -- is part of the window, not its end. Exports
+    without n_events (synthetic) are taken whole."""
+    b = _priced_buckets(arm, cell, rep)
+    if not b:
+        return None
     if "n_events" not in b[0]:
         return [float(x["cost_usd"]) for x in b]
-    counts = sorted(int(x["n_events"]) for x in b)
-    floor = WINDOW_EVENT_FRACTION * counts[len(counts) // 2]
+    floor = _floor(b)
+    idx = [i for i, x in enumerate(b) if int(x["n_events"]) >= floor]
+    if not idx:
+        return None
+    return [float(x["cost_usd"]) for x in b[idx[0]:idx[-1] + 1]]
+
+
+def window_costs_contiguous(arm: str, cell: str, rep: int) -> list[float] | None:
+    """Amendment 2's rule, kept for the sensitivity table: the LONGEST
+    CONTIGUOUS run of buckets at or above the floor. On a flat cell it is
+    the same window; on a cell with a trough it returns the longer fragment,
+    so its pairs can start mid-window against another arm's window start."""
+    b = _priced_buckets(arm, cell, rep)
+    if not b:
+        return None
+    if "n_events" not in b[0]:
+        return [float(x["cost_usd"]) for x in b]
+    floor = _floor(b)
     best, cur = [], []
     for x in b:
         if int(x["n_events"]) >= floor:
@@ -138,14 +167,16 @@ def window_costs(arm: str, cell: str, rep: int) -> list[float] | None:
     return best or None
 
 
-def paired_deltas(cell: str, a: str, b: str, reps: list[int]) -> list[float]:
+def paired_deltas(cell: str, a: str, b: str, reps: list[int], window=None) -> list[float]:
     """Per-bucket cost deltas a - b, paired by position from the window's
     first bucket, reps pooled. Where the two windows differ in length by a
     bucket (the window edges fall differently against the 10-s grid) the
-    pairing runs to the shorter one; n_pairs is reported with every CI."""
+    pairing runs to the shorter one; n_pairs is reported with every CI.
+    `window` selects the window rule (default: the span, Amendment 4)."""
+    window = window or window_costs
     out = []
     for rep in reps:
-        ca, cb = window_costs(a, cell, rep), window_costs(b, cell, rep)
+        ca, cb = window(a, cell, rep), window(b, cell, rep)
         if ca and cb:
             out.extend(x - y for x, y in zip(ca, cb))
     return out
@@ -161,12 +192,19 @@ def bootstrap_ci(deltas: list[float], n_boot: int = N_BOOT, seed: int = SEED) ->
 
 
 def matrix_audit() -> tuple[dict, int]:
+    """The runner's final report and the WL-H2 verdict count from the matrix
+    log. The log is every pass of the runner in order (Amendment 3: the
+    sitting's first pass plus one resume that re-executed the two runs a
+    GitHub HTTP 500 had failed at zero seconds), so the report that describes
+    the database is the LAST one; the verdicts are counted across all."""
     p = EVIDENCE / "run_logs" / "matrix.log"
     if not p.exists():
         return {}, 0
     text = p.read_text(encoding="utf-8", errors="replace")
-    m = re.search(r"\{[^{}]*\"experiment\"[^{}]*\}", text, re.S)
-    return (json.loads(m.group(0)) if m else {}), len(re.findall(r"verdict: WL-H2 PASS", text))
+    reports = re.findall(r"\{[^{}]*\"experiment\"[^{}]*\}", text, re.S)
+    audit = json.loads(reports[-1]) if reports else {}
+    audit["runner_passes"] = len(reports)
+    return audit, len(re.findall(r"verdict: WL-H2 PASS", text))
 
 
 def host() -> dict:
@@ -181,14 +219,14 @@ def means(df: pd.DataFrame) -> pd.DataFrame:
         ["total_cost_usd", "mean_jain", "mean_violation", "cache_hit_rate", "ai_p95_ms", "crud_p95_ms"]].mean()
 
 
-def compare(df: pd.DataFrame, cell: str, arm: str) -> dict:
+def compare(df: pd.DataFrame, cell: str, arm: str, window=None) -> dict:
     m = means(df)
     reps = sorted(df.rep.unique())
     t = m[(m.workload == cell) & (m.system == TREATMENT)].iloc[0]
     o = m[(m.workload == cell) & (m.system == arm)].iloc[0]
     d_cost = float(t.total_cost_usd - o.total_cost_usd)
     d_jain = float(t.mean_jain - o.mean_jain)
-    deltas = paired_deltas(cell, TREATMENT, arm, reps)
+    deltas = paired_deltas(cell, TREATMENT, arm, reps, window=window)
     ci = bootstrap_ci(deltas)
     excludes0 = ci is not None and (ci[1] < 0 or ci[0] > 0)
     return {"arm": arm, "cost": float(o.total_cost_usd), "jain": float(o.mean_jain),
@@ -246,7 +284,8 @@ def build() -> str:
              f"Beats {sum(r['beats'] for r in h1)} of {len(h1)} comparators on cost at iso-fairness with a paired-bootstrap "
              f"CI excluding 0" + (f"; arms missing from the data: {missing_arms}." if missing_arms else "."))
     L.append("")
-    L.append(f"**WL-H2 — {h2} PASS verdicts** in the matrix log; harness audit: expected {audit.get('expected_runs', '?')}, "
+    L.append(f"**WL-H2 — {h2} PASS verdicts** in the matrix log; harness audit after the last of "
+             f"{audit.get('runner_passes', '?')} runner pass(es): expected {audit.get('expected_runs', '?')}, "
              f"valid {audit.get('valid_runs', '?')}, failed {audit.get('failed_runs', '?')}, ok {audit.get('ok', '?')}.")
     L.append("")
     L.append("**WL-H4 — ablation dominance per cell:** " + "; ".join(f"`{c}` {v}" for c, _, v in h4) + ".")
@@ -265,6 +304,20 @@ def build() -> str:
     for r in h1:
         L.append(f"| {r['arm']} | {r['cost']:.4f} | {r['d_cost']:+.4f} | {r['d_cost_pct']:+.1f}% | {r['d_jain']:+.3f} | "
                  f"{'yes' if r['iso'] else 'no'} | {r['n_pairs']} | {fmt_ci(r['ci'])} | **{'yes' if r['beats'] else 'NO'}** |")
+    L.append("")
+    L.append("### Sensitivity — the same comparisons under Amendment 2's window rule")
+    L.append("")
+    L.append("Amendment 4 replaced the longest-contiguous-run window with the onset-to-end span (troughs included). "
+             "The primary table above uses the span; this one re-runs it under the earlier rule so the reader can see "
+             "the change did not produce the verdict. Fragmented windows (pairs well below 60) are the earlier rule "
+             "pairing a mid-window fragment against another arm's window start.")
+    L.append("")
+    L.append("| vs arm | pairs | 95% CI on Δ/bucket | beats |")
+    L.append("|---|---|---|---|")
+    for a in ARMS:
+        if a != TREATMENT and a in present:
+            r = compare(df, PRIMARY_CELL, a, window=window_costs_contiguous)
+            L.append(f"| {r['arm']} | {r['n_pairs']} | {fmt_ci(r['ci'])} | {'yes' if r['beats'] else 'NO'} |")
     L.append("")
     L.append("## WL-H4 — ablation dominance, every cell")
     L.append("")
@@ -302,10 +355,12 @@ def build() -> str:
     L.append("")
     L.append("* Histogram p95/p99 are route-level (the metric has no tenant label) and are never compared to the replay clock.")
     L.append("* Missing bucket costs (a run whose fine export lacks `cost_usd`) drop that rep from the pairing; `pairs` says how many buckets each CI rests on.")
-    L.append("* **Window (Amendment 2).** The fine export spans the WL-H2 preflight and the teardown seconds around the 300-s "
-             "window; the pairing uses the longest contiguous run of buckets carrying at least half the run's median "
-             f"per-bucket event count (`window buckets` above; 30 is the design), paired by position from the window's "
-             "first bucket and truncated to the shorter window of a pair.")
+    L.append("* **Window (Amendments 2 and 4).** The fine export spans the WL-H2 preflight and the teardown seconds around "
+             "the 300-s window; the pairing uses the span from the first to the last bucket carrying at least half the "
+             "run's median per-bucket event count, troughs included (`window buckets` above; 30 is the design, 31-32 "
+             "where the window's edges straddle the 10-s grid), paired by position from the window's first bucket and "
+             "truncated to the shorter window of a pair. Amendment 2's longest-contiguous-run rule fragmented the window "
+             "in cells whose demand dips by design; its result is kept in the sensitivity table.")
     L.append("* **Preflight spend is inside `total_cost_usd`.** The WL-H2 knob-liveness gate sends its own requests through the "
              "gateway before the window (eleven of them pinned to `large` in the first run, about $0.128 of every run's "
              "tier spend), and the run-level export prices them. The gate is identical for every arm, so the offset is "

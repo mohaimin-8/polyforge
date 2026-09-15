@@ -1,0 +1,76 @@
+{
+  "labels": [
+    "method",
+    "route"
+  ],
+  "metric": "polyforge_http_request_duration_seconds",
+  "note": "route-level; no tenant label, so no per-tenant fairness from this source. Buckets are the scored window (end minus start), summed over every control-plane pod present at each scrape.",
+  "pods_at_end": 5,
+  "pods_at_start": 1,
+  "pods_lost_in_window": [],
+  "routes": {
+    "GET /healthz": {
+      "buckets": {
+        "+Inf": 402.0,
+        "0.005": 402.0,
+        "0.01": 402.0,
+        "0.025": 402.0,
+        "0.05": 402.0,
+        "0.1": 402.0,
+        "0.25": 402.0,
+        "0.5": 402.0,
+        "1.0": 402.0,
+        "10.0": 402.0,
+        "2.5": 402.0,
+        "5.0": 402.0
+      },
+      "count": 402.0,
+      "mean_ms": 0.044413004975124376,
+      "p50_ms": 2.5000000000000004,
+      "p95_ms": 4.75,
+      "p99_ms": 4.95
+    },
+    "GET /metrics": {
+      "buckets": {
+        "+Inf": 1.0,
+        "0.005": 1.0,
+        "0.01": 1.0,
+        "0.025": 1.0,
+        "0.05": 1.0,
+        "0.1": 1.0,
+        "0.25": 1.0,
+        "0.5": 1.0,
+        "1.0": 1.0,
+        "10.0": 1.0,
+        "2.5": 1.0,
+        "5.0": 1.0
+      },
+      "count": 1.0,
+      "mean_ms": 0.245983,
+      "p50_ms": 2.5,
+      "p95_ms": 4.75,
+      "p99_ms": 4.95
+    },
+    "POST /v1/tenants/{tenant_id}/workloads/replay": {
+      "buckets": {
+        "+Inf": 20211.0,
+        "0.005": 20191.0,
+        "0.01": 20201.0,
+        "0.025": 20211.0,
+        "0.05": 20211.0,
+        "0.1": 20211.0,
+        "0.25": 20211.0,
+        "0.5": 20211.0,
+        "1.0": 20211.0,
+        "10.0": 20211.0,
+        "2.5": 20211.0,
+        "5.0": 20211.0
+      },
+      "count": 20211.0,
+      "mean_ms": 2.3339321408144085,
+      "p50_ms": 2.502476350849389,
+      "p95_ms": 4.754705066613838,
+      "p99_ms": 4.954903174681789
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "gateway": "http://127.0.0.1:30081",
+  "tenant": "t00",
+  "generated_at": "2026-09-15T17:29:48Z",
+  "cache": {
+    "hit_rate_budgeted": 1.0,
+    "hit_rate_zero": 0.0,
+    "delta": 1.0,
+    "margin": 0.5,
+    "live": true
+  },
+  "tier": {
+    "tier_a": "small",
+    "mean_ms_a": 298.9953844989941,
+    "tiers_seen_a": [
+      "small"
+    ],
+    "tier_b": "large",
+    "mean_ms_b": 2348.754099166399,
+    "tiers_seen_b": [
+      "large"
+    ],
+    "delta_ms": 2049.758714667405,
+    "rel_margin": 0.25,
+    "abs_margin_ms": 20.0,
+    "routing_moved": true,
+    "latency_moved": true,
+    "ordering_correct": true,
+    "live": true
+  },
+  "verdict": "WL-H2 PASS (both knobs live)"
+}

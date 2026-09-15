@@ -217,3 +217,79 @@ the record. `bootstrap_ci`, the seed, the resample count, the margin, the
 cost — includes the WL-H2 preflight's own requests (about $0.128 of tier
 spend in that first run). The gate is identical for every arm, so the offset
 is common to every run-level cost; it is absent from the per-bucket pairing.
+
+## Amendment 3 (session 48, 2026-09-15 20:55 UTC — after the sitting, before scoring)
+
+Appended after the registered text and Amendments 1–2; nothing above changed.
+
+**What happened.** The 40-run pass ended at 17:36 UTC with 38 valid runs
+and two recorded *failed*: `jcac`/`tier_mixed`/rep 0 and
+`replica-only`/`crud_bursty`/rep 1. The first died at zero seconds, before
+any cluster existed — `kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.0/components.yaml`
+answered **HTTP 500 from GitHub** — and measured nothing. The second
+**executed in full** (the log's verdict sequence shows all eight
+`replica-only` runs reaching WL-H2) and was recorded failed after its load
+window; its error text was overwritten by the resume below before it was
+read, an operator error disclosed here. The registered design says "the
+runner resumes: a crash costs the run in flight, never banked ones"; the
+runner was invoked once more with the same command and environment at
+20:32 UTC (box, tiers and tree unchanged). It re-executes **every**
+non-valid run, so it re-ran both. `jcac`/`tier_mixed`/rep 0 completed
+**valid** ($1.0115; rep 1 had measured $1.0262).
+`replica-only`/`crud_bursty`/rep 1 executed again and was **voided by the
+pinning ceiling** of the load-distribution guard: one pod carried 30.0% of
+the window's cumulative CPU across 20 replicas (ceiling 25%). Under *What
+voids a run* a guard-voided run is not re-run; the resume mechanism re-ran
+it regardless. The second attempt is also void, so **no data from it enters
+the record**; had it come back valid it would have been excluded under the
+registered rule, and this amendment would say so. The record scores
+`replica-only` in `crud_bursty` from its one valid rep. The mechanism is
+disclosed and not repaired: an HPA arm grows its Deployment during the
+window, so the first pod is alone for the early seconds and legitimately
+carries more cumulative CPU than a static fair share allows; the ceiling
+was calibrated on a static sixteen-replica Deployment. No rule is changed
+for it after the fact. Every other run passed both guard tests.
+
+**What changed in the scorer** (only this). `matrix_audit` reads the
+runner's **last** report in `run_logs/matrix.log` — the log is the first
+pass followed by the resume, in order, and the final report describes the
+database (39 valid, 1 failed) — and counts the runner passes it found (two).
+WL-H2 verdicts are counted across the whole log: 41, one per executed
+attempt (39 in the first pass, 2 in the resume).
+
+**Ledger of the sitting** (for the record's provenance): one aborted start
+(Amendment 1, one run, no export), one restart from zero, one resume; 40
+runs designed, 42 attempts executed (41 reached WL-H2), 39 valid, 1 void
+(both attempts), 1 zero-second infrastructure failure re-executed to a
+valid run. Host `g6e.2xlarge` `i-08855845b74db1df3`, 10:27–20:55 UTC.
+
+## Amendment 4 (session 48, 2026-09-15 21:10 UTC — after the first scoring pass, disclosed with the result it changes)
+
+Appended after the registered text and Amendments 1–3; nothing above changed.
+
+**What was seen.** The first scoring pass (the record as it stood before
+this amendment) scored WL-H1′ PASS on all four comparisons, but its run
+table showed windows of 17, 22, 12–20 buckets for several runs. Amendment
+2's rule — the longest *contiguous* run of buckets at or above half the
+run's median event count — was written on the first run's flat
+`ai_cacheable` shape. `joint_stress` dips to 342 events a bucket
+mid-window (floor 481) and `crud_bursty` to 720 (floor 1634): the demand
+trace varies by design, the rule split the window at the trough, and the
+pairing then zipped a mid-window fragment of one arm against the window
+start of another — misaligned pairs, which is the one thing a paired
+bootstrap must not have.
+
+**What changed** (scorer only). The window is the **span** from the first
+to the last bucket at or above the same floor, troughs included: 28–32
+buckets for every run of the matrix (30 is the design; 31–32 where the
+window's edges straddle the 10-s grid; 28 where an arm's early throughput
+collapsed under the ramp, `replica-only` in `joint_stress` rep 1 at 250–445
+events for its first three buckets, which trims them and shifts that
+pairing by up to three positions — a comparison decided by two orders of
+magnitude). The floor, the pairing by position, the truncation to the
+shorter window, the seed, the resample count, the margin and the "beats"
+rule are unchanged. Amendment 2's rule is kept in the scorer as
+`window_costs_contiguous` and the record prints the primary comparisons
+under **both** rules, so a reader can see the change did not produce the
+verdict: WL-H1′ was PASS on all four comparisons under the earlier rule and
+is PASS on all four under the span. Test added for the trough shape.

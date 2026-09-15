@@ -234,14 +234,26 @@ CAMPAIGN_RECORDS = [
     # failures rather than repaired after the fact.
     ("analysis_live_soak_v8.py", [], "RESULTS_LIVE_SOAK_V8.md"),
     #
-    # WP8b (B1, the three-knob live plane). Rebuilds from
-    # eval/results/wave4_live_plane_evidence/ and wp8b_substrate_evidence/.
-    # There are no run metrics because there are no valid runs: WL-H2's
-    # knob-liveness gate returned SUBSTRATE INADEQUATE and WL-H1 is void, which
-    # is the outcome PREREG_WAVE4_LIVE_PLANE registers for an inert knob. The
-    # record is built from the gate's own report plus the tunnel preflight that
-    # rules out the free split-host route as the cause.
+    # B1 (the three-knob live plane, one L40S host, 2026-09-15). Rebuilds from
+    # the committed export wave4_live_plane_runs.csv (16/16 valid) and
+    # wave4_live_plane_evidence/. WL-H1 FAILS as registered: jcac costs 23.3%
+    # more than its own tier-only ablation in joint_stress at equal fairness;
+    # WL-H2 passes 16 times; WL-H3's sim ordinal reproduces in 0 of 4 cells.
+    # The earlier "no valid runs / SUBSTRATE INADEQUATE" reading of this entry
+    # was the pre-sitting state and is superseded by the scored record.
     ("analysis_wave4_live_plane.py", [], "RESULTS_WAVE4_LIVE_PLANE.md"),
+    #
+    # B1' (the corrected joint controller on the same plane: 5 arms x 4 cells
+    # x 2 reps). Rebuilds from wave4_calibrated_plane_runs.csv and the per-run
+    # evidence under wave4_calibrated_plane_evidence/runs/ (per-10-s bucket
+    # cost for the registered paired bootstrap; in-run clause-4 histogram).
+    # WL-H1' is the primary reading, WL-H4/H5 secondary, WL-H2 the gate; the
+    # scorer was committed with PREREG_WAVE4_CALIBRATED.md before the sitting.
+    ("analysis_wave4_calibrated.py", [], "RESULTS_WAVE4_CALIBRATED.md"),
+    # fig20 rides along the frozen B1' scorer in its own script (the scorer
+    # is not edited after the run): the figure sheet is the "record" the gate
+    # compares, and the figure's content fingerprint is gated with the rest.
+    ("fig_wave4_calibrated.py", [], "FIGURE_WAVE4_CALIBRATED.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
