@@ -1,0 +1,173 @@
+"""Sensitivity of B1' to the bootstrap's independence assumption
+-> SENSITIVITY_WAVE4_CALIBRATED.md.
+
+The registered reading (PREREG_WAVE4_CALIBRATED.md, WL-H1') resamples the
+per-bucket cost deltas as if the 10-s buckets were independent. They are
+not: a controller's plan persists across control steps, and the lag-1
+autocorrelation of the paired deltas in joint_stress runs to +0.81 (vs
+replica-only) and +0.74 (vs jcac, rep 0). An i.i.d. bootstrap is optimistic
+under positive autocorrelation. This script leaves the registered reading
+exactly as scored and reports, beside it, what a dependence-aware reading
+says about the same comparisons:
+
+- the lag-1 autocorrelation of the deltas, per rep;
+- a MOVING-BLOCK bootstrap (Kunsch 1989) at block lengths 3, 5 and 10
+  buckets -- blocks drawn with replacement within each rep, reps pooled,
+  same resample count and seed as the registered reading;
+- the per-rep means and their sign agreement (the run-level reading, n = 2).
+
+A comparison "holds under dependence" when the block-5 CI (50 s, longer
+than the longest lag-1 correlation scale seen) still excludes zero. Every
+number here derives from analysis_wave4_calibrated.py's own loaders and
+window rule, so nothing can disagree with RESULTS_WAVE4_CALIBRATED.md.
+
+    python sensitivity_wave4_calibrated.py
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import random
+import statistics
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from stats import record_path  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location("aw", HERE / "analysis_wave4_calibrated.py")
+aw = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(aw)
+
+BLOCKS = (3, 5, 10)
+DECISIVE_BLOCK = 5
+
+
+def lag1_acf(x: list[float]) -> float | None:
+    if len(x) < 3:
+        return None
+    m = statistics.fmean(x)
+    den = sum((a - m) ** 2 for a in x)
+    if den == 0:
+        return None
+    return sum((a - m) * (b - m) for a, b in zip(x, x[1:])) / den
+
+
+def per_rep_deltas(cell: str, arm: str, reps: list[int]) -> dict[int, list[float]]:
+    out = {}
+    for rep in reps:
+        ca, cb = aw.window_costs(aw.TREATMENT, cell, rep), aw.window_costs(arm, cell, rep)
+        if ca and cb:
+            out[rep] = [x - y for x, y in zip(ca, cb)]
+    return out
+
+
+def block_bootstrap_ci(series: dict[int, list[float]], block: int,
+                       n_boot: int = aw.N_BOOT, seed: int = aw.SEED) -> tuple[float, float] | None:
+    """Moving-block bootstrap of the pooled mean: within each rep, draw
+    overlapping blocks of `block` consecutive deltas with replacement until
+    the rep's length is covered (truncating the last block), pool the reps,
+    take the mean; 2.5 / 97.5 percentiles over n_boot resamples."""
+    reps = [s for s in series.values() if len(s) >= 2]
+    if not reps:
+        return None
+    rng = random.Random(seed)
+    means = []
+    for _ in range(n_boot):
+        pooled: list[float] = []
+        for s in reps:
+            b = min(block, len(s))
+            starts = range(len(s) - b + 1)
+            drawn: list[float] = []
+            while len(drawn) < len(s):
+                k = rng.choice(starts)
+                drawn.extend(s[k:k + b])
+            pooled.extend(drawn[:len(s)])
+        means.append(statistics.fmean(pooled))
+    means.sort()
+    return means[int(0.025 * n_boot)], means[int(0.975 * n_boot) - 1]
+
+
+def row(cell: str, arm: str, reps: list[int]) -> dict:
+    series = per_rep_deltas(cell, arm, reps)
+    pooled = [d for s in series.values() for d in s]
+    iid = aw.bootstrap_ci(pooled)
+    blocks = {b: block_bootstrap_ci(series, b) for b in BLOCKS}
+    rep_means = {rep: statistics.fmean(s) for rep, s in series.items()}
+    return {
+        "cell": cell, "arm": arm, "n": len(pooled),
+        "mean": statistics.fmean(pooled) if pooled else None,
+        "acf": {rep: lag1_acf(s) for rep, s in series.items()},
+        "iid": iid, "blocks": blocks, "rep_means": rep_means,
+        "signs_agree": bool(rep_means) and (all(m < 0 for m in rep_means.values())
+                                            or all(m > 0 for m in rep_means.values())),
+        "holds": blocks[DECISIVE_BLOCK] is not None and blocks[DECISIVE_BLOCK][1] < 0,
+    }
+
+
+def fmt(ci) -> str:
+    return "n/a" if ci is None else f"[{ci[0]:+.4f}, {ci[1]:+.4f}]"
+
+
+def build() -> str:
+    df = aw.load()
+    reps = sorted(int(r) for r in df.rep.unique())
+    present = set(df.system.unique())
+    primary = [row(aw.PRIMARY_CELL, a, reps) for a in aw.ARMS if a != aw.TREATMENT and a in present]
+    per_cell = [(cell, row(cell, a, reps)) for cell in aw.CELLS
+                for a in ("jcac", "cache-only", "tier-only") if a in present]
+    all_hold = all(r["holds"] for r in primary)
+
+    L = [f"# B1′ sensitivity — the paired bootstrap under dependence: WL-H1′ {'holds' if all_hold else 'does NOT hold'} for every comparison at block 5",
+         "",
+         "Generated by `sensitivity_wave4_calibrated.py` from the same evidence, loaders and window rule as "
+         "`RESULTS_WAVE4_CALIBRATED.md`. The registered reading (i.i.d. bootstrap, `PREREG_WAVE4_CALIBRATED.md`) "
+         "stands as scored; this record reports what a dependence-aware reading says about the same comparisons. "
+         "It adds no hypothesis and changes no verdict.",
+         "",
+         "## Why",
+         "",
+         "Ten-second buckets of a controlled system are not independent draws: a plan persists across control "
+         "steps, so consecutive cost deltas are positively correlated and an i.i.d. bootstrap understates the "
+         "interval. The moving-block bootstrap (blocks of consecutive buckets drawn with replacement within each "
+         f"rep, reps pooled, {aw.N_BOOT} resamples, seed {aw.SEED}) preserves within-block dependence; block length "
+         f"{DECISIVE_BLOCK} (50 s) exceeds the longest lag-1 correlation scale observed and is the decisive one here.",
+         "",
+         f"## WL-H1′ comparisons in `{aw.PRIMARY_CELL}` (calibrated − arm, $ per 10-s bucket)",
+         "",
+         "| vs arm | pairs | mean Δ | lag-1 ACF (rep 0 ; rep 1) | i.i.d. CI (registered) | block 3 | block 5 | block 10 | rep means | signs agree | holds at block 5 |",
+         "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for r in primary:
+        acf = " ; ".join("n/a" if v is None else f"{v:+.2f}" for _, v in sorted(r["acf"].items()))
+        rm = " ; ".join(f"{m:+.4f}" for _, m in sorted(r["rep_means"].items()))
+        L.append(f"| {r['arm']} | {r['n']} | {r['mean']:+.4f} | {acf} | {fmt(r['iid'])} | {fmt(r['blocks'][3])} | "
+                 f"{fmt(r['blocks'][5])} | {fmt(r['blocks'][10])} | {rm} | {'yes' if r['signs_agree'] else 'no'} | "
+                 f"**{'yes' if r['holds'] else 'NO'}** |")
+    L += ["", "## WL-H4 / WL-H5 comparisons, every cell (calibrated − arm)", "",
+          "| cell | vs arm | pairs | mean Δ | lag-1 ACF | i.i.d. CI | block 5 | holds at block 5 |",
+          "|---|---|---|---|---|---|---|---|"]
+    for cell, r in per_cell:
+        acf = " ; ".join("n/a" if v is None else f"{v:+.2f}" for _, v in sorted(r["acf"].items()))
+        L.append(f"| {cell} | {r['arm']} | {r['n']} | {r['mean']:+.4f} | {acf} | {fmt(r['iid'])} | "
+                 f"{fmt(r['blocks'][5])} | {'yes' if r['holds'] else 'NO'} |")
+    L += ["", "## Reading", "",
+          "* A block CI wider than the i.i.d. one is the dependence the registered reading ignored; the widening "
+          "grows with the ACF and with block length, as it should.",
+          "* `signs agree` is the run-level reading: with two reps it is a sign test with n = 2 and carries no "
+          "inference on its own; it is printed because a per-bucket win that the two reps disagreed on would be "
+          "suspect regardless of any interval.",
+          "* Block lengths above 10 with 28–32 buckets a rep leave too few blocks to resample; the table stops at 10.",
+          ""]
+    return "\n".join(L) + "\n"
+
+
+def main() -> int:
+    out = record_path("SENSITIVITY_WAVE4_CALIBRATED.md")
+    out.write_text(build(), encoding="utf-8")
+    print(f"wrote {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
