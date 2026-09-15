@@ -566,3 +566,49 @@ class PlanningCellTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HeadroomCalibrationServiceTests(unittest.TestCase):
+    """B1 follow-up (session 48): the operator carries realized p95 per kind;
+    with --headroom-calibration the controller learns from it before each
+    plan. Without the flag the same payload changes nothing."""
+
+    PEAK = {"rps": {"crud_read": 20.0, "chat": 12.5, "embed": 5.0, "agent": 2.5},
+            "crud_base_ms": 50.0,
+            # the live cluster: 1 ms CRUD, cache-served AI reads 0 (unobserved)
+            "realized_p95_ms": {"crud_read": 1.0, "chat": 0.0}}
+
+    def test_flag_off_ignores_realized_p95(self):
+        core = PlannerCore()
+        core.plan({"tenants": [tenant("a", state={"replicas": 5, "cache_mb": 128, "tier": "small"},
+                                      demand=self.PEAK)]})
+        self.assertEqual(core._controller.capacity_scale["a"], 1.0)
+
+    def test_flag_on_learns_headroom_and_plans_fewer_replicas(self):
+        core = PlannerCore(headroom_calibration=True, headroom_cap=4.0, reversal_hysteresis=True)
+        t = tenant("a", state={"replicas": 5, "cache_mb": 128, "tier": "small"}, demand=self.PEAK)
+        first = core.plan({"tenants": [t]})
+        self.assertGreater(core._controller.capacity_scale["a"], 1.0)
+        for _ in range(40):
+            core.plan({"tenants": [t]})
+        self.assertGreater(core._controller.capacity_scale["a"], 3.5)
+        # a fresh open-loop controller keeps this tenant at 5 replicas for the
+        # same peak; the calibrated one has learned it can plan for fewer
+        open_loop = PlannerCore()
+        base = open_loop.plan({"tenants": [tenant("a", state={"replicas": 5, "cache_mb": 128, "tier": "small"},
+                                                  demand={"rps": self.PEAK["rps"], "crud_base_ms": 50.0})]})
+        # feed the plan back as the next interval's state: the calibrated
+        # controller walks replicas down to the floor; open-loop holds 5
+        state = {"replicas": 5, "cache_mb": 128, "tier": "small"}
+        for _ in range(12):
+            out = core.plan({"tenants": [tenant("a", state=state, demand=self.PEAK)]})["plans"]["a"]
+            state = {"replicas": out["replicas"], "cache_mb": out["cache_mb"], "tier": out["tier"]}
+        self.assertEqual(state["replicas"], 1)
+        self.assertEqual(state["tier"], "small")
+        self.assertEqual(base["plans"]["a"]["replicas"], 5)
+
+    def test_absent_or_empty_realized_map_is_unobserved(self):
+        core = PlannerCore(headroom_calibration=True)
+        d = {"rps": {"crud_read": 20.0}, "crud_base_ms": 50.0, "realized_p95_ms": {}}
+        core.plan({"tenants": [tenant("a", demand=d)]})
+        self.assertEqual(core._controller.capacity_scale["a"], 1.0)

@@ -329,6 +329,18 @@ class Forecast:
         return self._trend(y)
 
 
+@dataclass(frozen=True)
+class RealizedStep:
+    """What one tenant's plant served last interval: the state that served,
+    the demand that arrived, and the realized p95 per traffic family. Fed to
+    JCACController.observe_realized for headroom calibration."""
+
+    state: TenantState
+    demand: Demand
+    crud_p95_ms: float
+    ai_p95_ms: float
+
+
 @dataclass
 class PlanEntry:
     state: TenantState
@@ -352,6 +364,10 @@ class JCACController:
     CAP_LEARN = 0.15  # multiplicative step when projection was optimistic
     CAP_RECOVER = 0.02  # additive drift back toward trusting the model
     CAP_TOLERANCE = 0.02  # |realized - projected| below this is agreement
+    HEADROOM_FLOOR = 0.5   # never believe a replica delivers less than half
+    HEADROOM_LEARN_DOWN = 0.5  # toward a smaller scale: half the gap per step
+    HEADROOM_LEARN_UP = 0.1    # toward a larger scale: a tenth of the gap
+    HEADROOM_BISECT = 24       # bisection steps; 2^-24 of the bracket
 
     def __init__(
         self,
@@ -368,8 +384,48 @@ class JCACController:
         tenant_order_seed: int | None = None,
         enforce_budget: bool = True,
         belief_scale: dict | None = None,
+        headroom_calibration: bool = False,
+        headroom_cap: float = 4.0,
+        reversal_hysteresis: bool = False,
     ):
         self.configs = configs
+        # B1 follow-up (session 48), the second defect: SWITCH_PENALTY is a
+        # flat 0.05 objective units per changed knob, while one replica costs
+        # 0.048 $/h = 0.0133 units per 10 s step. Dropping the maximum two
+        # replicas saves 0.027, less than the penalty, so the published
+        # controller scales replicas UP on a projected violation and never
+        # back DOWN on cost alone -- a ratchet, visible as `4455555...` in the
+        # sim trace and as replicas nobody needed on the live bill. Hysteresis
+        # exists to stop oscillation, not convergence: with
+        # `reversal_hysteresis` the penalty applies only to a move that
+        # reverses the previous interval's move on the same knob. Default off:
+        # the published campaigns replay bit-identically (R4).
+        self.reversal_hysteresis = reversal_hysteresis
+        self._last_move: dict[str, dict[str, int]] = {}
+        # B1 follow-up (session 48): learn the plant's capacity from realized
+        # latency HEADROOM, not only from realized violation. The published
+        # `adaptive_capacity` can make the model humbler (capacity_scale <= 1)
+        # and never bolder, and it observes only the plan it executed: at the
+        # replicas the model demanded it projects ~0 violation, reality gives
+        # 0, and "agreement" teaches nothing about the replicas it did not
+        # try. On the live plane the model predicted 3,500 ms CRUD p95 at two
+        # replicas where the cluster served 1 ms, so the joint controller
+        # bought replicas that bought nothing and lost WL-H1 on cost to its own
+        # tier-only ablation, whose replica knob was pinned.
+        #
+        # With `headroom_calibration` on, `observe_realized` receives each
+        # tenant's executed state, arrived demand and realized p95s, solves
+        # for the load-scale at which the model reproduces the realized p95 at
+        # that very operating point (the model is monotone in load, so one
+        # bisection), and moves `capacity_scale` toward it -- fast downward,
+        # slow upward, bounded to [HEADROOM_FLOOR, headroom_cap]. The cap is
+        # the safety margin: however much headroom is observed, the model
+        # keeps predicting a violation for a demand jump beyond cap x plan.
+        # Composes with `belief_scale["replica_capacity"]` by multiplication
+        # (see _planning_demand), so a belief of b is corrected to b * s = 1.
+        # Default off: the published campaigns replay bit-identically (R4).
+        self.headroom_calibration = headroom_calibration
+        self.headroom_cap = float(headroom_cap)
         # PREREG_MODEL_MISMATCH (WP6): let the controller believe *wrong*
         # constants while the world keeps the published ones.
         #
@@ -488,6 +544,7 @@ class JCACController:
         return {
             "forecasts": {tid: f.snapshot() for tid, f in self.forecasts.items()},
             "capacity_scale": dict(self.capacity_scale),
+            "last_move": {tid: dict(m) for tid, m in self._last_move.items()},
         }
 
     def restore(self, data: dict) -> None:
@@ -501,6 +558,9 @@ class JCACController:
         for tid, scale in (data.get("capacity_scale") or {}).items():
             if tid in self.capacity_scale:
                 self.capacity_scale[tid] = float(scale)
+        for tid, move in (data.get("last_move") or {}).items():
+            if tid in self.configs and isinstance(move, dict):
+                self._last_move[tid] = {k: int(v) for k, v in move.items()}
 
     def observe_feedback(self, realized_violation: dict[str, float]) -> None:
         """Self-calibration hook the replay engine calls with what each
@@ -521,6 +581,89 @@ class JCACController:
                 scale = min(1.0, scale + self.CAP_RECOVER)
             self.capacity_scale[tid] = scale
 
+    @staticmethod
+    def _move_signs(before: TenantState, after: TenantState) -> dict[str, int]:
+        """Direction of each knob's move, -1/0/+1; tiers ordered by TIERS."""
+        def sign(a, b):
+            return (b > a) - (b < a)
+        return {
+            "replicas": sign(before.replicas, after.replicas),
+            "cache": sign(before.cache_mb, after.cache_mb),
+            "tier": sign(TIERS.index(before.tier), TIERS.index(after.tier)),
+        }
+
+    def _reversals(self, tid: str, base: TenantState, candidate: TenantState) -> int:
+        """How many knobs this candidate would move AGAINST the direction they
+        moved last interval -- the oscillation hysteresis is there to damp.
+        A first move, or a move continuing the last one, is free."""
+        last = self._last_move.get(tid)
+        if not last:
+            return 0
+        now = self._move_signs(base, candidate)
+        return sum(1 for k in now if now[k] != 0 and last[k] != 0 and now[k] == -last[k])
+
+    def observe_realized(self, realized: dict[str, "RealizedStep"]) -> None:
+        """Headroom calibration hook: what each tenant's plant actually served
+        last interval, at which state, under which demand. No-op unless
+        `headroom_calibration`; see __init__ for the mechanism."""
+        if not self.headroom_calibration:
+            return
+        for tid, obs in realized.items():
+            if tid not in self.configs:
+                continue
+            target = self._headroom_target(tid, obs)
+            if target is None:
+                continue
+            scale = self.capacity_scale[tid]
+            rate = self.HEADROOM_LEARN_DOWN if target < scale else self.HEADROOM_LEARN_UP
+            scale = scale + rate * (target - scale)
+            self.capacity_scale[tid] = min(self.headroom_cap, max(self.HEADROOM_FLOOR, scale))
+
+    def _headroom_target(self, tid: str, obs: "RealizedStep") -> float | None:
+        """The capacity scale at which the controller's own projection of the
+        executed point reproduces the realized p95 -- per traffic family,
+        combined conservatively (the smaller scale wins). None when nothing
+        was observed (no traffic, or a realized p95 of zero, which the live
+        export emits for cache-served AI and which carries no load signal)."""
+        config = self.configs[tid]
+        belief = (self.belief_scale or {}).get("replica_capacity", 1.0)
+        believed = self._believed_state(obs.state) if self.belief_scale else obs.state
+
+        def predicted(scale: float):
+            eff = scale * belief
+            d = Demand(rps={k: v / eff for k, v in obs.demand.rps.items()},
+                       crud_base_ms=obs.demand.crud_base_ms)
+            return evaluate_step(config, believed, d)
+
+        families = []
+        crud_rps = sum(obs.demand.rps.get(k, 0.0) for k in model.CRUD_KINDS)
+        ai_rps = sum(obs.demand.rps.get(k, 0.0) for k in model.AI_KINDS)
+        if crud_rps > 0.0 and obs.crud_p95_ms > 0.0:
+            families.append(("crud_p95_ms", obs.crud_p95_ms))
+        if ai_rps > 0.0 and obs.ai_p95_ms > 0.0:
+            families.append(("ai_p95_ms", obs.ai_p95_ms))
+        if not families:
+            return None
+
+        targets = []
+        for attr, realized_ms in families:
+            lo, hi = self.HEADROOM_FLOOR, self.headroom_cap
+            # predicted p95 is non-increasing in scale: bracket, then bisect
+            if getattr(predicted(hi), attr) >= realized_ms:
+                targets.append(hi)
+                continue
+            if getattr(predicted(lo), attr) <= realized_ms:
+                targets.append(lo)
+                continue
+            for _ in range(self.HEADROOM_BISECT):
+                mid = 0.5 * (lo + hi)
+                if getattr(predicted(mid), attr) >= realized_ms:
+                    lo = mid
+                else:
+                    hi = mid
+            targets.append(lo)
+        return min(targets)
+
     def _planning_demand(self, tid: str, demand: Demand) -> Demand:
         """Capacity correction applied as demand inflation: planning for
         rps/scale on nominal capacity equals planning for rps on
@@ -531,7 +674,9 @@ class JCACController:
             # correction and is never above 1.0, so >= 1.0 means "nothing to
             # correct". A belief CAN exceed 1.0 (an over-optimistic
             # controller), which is why the belief branch tests != instead.
-            if scale >= 1.0:
+            # Under headroom calibration the scale may legitimately exceed
+            # 1.0 (the plant out-performs the model) and is applied.
+            if scale == 1.0 or (scale > 1.0 and not self.headroom_calibration):
                 return demand
         else:
             # PREREG_MODEL_MISMATCH: a `replica_capacity` belief of b says
@@ -587,6 +732,10 @@ class JCACController:
             for tid in self._sweep_order():
                 chosen[tid] = self._best_for_tenant(tid, chosen, horizons, origin,
                                                     cost_horizons)
+
+        if self.reversal_hysteresis:
+            for tid, state in chosen.items():
+                self._last_move[tid] = self._move_signs(states[tid], state)
 
         plans = {}
         for tid, state in chosen.items():
@@ -767,11 +916,14 @@ class JCACController:
                     # bit-identically (R4).
                     if self.enforce_budget and cost > budget_per_step:
                         continue
-                    switches = (
-                        (candidate.replicas != base.replicas)
-                        + (candidate.cache_mb != base.cache_mb)
-                        + (candidate.tier != base.tier)
-                    )
+                    if self.reversal_hysteresis:
+                        switches = self._reversals(tid, base, candidate)
+                    else:
+                        switches = (
+                            (candidate.replicas != base.replicas)
+                            + (candidate.cache_mb != base.cache_mb)
+                            + (candidate.tier != base.tier)
+                        )
                     fairness = 1.0 - jain_index(other_satisfaction + [1.0 - viol])
                     # W32: a tenant flagged noisy pays for expansion in
                     # proportion to its interference score — the planner
