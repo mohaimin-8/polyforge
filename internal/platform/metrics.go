@@ -14,7 +14,14 @@ import (
 )
 
 var (
-	requestDurationBucketsSec = []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
+	// Sub-5 ms boundaries (session 48): the CRUD path serves at 1-2 ms, so
+	// with Prometheus's default first boundary of 5 ms every CRUD request
+	// landed in one bucket and the in-run histogram's p95 was the bucket's
+	// upper edge, not a measurement (RESULTS_WAVE4_CALIBRATED.md reports
+	// 4.8/5.0 ms for every arm in every cell). Five boundaries below 5 ms
+	// resolve the path this system is judged on; the coarse tail is kept so
+	// existing dashboards and the AI path read as before.
+	requestDurationBucketsSec = []float64{0.0005, 0.001, 0.002, 0.003, 0.005, 0.0075, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 	telemetryLatencyBucketsMS = []float64{1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000}
 	telemetryPayloadBuckets   = []float64{128, 512, 1024, 4096, 8192, 16384, 65536, 262144, 1048576}
 )
