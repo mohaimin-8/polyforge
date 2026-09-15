@@ -1,0 +1,28 @@
+# Wave 4 follow-up: the corrected joint controller on the live plane (B1').
+# Pre-registration: research/analysis/PREREG_WAVE4_CALIBRATED.md -- read it
+# before running; this file is only the matrix.
+#
+# 5 arms x 4 cells x 2 reps = 40 runs, one sitting, the runner resumes.
+# jcac (the published controller) is an arm so the correction's effect is
+# measured; jcac-calibrated is the same controller with headroom-calibrated
+# capacity, a learned tier-latency offset and a half-replica switching
+# penalty (eval/harness/systems.py; the operator chart's planner flags).
+#
+# RUN REQUIREMENTS -- live-AI plane:
+#   POLYFORGE_EVAL_LIVE_AI=1  POLYFORGE_EVAL_SHARED_PG=1
+#   POLYFORGE_EVAL_TIER_BACKENDS='<the line b1_tier_host.sh printed>'
+#   POLYFORGE_EVAL_FINE_BUCKET_SECONDS=10   # one bucket per control step:
+#                                           # the paired bootstrap's unit
+# The harness scrapes the clause-4 histogram inside every run and keeps
+# each run's evidence under wave4_calibrated_plane_evidence/runs/.
+name: wave4_calibrated_plane
+backend: cluster
+steps: 30
+reps: 2
+systems: [jcac-calibrated, jcac, replica-only, cache-only, tier-only]
+workloads: [ai_cacheable, tier_mixed, crud_bursty, joint_stress]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/wave4_calibrated_plane.duckdb
+retries: 0
+timeseries_reps: 0
