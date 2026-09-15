@@ -1385,3 +1385,5 @@ Appended by the runner every progress tick.
 | 2026-09-09 10:22 | wave4_jointstress_probe | 1/1 | 1 | 10 runs/h |
 | 2026-09-09 10:44 | wave4_jointstress_probe | 1/1 | 1 | 11 runs/h |
 | 2026-09-09 10:51 | wave4_jointstress_probe | 1/1 | 1 | 11 runs/h |
+| 2026-09-15 07:47 | wave4_sim_ref | 25/48 | 0 | 12306 runs/h |
+| 2026-09-15 07:47 | wave4_sim_ref | 48/48 | 0 | 15885 runs/h |
