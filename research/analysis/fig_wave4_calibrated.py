@@ -49,15 +49,16 @@ CELL_LABELS = {"ai_cacheable": "ai_cacheable", "tier_mixed": "tier_mixed",
                "crud_bursty": "crud_bursty", "joint_stress": "joint_stress (primary)"}
 
 
-def per_cell_costs(df) -> dict[str, dict[str, tuple[float, list[float]]]]:
-    """cell -> arm -> (mean cost over reps, the rep costs)."""
-    out: dict[str, dict[str, tuple[float, list[float]]]] = {}
+def per_cell_costs(df) -> dict[str, dict[str, tuple[float, list[float], list[int]]]]:
+    """cell -> arm -> (mean cost over reps, the rep costs, the rep ids), reps in order."""
+    out: dict[str, dict[str, tuple[float, list[float], list[int]]]] = {}
     for cell in aw.CELLS:
         out[cell] = {}
         for arm in aw.ARMS:
-            reps = df[(df.workload == cell) & (df.system == arm)].total_cost_usd.tolist()
-            if reps:
-                out[cell][arm] = (float(np.mean(reps)), [float(r) for r in reps])
+            sub = df[(df.workload == cell) & (df.system == arm)].sort_values("rep")
+            if len(sub):
+                out[cell][arm] = (float(sub.total_cost_usd.mean()),
+                                  [float(r) for r in sub.total_cost_usd], [int(r) for r in sub.rep])
     return out
 
 
@@ -98,7 +99,7 @@ def draw(costs: dict, deltas: list[dict]) -> tuple[object, str]:
         for i, arm in enumerate(aw.ARMS):
             if arm not in costs[cell]:
                 continue
-            mean, reps = costs[cell][arm]
+            mean, reps, _ = costs[cell][arm]
             y = yc + (i - (n_arms - 1) / 2) * -step
             ax_cost.plot(reps, [y] * len(reps), "|", color=ARM_COLORS[arm], ms=7, mew=1.2)
             ax_cost.plot(mean, y, "o", color=ARM_COLORS[arm], ms=5.5,
@@ -157,12 +158,17 @@ def sheet(costs: dict, deltas: list[dict], caption: str) -> str:
          "![fig20](../../eval/results/figures/fig20_calibrated_plane.png)", "",
          f"**Caption.** {caption}", "",
          "## Panel A — total cost per run (USD)", "",
-         "| cell | arm | mean | reps |", "|---|---|---|---|"]
+         "`window $` is the sum of the run's window buckets (what the pairing compares); "
+         "`total` is the registered run-level metric, which also carries the WL-H2 preflight's "
+         "own spend and any traffic outside the window.", "",
+         "| cell | arm | mean total | reps total | reps window $ |", "|---|---|---|---|---|"]
     for cell in aw.CELLS:
         for arm in aw.ARMS:
             if arm in costs.get(cell, {}):
-                mean, reps = costs[cell][arm]
-                L.append(f"| {cell} | {arm} | {mean:.4f} | {', '.join(f'{r:.4f}' for r in reps)} |")
+                mean, reps, rep_ids = costs[cell][arm]
+                win = [aw.window_costs(arm, cell, rep) for rep in rep_ids]
+                win_s = ", ".join(f"{sum(w):.4f}" if w else "n/a" for w in win)
+                L.append(f"| {cell} | {arm} | {mean:.4f} | {', '.join(f'{r:.4f}' for r in reps)} | {win_s} |")
     L += ["", "## Panel B — joint_stress, calibrated − arm per window bucket", "",
           "| vs arm | Δ % of arm's mean bucket cost | 95% CI | pairs | beats |", "|---|---|---|---|---|"]
     for d in deltas:
