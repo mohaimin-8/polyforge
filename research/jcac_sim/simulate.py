@@ -30,7 +30,6 @@ from model import (
     AI_KINDS,
     CACHEABLE_FRACTION,
     CRUD_KINDS,
-    REPLICA_CAPACITY_WU,
     Demand,
     TenantConfig,
     TenantState,
@@ -200,7 +199,7 @@ def interference_scores(
     reduces the interference (unlike raw demand, which is exogenous)."""
     served = {
         tid: min(d.work_units(states[tid].cache_mb, states[tid].tier),
-                 states[tid].replicas * REPLICA_CAPACITY_WU)
+                 states[tid].replicas * model.REPLICA_CAPACITY_WU)
         for tid, d in demands.items()
     }
     total = sum(served.values())
@@ -410,7 +409,8 @@ def run(
                 ai_p95s.append(m.ai_p95_ms)
                 hit = hit_rate(serving.cache_mb)
                 ai_hit_rps += sum(
-                    demand.rps.get(k, 0.0) * hit * CACHEABLE_FRACTION[k] for k in AI_KINDS
+                    demand.rps.get(k, 0.0) * hit * (1.0 if model.CACHEABLE_UNIFORM else CACHEABLE_FRACTION[k])
+                    for k in AI_KINDS
                 )
                 ai_total_rps += ai_rps
 

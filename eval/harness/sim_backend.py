@@ -83,6 +83,12 @@ def _apply_model_form(form: tuple) -> None:
         p95_tail=p95_tail,
         mixture_p95=bool(f.get("mixture_p95", 0)),
         wu_tier_factor=wu or None,
+        replica_capacity_wu=f.get("replica_capacity_wu"),
+        wu_ai_scale=f.get("wu_ai_scale"),
+        crud_base_scale=f.get("crud_base_scale"),
+        cacheable_uniform=bool(f.get("cacheable_uniform", 0)),
+        tier_latency_ms=({t: f[f"tier_latency_{t}"] for t in ("small", "mid", "large")}
+                         if "tier_latency_small" in f else None),
     )
 
 

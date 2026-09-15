@@ -1,0 +1,52 @@
+{
+  "cells": {
+    "ai_cacheable": {
+      "cache_half_mb": 4.0,
+      "cache_hit_max": 0.9624305571067984,
+      "cacheable_uniform": 1,
+      "crud_base_scale": 0.011970845238095239,
+      "live_crud_p95_ms": 1.005551,
+      "published_crud_p95_ms_at_zero_load": 84.0
+    },
+    "crud_bursty": {
+      "crud_base_scale": 0.03581871428571428,
+      "live_crud_p95_ms": 2.005848,
+      "published_crud_p95_ms_at_zero_load": 56.0
+    },
+    "joint_stress": {
+      "cache_half_mb": 4.0,
+      "cache_hit_max": 0.9553674092615979,
+      "cacheable_uniform": 1,
+      "crud_base_scale": 0.014370614285714286,
+      "live_crud_p95_ms": 1.005943,
+      "published_crud_p95_ms_at_zero_load": 70.0
+    },
+    "tier_mixed": {
+      "cache_half_mb": 4.0,
+      "cache_hit_max": 0.2951594498488205,
+      "cacheable_uniform": 1,
+      "crud_base_scale": 0.011975702380952379,
+      "live_crud_p95_ms": 1.0059589999999998,
+      "published_crud_p95_ms_at_zero_load": 84.0
+    }
+  },
+  "replica_capacity_basis": {
+    "peak_crud_rps": 300.7806451612903,
+    "peak_crud_wu_per_replica_per_s": 56.12818037374073,
+    "peak_mean_replicas": 8.0025,
+    "peak_run": "jcac-calibrated/crud_bursty",
+    "published_replica_capacity_wu": 100.0,
+    "rho_cal": 0.05
+  },
+  "replica_capacity_wu": 1122.5636074748145,
+  "rule": "PREREG_WAVE4_SIM_TRANSFER.md; research/calibration/live_plant_fit.py",
+  "source": "eval/results/wave4_calibrated_plane_evidence (B1', 2026-09-15, one L40S host)",
+  "tier_latency_basis": "small/large: knob-preflight sequential probes, mean over valid runs; mid: geometric mean, not measured",
+  "tier_latency_ms": {
+    "large": 2155.729055226545,
+    "mid": 751.1507718698944,
+    "small": 261.7339506153493
+  },
+  "valid_runs": 39,
+  "wu_ai_scale": 0.0
+}

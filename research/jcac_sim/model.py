@@ -196,6 +196,27 @@ MIXTURE_P95 = False  # True: ai_p95 is the 95th percentile of the hit/miss mixtu
 WU_TIER_FACTOR = {"none": 1.0, "small": 1.0, "mid": 1.0, "large": 1.0}
 _DEFAULT_WU_TIER_FACTOR = dict(WU_TIER_FACTOR)
 
+# --- live-plant overrides (session 48, PREREG_WAVE4_SIM_TRANSFER) --------
+# B1 measured the simulator's ordinal predictions reproducing live in 0 of
+# 4 cells. The live evidence (B1', 40 runs) names three plant facts the
+# published constants get wrong: the control-plane replica serves CRUD at
+# 1 ms with no congestion from 2 to 35 rps per replica (capacity far above
+# 100 wu/s); AI requests never touch the replicas at all (k6 -> gateway ->
+# vLLM, while the model charges 20-40 wu each); and the cache hits 0.95-0.97
+# at 64 MB in the cacheable cells (the curve gives 0.17). These four knobs
+# let a pre-registered rerun put the measured plant under every arm at
+# once. Defaults are the published constants, bit-identical.
+_DEFAULT_REPLICA_CAPACITY_WU = REPLICA_CAPACITY_WU
+WU_AI_SCALE = 1.0          # multiplier on AI kinds' work units (0 = off the replicas)
+CRUD_BASE_SCALE = 1.0      # multiplier on demand.crud_base_ms
+CACHEABLE_UNIFORM = False  # True: every AI kind is fully cacheable; the ceiling is CACHE_HIT_MAX
+# Flat per-tier base latency for every AI kind (ms), None = the published
+# per-kind table. The live tiers are three sizes of one chat model: `small`
+# is fastest AND cheapest for every kind (257 ms vs 2306 ms for `large` in
+# the B1' knob preflight), where the published table makes `agent` degrade
+# on `small` (6000 ms) so that tier choice is non-trivial.
+TIER_LATENCY_FLAT: dict | None = None
+
 _Z95 = 1.6448536269514722  # standard-normal 95th-percentile z
 
 # The lognormal branch family needs p95/mean < exp(z95^2 / 2).
@@ -207,6 +228,11 @@ def set_model_form(
     p95_tail: tuple | None = None,
     mixture_p95: bool | None = None,
     wu_tier_factor: dict | None = None,
+    replica_capacity_wu: float | None = None,
+    wu_ai_scale: float | None = None,
+    crud_base_scale: float | None = None,
+    cacheable_uniform: bool | None = None,
+    tier_latency_ms: dict | None = None,
 ) -> None:
     """Reset the model form to the published defaults, then apply overrides.
 
@@ -216,6 +242,31 @@ def set_model_form(
     `from model import` aliases keep seeing the active form.
     """
     global CONGESTION_EXPONENT, P95_TAIL, MIXTURE_P95
+    global REPLICA_CAPACITY_WU, WU_AI_SCALE, CRUD_BASE_SCALE, CACHEABLE_UNIFORM, TIER_LATENCY_FLAT
+    TIER_LATENCY_FLAT = None
+    if tier_latency_ms:
+        unknown = set(tier_latency_ms) - {"small", "mid", "large"}
+        if unknown or set(tier_latency_ms) != {"small", "mid", "large"}:
+            raise ValueError("tier_latency_ms needs exactly small, mid and large")
+        if any(float(v) <= 0.0 for v in tier_latency_ms.values()):
+            raise ValueError("tier latencies must be positive")
+        TIER_LATENCY_FLAT = {k: float(v) for k, v in tier_latency_ms.items()}
+    REPLICA_CAPACITY_WU = _DEFAULT_REPLICA_CAPACITY_WU
+    if replica_capacity_wu is not None:
+        if float(replica_capacity_wu) <= 0.0:
+            raise ValueError("replica_capacity_wu must be positive")
+        REPLICA_CAPACITY_WU = float(replica_capacity_wu)
+    WU_AI_SCALE = 1.0
+    if wu_ai_scale is not None:
+        if float(wu_ai_scale) < 0.0:
+            raise ValueError("wu_ai_scale must be non-negative")
+        WU_AI_SCALE = float(wu_ai_scale)
+    CRUD_BASE_SCALE = 1.0
+    if crud_base_scale is not None:
+        if float(crud_base_scale) <= 0.0:
+            raise ValueError("crud_base_scale must be positive")
+        CRUD_BASE_SCALE = float(crud_base_scale)
+    CACHEABLE_UNIFORM = bool(cacheable_uniform) if cacheable_uniform is not None else False
     CONGESTION_EXPONENT = 1.0
     if congestion_exponent is not None:
         a = float(congestion_exponent)
@@ -343,14 +394,25 @@ class Demand:
             served = rate
             wu = WORK_UNITS[kind]
             if kind in AI_KINDS:
-                served = rate * (1.0 - hit * CACHEABLE_FRACTION[kind])
+                cacheable = 1.0 if CACHEABLE_UNIFORM else CACHEABLE_FRACTION[kind]
+                served = rate * (1.0 - hit * cacheable)
                 if ai_factor != 1.0:
                     wu = wu * ai_factor
+                if WU_AI_SCALE != 1.0:
+                    wu = wu * WU_AI_SCALE
             total += served * wu
         return total
 
     def total_rps(self) -> float:
         return sum(self.rps.values())
+
+
+def tier_base_latency_ms(kind: str, tier: str) -> float:
+    """Base latency of an AI `kind` served on `tier`: the published per-kind
+    table, or the flat live table when a pre-registered rerun set one."""
+    if TIER_LATENCY_FLAT is not None and tier in TIER_LATENCY_FLAT:
+        return TIER_LATENCY_FLAT[tier]
+    return TIER_BASE_LATENCY_MS[kind][tier]
 
 
 def hit_rate(cache_mb: int) -> float:
@@ -484,7 +546,7 @@ def evaluate_step(
     crud_rps = sum(demand.rps.get(k, 0.0) for k in CRUD_KINDS)
     ai_rps = sum(demand.rps.get(k, 0.0) for k in AI_KINDS)
 
-    crud_p95 = demand.crud_base_ms * inflate * tail
+    crud_p95 = demand.crud_base_ms * CRUD_BASE_SCALE * inflate * tail
 
     # AI latency: cache hits are flat-fast, misses pay the tier price.
     ai_p95 = 0.0
@@ -496,11 +558,11 @@ def evaluate_step(
             rate = demand.rps.get(kind, 0.0)
             if rate <= 0.0:
                 continue
-            hit_share = hit * CACHEABLE_FRACTION[kind]
+            hit_share = hit * (1.0 if CACHEABLE_UNIFORM else CACHEABLE_FRACTION[kind])
             if state.tier == "none":
                 miss_ms = NO_TIER_LATENCY_MS
             else:
-                miss_ms = TIER_BASE_LATENCY_MS[kind][state.tier] * inflate
+                miss_ms = tier_base_latency_ms(kind, state.tier) * inflate
             weighted_ms += rate * (hit_share * CACHE_HIT_LATENCY_MS + (1.0 - hit_share) * miss_ms)
             miss_rps += rate * (1.0 - hit_share)
             if MIXTURE_P95:

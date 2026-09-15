@@ -20,7 +20,6 @@ from model import (
     AI_KINDS,
     CACHE_LEVELS_MB,
     CACHEABLE_FRACTION,
-    REPLICA_CAPACITY_WU,
     SLO_BASE_MS,
     SLO_CLASS_FACTOR,
     Demand,
@@ -79,7 +78,7 @@ class HPAController:
         for tid, state in states.items():
             config = self.configs[tid]
             demand = demands.get(tid, Demand())
-            rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * REPLICA_CAPACITY_WU)
+            rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * model.REPLICA_CAPACITY_WU)
             desired = math.ceil(state.replicas * rho / self.target_rho) if rho > 0 else config.replica_min
             delta = max(-2, min(2, desired - state.replicas))
             out[tid] = apply_action(config, state, delta, state.cache_mb, state.tier)
@@ -132,7 +131,7 @@ class LayeredController:
             config = self.configs[tid]
             demand = demands.get(tid, Demand())
 
-            rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * REPLICA_CAPACITY_WU)
+            rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * model.REPLICA_CAPACITY_WU)
             desired = math.ceil(state.replicas * rho / self.target_rho) if rho > 0 else config.replica_min
             delta = max(-2, min(2, desired - state.replicas))
 
@@ -215,7 +214,7 @@ class FIRMReplicaController:
         self._last: dict[str, tuple[tuple[int, bool], int]] = {}
 
     def _observe(self, config: TenantConfig, state: TenantState, demand: Demand):
-        rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * REPLICA_CAPACITY_WU)
+        rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * model.REPLICA_CAPACITY_WU)
         m = evaluate_step(config, state, demand)
         bucket = min(9, int(rho * 5.0))  # 0..9 in ρ steps of 0.2
         s = (bucket, m.violation > 0.0)
@@ -278,7 +277,7 @@ class GPTCacheLRUController:
             config = self.configs[tid]
             demand = demands.get(tid, Demand())
 
-            rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * REPLICA_CAPACITY_WU)
+            rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * model.REPLICA_CAPACITY_WU)
             desired = math.ceil(state.replicas * rho / self.target_rho) if rho > 0 else config.replica_min
             delta = max(-2, min(2, desired - state.replicas))
 
@@ -359,7 +358,7 @@ class ConcurrencyController:
             config = self.configs[tid]
             demand = demands.get(tid, Demand())
             lam = demand.work_units(state.cache_mb, state.tier)
-            rho = lam / max(1, state.replicas * REPLICA_CAPACITY_WU)
+            rho = lam / max(1, state.replicas * model.REPLICA_CAPACITY_WU)
             in_flight = rho * congestion(lam, state.replicas) * state.replicas
             desired = (math.ceil(in_flight / self.c_t) if in_flight > 0
                        else config.replica_min)
@@ -427,10 +426,10 @@ class VTCReplicaController:
         for tid, state in states.items():
             config = self.configs[tid]
             offered = demands.get(tid, Demand()).work_units(state.cache_mb, state.tier)
-            served = min(offered, state.replicas * REPLICA_CAPACITY_WU)
+            served = min(offered, state.replicas * model.REPLICA_CAPACITY_WU)
             weight = max(config.hourly_budget_usd, 1e-9)
             self.counters[tid] += served / weight
-            need = math.ceil(offered / (REPLICA_CAPACITY_WU * self.target_rho)) if offered > 0 else 0
+            need = math.ceil(offered / (model.REPLICA_CAPACITY_WU * self.target_rho)) if offered > 0 else 0
             needs[tid] = max(config.replica_min, min(config.replica_max, need))
 
         # Everyone keeps its floor; the rest of the pool goes least-served
@@ -605,7 +604,7 @@ class LearnedJointController:
         relative."""
         slo_b = _SLO_CLASSES.index(config.slo_class) if config.slo_class in _SLO_CLASSES else 1
         lam = demand.work_units(state.cache_mb, state.tier)
-        rho = lam / max(1, state.replicas * REPLICA_CAPACITY_WU)
+        rho = lam / max(1, state.replicas * model.REPLICA_CAPACITY_WU)
         rho_b = min(9, int(rho * 5.0))  # 0..9 in ρ steps of 0.2 (FIRM's bucketing)
         m = evaluate_step(config, state, demand)
         viol_b = 0 if m.violation <= 0.0 else (1 if m.violation < 0.5 else 2)
@@ -723,7 +722,7 @@ def latency_ranked_tier(config: TenantConfig, state: TenantState,
                   if config.knob_admits(state.cache_mb, t)]
     if not admissible:
         return state.tier
-    by_speed = sorted(admissible, key=lambda t: model.TIER_BASE_LATENCY_MS[kind][t])
+    by_speed = sorted(admissible, key=lambda t: model.tier_base_latency_ms(kind, t))
     current = state.tier if state.tier in admissible else by_speed[0]
     target = SLO_BASE_MS["ai"] * SLO_CLASS_FACTOR[config.slo_class]
 

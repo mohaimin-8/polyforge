@@ -868,6 +868,28 @@ class TestModelFormOverride:
         with pytest.raises(ValueError, match="set together"):
             load(bad)
 
+    def test_live_plant_keys_enter_the_identity_and_reach_the_model(self, tmp_path):
+        """PREREG_WAVE4_SIM_TRANSFER: the four live-plant overrides are
+        model_form keys; setting them changes every run_id (a calibrated
+        rerun can never collide with a published run) and the sim backend
+        applies and clears them like the Wave 5 forms."""
+        import model
+        base, _ = run_identity(tiny_spec(), "hpa", "crud_steady", "uniform", "small", 0)
+        fitted = tiny_spec(model_form={"replica_capacity_wu": 1000.0, "wu_ai_scale": 0,
+                                       "crud_base_scale": 0.0202, "cacheable_uniform": 1})
+        assert base != run_identity(fitted, "hpa", "crud_steady", "uniform", "small", 0)[0]
+        bad = tmp_path / "f.yaml"
+        bad.write_text("name: x\nmodel_form: {replica_capacity_wu: -1}\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="non-negative"):
+            load(bad)
+        run_f = expand(tiny_spec(systems=["hpa"], workloads=["crud_steady"],
+                                 model_form={"replica_capacity_wu": 1000.0, "wu_ai_scale": 0,
+                                             "crud_base_scale": 0.0202, "cacheable_uniform": 1}))[0]
+        sim_backend._apply_model_form(run_f.model_form)
+        assert (model.REPLICA_CAPACITY_WU, model.WU_AI_SCALE, model.CRUD_BASE_SCALE, model.CACHEABLE_UNIFORM)             == (1000.0, 0.0, 0.0202, True)
+        sim_backend._apply_model_form(())
+        assert (model.REPLICA_CAPACITY_WU, model.WU_AI_SCALE, model.CRUD_BASE_SCALE, model.CACHEABLE_UNIFORM)             == (100.0, 1.0, 1.0, False)
+
     def test_execute_applies_and_clears_model_form(self):
         import model
 

@@ -1728,3 +1728,71 @@ class ReplicaDwellTests(unittest.TestCase):
         self.assertEqual(other._replica_move, ctl._replica_move)
         # and, restored, an immediate reversal is still blocked
         self.assertTrue(other._dwell_blocks("a", +1))
+
+
+class LivePlantOverrideTests(unittest.TestCase):
+    """PREREG_WAVE4_SIM_TRANSFER: the four live-plant knobs move the world
+    and every belief together, and reset to the published constants."""
+
+    def tearDown(self):
+        model.set_model_form()
+
+    def test_defaults_are_the_published_constants(self):
+        model.set_model_form(replica_capacity_wu=1000.0, wu_ai_scale=0.0, crud_base_scale=0.02,
+                             cacheable_uniform=True)
+        model.set_model_form()
+        self.assertEqual(model.REPLICA_CAPACITY_WU, 100.0)
+        self.assertEqual((model.WU_AI_SCALE, model.CRUD_BASE_SCALE, model.CACHEABLE_UNIFORM), (1.0, 1.0, False))
+
+    def test_ai_work_leaves_the_replicas_and_capacity_grows(self):
+        d = demand({"crud_read": 10.0, "chat": 5.0})
+        published = d.work_units(0)
+        self.assertAlmostEqual(published, 10.0 * 1.0 + 5.0 * 20.0)
+        model.set_model_form(wu_ai_scale=0.0)
+        self.assertAlmostEqual(d.work_units(0), 10.0)
+        model.set_model_form(replica_capacity_wu=1000.0)
+        self.assertLess(model.congestion(110.0, 1), model.congestion(50.0, 1) + 0.2)
+        self.assertAlmostEqual(model.congestion(500.0, 1), 1.0 / (1.0 - 0.5))
+        # baselines and the simulator read the override, not a stale alias
+        import baselines, simulate
+        self.assertEqual(baselines.model.REPLICA_CAPACITY_WU, 1000.0)
+        self.assertEqual(simulate.model.REPLICA_CAPACITY_WU, 1000.0)
+
+    def test_crud_base_scale_and_uniform_cacheable(self):
+        cfg = TenantConfig(tenant_id="a")
+        st = TenantState(replicas=4, cache_mb=256, tier="small")
+        d = demand({"crud_read": 10.0, "agent": 2.0})
+        base = evaluate_step(cfg, st, d)
+        model.set_model_form(crud_base_scale=0.02)
+        scaled = evaluate_step(cfg, st, d)
+        self.assertAlmostEqual(scaled.crud_p95_ms, base.crud_p95_ms * 0.02, places=9)
+        model.set_model_form(cacheable_uniform=True)
+        # agent is 10% cacheable in the published model; uniform makes it fully cacheable,
+        # so the served AI work falls to the cache miss share alone
+        hit = model.hit_rate(256)
+        self.assertAlmostEqual(d.work_units(256), 10.0 + 2.0 * (1.0 - hit) * 40.0)
+
+    def test_rejects_nonsense(self):
+        with self.assertRaises(ValueError):
+            model.set_model_form(replica_capacity_wu=0.0)
+        with self.assertRaises(ValueError):
+            model.set_model_form(wu_ai_scale=-1.0)
+        with self.assertRaises(ValueError):
+            model.set_model_form(crud_base_scale=0.0)
+
+    def test_flat_tier_latency_makes_small_fastest_for_every_kind(self):
+        cfg = TenantConfig(tenant_id="a")
+        d = demand({"agent": 2.0})
+        published = {t: evaluate_step(cfg, TenantState(replicas=4, cache_mb=0, tier=t), d).ai_p95_ms
+                     for t in ("small", "mid", "large")}
+        self.assertGreater(published["small"], published["mid"])  # agent degrades on small, as published
+        model.set_model_form(tier_latency_ms={"small": 257.0, "mid": 770.0, "large": 2306.0})
+        flat = {t: evaluate_step(cfg, TenantState(replicas=4, cache_mb=0, tier=t), d).ai_p95_ms
+                for t in ("small", "mid", "large")}
+        self.assertLess(flat["small"], flat["mid"])
+        self.assertLess(flat["mid"], flat["large"])
+        self.assertEqual(model.tier_base_latency_ms("chat", "large"), 2306.0)
+        with self.assertRaises(ValueError):
+            model.set_model_form(tier_latency_ms={"small": 1.0})
+        model.set_model_form()
+        self.assertIsNone(model.TIER_LATENCY_FLAT)
