@@ -39,7 +39,7 @@ from pathlib import Path
 from model import TenantState, TIERS as MODEL_TIERS  # research/jcac_sim via harness sys.path
 
 from .config import RunSpec
-from . import workloads
+from . import histogram, workloads
 # EVAL_DIR is defined once in harness/__init__.py; isocost.py and runner.py
 # import it the same way. run_knob_preflight() USED it without importing it, so
 # WL-H2 raised NameError on every run of the live-AI plane. The line had never
@@ -1524,6 +1524,19 @@ def evidence_dir_for(run: RunSpec) -> Path:
     return REPO_ROOT / "eval" / "results" / f"{run.experiment}_evidence"
 
 
+def run_evidence_dir(run: RunSpec) -> Path:
+    """This run's own subdirectory under the experiment's evidence dir.
+
+    The experiment dir keeps the LAST run's files at its top level (every
+    record so far reads them there); this keeps EVERY run's. The B1 sitting of
+    2026-09-15 overwrote 15 of its 16 per-run exports, which is why its record
+    cannot compute the registered paired bootstrap and cannot say where the
+    joint arm's extra spend went. Named by the cell, not the run id, so a
+    reader can find `jcac__joint_stress` without a lookup."""
+    return (evidence_dir_for(run) / "runs"
+            / f"{run.system}__{run.workload}__{run.tenant_mix}__{run.cluster_size}__rep{run.rep}")
+
+
 def _run_step(cmd: list[str], *, env, timeout_s: float,
               live_log: "Path | None" = None):
     """Run one plan step, optionally streaming its output to a file as it goes.
@@ -1661,7 +1674,8 @@ def host_facts() -> dict:
 
 def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
                        supervisor: "PortForwardSupervisor | None",
-                       loadspread: "LoadDistributionSampler | None" = None) -> None:
+                       loadspread: "LoadDistributionSampler | None" = None,
+                       per_run: Path | None = None) -> None:
     """Copy the run's diagnostics out of the temp workdir. Best-effort and
     never raising: a failure to save evidence must not also fail the run."""
     if evidence_dir is None:
@@ -1675,26 +1689,35 @@ def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
         # attempt 2's k6 summary. The verdict that VOIDS a run is exactly the
         # evidence a reader will want to check.
         for name in ("k6-summary.json", "eval-export.json", "eval-export-fine.json",
-                     "knob_preflight.json"):
+                     "knob_preflight.json", "metrics_histogram.json"):
             src = workdir / name
             if src.exists():
                 shutil.copy2(src, evidence_dir / name)
         (evidence_dir / "host_facts.json").write_text(
             json.dumps(host_facts(), indent=2), encoding="utf-8")
+        if per_run is not None:
+            per_run.mkdir(parents=True, exist_ok=True)
+            for name in ("k6-summary.json", "eval-export.json", "eval-export-fine.json",
+                         "knob_preflight.json", "metrics_histogram.json", "host_facts.json"):
+                src = evidence_dir / name
+                if src.exists():
+                    shutil.copy2(src, per_run / name)
         if supervisor is not None:
             (evidence_dir / "port_forward_summary.json").write_text(
                 json.dumps(supervisor.summary(), indent=2), encoding="utf-8")
         if loadspread is not None:
             # SK-H6's evidence. Written even when the gate rejects the run,
             # because a pinned distribution IS the finding in that case.
-            (evidence_dir / "load_distribution.json").write_text(
-                json.dumps({"samples": loadspread.samples,
-                            "failures": loadspread.failures,
-                            "cpu_ms": loadspread.cpu_ms,
-                            "shares": loadspread.shares(),
-                            "node_of": loadspread.node_of,
-                            "node_shares": loadspread.node_shares()}, indent=2),
-                encoding="utf-8")
+            payload = json.dumps({"samples": loadspread.samples,
+                                  "failures": loadspread.failures,
+                                  "cpu_ms": loadspread.cpu_ms,
+                                  "shares": loadspread.shares(),
+                                  "node_of": loadspread.node_of,
+                                  "node_shares": loadspread.node_shares()}, indent=2)
+            (evidence_dir / "load_distribution.json").write_text(payload, encoding="utf-8")
+            if per_run is not None:
+                per_run.mkdir(parents=True, exist_ok=True)
+                (per_run / "load_distribution.json").write_text(payload, encoding="utf-8")
     except Exception:
         pass
 
@@ -1915,6 +1938,8 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
         gw_portforward = None
         sampler = None
         loadspread = None
+        hist_start = hist_end = None
+        hist_error = "scored window never opened"
         infra_cost = 0.0
         try:
             for cmd in plan:
@@ -1957,6 +1982,14 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                     sampler.start()
                     loadspread = LoadDistributionSampler()
                     loadspread.start()
+                    # Clause 4's primary measurand, scraped where it cannot be
+                    # skipped: every control-plane pod, at the opening of the
+                    # scored window. Best-effort -- a scrape failure is
+                    # recorded, never a reason to void a run.
+                    try:
+                        hist_start = histogram.scrape()
+                    except Exception as exc:  # noqa: BLE001
+                        hist_start, hist_error = None, f"start scrape failed: {exc}"
                     try:
                         SOAK_MARKER.write_text(
                             f"run_id={run.run_id}\n"
@@ -1986,6 +2019,19 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                 if exporting and proc.returncode == 0:
                     (workdir / export_name).write_text(proc.stdout, encoding="utf-8")
                 if _is_scored_load(cmd):
+                    # ... and at its close, before anything is torn down.
+                    try:
+                        hist_end = histogram.scrape()
+                    except Exception as exc:  # noqa: BLE001
+                        hist_end, hist_error = None, f"end scrape failed: {exc}"
+                    if hist_start is not None and hist_end is not None:
+                        win, lost = histogram.window(hist_end, hist_start)
+                        doc = histogram.summarize(win, len(hist_start), len(hist_end), lost)
+                    else:
+                        doc = {"metric": histogram.METRIC, "error": hist_error,
+                               "note": "histogram not captured for this run"}
+                    (workdir / "metrics_histogram.json").write_text(histogram.dumps(doc),
+                                                                    encoding="utf-8")
                     if sampler is not None:
                         sampler.stop()
                         sampler.join(timeout=30)
@@ -2000,7 +2046,7 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                         loadspread.stop()
                         loadspread.join(timeout=60)
                     _preserve_evidence(workdir, evidence_dir, portforward,
-                                       loadspread)
+                                       loadspread, per_run=run_evidence_dir(run))
                     # Order matters. check_k6_delivery answers "did the
                     # requests succeed"; check_load_distribution answers "did
                     # they reach more than one pod". Attempt 4 passed the
@@ -2047,7 +2093,7 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
             # Second attempt at preserving evidence: the first is before the
             # delivery gate (so a rejected run keeps its diagnostics); this one
             # covers every other exit path, including an exception mid-load.
-            _preserve_evidence(workdir, evidence_dir, portforward)
+            _preserve_evidence(workdir, evidence_dir, portforward, per_run=run_evidence_dir(run))
             if portforward is not None:
                 portforward.stop()
             if gw_portforward is not None:
