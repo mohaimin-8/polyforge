@@ -295,9 +295,10 @@ re-scoring pass:
 3. **The metrics-server manifest is fetched from GitHub on every run.**
    One run of forty died at zero seconds on an HTTP 500 from
    `github.com/kubernetes-sigs/metrics-server/releases/...`. The runner's
-   resume re-executed it. Vendoring that manifest (Apache-2.0, ~200 lines)
-   into `eval/` removes the dependency; it is the one hardening item left
-   open by this sitting.
+   resume re-executed it. The manifest is now vendored, unmodified, at
+   `eval/harness/manifests/metrics-server-v0.9.0.yaml` (its header records
+   the upstream sha256; a test re-hashes the body), so a scored run's
+   critical path touches no third party.
 
 The fine export spans the WL-H2 preflight (five buckets, ~$0.13 of `large`
 tier spend that every arm pays identically inside `total_cost_usd`) and the

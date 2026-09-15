@@ -61,9 +61,14 @@ POSTGRES_IMAGE = "postgres:16-alpine"
 METRICS_SERVER_VERSION = "v0.9.0"
 METRICS_SERVER_IMAGE = (
     f"registry.k8s.io/metrics-server/metrics-server:{METRICS_SERVER_VERSION}")
-METRICS_SERVER_MANIFEST = (
-    "https://github.com/kubernetes-sigs/metrics-server/releases/download/"
-    f"{METRICS_SERVER_VERSION}/components.yaml")
+# The manifest is VENDORED next to the harness (unmodified upstream file with
+# its sha256 in the header). The image was side-loaded and pinned in session
+# 44; the manifest kept coming from GitHub on every run until one run of the
+# B1' sitting died at zero seconds on an HTTP 500 from that URL. A scored
+# run's critical path now touches no third party.
+METRICS_SERVER_MANIFEST = str(
+    Path(__file__).resolve().parent / "manifests"
+    / f"metrics-server-{METRICS_SERVER_VERSION}.yaml")
 NATS_TAR = str(Path(tempfile.gettempdir()) / "nats-2.10-alpine.tar")
 POSTGRES_TAR = str(Path(tempfile.gettempdir()) / "postgres-16-alpine.tar")
 METRICS_SERVER_TAR = str(
