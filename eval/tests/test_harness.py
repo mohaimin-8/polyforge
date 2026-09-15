@@ -333,6 +333,26 @@ class TestClusterBackend:
         assert "--set=replicaCount=16" in install  # 8 tenants x sim initial 2
         assert "--set=autoscaling.hpa.maxReplicas=24" in install  # small cap
 
+    def test_metrics_server_manifest_is_vendored_pinned_and_unmodified(self, tmp_path):
+        """Session 48: one B1' run died at zero seconds on an HTTP 500 from
+        github.com while `kubectl apply -f <release URL>` fetched the
+        manifest. The image was already side-loaded and pinned; the manifest
+        must be too -- a local file, the pinned version, the upstream bytes
+        (the header records their sha256, and the body must still hash to it)."""
+        import hashlib
+        import re
+        run = expand(tiny_spec(systems=["jcac"]))[0]
+        plan = cluster_backend.command_plan(run, tmp_path)
+        apply = next(c for c in plan if c[:3] == ["kubectl", "apply", "-f"])
+        manifest = Path(apply[3])
+        assert manifest.exists() and not apply[3].startswith("http")
+        assert cluster_backend.METRICS_SERVER_VERSION in manifest.name
+        text = manifest.read_text(encoding="utf-8")  # universal newlines: a CRLF checkout hashes the same
+        recorded = re.search(r"sha256 of the upstream file as fetched [0-9-]+: ([0-9a-f]{64})", text).group(1)
+        body = text[text.index("apiVersion:"):]
+        assert hashlib.sha256(body.encode("utf-8")).hexdigest() == recorded
+        assert f"metrics-server:{cluster_backend.METRICS_SERVER_VERSION}" in body
+
     def test_jcac_command_plan_arms_and_gates_the_operator(self, tmp_path):
         run = expand(tiny_spec(systems=["jcac"]))[0]
         plan = cluster_backend.command_plan(run, tmp_path)
