@@ -37,6 +37,12 @@ MODEL_FORM_KEYS = {
     "p95_tail_f0", "p95_tail_b",  # p95/mean = f0*(1-min(rho,sat))^(-b), paired
     "mixture_p95",               # 1: ai_p95 is the true hit/miss mixture percentile
     "wu_tier_mid", "wu_tier_large",  # per-AI-request capacity multiplier vs small
+    # Live-plant overrides (session 48, PREREG_WAVE4_SIM_TRANSFER): the
+    # replica's capacity, AI work on the replicas (0 = the live gateway
+    # path), CRUD base-latency scale, and a per-cell cache ceiling
+    # (every AI kind cacheable; the ceiling is economy.cache_hit_max).
+    "replica_capacity_wu", "wu_ai_scale", "crud_base_scale", "cacheable_uniform",
+    "tier_latency_small", "tier_latency_mid", "tier_latency_large",  # flat ms, all three together
 }
 
 
@@ -157,6 +163,9 @@ def load(path: str | Path) -> ExperimentSpec:
             raise ValueError(f"model_form values must be non-negative numbers: {bad}")
         if ("p95_tail_f0" in spec.model_form) != ("p95_tail_b" in spec.model_form):
             raise ValueError("p95_tail_f0 and p95_tail_b must be set together")
+        tiers = {k for k in spec.model_form if k.startswith("tier_latency_")}
+        if tiers and tiers != {"tier_latency_small", "tier_latency_mid", "tier_latency_large"}:
+            raise ValueError("tier_latency_small, tier_latency_mid and tier_latency_large must be set together")
     return spec
 
 
