@@ -1,0 +1,114 @@
+{
+  "total_cost_usd": 0.37886699999999995,
+  "cost_tier_usd": 0.3106,
+  "cost_infra_usd": 0.068267,
+  "mean_violation": 0,
+  "violation_step_share": 0,
+  "mean_jain": 1,
+  "cache_hit_rate": 0.9479811512519634,
+  "crud_p95_ms": 1.006539,
+  "ai_p95_ms": 1331.547,
+  "crud_p99_ms": 1.009151,
+  "ai_p99_ms": 3317.244,
+  "tier_requests": {
+    "large": 12,
+    "mid": 88,
+    "small": 1026
+  },
+  "buckets": [
+    {
+      "bucket_start_utc": "2026-09-15T08:53:00Z",
+      "n_events": 12,
+      "crud_p95_ms": 0,
+      "crud_p99_ms": 0,
+      "ai_p95_ms": 1333.575,
+      "ai_p99_ms": 1333.575,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T08:54:00Z",
+      "n_events": 69,
+      "crud_p95_ms": 0,
+      "crud_p99_ms": 0,
+      "ai_p95_ms": 1333.748,
+      "ai_p99_ms": 1333.886,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T08:55:00Z",
+      "n_events": 39,
+      "crud_p95_ms": 0,
+      "crud_p99_ms": 0,
+      "ai_p95_ms": 1993.819,
+      "ai_p99_ms": 1993.965,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T08:56:00Z",
+      "n_events": 8049,
+      "crud_p95_ms": 1.006435,
+      "crud_p99_ms": 1.008782,
+      "ai_p95_ms": 3341.49,
+      "ai_p99_ms": 3879.968,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T08:57:00Z",
+      "n_events": 9094,
+      "crud_p95_ms": 1.006725,
+      "crud_p99_ms": 1.010228,
+      "ai_p95_ms": 0.151,
+      "ai_p99_ms": 2101.937,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T08:58:00Z",
+      "n_events": 7297,
+      "crud_p95_ms": 1.00649,
+      "crud_p99_ms": 1.010762,
+      "ai_p95_ms": 0.14,
+      "ai_p99_ms": 1299.023,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T08:59:00Z",
+      "n_events": 5191,
+      "crud_p95_ms": 1.006479,
+      "crud_p99_ms": 1.008226,
+      "ai_p95_ms": 0.138,
+      "ai_p99_ms": 0.152,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T09:00:00Z",
+      "n_events": 9143,
+      "crud_p95_ms": 1.006528,
+      "crud_p99_ms": 1.009012,
+      "ai_p95_ms": 0.137,
+      "ai_p99_ms": 0.156,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    },
+    {
+      "bucket_start_utc": "2026-09-15T09:01:00Z",
+      "n_events": 4077,
+      "crud_p95_ms": 1.006577,
+      "crud_p99_ms": 1.011545,
+      "ai_p95_ms": 0.144,
+      "ai_p99_ms": 0.162,
+      "mean_violation": 0,
+      "violation_step_share": 0
+    }
+  ],
+  "n_events": 42971,
+  "n_tenants": 8,
+  "generated_at_utc": "2026-09-15T09:01:26Z",
+  "cost_infra_source_note": "infra component injected via --infra-cost-usd; replica-hours are not visible in-pod"
+}
