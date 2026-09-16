@@ -34,6 +34,7 @@ detail — every record, the hypotheses it names, and whether the gate rebuilds 
 | [FINAL_ROADMAP.md](FINAL_ROADMAP.md) | **100% of what is left that is not writing.** Absorbs ZERO_COST + COMPLETION Track A/B; adds theory (T1 S3 exact walk), real-trace live sitting, latency semantics, p99/TTFT, cache embedder. Writing held in §9 |
 | [ZERO_COST_ROADMAP.md](ZERO_COST_ROADMAP.md) | **The $0 route to a scored B1.** Why the free-route block is our batch-1 tier server, not the P100; phased plan (preflight fix -> batched server -> re-bench -> score); writing HELD until the author says |
 | [REMAINING_WORK.md](REMAINING_WORK.md) | Open items and known gaps |
+| [THESIS_DRIFT.md](THESIS_DRIFT.md) | **Generated** (`scripts/thesis_drift.py`): what the thesis, slides and paper draft still say that the records withdrew or bounded, the records no document cites, the figures none includes. The writing's checklist; changes no document |
 | [WP14_SOAK_RESTORE.md](WP14_SOAK_RESTORE.md) | How to restore the live-soak apparatus |
 
 > If these disagree, `FINAL_ROADMAP.md` wins — it is the current execution
@@ -111,7 +112,7 @@ precision — the ceiling is response stochasticity).
 | [DEFENSE_QA.md](DEFENSE_QA.md) | Anticipated examiner questions and answers |
 | [RELATED_WORK.md](RELATED_WORK.md) | Literature positioning |
 | [SECURITY.md](SECURITY.md) | Threat model, security posture |
-| [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) | Pre-release verification |
+| [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) | Everything the paper attaches or points at — figures, records, Zenodo, site, images, live evidence, text — with its state and who does what |
 | [CLICKHOUSE_DESIGN.md](CLICKHOUSE_DESIGN.md) | Telemetry store design |
 | [INFERENCE_BENCH.md](INFERENCE_BENCH.md) | Inference benchmark method |
 | [V2_README.md](V2_README.md) | v2 simulator notes |

@@ -14,18 +14,31 @@ TeX Live works). Figures are included directly from
 `eval/results/figures/*.pdf` — do not move that directory relative to
 `thesis/`.
 
+## Status (2026-09-16)
+
+The text was last written in session 23 (July 2026) and has not been
+revised since; the evidence base has. **`docs/THESIS_DRIFT.md`** (generated
+by `scripts/thesis_drift.py`, kept current by CI) lists exactly what has
+moved: the claims the adjudications withdrew or bounded and every line of
+tex that still makes them (the −70 %/−42 % cost headlines, the 4.3e-06
+p-value, the d_z 0.66–1.12 matrix win, the +2884 % ablation), the records
+no chapter cites (the 24 h soak, the multi-node sitting, the live plane
+B1/B1′/B1″, the wire attack, the S3 floor, …), and the committed figures no
+document includes. Rewrite from that list, not from memory. The figures the
+documents do include (`fig01/03/07/08/09/13/16/17`) are unchanged since the
+PDFs were built, so the compiled PDFs are current on figures and stale on
+text.
+
 ## Before submission (human fill-ins)
 
 1. `report/main.tex` — the `\thesisauthor`/`\thesisdegree`/`\thesisuniversity`/
    `\thesisdepartment`/`\thesissupervisor` macros are placeholders.
-2. `report/references.bib` — entries for arXiv-only systems use placeholder
-   author fields (e.g. "Chiron authors") because author lists were not
-   verified from the papers; replace them with real author lists before any
-   submission. URLs/arXiv IDs are from `docs/RELATED_WORK.md` (verified
-   2026-07-12/13).
-3. The live jcac ordinal figure (PHASE7) does not exist yet; the report
-   states its status honestly in §6.10 (live section). After the live run,
-   add the figure + frozen caption from `docs/PHASE7_JCAC_PLAN.md` and
-   update that section.
-4. Companion defense prep lives in `docs/DEFENSE_QA.md` (13 pre-answered
-   questions) — rehearse from there.
+2. `report/references.bib` — author lists are complete (the two `and others`
+   entries were filled from arXiv on 2026-09-16); URLs/arXiv IDs are from
+   `docs/RELATED_WORK.md` (verified 2026-07-12/13). Re-verify venue fields
+   for the arXiv-only entries at submission time.
+3. `eval/zenodo_creators.json` — write it, rebuild the deposit
+   (`cd eval && python scripts/archive_zenodo.py`), publish, and put the DOI
+   in the Reproducibility section.
+4. Companion defense prep lives in `docs/DEFENSE_QA.md` — rehearse from
+   there, after it too has been checked against `THESIS_DRIFT.md`.
