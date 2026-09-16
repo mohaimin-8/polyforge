@@ -236,6 +236,10 @@ Real datasets (BurstGPT v2.0, gated LMSYS-Chat-1M, Azure LLM inference
 2024) are downloaded, never committed; the ETLs under `research/traces/`
 are the committed artifacts.
 
+**Evidence site:** every pre-registration, record and figure, with the gate
+status of each, is published at https://mohaimin-8.github.io/polyforge/
+(rebuilt from `main` on every push).
+
 **Archived evaluation artifact (DOI):** the raw run databases, every
 pre-registration and record, the live-campaign evidence and the IaC are
 deposited at [https://doi.org/10.5281/zenodo.22801196](https://doi.org/10.5281/zenodo.22801196)
