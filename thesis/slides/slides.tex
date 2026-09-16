@@ -17,7 +17,7 @@
 \title{PolyForge: Joint Cross-Layer Control of Replicas,\\
 Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
 \author{Mohaiminul}
-\date{July 2026}
+\date{September 2026}
 
 \begin{document}
 
@@ -47,7 +47,7 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
     dominates tuned per-layer baselines.
   \end{quote}
   \vfill
-  Tested under \textbf{13 pre-registered protocols} (pushed before runs),
+  Tested under \textbf{48 pre-registered protocols} (pushed before runs),
   \textbf{tuned} baselines, paired seeds, effect sizes with bootstrap CIs
   --- and \textbf{published nulls}.
 \end{frame}
@@ -71,7 +71,7 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
 
 \begin{frame}{Methodology: the part built to be attacked}
   \begin{itemize}
-    \item 13 pre-registrations committed \textbf{and pushed before any run};
+    \item 48 pre-registrations committed \textbf{and pushed before any run};
           closed campaigns immutable; stopping rules enforced.
     \item Baselines (HPA, KEDA, FIRM, GPTCache-LRU, static, VTC-replica,
           iso-cost) \textbf{grid-tuned on our own objective}.
@@ -88,8 +88,11 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
   \includegraphics[height=0.62\textheight]{fig03_pareto_cost_violation.pdf}
 
   \small Wins composite $J$ vs.\ every tuned baseline
-  ($|\dz|$ 0.66--1.44); only Pareto-undominated system.
-  Ablations: $-$jointness $= +2884\%$ cost.
+  ($|\dz|$ 0.66--1.44); only Pareto-undominated system --- non-dominated in
+  48/60 cells under \emph{any} weighting.
+  Ablations: $-$jointness $= +2884\%$ cost vs.\ the published layered
+  comparator; $86\%$ smaller once its tier defect is repaired (LF-H1) ---
+  the smaller number is the claim.
 \end{frame}
 
 \begin{frame}{Joint control, visible in one trace}
@@ -107,12 +110,21 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
           estimates reproduce the v1 ranking. Published as measured.
     \item Powered replay $n{=}96$ (new prereg): \textbf{HT2 PASS} ---
           $J$ beats HPA/KEDA/FIRM ($p \le 5.5{\times}10^{-5}$,
-          $\dz$ $-0.43\ldots{-0.47}$),
-          \alert{cost $-70\%$} ($p \le 4.3{\times}10^{-6}$),
-          violation trade $+0.07$ \textbf{disclosed as pre-registered}.
+          $\dz$ $-0.43\ldots{-0.47}$); cost $-70\%$ \emph{against the
+          baselines as tuned}; violation trade $+0.07$ \textbf{disclosed as
+          pre-registered}.
+    \item \alert{Adjudicated after the campaign closed} (V-series, three
+          pre-registered re-scorings): every comparator carried an eviction
+          charge and a pinned cache JCAC never paid, and only JCAC was
+          held to the per-tenant budget. At eviction parity $-70\%
+          \to -52.2\%$ and \alert{TP-H1a FAIL} (rank test); at budget
+          parity \alert{BP-H1a/b FAIL} on both traces.
   \end{itemize}
   \vfill
-  \small Cite $-70\%$ ($n{=}96$), never the underpowered sample's $-76\%$.
+  \small \textbf{The cost claim is withdrawn as a percentage.} What
+  survives: the per-tenant budget is satisfiable only by a controller
+  holding the tier knob --- no replica-only reactive controller can meet it
+  (capping one moves its tier spend by exactly 0.00\%).
 \end{frame}
 
 \begin{frame}{The SLO story, told honestly}
@@ -202,46 +214,62 @@ Semantic Cache, and Model Tier for Multi-Tenant Hybrid Serving}
           vs.\ assumed 1.0; GPU tier bench confirms ordering (1:1.5:16.6).
     \item \textbf{Real data carries the claims}: BurstGPT $+$ Azure demand,
           LMSYS prompts.
-    \item \textbf{Live check executed, ordinal-only}: both arms ran on a
-          real kind cluster (12/12 valid); the pre-frozen protocol recorded a
-          \alert{DISAGREE} --- live \emph{parity} where the sim separates the
-          arms (cache/tier knobs inert live by construction). Published as
-          measured; no claim rested on live-ranking transfer.
+    \item \textbf{Live, replica-only}: ordinal check recorded a
+          \alert{DISAGREE} (live parity; cache/tier inert by construction);
+          a valid 24\,h soak (25.8M requests, 0 dropped, SK-H4 PASS;
+          SK-H1/H3 \alert{FAIL}); load spreads across nodes (MN-H1 PASS); a
+          real trace live matches the sim's cost ordering (TL-H1 PASS).
+    \item \textbf{Live, three knobs, rented L40S host}: the published
+          controller \alert{lost to its own tier-only ablation} (B1, WL-H1
+          FAIL); the corrected controller beats all four arms at
+          iso-fairness (B1$'$, WL-H1$'$ PASS, CIs $<0$); the fitted
+          simulator matches live in 3/4 cells (WL-H3$'$ PASS); the dwell
+          damper \alert{fails} (B1$''$, WL-H6/H7 FAIL).
   \end{itemize}
   \vfill
-  Not claimed: absolute dollars/latency on production fleets; token-level
-  fairness; p99 on sim.
+  Not claimed: any cost percentage vs.\ the originally tuned baselines;
+  absolute dollars/latency on production fleets; token-level fairness;
+  p99 on sim.
 \end{frame}
 
 \begin{frame}{Contributions}
   \begin{enumerate}
     \item First joint replicas$+$cache$+$tier controller with per-tenant
           dollar accounting.
-    \item The composition gap, measured: $+2884\%$ cost without jointness;
-          $-70\%$ cost on real demand vs.\ tuned scalers.
+    \item The composition gap, measured and adjudicated: jointness wins
+          $J$ in every campaign, incl.\ vs.\ a learned (RL) controller; the
+          cost \emph{percentage} vs.\ tuned scalers is withdrawn --- what
+          stands is that only a tier-holding controller can keep a
+          per-tenant budget.
     \item Honest SLO account: parity at $-43\ldots{-48\%}$ cost; mechanism
-          confirmed; two failures published.
+          confirmed; two failures published; severity reverses on BurstGPT,
+          stated beside the Azure advantage.
     \item Real-data cache results \emph{with a quality denominator}.
     \item Fairness wins at stated altitude; own term nulled in public.
     \item Cache side-channel attack $+$ dominant defense frontier,
           confirmed over the wire.
-    \item Two construction-level solver guarantees.
-    \item A pre-registered, null-publishing systems methodology --- in git,
-          diffable.
+    \item Two construction-level solver guarantees; a single-tenant cost
+          separation from the plant constants; its multi-tenant extension
+          computed exactly and \emph{falsified}.
+    \item Live evidence at three depths, incl.\ a three-knob live plane on
+          which the published controller lost and the corrected one won.
+    \item A pre-registered, null-publishing, adjudicate-by-new-record
+          systems methodology --- 48 protocols, in git, diffable.
   \end{enumerate}
 \end{frame}
 
 \begin{frame}{What remains, and closing}
-  \textbf{Done since the proposal:} the live JCAC ordinal slice ran
-  (12/12, DISAGREE published); tier-price and empirical-cache-curve reruns
-  (both PASS 5/5); sim chaos (a dead planner still beats a healthy HPA);
-  planner cells to \textbf{1024 tenants}; the isolation attack executed
-  over the wire.
+  \textbf{Done since the proposal:} the live ordinal slice (DISAGREE
+  published); the 24\,h soak; multi-node and real-trace live sittings; the
+  wire attack; the V-series adjudication that withdrew the cost percentage;
+  the \textbf{three-knob live plane} B1 $\to$ B1$'$ $\to$ B1$''$ on a
+  rented GPU host; a reproduction gate that re-derives every record, figure
+  and caption.
   \vfill
-  \textbf{Remaining (user-gated, GPU host):} the \alert{three-knob live
-  plane} --- the joint controller with cache \emph{and} tier as live levers,
-  not just replicas (pre-registered as the Wave 4 live plane); plus live
-  chaos and a live p99 number.
+  \textbf{Remaining:} a damper for the corrected controller that acts on
+  the plant-estimate feedback, not on move reversals --- a new design and a
+  new pre-registration; the cost claim on an engine-optimized stack; a live
+  p99 number.
   \vfill
   \begin{quote}
     The strongest sentence in this thesis is not a percentage --- it is

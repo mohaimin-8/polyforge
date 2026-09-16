@@ -24,6 +24,52 @@ the \jcac{} arm gated behind an executable actuation check. What is not
 claimed: absolute dollars or latencies transferring to any production
 fleet.
 
+\paragraph{``Your economy and your model constants are convenient.''}
+Each was re-run with the constant replaced by the measured one, under a
+frozen protocol, and the headline matrix's direction re-scored. At the
+corrected GPU tier ratio (1:1.475:1.518 instead of the published
+1:10:100; \evfile{RESULTS\_TIER\_RATIO\_V2.md}, TR2-H1/H2), with tier-scaled
+work units (\evfile{RESULTS\_TIER\_WU.md}), with the AI p95 taken as the
+true hit/miss mixture percentile (\evfile{RESULTS\_MIXTURE\_P95.md}), and
+with the measured latency model adopted ($a{=}0.86$;
+\evfile{RESULTS\_LM\_ADOPTION.md}), the composite-$J$ win against all five
+baselines reproduces at $p<0.01$ in every rerun --- the same direction
+against the originally tuned comparators, and therefore carrying the same
+adjudication as the headline (Section~\ref{sec:eval-adjudication}). All
+three structural forms together (\evfile{RESULTS\_STRUCTREAL.md}) and the
+tier-price break-even sweep (\evfile{BREAKEVEN\_TIER.md},
+\evfile{BREAKEVEN\_TIER\_V2.md}) are exploratory and quoted as such: where
+the corrected economy diverges from the published one, the divergence is
+listed verbatim, and any advantage that depended on an expensive large tier
+is overstated by v1 and corrected there. The objective's \emph{form} is a
+separate axis from its weights: across 85 campaign--baseline--form
+combinations, 69 preserve the published direction at $p<0.01$, and the
+non-wins sit under forms that deliberately compress cost-driven separation
+or demand strict violation-then-cost dominance --- they bound the shape of
+the claim rather than refute it (\evfile{OBJECTIVE\_FORM.md}, exploratory,
+no confirmatory claim). The deployed solver is not the exact joint
+optimum, and the gap is measured: the two-sweep coordinate descent lands
+within 1\% median and 5\% maximum of an exhaustive joint optimum at every
+tenant count tested, for the published and the anchored controller alike
+(CG-H1 PASS; \evfile{COORD\_GAP.md}, \evfile{COORD\_GAP\_ANCHORED.md}).
+Past the 128-tenant planner wall, hash-based planning cells hold the
+per-cell p95 under the 3\,s operator timeout through 1{,}024 tenants
+(PS-H1 PASS) at a global-Jain cost the first assignment exceeded
+($-0.089$, PS-H2 FAIL) and a de-aliased assignment brings within bound
+($-0.0053$, PF-H1 PASS; \evfile{PLANNER\_CELLS.md},
+\evfile{PLANNER\_CELLS\_DEALIAS.md}); the wall reproduces at the same
+width through the shipped Go operator and deployed planner
+(\evfile{CELLS\_SHIPPED.md}). Two engineering probes are recorded so that
+nothing rests on them silently: multi-resolution forecasting closes the
+deployed-artifact gap with no headline number changed
+(\evfile{FORECAST\_MR.md}), and the graceful-degradation fallback --- the
+cheapest affordable tier instead of a designed outage --- is a measured
+no-op inside every committed campaign's budget envelope and stays within a
+$4\times$ cost band where it does bind (DG-H2 PASS;
+\evfile{DEGRADE\_PROBE.md}). The forecasting decomposition on real-trace
+periodicity began in \evfile{FORECAST\_TRACE.md} (v2 Phase 3a) before the
+two real traces settled it (Section~\ref{sec:eval-forecast}).
+
 \paragraph{``You designed the v3 overload cells so your system would
 win.''} The cells were sized by arithmetic on committed model constants,
 pinned by unit tests, not tuned by trial runs. Three protections: the
@@ -40,7 +86,7 @@ citation unit is the paired effect size with a bootstrap CI
 outcomes.
 
 \paragraph{``Your SLO story moved the goalposts.''} The ledger says
-otherwise, and the ledger is the answer: thirteen pre-registrations pushed
+otherwise, and the ledger is the answer: forty-eight pre-registrations pushed
 before their runs, two confirmatory SLO failures published as failures, one
 mechanism confirmation, and a stopping rule forbidding a third attempt. The
 final SLO claim --- parity at $-43\ldots{-48\%}$ cost --- is what survived,
@@ -213,13 +259,19 @@ are read against that one claim.
         whether a \emph{shared} cache can be defended without forfeiting its
         hit-rate benefit (noise, bucketing, differential privacy) is an open
         frontier question the partition/padding/TTL sweep does not answer.
-  \item \textbf{The cost win is measured against orchestration-layer
-        baselines, not the serving-engine frontier.} \polyforge{} is a control
-        plane; its $-70\%$ figure is against tuned reactive autoscalers
-        (HPA/KEDA/FIRM) that over-provision, not against a well-provisioned
-        2026 serving engine whose efficiency comes from disaggregated
-        prefill/decode, continuous batching, and KV-cache management
-        (llm-d, AIBrix, Dynamo). Those systems are the \emph{actuation} level
+  \item \textbf{The cost result is a feasibility statement against
+        orchestration-layer baselines, not a win over the serving-engine
+        frontier.} \polyforge{} is a control plane. Its comparative cost
+        percentages against tuned reactive autoscalers (HPA/KEDA/FIRM) were
+        withdrawn once those comparators were corrected for the eviction
+        charge, the pinned cache and the budget filter they never carried
+        (Section~\ref{sec:eval-adjudication}); what stands is that the
+        per-tenant budget cannot be met by any replica-only reactive
+        controller under AI load. That statement is made against
+        orchestration-layer baselines that over-provision, not against a
+        well-provisioned 2026 serving engine whose efficiency comes from
+        disaggregated prefill/decode, continuous batching, and KV-cache
+        management (llm-d, AIBrix, Dynamo). Those systems are the \emph{actuation} level
         the three knobs sit above, and the mapping is direct
         (RELATED\_WORK \S4); what \polyforge{} adds is the joint,
         dollar-accounted, fairness-aware decision across a tenant portfolio,

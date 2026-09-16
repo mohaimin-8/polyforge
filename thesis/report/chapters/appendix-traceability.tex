@@ -1,6 +1,9 @@
 \chapter{Claims Traceability}
 \label{app:traceability}
 
+% File names in the narrow table columns may break after an underscore.
+\renewcommand{\_}{\textunderscore\allowbreak}
+
 Every claim in this thesis maps to a committed, machine-generated
 measurement record in the public repository, regenerable by a named script
 from archived run databases. The consolidated entry point is
@@ -29,10 +32,20 @@ matrix; raw per-metric gate FAIL &
 \evfile{RESULTS.md} &
 v1 gate frozen in roadmap; \evfile{run\_analysis.py} \\
 \addlinespace
-Ablations: $-$joint $+2884\%$ cost; $-$eviction $+35.7\%$; $-$classifier
-$-45\%$ relative hits &
+Ablations: $-$joint $+2884\%$ cost (published comparator; see the
+layered-fix row for the surviving margin); $-$eviction $+35.7\%$;
+$-$classifier $-45\%$ relative hits &
 \evfile{RESULTS.md} (ablation tables) &
 \evfile{run\_analysis.py} \\
+\addlinespace
+$-$joint ablation re-scored against a competent tier rule: delta shrinks
+$-86.4\%$ (LF-H1 PASS); GPTCache $J$ comparison survives (LF-H2 PASS) &
+\evfile{RESULTS\_LAYERED\_FIX.md} &
+\evfile{PREREG\_LAYERED\_FIX.md}; \evfile{analysis\_layered\_fix.py} \\
+\addlinespace
+Weight-free dominance: \jcac{} non-dominated in 48/60 cells &
+\evfile{RESULTS\_DOMINANCE.md} &
+\evfile{analysis\_dominance.py} (descriptive) \\
 \addlinespace
 Holt $-16.3\%$ violation in-loop; realism ablation; self-calibration
 $\dz{=}{+}0.46$; side channel AUC 0.88 $\to$ 0.50 &
@@ -53,9 +66,124 @@ Replay $n{=}16$: HT FAIL, point estimates reproduce v1 ranking &
 \evfile{RESULTS\_TRACE.md} &
 \evfile{PREREG\_TRACE.md}; \evfile{trace\_matrix.py} \\
 \addlinespace
-Replay $n{=}96$: HT2 PASS, cost $-70\%$, violation $+0.07$ disclosed &
+Replay $n{=}96$: HT2 PASS on $J$; cost $-70\%$ against the baselines as
+tuned (withdrawn as a like-for-like claim, three rows below), violation
+$+0.07$ disclosed &
 \evfile{RESULTS\_TRACE2.md} &
 \evfile{PREREG\_TRACE2.md}; \evfile{trace\_matrix2.py} \\
+\addlinespace
+Eviction parity: matrix cost-neutral vs.\ \texttt{hpa\_fair} ($+0.8\%$,
+EP-H1a FAIL), $-14.1\%$ vs.\ \texttt{keda\_fair}; unbounded severity
+0.2143 vs.\ 0.4288 &
+\evfile{RESULTS\_EVICTION\_PARITY.md} &
+\evfile{PREREG\_EVICTION\_PARITY.md}; \evfile{analysis\_eviction\_parity.py} \\
+\addlinespace
+Trace parity: Azure $-7.1\%$ (TP-H1a/b PASS); BurstGPT $-52.2\%$ mean but
+TP-H1a FAIL; severity reverses on BurstGPT ($58\times$, TP-H3a/b FAIL) &
+\evfile{RESULTS\_TRACE\_PARITY.md} &
+\evfile{PREREG\_TRACE\_PARITY.md}; \evfile{analysis\_trace\_parity.py} \\
+\addlinespace
+Budget parity: BP-H1a/b FAIL on both traces --- like-for-like cost claim
+withdrawn; Amendment~1: no budget-respecting replica-only comparator
+exists (tier spend moves 0.00\%); BP-H2a/b PASS bounded; BP-H3: cap
+removal recovers 79\% of severity gap &
+\evfile{RESULTS\_BUDGET\_PARITY.md} &
+\evfile{PREREG\_BUDGET\_PARITY.md}; \evfile{analysis\_budget\_parity.py} \\
+\addlinespace
+Cost win and SLO penalty are the same windows (characterisation only) &
+\evfile{RESULTS\_WINDOW\_CHARACTER.md} &
+\evfile{analysis\_window\_character.py} (post hoc, not citable as a result) \\
+\addlinespace
+Sweep-order confound immaterial: max Jain excursion 0.0001 (OP-H1 FAIL as
+a strict bound, OP-H3 PASS on cost) &
+\evfile{RESULTS\_ORDER\_PERMUTATION.md} &
+\evfile{PREREG\_ORDER\_PERMUTATION.md}; \evfile{analysis\_order\_permutation.py} \\
+\addlinespace
+Plant mismatch $\pm25\%$, one constant at a time: cost win vs.\
+\texttt{keda\_fair} survives (MM-H1 PASS), severity within margin (MM-H2
+PASS) &
+\evfile{RESULTS\_MODEL\_MISMATCH.md} &
+\evfile{PREREG\_MODEL\_MISMATCH.md}; \evfile{analysis\_model\_mismatch.py} \\
+\addlinespace
+Learned (RL) joint controller: MPC non-inferior and better on $J$ (LR-H1
+PASS, $\dz{=}{-0.708}$); online learning materially worse (LR-H2 PASS) &
+\evfile{RESULTS\_LEARNED.md} &
+\evfile{PREREG\_LEARNED\_CONTROL.md}; \evfile{analysis\_learned.py} \\
+\addlinespace
+Cache precision ceiling: oracle same-model precision 0.4898; perfect
+retrieval recovers only $+0.047$ (C1 PASS) &
+\evfile{RESULTS\_CACHE\_CEILING.md} &
+\evfile{analysis\_cache\_ceiling.py} (reading declared in
+\evfile{CACHE\_PRECISION.md}; needs LMSYS, outside the gate) \\
+\addlinespace
+Side channel over the wire: per-tenant AUC 0.502 [0.384, 0.612] (WA-H1
+PASS); shared posture AUC 1.000 &
+\evfile{eval/\allowbreak results/\allowbreak security/\allowbreak RESULTS\_WIRE\_ATTACK.md} &
+\evfile{PREREG\_WIRE\_ATTACK.md}; live campaign, outside the gate \\
+\addlinespace
+Risk-aware MPC: RQ-H1/H2 FAIL (knob moves the wrong way) &
+\evfile{RESULTS\_RISK.md}, fig.\ 18 &
+\evfile{PREREG\_RISK\_MPC.md}; \evfile{analysis\_risk.py} \\
+\addlinespace
+Budget-corrected risk MPC: RB-H1 PASS at $q{=}0.90$; RB-H2/H3 FAIL &
+\evfile{RESULTS\_RISK\_BUDGET.md}, fig.\ 19 &
+\evfile{PREREG\_RISK\_BUDGET.md}; \evfile{analysis\_risk\_budget.py} \\
+\addlinespace
+24\,h live soak: 25,806,353 requests, 0 dropped (SK-H4 PASS), SK-H2 PASS,
+SK-H1 FAIL (1/8 injections), SK-H3 FAIL (6/25 buckets); attempts 4--9
+INVALID/VOID with causes traced &
+\evfile{RESULTS\_LIVE\_SOAK\_V8.md} (\evfile{RESULTS\_LIVE\_SOAK\_V2.md}
+through \evfile{\ldots\_V7.md} for the earlier attempts) &
+\evfile{PREREG\_LIVE\_SOAK\_V8.md}; \evfile{analysis\_live\_soak\_v8.py} \\
+\addlinespace
+SK-H1 rule scores peak-against-trough on a 4-min oscillation
+(characterisation; SK-H1 stays FAILED) &
+\evfile{RESULTS\_SKH1\_DISCRIMINABILITY.md} &
+\evfile{analysis\_skh1\_discriminability.py} (descriptive) \\
+\addlinespace
+Load spreads across nodes: busiest node 0.3815 $<$ 0.90 (MN-H1 PASS) &
+\evfile{RESULTS\_MULTINODE.md} &
+\evfile{PREREG\_MULTINODE.md}; \evfile{analysis\_multinode.py} \\
+\addlinespace
+Real trace live: cost ordering matches sim (TL-H1 PASS), TL-H2 VACUOUS,
+demand delivered (TL-H3 PASS) &
+\evfile{RESULTS\_TRACE\_LIVE.md} &
+\evfile{PREREG\_TRACE\_LIVE.md}; \evfile{analysis\_trace\_live.py} \\
+\addlinespace
+B1 three-knob live plane: WL-H1 FAIL ($+23.3\%$ vs.\ tier-only), WL-H2
+PASS $\times16$ &
+\evfile{RESULTS\_WAVE4\_LIVE\_PLANE.md} &
+\evfile{PREREG\_WAVE4\_LIVE\_PLANE.md}; \evfile{analysis\_wave4\_live\_plane.py} \\
+\addlinespace
+B1$'$ corrected controller: WL-H1$'$ PASS (4/4 comparators, CIs $<0$),
+WL-H4 PASS $\times4$; churn disclosed; block-bootstrap sensitivity &
+\evfile{RESULTS\_WAVE4\_CALIBRATED.md}, \evfile{CHURN\_WAVE4\_CALIBRATED.md},
+\evfile{SENSITIVITY\_WAVE4\_CALIBRATED.md}, fig.\ 20 &
+\evfile{PREREG\_WAVE4\_CALIBRATED.md}; \evfile{analysis\_wave4\_calibrated.py} \\
+\addlinespace
+Fitted simulator transfers: cost winner matches live 3/4 cells (WL-H3$'$
+PASS) &
+\evfile{RESULTS\_WAVE4\_SIM\_TRANSFER.md} &
+\evfile{PREREG\_WAVE4\_SIM\_TRANSFER.md};
+\evfile{research/\allowbreak calibration/\allowbreak live\_plant\_fit.py};
+\evfile{analysis\_wave4\_sim\_transfer.py} \\
+\addlinespace
+B1$''$ dwell damper: WL-H6 FAIL, WL-H7 FAIL; still beats tier-only
+$-31.4\%$ &
+\evfile{RESULTS\_WAVE4\_DWELL.md}, fig.\ 21 &
+\evfile{PREREG\_WAVE4\_DWELL.md}; \evfile{analysis\_wave4\_dwell.py} \\
+\addlinespace
+Single-tenant cost separation: \texttt{flash} $+49.0\%$, \texttt{ramp\_gentle}
+$+2.7\%$ from plant constants; gap inverts/vanishes without aliasing &
+\evfile{RESULTS\_SEPARATION.md} &
+\evfile{analysis\_separation.py} over \evfile{jcac\_sim/guarantee.py} \\
+\addlinespace
+Eight-tenant coupled floor 0.126189 computed exactly ($2^{28}$ offset
+vectors); S3 FAIL (\texttt{keda} $67\times$ below); steps 1--2 stand as
+falsified / not evaluable &
+\evfile{RESULTS\_SEPARATION\_MT\_V3.md} (\evfile{RESULTS\_SEPARATION\_MT.md},
+\evfile{RESULTS\_SEPARATION\_MT\_V2.md}) &
+\evfile{separation\_mt\_v3\_walk.py}; \evfile{analysis\_separation\_mt\_v3.py} \\
 \addlinespace
 Effect sizes with 95\% bootstrap CIs (citable unit) &
 \evfile{EFFECT\_SIZES.md} &
@@ -129,7 +257,13 @@ grids in \evfile{eval/baselines/grids/} \\
 \end{small}
 
 \paragraph{Reading order for an examiner.} (1)~\evfile{RESULTS\_MASTER.md}
---- scoreboard, ledger, disambiguation; (2)~the pre-registrations, in commit
-order, against their result files; (3)~\evfile{docs/DEFENSE\_QA.md} ---
-thirteen hard questions pre-answered; (4)~\evfile{docs/SESSION\_LOG.md} ---
-the session-by-session verification record.
+--- scoreboard, ledger, disambiguation, and the adjudications of sessions
+37--38; (2)~\evfile{RECORDS\_INDEX.md} --- every record, generated, with the
+hypotheses it names and whether the gate rebuilds it; (3)~the
+pre-registrations, in commit order, against their result files
+(\evfile{scripts/check\_preregs.py} proves none was edited after its
+result); (4)~\evfile{docs/DEFENSE\_QA.md} --- the hard questions
+pre-answered; (5)~\evfile{docs/SESSION\_LOG.md} --- the session-by-session
+verification record. One command, \evfile{python scripts/reproduce.py},
+re-derives every gated record byte-for-byte and every figure and caption
+from the committed exports.

@@ -10,17 +10,27 @@ happened under them --- including the hypotheses that failed.
 
 Every confirmatory campaign's protocol --- hypotheses, sole treatment,
 analysis script, and stopping rule --- was committed and pushed to the
-public repository \emph{before its first run}. Seven pre-registrations
-exist: \evfile{PREREG\_V2.md}, \evfile{PREREG\_V3.md},
-\evfile{PREREG\_TRACE.md}, \evfile{PREREG\_TRACE2.md},
-\evfile{PREREG\_VTC.md}, plus the v1 gate and the Phase-4 acceptance frozen
-in the roadmap documents. Protocol changes forced by feasibility (e.g.\ the
-LMSYS similarity matrix that would not fit in 40\,TB) were committed as
-\emph{declared pre-run amendments} before the gated data was downloaded ---
-the amendment chain is the pre-registration's honest continuation, visible
-in git history. Closed campaigns are immutable: stopping rules forbid
-re-running, widening, or post-hoc tuning, and campaign result files are
-never edited after their run.
+public repository \emph{before its first run}. The first seven were
+\evfile{PREREG\_V2.md}, \evfile{PREREG\_V3.md}, \evfile{PREREG\_TRACE.md},
+\evfile{PREREG\_TRACE2.md}, \evfile{PREREG\_VTC.md}, plus the v1 gate and
+the Phase-4 acceptance frozen in the roadmap documents; forty-eight
+\evfile{PREREG\_*.md} files exist at the time of writing, each with its
+push timestamp as the anchor, twenty-nine of them mirrored to an external
+registry index (\evfile{OSF\_REGISTRATION.md}), and a gate
+(\evfile{scripts/check\_preregs.py}) proves from the git history that no
+registered text was altered after its result existed. Protocol changes
+forced by feasibility (e.g.\ the LMSYS similarity matrix that would not fit
+in 40\,TB) were committed as \emph{declared pre-run amendments} before the
+gated data was downloaded --- the amendment chain is the pre-registration's
+honest continuation, visible in git history. Closed campaigns are
+immutable: stopping rules forbid re-running, widening, or post-hoc tuning,
+and campaign result files are never edited after their run. When a
+confound is found \emph{after} a campaign closes --- as three were, in an
+audit of the baseline implementations (Section~\ref{sec:eval-adjudication})
+--- the response is a new pre-registration whose outcome for the published
+claim is committed before the re-scoring runs, and a new record beside the
+old one; the published record stands, and the thesis quotes the surviving
+claim.
 
 \section{Baselines, tuned on our own objective}
 \label{sec:method-baselines}
