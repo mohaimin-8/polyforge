@@ -291,6 +291,10 @@ jobs:
         run: python scripts/check_preregs.py
       - name: The gate itself can fail
         run: python -m pytest scripts/test_check_preregs.py -q
+      # Same full history: the thesis-drift report dates every record and
+      # document from git, and must be the list a fresh build produces.
+      - name: The thesis-drift report is current
+        run: python -m pytest scripts/test_thesis_drift.py -q
 
   analysis-tests:
     runs-on: ubuntu-latest
