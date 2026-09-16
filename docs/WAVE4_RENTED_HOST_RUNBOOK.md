@@ -315,7 +315,8 @@ comparable to B1/B1′'s without the offset.
 `jcac-calibrated-dwell` (the calibrated arm plus a three-cycle replica
 dwell, `6ca8626`) against `jcac-calibrated` and `tier-only`, under
 `PREREG_WAVE4_DWELL.md`, scored **WL-H6 FAIL, WL-H7 FAIL**
-(`RESULTS_WAVE4_DWELL.md`): the dwell caps the largest jump but does not
+(`RESULTS_WAVE4_DWELL.md`; `fig_wave4_dwell.py` draws fig21 from the same
+functions): the dwell caps the largest jump but does not
 halve the churn, and non-inferiority on cost was not shown. The cycle is a
 long swing, not chatter; the next damper must act on the plant-estimate
 feedback (the offset's fast-up / slow-down learning), not on move reversals.

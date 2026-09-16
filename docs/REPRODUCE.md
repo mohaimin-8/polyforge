@@ -27,6 +27,18 @@ campaign records (concurrency, learned control, both risk campaigns,
 tenant scale, sim chaos, and the five economy/structural-form reruns) — so
 a reviewer with nothing but a clone can re-derive every published number.
 
+Figures are held to their data three ways, each printed on its own line of
+the report: **figure content** — the platform-independent dump of what each
+figure plots (`eval/results/figures/content/*.json`: every line, bar, scatter
+offset, scale, limit, tick label and legend entry), compared byte for byte;
+**figure captions** — each rebuilt figure's caption against the committed
+`FIGURES.md` inventory the site publishes, and every committed figure's
+presence in it (captions are outcome-aware text computed from the data, and
+`figures.save()` upserts each one as it draws); **figure files** — the PDF and
+PNG bytes, exact on the renderer that drew them and reported as
+not-comparable on any other. The first two decide the verdict everywhere;
+the third only where the renderer matches.
+
 ## Tiers — what reproduces from what
 
 | tier | inputs | what re-derives |

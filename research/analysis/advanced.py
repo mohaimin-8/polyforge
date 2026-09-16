@@ -329,22 +329,8 @@ def main() -> None:
     out = stats.record_path("ADVANCED.md")
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {out}")
-
-    # Record the advanced figures (13-17) in FIGURES.md, which figures.main()
-    # writes for the base 12 only. Append the advanced captions that
-    # accumulated in F.CAPTIONS during this run so the inventory is complete.
-    fig_md = F.FIG_DIR / "FIGURES.md"
-    advanced_names = {"fig13_forecast_ablation", "fig14_realism_pareto",
-                      "fig15_adaptive_under_realism", "fig16_cache_side_channel",
-                      "fig17_defense_frontier"}
-    have = fig_md.read_text(encoding="utf-8") if fig_md.exists() else ""
-    with open(fig_md, "a", encoding="utf-8") as f:
-        if "Advanced figures" not in have:
-            f.write("\n## Advanced figures (Tier 2 + security, v2)\n\n")
-        for name, caption in F.CAPTIONS:
-            if name in advanced_names and f"**{name}**" not in have:
-                f.write(f"- **{name}** — {caption}\n")
-    print(f"appended advanced figure captions to {fig_md}")
+    # The advanced figures (13-17) reach FIGURES.md through F.save() itself,
+    # which upserts every caption it draws; nothing to append here.
 
 
 if __name__ == "__main__":

@@ -3,8 +3,10 @@ every arm in every cell, one CI row per compared arm, and write the sheet."""
 
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -16,6 +18,11 @@ def _load(monkeypatch, fig_dir: Path, out_dir: Path):
     out_dir.mkdir(parents=True, exist_ok=True)  # record_path() writes into an existing dir
     monkeypatch.setenv("POLYFORGE_FIG_DIR", str(fig_dir))
     monkeypatch.setenv("POLYFORGE_ANALYSIS_OUT", str(out_dir))
+    # figures.py fixes FIG_DIR at import; the ride-along tests share one
+    # pytest process, so the cached module must re-read this test's env.
+    sys.path.insert(0, str(HERE))
+    import figures
+    importlib.reload(figures)
     spec = importlib.util.spec_from_file_location("figw4c", HERE / "fig_wave4_calibrated.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
