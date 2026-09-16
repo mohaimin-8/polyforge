@@ -301,10 +301,27 @@ re-scoring pass:
    critical path touches no third party.
 
 The fine export spans the WL-H2 preflight (five buckets, ~$0.13 of `large`
-tier spend that every arm pays identically inside `total_cost_usd`) and the
-teardown seconds; the scorer pairs buckets inside the load window (the span
-from the first to the last bucket at ≥ half the run's median event count,
-troughs included). A dead-man `sudo shutdown -h +N` on the box, re-armed
+tier spend that every arm paid identically inside `total_cost_usd` in B1
+and B1′) and the teardown seconds; the B1′ scorer pairs buckets inside the
+load window (the span from the first to the last bucket at ≥ half the run's
+median event count, troughs included). **Since `e94c3e5` the harness passes
+the load window's opening instant to both exports as `--since`**, so on any
+future sitting `total_cost_usd`, latency, violation and cache-hit score the
+window alone and the preflight's spend is gone from every metric; a new
+pre-registration must say so, because its run-level numbers will not be
+comparable to B1/B1′'s without the offset.
+
+**The next sitting, if one is paid for:** `jcac-calibrated-dwell` (the
+calibrated arm plus a three-cycle replica dwell, `6ca8626`) against the
+five B1′ arms, under its own pre-registration; the plumbing was exercised
+on the mock (`wave4_dwell_probe.yaml`, NOT EVIDENCE) before any GPU time:
+on a Windows laptop's kind cluster the chart set `--replica-dwell-steps=3`
+on the planner, the planner booted with it and passed WL-H2, and the window
+ran — then the run was voided by the harness's own guards (1.5% failed
+requests, 2 s p95, a replica sampler at 37% coverage), which is what a
+CPU-starved substrate should produce. **A laptop rehearses the plumbing,
+never the load window.** The sampler now keeps a wall-clock cadence
+(`ReplicaSampler.run`), so a slow `kubectl` no longer stretches its period. A dead-man `sudo shutdown -h +N` on the box, re-armed
 as the run outlasts it, is what makes an operator-side outage cost the box
 and not the evidence: copy and hash-verify the evidence **before**
 terminating, never the other way round.

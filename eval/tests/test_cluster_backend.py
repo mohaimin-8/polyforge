@@ -442,3 +442,30 @@ def test_export_is_scoped_to_the_scored_window():
     args = cb.export_since_args(1789471560.7)  # 2026-09-15T11:26:00Z
     assert args == ["--since=2026-09-15T11:26:00Z"]
     assert "execute" in cb.__dict__ and "export_since_args(window_start)" in __import__("inspect").getsource(cb.execute)
+
+
+def test_replica_sampler_keeps_its_cadence_when_kubectl_is_slow(monkeypatch):
+    """Session 48: on a laptop where each kubectl call takes ~2x the interval
+    the sampler used to cover a third of the window. The next sample is due
+    interval_s after the previous one was DUE, so a slow call is followed by
+    the next one at once, and coverage stays near 100%."""
+    calls = []
+
+    class _P:
+        returncode = 0
+        stdout = "4"
+
+    def slow_run(*a, **k):
+        calls.append(cb.time.monotonic())
+        cb.time.sleep(0.05)  # the call itself is slower than the interval below
+        return _P()
+
+    monkeypatch.setattr(cb.subprocess, "run", slow_run)
+    s = cb.ReplicaSampler(interval_s=0.02)
+    s.start()
+    cb.time.sleep(0.5)
+    s.stop(); s.join(timeout=5)
+    # ~0.5 s of window at 0.05 s per call: an after-the-call wait would give ~7 samples,
+    # the wall-clock schedule gives close to 10 (back-to-back calls while overrunning)
+    assert len(s.samples) >= 8, len(s.samples)
+    assert s.failures == 0
