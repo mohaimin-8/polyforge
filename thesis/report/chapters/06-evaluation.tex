@@ -12,19 +12,35 @@ could disagree, the campaign file wins.
 
 \begin{table}[htbp]
 \centering\small
-\begin{tabularx}{\textwidth}{@{}lp{0.21\textwidth}X@{}}
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}p{0.21\textwidth}X@{}}
 \toprule
 \textbf{Segment} & \textbf{Verdict} & \textbf{The citable claim} \\
 \midrule
-Cost & \textbf{Won} (confirmatory; synthetic $+$ real) &
-Beats every tuned baseline on cost in the 1{,}800-run matrix
-($\dz$ 0.66--1.12); on real BurstGPT demand: $-70\%$ cost vs.\ tuned
-HPA/KEDA/FIRM ($p \le 4.3{\times}10^{-6}$, $n{=}96$). \\
-SLO & \textbf{Closed honestly} &
+Cost & \textbf{Closed} --- feasibility, not performance (adjudicated,
+Section~\ref{sec:eval-adjudication}) &
+Against the originally tuned baselines: beats all five on cost in the
+1{,}800-run matrix and $-70\%$ on replayed BurstGPT demand. \textbf{All of
+that is withdrawn as a like-for-like comparison}: every comparator carried
+an eviction charge and a pinned cache no \jcac{} arm paid, and only \jcac{}
+was subject to the per-tenant budget filter. Re-scored against fair
+comparators the matrix is cost-neutral vs.\ \texttt{hpa\_fair} ($+0.8\%$,
+EP-H1a FAIL) with $-14.1\%$ vs.\ \texttt{keda\_fair} surviving
+($p{=}3.8{\times}10^{-16}$); the BurstGPT $-70\%$ shrinks to $-52.2\%$ and
+fails its own rank test; against comparators carrying the budget rule
+BP-H1a/b FAIL on both traces. What stands: the per-tenant budget is
+satisfiable only by a controller holding the tier knob --- no replica-only
+reactive controller can meet it under AI load by any decision available to
+it. \\
+SLO & \textbf{Closed honestly} (iso-attainment; bounded) &
 Violation parity with tuned HPA/KEDA at $-43\ldots{-48\%}$ cost; beats FIRM.
 Overload: reactive scalers buy attainment at 3.2--3.4$\times$ spend
 (H1$'$ FAIL); forecast mechanism confirmed (H2$'$ PASS); spike-class
-exploratory win. \\
+exploratory win. Adjudicated on the unbounded severity metric: the synthetic
+advantage is \emph{understated} (excess 0.214 vs.\ 0.429 for
+\texttt{hpa\_fair}) and holds on Azure, but \textbf{reverses on BurstGPT}
+(excess $58\times$ worse than \texttt{hpa\_fair}, TP-H3a/b FAIL); lifting
+\jcac{}'s budget cap removes 79\% of that gap (BP-H2 PASS, a typical-window
+claim whose tail still breaches the margin in 22\% of windows). \\
 Fairness & \textbf{Won} (two dedicated baselines) &
 Beats FIRM on Jain ($\dz{=}1.0$); beats tuned VTC-replica on Jain itself
 (0.9705 vs.\ 0.9599) at $-35\%$ cost. Own $\gamma$-term honestly nulled. \\
@@ -50,11 +66,24 @@ On the composite objective $J$ --- the objective every baseline was tuned on
 --- \polyforge{} wins against \emph{every} baseline in \emph{every} campaign
 that tested it: v1 ($p \le 4.6{\times}10^{-25}$), v2
 ($p \le 6.7{\times}10^{-25}$), v3 overload ($p \le 1.3{\times}10^{-11}$),
-the VTC slice ($p = 3.3{\times}10^{-19}$), and the real-demand replay
-($p \le 5.5{\times}10^{-5}$) --- and is the only Pareto-undominated system
-in the matrix (Figure~\ref{fig:pareto}). Figure~\ref{fig:composite-objective}
-is that single-number ranking; every other figure in this chapter decomposes
-it.
+the VTC slice ($p = 3.3{\times}10^{-19}$), the real-demand replay
+($p \le 5.5{\times}10^{-5}$), the Azure replay
+($p \le 5.3{\times}10^{-22}$), the 2026-stack concurrency arm
+($p = 1.3{\times}10^{-44}$ at violation parity,
+\evfile{RESULTS\_CONCURRENCY.md}), the 32-tenant slice
+($p \le 2.2{\times}10^{-4}$, \evfile{RESULTS\_TENANT\_SCALE.md}), and an
+offline-trained learned (RL) joint controller over the identical action
+space ($p = 2.9{\times}10^{-28}$, $\dz{=}{-0.708}$, at zero training cost;
+LR-H1/LR-H2 PASS, \evfile{RESULTS\_LEARNED.md}) --- and is the only
+Pareto-undominated system in the matrix (Figure~\ref{fig:pareto}). Read
+without any weights at all, \jcac{} is non-dominated in 48 of 60 cells, the
+most of any arm (\evfile{RESULTS\_DOMINANCE.md}).
+Figure~\ref{fig:composite-objective} is that single-number ranking; every
+other figure in this chapter decomposes it. The composite-$J$ wins are
+scored against the originally tuned baselines; Section~\ref{sec:eval-adjudication}
+re-scores the \emph{cost} and \emph{SLO} components against comparators
+corrected for three confounds found after the campaigns closed, and the
+scoreboard above states what survives.
 
 \begin{figure}[htbp]
   \centering
@@ -71,7 +100,9 @@ it.
 The blocked factorial of Section~\ref{sec:method-matrix} with all baselines
 grid-tuned on $J$. \polyforge{} beats every tuned baseline on composite $J$
 ($p \le 4.6{\times}10^{-25}$, $|\dz|$ 0.66--1.44) and on cost against all
-five (Figure~\ref{fig:cost-by-system}); it holds violations near the
+five as tuned (Figure~\ref{fig:cost-by-system}; the cost margin against the
+reactive scalers does not survive eviction parity,
+Section~\ref{sec:eval-adjudication}); it holds violations near the
 over-provisioned floor at a fraction of that floor's cost
 (Figure~\ref{fig:violation-by-system}), and sits alone on the
 cost--violation frontier (Figure~\ref{fig:pareto}). The two views of SLO
@@ -193,11 +224,22 @@ correctly declines to spend memory on uncacheable ones.
 \end{figure}
 
 \paragraph{Ablations (500 runs).} Removing joint control costs $+2884\%$ on
-the cost metric; removing cost-aware eviction $+35.7\%$; removing the
-classifier $+2.1\%$ cost and $-45\%$ relative hit rate; each of the four
-components carries independent, statistically significant weight
-(Figure~\ref{fig:ablations}). The composition claim of
-Section~\ref{sec:intro-scope} is this measurement.
+the cost metric as published; removing cost-aware eviction $+35.7\%$;
+removing the classifier $+2.1\%$ cost and $-45\%$ relative hit rate; each
+of the four components carries independent, statistically significant
+weight (Figure~\ref{fig:ablations}). \textbf{The $+2884\%$ figure must not
+be cited without its caveat.} It rests on the \texttt{layered}/GPTCache
+comparator's absorbing-tier defect: that arm ranks tiers by name and
+de-escalates only below $0.3\times$ target, so for agentic traffic it
+escalates past the fastest tier and sticks at the dearest one. A
+pre-registered re-scoring against a competent layer-local tier rule
+(\evfile{PREREG\_LAYERED\_FIX.md} $\to$ \evfile{RESULTS\_LAYERED\_FIX.md})
+shrinks the ablation's cost delta by $-86.4\%$ (LF-H1 PASS,
+$p{=}1.2{\times}10^{-11}$); the composite-$J$ win over the corrected
+GPTCache arm survives at the smaller margin (LF-H2 PASS,
+$p{=}8.4{\times}10^{-16}$). The composition claim of
+Section~\ref{sec:intro-scope} is that surviving, smaller measurement ---
+not the published multiple.
 
 \begin{figure}[htbp]
   \centering
@@ -364,14 +406,106 @@ reproduces the v1 ranking. The sample stands as measured; it is not the
 citable headline. \textbf{Powered second sample
 (\evfile{PREREG\_TRACE2.md}, $n{=}96$ independent seeds, ${\sim}94\%$
 power): HT2 PASSED with disclosure} --- $J$ beats HPA/KEDA/FIRM at
-$p \le 5.5{\times}10^{-5}$ ($\dz$ $-0.43\ldots{-0.47}$), \textbf{cost
-$-70\%$} ($-\$77\ldots{-\$80}$ per window, $p \le 4.3{\times}10^{-6}$), and
-the pre-registered disclosure is honored: a violation trade of $+0.07$
-($p<10^{-6}$) rides along --- the same attainment-for-multiples-of-spend
-trade quantified everywhere else. Both collection segments show the
-identical effect; samples are never pooled. Effect sizes with bootstrap CIs,
-the citable unit, are tabulated in \evfile{EFFECT\_SIZES.md}; all $n{=}96$
-confirmatory intervals exclude zero.
+$p \le 5.5{\times}10^{-5}$ ($\dz$ $-0.43\ldots{-0.47}$), cost $-70\%$
+against the baselines as tuned ($-\$77\ldots{-\$80}$ per window,
+$p \le 4.3{\times}10^{-6}$), and the pre-registered disclosure is honored: a
+violation trade of $+0.07$ ($p<10^{-6}$) rides along --- the same
+attainment-for-multiples-of-spend trade quantified everywhere else. Both
+collection segments show the identical effect; samples are never pooled.
+Effect sizes with bootstrap CIs, the citable unit, are tabulated in
+\evfile{EFFECT\_SIZES.md}; all $n{=}96$ confirmatory intervals exclude
+zero. The second real trace (Azure LLM inference 2024, 44.1M requests,
+\evfile{RESULTS\_TRACE\_AZURE.md}) reproduced the pattern at $-42\%$ per
+window against the same comparators.
+
+\textbf{Neither cost figure is the thesis's claim.} Both were re-scored
+after the campaigns closed against comparators corrected for the confounds
+the V-series audit found (Section~\ref{sec:eval-adjudication}): the
+BurstGPT advantage shrinks from $-70.4\%$ to $-52.2\%$ at eviction parity
+and \emph{fails its own pre-registered rank test}; Azure shrinks from
+$-42.5\%$ to a real but small $-7.1\%$; and against comparators carrying
+\jcac{}'s own budget rule both fail (BP-H1a/b). The replay records stand
+exactly as committed, as the ground rules require; the numbers in them are
+reported here as the history of the claim, not as the claim.
+
+\section{Adjudication: the cost and SLO claims under fair comparators}
+\label{sec:eval-adjudication}
+
+After the campaigns above had closed, an audit of the baseline
+implementations (the V-series, sessions 37--38) found three asymmetries
+between \jcac{} and every comparator it had been scored against. Each was
+addressed by a pre-registered re-scoring against a corrected comparator,
+with the outcome for the published claim committed before the run. None of
+the original records was edited; every re-scoring is a new record.
+
+\paragraph{Eviction parity (\evfile{PREREG\_EVICTION\_PARITY.md} $\to$
+\evfile{RESULTS\_EVICTION\_PARITY.md}).} Every reactive comparator carried
+a $1.4581\times$ LRU inference charge that no \jcac{} arm paid, and was
+pinned at a 128\,MB cache it could not move. Against \texttt{hpa\_fair} and
+\texttt{keda\_fair} --- no charge, competently pre-sized at 512\,MB --- the
+1{,}800-run matrix is \textbf{cost-neutral against \texttt{hpa\_fair}}
+($+0.8\%$, EP-H1a FAIL) while $-14.1\%$ against \texttt{keda\_fair}
+survives ($p{=}3.8{\times}10^{-16}$). The same record replaces the
+saturating \texttt{mean\_violation} with an unbounded severity metric,
+\texttt{mean\_excess}, on which the synthetic SLO advantage is
+\emph{understated} by the published metric: 0.2143 vs.\ 0.4288 for
+\texttt{hpa\_fair}, roughly half.
+
+\paragraph{Trace parity (\evfile{PREREG\_TRACE\_PARITY.md} $\to$
+\evfile{RESULTS\_TRACE\_PARITY.md}).} The two real-demand headlines
+re-scored against the fair comparators. Azure: $-7.1\%$, real and
+pervasive (TP-H1a/b PASS, $p \le 9.5{\times}10^{-5}$, 69.4\% of windows
+favour \jcac{}), with the SLO pattern holding within margin (TP-H3a/b
+PASS). BurstGPT: $-52.2\%$ on the mean but \textbf{TP-H1a FAIL}
+($p{=}0.0133$ against a Holm threshold of $0.01250$) --- the advantage is
+concentrated in a minority of windows, and \jcac{} is the \emph{dearer}
+system in 57.3\% of 6-hour windows (median difference $+2.232$). On
+severity BurstGPT \textbf{reverses}: \jcac{}'s \texttt{mean\_excess} is
+0.5134 against 0.0088 for \texttt{hpa\_fair}, $58\times$ worse, breaching
+the 0.05 non-inferiority margin in 41.7\% of windows, with AI requests shed
+on 9.3\% of tenant-steps against none for any reactive arm (TP-H3a/b
+FAIL). The ``half the SLO overshoot'' reading is therefore
+synthetic-and-Azure only and is never stated without the BurstGPT caveat.
+
+\paragraph{Budget parity (\evfile{PREREG\_BUDGET\_PARITY.md} $\to$
+\evfile{RESULTS\_BUDGET\_PARITY.md}).} The fair comparators removed the
+eviction and cache-posture confounds but not a third: only \jcac{} was
+ever subject to the per-tenant budget filter --- the controller rejects
+over-budget candidates before its objective is evaluated, and no baseline
+\texttt{plan()} has a cost term at all. Scored against comparators carrying
+the controller's own budget rule verbatim, \textbf{BP-H1a/b FAIL on both
+traces} (Azure $-3.3\%$/$-1.3\%$, $p{=}0.379$/$0.91$; BurstGPT
+$-50.2\%$/$-49.8\%$, $p{=}0.112$/$0.191$ --- again a minority-of-windows
+mean that does not survive the rank gate). Per the response committed
+before the run, \textbf{the like-for-like cost claim is withdrawn}, not
+restated. Amendment~1, disclosed before scoring, explains why no better
+comparator can rescue it: at the per-tenant cap, tier spend dominates infra
+spend by three orders of magnitude, and capping a replica-only arm moves
+its infra spend $-45.7\%$/$-57.4\%$ and its tier spend by \emph{exactly}
+0.00\% on both traces --- \textbf{no budget-respecting comparator exists in
+the replica-only class}. That is the claim that survives: the per-tenant
+budget is a promise only a controller holding the tier knob can keep. On
+the SLO side, lifting \jcac{}'s budget cap removes 79\% of the BurstGPT
+severity gap (BP-H3) and BP-H2a/b PASS on both traces --- bounded, on
+BurstGPT, to a typical-window claim: the median difference is exactly
+0.0000 and 51\% of windows are no worse, but the \emph{mean} difference
+($+0.1037$) exceeds the margin the rank test passed, 22\% of windows breach
+it and the worst breaches it $59\times$. A descriptive follow-up
+(\evfile{RESULTS\_WINDOW\_CHARACTER.md}, not pre-registered and quotable
+only as characterisation) finds that the cost win and the SLO penalty are
+the same windows.
+
+\paragraph{Robustness of what remains.} The sweep-order confound raised by
+the same audit is real but immaterial: permuting the tenant sweep moves
+Jain by at most 0.0001 against a pre-registered 0.01 threshold (OP-H1 fails
+strictly as a sensitivity bound, OP-H3 PASS on cost;
+\evfile{RESULTS\_ORDER\_PERMUTATION.md}), and \texttt{tenant\_order\_seed}
+is now an explicit parameter. The controller also survives being wrong
+about its own plant: with each plant constant perturbed $\pm25\%$ one at a
+time, the cost win over \texttt{keda\_fair} survives on every constant
+(MM-H1 PASS) and severity stays within the inherited 0.05 margin (MM-H2
+PASS; \evfile{RESULTS\_MODEL\_MISMATCH.md}) --- mismatch-robust within that
+band, one constant at a time, and quoted with that scope.
 
 \section{Forecasting on real traces: a prediction fails to transfer, a
 boundary reproduces}
@@ -440,7 +574,12 @@ dominate the absolute level. The citable claims are therefore the
 (0.249 $\to$ 0.338) while hit rate falls, and same-model precision is
 ${\approx}2\times$ cross-model (0.443 vs.\ 0.223) --- a production
 deployment caching a single model's responses sits in the most favorable
-stratum.
+stratum. A later pre-registered probe located the ceiling itself
+(\evfile{RESULTS\_CACHE\_CEILING.md}, C1 PASS): with \emph{perfect}
+retrieval --- oracle same-model duplicate pairs --- precision reaches only
+0.4898, so removing every retrieval error recovers $+0.047$; the binding
+constraint on hit quality is response stochasticity, not the embedder or
+the threshold.
 
 \section{Fairness: two dedicated baselines beaten, one own term nulled}
 \label{sec:eval-fairness}
@@ -479,7 +618,13 @@ while keeping 76\% of hits --- strictly dominating response-time padding
 ${\sim}90\%$ hit loss) on the leakage-vs-benefit frontier
 (Figure~\ref{fig:defense-frontier}). This measurement motivated the
 per-tenant default in the gateway design
-(Section~\ref{sec:design-loop}).
+(Section~\ref{sec:design-loop}). The frontier was then confirmed over the
+wire, against the real gateway process rather than the simulator
+(\evfile{eval/results/security/RESULTS\_WIRE\_ATTACK.md}): with the
+per-tenant posture the membership attack lands at AUC 0.502 (95\% CI
+$[0.384, 0.612]$) --- chance --- \textbf{WA-H1 PASS} on the real HTTP/cache
+path, while the deliberately shared posture leaks perfectly on loopback
+(AUC 1.000, all 50 victim secrets recovered; WA-H2, reported as measured).
 
 \begin{figure}[htbp]
   \centering
@@ -570,6 +715,41 @@ projection at this amplitude. That result is published per the frozen
 protocol, and it is the single strongest argument for the three-knob live
 substrate named in future work (Section~\ref{ch:conclusion}).
 
+\subsection{Beyond the ordinal check: a 24-hour soak, node spread, and a
+real trace driving the cluster}
+\label{sec:eval-live-more}
+
+Three further live campaigns, each pre-registered, close gaps the ordinal
+check left open. \textbf{Endurance.} The live CRUD plane was held under
+load for a full day (\evfile{PREREG\_LIVE\_SOAK\_V8.md} $\to$
+\evfile{RESULTS\_LIVE\_SOAK\_V8.md}): 24\,h\,00\,m\,11\,s, 25{,}806{,}353
+requests at 298.6/s, 0.0012\% failed, \textbf{0 dropped iterations and 0
+pod restarts} --- \textbf{SK-H4 PASS} on the absolute validity rule that
+had ended four earlier attempts and was never relaxed, and SK-H2 (audit
+continuity) PASS. The result is split, and both halves are the finding:
+\textbf{SK-H1 FAIL} (recovery within a 20\% band after fault injection
+fails on 1 of 8 injections) and \textbf{SK-H3 FAIL} (hourly CRUD p95
+$\le$ 8.0072\,ms exceeded in 6 of 25 buckets). Attempts 4--9
+(\evfile{RESULTS\_LIVE\_SOAK\_V2.md} through \evfile{RESULTS\_LIVE\_SOAK\_V7.md}) are published
+as INVALID or VOID with their causes traced --- a port-forward that pinned
+all load to one pod of sixteen, then host power-source flapping that opened
+48--51\,s scheduling gaps --- none of them the controller. A descriptive
+follow-up (\evfile{RESULTS\_SKH1\_DISCRIMINABILITY.md}, not pre-registered,
+revising nothing) shows the frozen SK-H1 rule scores peak-against-trough on
+a four-minute latency oscillation present before, during and after the
+failing injection, so it cannot tell that fault from a quiet minute; SK-H1
+stays FAILED as scored. \textbf{Placement.} On a four-node cluster the load
+actually spread: three nodes carried work and the busiest held 0.3815 of
+it, below the frozen 0.90 pinning threshold (\textbf{MN-H1 PASS}, MN-H2
+gating PASS; \evfile{RESULTS\_MULTINODE.md}). \textbf{A real trace, live.}
+Window 0 of the BurstGPT trace drove the real cluster
+(\evfile{RESULTS\_TRACE\_LIVE.md}): the live cost ordering \jcac{} $>$ HPA
+matches the simulator's (\textbf{TL-H1 PASS}); on violation both
+substrates rank the arms equal (TL-H2 VACUOUS);
+the substrate delivered the registered demand within the 1/60-rps
+quantisation of a one-minute time unit (TL-H3 PASS). None of these
+compares absolutes across substrates.
+
 \subsection{The three-knob live plane on a rented GPU host: B1, B1$'$, B1$''$}
 \label{sec:eval-live-plane}
 
@@ -595,10 +775,19 @@ protocol.
 the corrected controller beats every one of the four comparators on cost at
 iso-fairness in \texttt{joint\_stress}, each with a paired-bootstrap CI
 excluding zero --- \textbf{WL-H1$'$ PASS} (\$0.2650, Jain 1.000); the
-per-cell ablation dominance WL-H4 passes in all four cells. The record also
-prints, beside the win, that the corrected controller oscillates its
-replica count (8--24 replicas in \texttt{tier\_mixed};
-\evfile{CHURN\_WAVE4\_CALIBRATED.md}).
+per-cell ablation dominance WL-H4 passes in all four cells. The paired
+bootstrap assumes independent buckets and the deltas are autocorrelated
+(lag-1 ACF up to $+0.81$); a moving-block bootstrap at blocks 5 and 10
+leaves every WL-H1$'$ interval below zero
+(\evfile{SENSITIVITY\_WAVE4\_CALIBRATED.md}). The record also prints,
+beside the win, that the corrected controller oscillates its replica count
+(8--24 replicas in \texttt{tier\_mixed};
+\evfile{CHURN\_WAVE4\_CALIBRATED.md}). With its plant fitted to this live
+evidence under a rule frozen beforehand, the simulator's cost winner then
+matches the live one in 3 of 4 cells, against 1 of 4 for the published
+plant (\textbf{WL-H3$'$ PASS}, \evfile{RESULTS\_WAVE4\_SIM\_TRANSFER.md})
+--- the ordinal disagreement of the earlier live campaigns was a plant
+calibration gap, not a ranking the simulator cannot express.
 
 \textbf{B1$''$} (\evfile{PREREG\_WAVE4\_DWELL.md} $\to$
 \evfile{RESULTS\_WAVE4\_DWELL.md}; Figure~\ref{fig:dwell-plane}) tested the
@@ -655,26 +844,54 @@ reversals --- not built, and not pre-registered.
 \toprule
 \textbf{Claim} & \textbf{Cite} & \textbf{Not} \\
 \midrule
-Cost, real demand & $-70\%$ ($n{=}96$, $p\le4.3{\times}10^{-6}$) & $-76\%$
-($n{=}16$ point estimate, HT FAIL) \\
-Cost, synthetic matrix & $-36\ldots{-48\%}$ vs.\ HPA/KEDA/FIRM & any mixing
-with replay numbers \\
+Cost, the claim & the per-tenant budget is satisfiable only by a
+controller holding the tier knob; no replica-only reactive controller can
+meet it (BP Amendment~1: tier spend moves 0.00\% under any replica cap) &
+any comparative percentage against the originally tuned baselines \\
+Cost, real demand & Azure $-7.1\%$ at eviction parity (TP-H1a/b PASS);
+BurstGPT: no rank-test-surviving advantage (TP-H1a FAIL, BP-H1a/b FAIL) &
+$-70\%$ / $-42\%$ (withdrawn); $-52.2\%$ (mean only, fails its rank test);
+$-76\%$ ($n{=}16$, HT FAIL) \\
+Cost, synthetic matrix & $-14.1\%$ vs.\ \texttt{keda\_fair}; cost-neutral
+vs.\ \texttt{hpa\_fair} ($+0.8\%$, EP-H1a FAIL) & $-36\ldots{-48\%}$ vs.\
+HPA/KEDA/FIRM as tuned; any mixing with replay numbers \\
+Composition (ablation) & $-$joint control worsens cost, at the margin that
+survives a competent tier rule (LF-H1: delta $-86.4\%$ vs.\ published) &
+$+2884\%$ without its comparator caveat \\
 Forecasting gain & Holt $-26.9\%$ RMSE, real trace & seasonal $-44.8\%$
 (synthetic; did not transfer) \\
 Forecasting, external & winner tracks measured periodicity (3 traces) &
 ``Holt is best'' (scoped to BurstGPT) \\
-SLO & parity at $-43\ldots{-48\%}$ cost; mechanism $p=6{\times}10^{-4}$ &
-any ``beats HPA/KEDA on violation'' \\
+SLO & parity at $-43\ldots{-48\%}$ cost; mechanism $p=6{\times}10^{-4}$;
+severity half of \texttt{hpa\_fair}'s on synthetic and Azure, with the
+BurstGPT reversal ($58\times$, TP-H3 FAIL) stated beside it & any ``beats
+HPA/KEDA on violation''; ``half the overshoot'' without the BurstGPT
+caveat; ``lifting the budget removes the overshoot'' \\
 Fairness & Jain 0.9705 vs.\ VTC 0.9599; FIRM $\dz{=}1.0$ & the
 $\gamma$-ablation (published null) \\
 Cache hit rate & 29.6\% @ 0.85, real LMSYS, $+93\%$ vs.\ 10\%-fixed &
 synthetic saturation; the 200-entry strawman \\
 Cache quality & precision-vs-$\tau$ shape $+$ strata & ``69\% of hits are
 wrong'' (ignores the stochasticity ceiling) \\
-Security & AUC 0.88 $\to$ 0.50 at 24\% latency, 76\% hits kept & --- \\
-Live validation & both arms verified end-to-end; ordinal check recorded
-DISAGREE (live parity, replica-only projection) & any ``sim ranking
-confirmed live'' claim \\
+Security & AUC 0.88 $\to$ 0.50 at 24\% latency, 76\% hits kept (sim);
+AUC 0.502 over the wire (WA-H1 PASS) & --- \\
+Live validation, replica-only & both arms verified end-to-end; ordinal
+check recorded DISAGREE (live parity); 24\,h soak valid (SK-H4 PASS, 25.8M
+requests, 0 dropped) with SK-H1/SK-H3 FAIL; load spreads across nodes
+(MN-H1 PASS); live cost ordering matches sim on a real trace (TL-H1 PASS)
+& any ``sim ranking confirmed live'' claim from the ordinal check alone \\
+Live validation, three knobs & published controller loses to its tier-only
+ablation (B1, WL-H1 FAIL); corrected controller beats all four arms at
+iso-fairness in \texttt{joint\_stress} (B1$'$, WL-H1$'$ PASS, CIs
+excluding 0, block-bootstrap robust); fitted simulator matches live in 3/4
+cells (WL-H3$'$ PASS); dwell damper fails (B1$''$, WL-H6/H7 FAIL) & any
+claim for the published controller on the live plane; any absolute dollar
+transfer \\
+Theory & single-tenant cost separation, aliased orbits: $+49.0\%$
+(\texttt{flash}), $+2.7\%$ (\texttt{ramp\_gentle}), computed from the plant
+constants and inverting/vanishing when aliasing is removed; eight-tenant
+floor 0.126189 computed exactly & any multi-tenant floor claim: S3 FAIL
+(\texttt{keda} measures $67\times$ below it) \\
 Effect sizes & $\dz$ with 95\% bootstrap CI & bare p-values below
 ${\sim}10^{-6}$ \\
 Planner scale & exponent 1.45; 3\,s timeout crossed at 128 tenants &

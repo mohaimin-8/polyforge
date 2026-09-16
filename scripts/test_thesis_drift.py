@@ -57,6 +57,19 @@ def test_each_claim_pattern_finds_the_sentence_it_exists_for(label, sample):
     assert re.search(pattern, sample), f"{label!r}: pattern misses {sample!r}"
 
 
+def test_a_withdrawn_number_beside_its_withdrawal_is_not_drift(tmp_path):
+    mod = _mod()
+    bare = tmp_path / "bare.tex"
+    bare.write_text(r"on real BurstGPT demand: $-70\%$ cost vs.\ tuned HPA/KEDA/FIRM.", encoding="utf-8")
+    qualified = tmp_path / "qualified.tex"
+    qualified.write_text("cost $-70\\%$ against the baselines as tuned\n"
+                         "--- withdrawn as a like-for-like comparison.", encoding="utf-8")
+    rows = {r[0]: r for r in mod.contradicted({p: p.read_text(encoding="utf-8") for p in (bare, qualified)})}
+    label, _, _, where, n_qualified = rows["BurstGPT cost -70% vs tuned HPA/KEDA/FIRM"]
+    assert where == [f"{bare.as_posix()}:1"]
+    assert n_qualified == 1
+
+
 def test_the_azure_pattern_ignores_another_papers_minus_42():
     mod = _mod()
     pattern = next(p for lbl, p, _, _ in mod.CONTRADICTED if lbl.startswith("Azure"))

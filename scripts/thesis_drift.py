@@ -139,21 +139,48 @@ def headline(record: Path) -> str:
     return ""
 
 
+def rel(path: Path) -> str:
+    """Repo-relative POSIX path; the path itself when it lies outside the repo (tests)."""
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def detex(text: str) -> str:
     """Enough of the tex to match a file name: `RESULTS\\_V2.md` -> `RESULTS_V2.md`."""
     return text.replace("\\_", "_")
 
 
-def contradicted(docs: dict[Path, str]) -> list[tuple[str, str, str, list[str]]]:
+# A withdrawn number may still appear in the text -- as history, beside its
+# withdrawal. A mention is BARE (drift) only when no qualifier sits within
+# two lines of it; qualified mentions are counted, not flagged.
+QUALIFIED = re.compile(
+    r"withdrawn|as tuned|caveat|published comparator|layered comparator|adjudicat|"
+    r"not the (thesis's )?claim|history of the claim|no longer|superseded|WITHDRAWN|"
+    r"smaller (number|margin)|percentage.*withdrawn|\(Not\)|never the|as published|"
+    r"shrinks to|rank test|eviction parity|budget parity|concurrency arm|learned \(RL\)|"
+    r"RL\) joint",
+    re.IGNORECASE)
+QUALIFIER_WINDOW = 3
+
+
+def contradicted(docs: dict[Path, str]) -> list[tuple[str, str, str, list[str], int]]:
     rows = []
     for label, pattern, now, record in CONTRADICTED:
         rx = re.compile(pattern)
-        where = []
+        bare, qualified = [], 0
         for path, text in docs.items():
-            for i, line in enumerate(text.splitlines(), 1):
-                if rx.search(line):
-                    where.append(f"{path.relative_to(REPO_ROOT).as_posix()}:{i}")
-        rows.append((label, now, record, where))
+            lines = text.splitlines()
+            for i, line in enumerate(lines, 1):
+                if not rx.search(line):
+                    continue
+                window = "\n".join(lines[max(0, i - 1 - QUALIFIER_WINDOW):i + QUALIFIER_WINDOW])
+                if QUALIFIED.search(window):
+                    qualified += 1
+                else:
+                    bare.append(f"{rel(path)}:{i}")
+        rows.append((label, now, record, bare, qualified))
     return rows
 
 
@@ -195,14 +222,18 @@ def build() -> str:
          "no document cites; the committed figures no document includes.", "",
          "## Documents", "", "| document | last commit |", "|---|---|"]
     for p in docs:
-        L.append(f"| `{p.relative_to(REPO_ROOT).as_posix()}` | {last_commit_date(p)} |")
+        L.append(f"| `{rel(p)}` | {last_commit_date(p)} |")
     L += ["", f"Newest record in the gate: **{newest}**. Records known to the gate: **{len(records)}**; "
           f"cited by at least one document: **{len(records) - len(rows_u)}**.", "",
-          f"## 1. Contradicted claims — {len(hit_c)} of {len(rows_c)} still in the text", "",
-          "| claim as written | where | what the record says now | record |", "|---|---|---|---|"]
-    for label, now, record, where in rows_c:
-        loc = "<br>".join(f"`{w}`" for w in where) if where else "— (no longer in the text)"
-        L.append(f"| {label} | {loc} | {now} | `{record}` |")
+          f"## 1. Contradicted claims — {len(hit_c)} of {len(rows_c)} still made bare in the text", "",
+          "A mention counts as bare when no qualifier (withdrawn, as tuned, caveat, adjudicated, ...) "
+          "sits within three lines of it; mentions that carry their withdrawal are counted in the last "
+          "column and are not drift.", "",
+          "| claim as written | bare, where | what the record says now | record | qualified mentions |",
+          "|---|---|---|---|---|"]
+    for label, now, record, where, qualified in rows_c:
+        loc = "<br>".join(f"`{w}`" for w in where) if where else "— (none)"
+        L.append(f"| {label} | {loc} | {now} | `{record}` | {qualified} |")
     L += ["", f"## 2. Records no document cites — {len(rows_u)}", "",
           "By file name or by any hypothesis tag the record names; newest first. Not every one "
           "belongs in the thesis; every one is a decision the author has not yet made.", "",

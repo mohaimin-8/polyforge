@@ -41,9 +41,9 @@ provides.}
 \end{quote}
 
 The claim is tested, not asserted: against five baselines each grid-tuned on
-the thesis's own objective, under seven pre-registered protocols whose
-hypotheses --- including the two that failed --- were committed and pushed
-before the first run.
+the thesis's own objective, under pre-registered protocols (seven at the
+first campaign, forty-eight by the last) whose hypotheses --- including the
+ones that failed --- were committed and pushed before the first run.
 
 \section{What was built}
 
@@ -78,22 +78,34 @@ statement end to end (Chapter~\ref{ch:design}):
   \item \textbf{Joint cross-layer control.} The first surveyed controller to
         co-optimize replicas, semantic-cache budget, and model tier against
         one multi-tenant objective (Chapter~\ref{ch:design}); ablating
-        jointness costs $+2884\%$ on the objective's cost term
-        (Section~\ref{sec:eval-v1}).
-  \item \textbf{A measured composition result.} On a 1{,}800-run blocked
-        factorial with tuned baselines, \polyforge{} wins the composite
-        objective against every baseline ($|\dz|$ 0.66--1.44) and is the only
-        Pareto-undominated system; on replayed real BurstGPT demand the
-        powered confirmatory replay shows $-70\%$ cost
-        ($n{=}96$, $p \le 4.3\times10^{-6}$) with a disclosed $+0.07$
-        violation trade (Section~\ref{sec:eval-replay}).
+        jointness worsens the objective's cost term --- by $+2884\%$ against
+        the published layered comparator, and by a margin $86\%$ smaller
+        once that comparator's absorbing-tier defect is repaired
+        (Section~\ref{sec:eval-v1}); the smaller number is the claim.
+  \item \textbf{A measured composition result, and its adjudication.} On a
+        1{,}800-run blocked factorial with tuned baselines, \polyforge{} wins
+        the composite objective against every baseline ($|\dz|$ 0.66--1.44)
+        and is the only Pareto-undominated system --- non-dominated in 48 of
+        60 cells under \emph{any} weighting; the composite-$J$ win holds in
+        every later campaign that tested it, including against an
+        offline-trained learned joint controller over the same action space.
+        The \emph{cost} component was then re-scored against comparators
+        corrected for three confounds found after the campaigns closed
+        (Section~\ref{sec:eval-adjudication}): the replayed-BurstGPT $-70\%$
+        and Azure $-42\%$ headlines are \textbf{withdrawn} as like-for-like
+        comparisons, and what survives is a feasibility result --- the
+        per-tenant budget is satisfiable only by a controller holding the
+        tier knob, and no replica-only reactive controller can meet it under
+        AI load by any decision available to it.
   \item \textbf{An honest SLO result.} Two pre-registered attempts to beat
         tuned reactive scalers on raw violation failed and are published as
         failures; what holds is violation parity at $-43$\ldots$-48\%$ cost,
         a confirmed forecasting mechanism (seasonal $<$ trend on violation
         where real periodicity exists, $p=6\times10^{-4}$), and a
         declared-exploratory win in the spike regime where reaction is
-        structurally impossible (Section~\ref{sec:eval-v3}).
+        structurally impossible (Section~\ref{sec:eval-v3}). On the
+        unbounded severity metric the synthetic and Azure advantage is real
+        and the BurstGPT one reverses; both are stated together, always.
   \item \textbf{Real-data cache results with a quality denominator.} On real
         LMSYS-Chat-1M prompts: 29.6\% adaptive hit rate at cosine 0.85
         ($+93\%$ over a 10\%-of-working-set fixed cache), dollar-weighted
@@ -113,12 +125,28 @@ statement end to end (Chapter~\ref{ch:design}):
   \item \textbf{Construction-level theory.} Block-coordinate optimality of
         the planner's two-sweep solver and boundedness/contraction of its
         self-calibration scale, stated at exactly the altitude the code
-        delivers (Section~\ref{sec:design-theory}).
-  \item \textbf{A pre-registered systems methodology.} Seven protocols
-        pushed before their runs, tuned baselines, paired effect sizes with
-        bootstrap CIs, stopping rules, substrate separation, and a published
-        honest-nulls ledger (Chapter~\ref{ch:methodology}) --- a
-        methodological contribution independent of any performance number.
+        delivers (Section~\ref{sec:design-theory}); a single-tenant cost
+        separation between reactive and predictive control computed from
+        the plant constants alone, shown to be exactly the information
+        asymmetry of observational aliasing; and its multi-tenant extension
+        computed exactly and \emph{falsified} against the measured arms
+        (Section~\ref{sec:eval-summary}).
+  \item \textbf{Live evidence at three depths.} A replica-only ordinal check
+        on a kind cluster (disagreement, published), a valid 24-hour soak
+        (25.8M requests, nothing dropped, two of four hypotheses failed and
+        published), a real trace driving the real cluster, and a three-knob
+        live plane on a rented GPU host on which the published controller
+        \emph{lost} to its own ablation, the corrected controller then beat
+        every arm at iso-fairness, and the obvious damper for its
+        oscillation failed (Section~\ref{sec:eval-live}).
+  \item \textbf{A pre-registered systems methodology.} Forty-eight
+        protocols pushed before their runs, tuned baselines, paired effect
+        sizes with bootstrap CIs, stopping rules, substrate separation, an
+        adjudication practice in which confounds found after a campaign
+        closes are answered by a new pre-registered record and never by
+        editing the old one, and a published honest-nulls ledger
+        (Chapter~\ref{ch:methodology}) --- a methodological contribution
+        independent of any performance number.
 \end{enumerate}
 
 \section{Scope and honesty of claims}
@@ -131,14 +159,19 @@ calibrated against a real inference server (the fit direction errs
 were checked against a real GPU latency bench. Real data enters three ways:
 replayed BurstGPT demand (10.63M requests) and Azure LLM inference 2024
 demand (44.1M requests) for the cost and forecasting claims, and real
-LMSYS-Chat-1M prompts for the cache claims. Live-cluster validation is
-\emph{ordinal only} by design --- absolutes are never compared across
-substrates --- and both arms are live-verified end to end; the
-pre-registered ordinal check recorded a \emph{disagreement} (live parity
-between the arms at the replica-only projection), published as measured in
-Section~\ref{sec:eval-live}. What is \emph{not} claimed: absolute dollar or
-latency numbers transferring to any production fleet, token-level scheduling
-fairness, or tail behavior beyond p95 on the simulated substrate.
+LMSYS-Chat-1M prompts for the cache claims. Live-cluster validation never
+compares absolutes across substrates. The replica-only ordinal check
+recorded a \emph{disagreement} (live parity between the arms), published as
+measured; the three-knob live plane that followed on a rented GPU host is
+the one place where every knob is live and every arm is scored on the same
+cells, and its verdicts --- the published controller's loss, the corrected
+controller's win, the damper's failure --- are reported in
+Section~\ref{sec:eval-live} exactly as their frozen protocols scored them.
+What is \emph{not} claimed: any comparative cost percentage against the
+originally tuned baselines (withdrawn, Section~\ref{sec:eval-adjudication}),
+absolute dollar or latency numbers transferring to any production fleet,
+token-level scheduling fairness, or tail behavior beyond p95 on the
+simulated substrate.
 
 \section{Document structure}
 

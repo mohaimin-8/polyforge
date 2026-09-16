@@ -5,42 +5,72 @@
 
 This thesis set out to test whether per-layer local optima compose in
 multi-tenant hybrid serving, and answered with a built system and a
-pre-registered measurement campaign. The answer: they do not compose, and
-the gap is large. A controller that plans replicas, semantic-cache budget,
-and model tier together beats every tuned per-layer baseline on the
-composite objective in every campaign that tested it, is the only
-Pareto-undominated system in a 1{,}800-run matrix, and on replayed real
-demand delivers $-70\%$ cost against tuned reactive scalers with a
-disclosed $+0.07$ violation trade. Removing jointness alone costs
-$+2884\%$ on the cost term --- the composition gap made into a number.
+pre-registered measurement campaign. The answer: they do not compose. A
+controller that plans replicas, semantic-cache budget, and model tier
+together beats every tuned per-layer baseline on the composite objective in
+every campaign that tested it --- the 1{,}800-run matrix, two real-trace
+replays, the 2026-stack concurrency arm, the tenant-scale slice, and an
+offline-trained learned controller over the same action space --- and is
+the only Pareto-undominated system in the matrix, non-dominated in 48 of
+60 cells under any weighting. Removing jointness worsens the cost term
+against the published layered comparator by $+2884\%$, and by a margin
+$86\%$ smaller once that comparator's tier defect is repaired; the smaller
+number is the composition gap made honest.
+
+The cost \emph{percentage} that once headlined this thesis --- $-70\%$
+against tuned reactive scalers on replayed real demand --- is withdrawn.
+An audit after the campaigns closed found that every comparator carried an
+eviction charge and a pinned cache no \jcac{} arm paid, and that only
+\jcac{} was ever held to the per-tenant budget; re-scored under three
+pre-registered corrections, the like-for-like advantage does not survive
+its own rank tests. What survives is sharper than a percentage: the
+per-tenant budget is a promise only a controller holding the tier knob can
+keep, because capping a replica-only controller moves its tier spend by
+exactly nothing. That is the thesis's cost claim.
 
 Around that central result: an honest SLO account (parity at
 $-43\ldots{-48\%}$ cost, a confirmed forecasting mechanism, two published
-confirmatory failures, and a stopping rule); real-data cache results with a
-quality denominator no surveyed cache paper publishes; fairness wins over
-two dedicated baselines at the stated altitude with the controller's own
-fairness term honestly nulled; a security frontier showing per-tenant cache
-partitioning dominates padding and jitter defenses against a demonstrated
-AUC-0.88 timing side channel; two construction-level guarantees on the
-deployed solver; and a working Kubernetes-native implementation held to CI
-gates throughout.
+confirmatory failures, a stopping rule, and a severity reversal on one real
+trace stated beside the advantage on the other); real-data cache results
+with a quality denominator no surveyed cache paper publishes, and the
+ceiling on that quality located in response stochasticity rather than
+retrieval; fairness wins over two dedicated baselines at the stated
+altitude with the controller's own fairness term honestly nulled; a
+security frontier showing per-tenant cache partitioning dominates padding
+and jitter defenses against a demonstrated AUC-0.88 timing side channel,
+confirmed at chance over the wire; two construction-level guarantees on the
+deployed solver, a single-tenant cost-separation result and its
+multi-tenant extension computed exactly and falsified; live evidence at
+three depths, including a three-knob live plane on which the published
+controller lost to its own ablation and the corrected controller then beat
+every arm at iso-fairness; and a working Kubernetes-native implementation
+held to CI gates throughout.
 
-The methodological result may outlast the numbers: seven pre-registrations
-pushed before their runs, immutable closed campaigns, effect sizes over
-p-values, substrate separation, and a published honest-nulls ledger ---
-demonstrated in a systems evaluation at thesis scale, in public git
-history.
+The methodological result may outlast the numbers: forty-eight
+pre-registrations pushed before their runs, immutable closed campaigns,
+effect sizes over p-values, substrate separation, adjudication by new
+record rather than by edit, a published honest-nulls ledger, and a
+reproduction gate that re-derives every record, figure and caption from
+the committed data --- demonstrated in a systems evaluation at thesis
+scale, in public git history.
 
 \section{Future work}
 
 \begin{itemize}
-  \item \textbf{A three-knob live substrate.} The completed live campaign
-        (Section~\ref{sec:eval-live}) recorded ordinal disagreement with
-        live parity between the arms --- because the live data plane
-        exposes only the replica lever. Extending it with a real semantic
-        cache and tier-differentiated service is the highest-priority
-        follow-up: it is the experiment that could confirm, or refute, the
-        joint-control ranking outside the simulator.
+  \item \textbf{A damper for the corrected controller.} The three-knob
+        live plane (Section~\ref{sec:eval-live-plane}) is done: the
+        corrected controller wins at iso-fairness but oscillates its
+        replica count in a slow swing, and the obvious damper --- a dwell
+        on reversals --- failed its pre-registered test. The next damper
+        must act on the plant-estimate feedback (asymmetric fast-up /
+        slow-down learning of the tier-latency offset), and it is a new
+        controller design with a new pre-registration, not a knob.
+  \item \textbf{The cost claim on an engine-optimized stack.} The
+        feasibility result --- only a tier-holding controller meets the
+        per-tenant budget --- was established against orchestration-layer
+        reactive baselines. Whether, and how much of, the advantage
+        survives on top of a serving engine that already batches,
+        disaggregates and manages its KV cache is untested.
   \item \textbf{Token-level demand signals.} Swap the request-rate
         \texttt{DemandSource} for TTFT/queue-depth/KV-pressure signals from
         an llm-d-class engine, keeping the planner unchanged --- the

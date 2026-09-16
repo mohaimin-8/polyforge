@@ -42,11 +42,17 @@ and Model Tier for Multi-Tenant Hybrid AI Serving}
 
 \begin{abstract}
 % TODO(author): ~200 words. Sources: RESULTS_MASTER.md scoreboard for the
-% headline numbers (-70% BurstGPT / -42% Azure cost at violation parity,
-% Jain win vs tuned VTC-replica, Pareto-undominated in the 1,800-run
-% matrix); ARCHITECTURE.md for the one-sentence system description; the
-% central claim is the joint-control thesis (per-layer local optima do not
-% compose).
+% headline claims. NOTE the comparative cost percentages (BurstGPT, Azure)
+% were WITHDRAWN by the V-series adjudication (RESULTS_EVICTION_PARITY,
+% RESULTS_TRACE_PARITY, RESULTS_BUDGET_PARITY): the citable cost claim is
+% feasibility -- the per-tenant budget is satisfiable only by a controller
+% holding the tier knob. Still citable: composite-J win in every campaign
+% (incl. vs a learned RL controller), Pareto-undominated / non-dominated in
+% 48 of 60 cells, Jain win vs tuned VTC-replica, the B1' live-plane win at
+% iso-fairness (WL-H1' PASS) beside the B1 loss (WL-H1 FAIL).
+% thesis/report/chapters/06-evaluation.tex carries the adjudicated wording;
+% ARCHITECTURE.md the one-sentence system description; the central claim is
+% the joint-control thesis (per-layer local optima do not compose).
 \end{abstract}
 
 \begin{keyword}
