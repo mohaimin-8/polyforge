@@ -195,6 +195,8 @@ margin is larger on code-dominant windows. Two independent real traces
 now show the same ranking with the same disclosed trade; per ground
 rules the samples are never pooled.
 
+**Adjudicated (sessions 37–38, see #29):** the −42% and the BurstGPT −70% are withdrawn as like-for-like cost claims — at eviction parity Azure is −7.1% (TP-H1a/b PASS) and BurstGPT fails its rank test (TP-H1a FAIL); at budget parity both fail (BP-H1a/b). The *J* ranking and the forecasting boundary in this answer stand; the cost percentages do not.
+
 ## 13. "Eight tenants is not multi-tenancy at scale."
 
 Eight tenants per cluster is the factor under study (composition, not
@@ -445,8 +447,10 @@ Three things bound the gap without closing it: (a) each knob's realism is
 carried separately on a real substrate — the cache knob by the LMSYS hit-rate
 protocol *and* the over-the-wire isolation test, the tier knob by the GPU tier
 bench; (b) the `-joint` ablation that establishes jointness matters (+2884%
-cost when the knobs are decoupled) is a sim mechanism result, not a headline
-absolute; (c) the closure is now pre-registered
+cost when the knobs are decoupled against the published layered comparator —
+a margin that shrinks by 86.4% once that comparator's absorbing-tier defect is
+repaired, `RESULTS_LAYERED_FIX.md` LF-H1; the smaller number is the claim) is a
+sim mechanism result, not a headline absolute; (c) the closure is now pre-registered
 (`research/analysis/PREREG_WAVE4_LIVE_PLANE.md`) and gated only on a
 GPU-capable host: a real cache/tier data plane where all three knobs actuate,
 with the falsifier stated in advance (if the joint arm does not beat the
@@ -459,10 +463,13 @@ claim.
 
 ## 22. "−70% is against HPA/KEDA/FIRM, which over-provision. Against a well-configured 2026 serving engine, does the win survive?"
 
-The comparison is honest about its *altitude*, and that is the whole answer.
-PolyForge is a control plane; the −70% is an orchestration-level figure
-against tuned-but-reactive autoscalers, and it is never claimed against
-engine-level state of the art. Engine-level efficiency (continuous batching,
+First, the premise: the −70% is **withdrawn** as a like-for-like cost claim
+(#29) — what survives is the feasibility result, that the per-tenant budget
+is satisfiable only by a controller holding the tier knob. The altitude
+answer below applies to that surviving claim exactly as it applied to the
+percentage. PolyForge is a control plane; whatever it wins is an
+orchestration-level result against tuned-but-reactive autoscalers, and it is
+never claimed against engine-level state of the art. Engine-level efficiency (continuous batching,
 disaggregated prefill/decode, KV-cache management) comes from the *actuation*
 layer the three knobs sit above; the mapping is explicit (`RELATED_WORK.md`
 §4: replicas → decode-pool size, cache → gateway semantic-cache budget as a
@@ -478,12 +485,14 @@ than compete.
 
 What is genuinely untested, and named as such in the limitations: the residual
 orchestration-level win *on top of* an engine-level-optimised stack — because
-some fraction of −70% is precisely the over-provisioning a good engine would
+some fraction of the (withdrawn) −70% was precisely the over-provisioning a good engine would
 not do, so the number would compress against a strong engine even though the
 portfolio-level decision still adds value.
 
-**Do not say:** "−70% versus the state of the art." It is −70% versus
-tuned-but-reactive autoscalers, full stop.
+**Do not say:** "−70% versus the state of the art" — or −70% at all, now
+that it is withdrawn (#29). **Do say:** only a tier-holding controller can
+keep a per-tenant budget, measured against tuned-but-reactive autoscalers,
+full stop.
 
 **The reactive half of this question is now measured, not argued
 (session 27, `PREREG_CONCURRENCY.md` → `RESULTS_CONCURRENCY.md`):** the
@@ -788,3 +797,54 @@ brute-force-verified cost separation whose mechanism we tested by removing it;
 and its correspondence to the measured record is one-operating-point structural
 corroboration in a single-tenant model, with the multi-tenant extension named
 as the open item.
+
+## 29. "You withdrew your own −70% headline (see #22). What is left of the cost claim?"
+
+The withdrawal is the answer, and it was pre-committed. After the campaigns
+closed, an audit of the baseline implementations (the V-series, sessions
+37–38) found three asymmetries between jcac and every comparator it had been
+scored against: (1) every reactive comparator carried a 1.4581× LRU inference
+charge no jcac arm paid and was pinned at a 128 MB cache it could not move;
+(2) the same on the two real traces; (3) only jcac was ever subject to the
+per-tenant budget filter — `controller.py` rejects over-budget candidates
+before its objective is evaluated, and no baseline `plan()` has a cost term at
+all. Each was answered by a new pre-registration whose outcome for the
+published claim was committed *before* the re-scoring ran; no original record
+was edited.
+
+**What the re-scorings found** (`RESULTS_EVICTION_PARITY.md`,
+`RESULTS_TRACE_PARITY.md`, `RESULTS_BUDGET_PARITY.md`): against `hpa_fair` /
+`keda_fair` (no charge, competently pre-sized at 512 MB) the 1,800-run matrix
+is cost-neutral vs `hpa_fair` (+0.8%, EP-H1a FAIL) with −14.1% vs `keda_fair`
+surviving (p=3.8e-16); Azure shrinks from −42.5% to a real, pervasive −7.1%
+(TP-H1a/b PASS, 69.4% of windows); BurstGPT shrinks from −70.4% to −52.2% on
+the mean but **fails its own pre-registered Wilcoxon** (TP-H1a p=0.0133 vs
+Holm 0.01250) — jcac is the *dearer* system in 57.3% of 6-hour windows. Against
+comparators carrying jcac's own budget rule verbatim, **BP-H1a/b FAIL on both
+traces** (Azure −3.3%/−1.3%, p=0.379/0.91; BurstGPT −50.2%/−49.8%,
+p=0.112/0.191 — a minority-of-windows mean that does not survive the rank
+gate). Per the response committed before the run, the like-for-like cost claim
+is **withdrawn, not restated**.
+
+**What survives, and why it is sharper than a percentage.** Amendment 1,
+disclosed before scoring, explains why no better comparator can rescue the
+percentage: at the per-tenant cap, tier spend dominates infra spend by three
+orders of magnitude, and capping a replica-only arm moves its infra spend
+−45.7%/−57.4% and its tier spend by **exactly 0.00%** on both traces. **No
+budget-respecting comparator exists in the replica-only class.** The cost
+result is therefore a *feasibility* statement: the per-tenant budget is a
+promise only a controller holding the tier knob can keep, and no replica-only
+reactive controller can meet it under AI load by any decision available to it.
+The composite-J wins, the fairness wins, the forecasting boundary and the
+security frontier are untouched by the adjudication; the SLO reading gains a
+bounded caveat (#5: severity halves vs `hpa_fair` on synthetic and Azure,
+reverses 58× on BurstGPT, TP-H3a/b FAIL; lifting the budget cap removes 79% of
+that gap, BP-H3, as a typical-window claim whose tail still breaches the
+margin in 22% of windows).
+
+**Do not say:** "−70%", "−42%", "−52%", or "beats every tuned baseline on
+cost". **Do say:** "withdrawn under three pre-registered re-scorings; what
+stands is that only a tier-holding controller can keep a per-tenant budget."
+The thesis text (`thesis/report/chapters/06-evaluation.tex` §6.7) and
+`docs/THESIS_DRIFT.md` (generated) carry the adjudicated wording; the drift
+report fails CI if a withdrawn number reappears bare.

@@ -51,6 +51,8 @@ DOCUMENTS = (
     sorted((REPO_ROOT / "thesis" / "report" / "chapters").glob("*.tex"))
     + [REPO_ROOT / "thesis" / "slides" / "slides.tex"]
     + sorted((REPO_ROOT / "research" / "paper").glob("*.tex"))
+    # The defence Q&A is prose that quotes the records too, and is rehearsed from.
+    + [REPO_ROOT / "docs" / "DEFENSE_QA.md"]
 )
 
 # The claims the adjudications withdrew or bounded, as the tex spells them.
@@ -160,7 +162,7 @@ QUALIFIED = re.compile(
     r"not the (thesis's )?claim|history of the claim|no longer|superseded|WITHDRAWN|"
     r"smaller (number|margin)|percentage.*withdrawn|\(Not\)|never the|as published|"
     r"shrinks to|rank test|eviction parity|budget parity|concurrency arm|learned \(RL\)|"
-    r"RL\) joint",
+    r"RL\) joint|withdrew|shrinks from",
     re.IGNORECASE)
 QUALIFIER_WINDOW = 3
 

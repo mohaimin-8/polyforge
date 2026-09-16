@@ -61,12 +61,16 @@ multi-node sitting (`RESULTS_MULTINODE.md`), the trace-driven cluster
 `RESULTS_WAVE4_DWELL.md`; runbook `WAVE4_RENTED_HOST_RUNBOOK.md`). Every box
 is terminated and the AWS key is deactivated; nothing is running.
 
-## 7. The text — held
+## 7. The text — rewritten to the records (2026-09-16)
 
-`thesis/report`, `thesis/slides` and `research/paper` were last written in
-July and quote claims the adjudications have since withdrawn.
-`docs/THESIS_DRIFT.md` is the generated list of what must change. Rewriting
-waits for the author's go.
+`thesis/report` (62 pp.) and `thesis/slides` (16 frames) now state the
+adjudicated claims: the cost percentages are withdrawn and replaced by the
+feasibility result, every gated record is cited, all 21 figures are in.
+`docs/THESIS_DRIFT.md` (generated; CI keeps it current) reads 0 bare claims /
+0 uncited records / 0 unplaced figures. `research/paper/main.tex` is still the
+FGCS skeleton with TODO blocks — carve it from the thesis chapters when a
+venue is chosen. Human fill-ins remain: author/degree/university macros in
+`thesis/report/main.tex`.
 
 ## 8. Submission-adjacent — human
 
