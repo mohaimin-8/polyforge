@@ -1467,9 +1467,13 @@ class LoadDistributionSampler(threading.Thread):
         self._halt.set()
 
     def run(self) -> None:
+        # Same wall-clock cadence as ReplicaSampler.run: a slow `kubectl top`
+        # must not stretch the period.
+        next_due = time.monotonic()
         while not self._halt.is_set():
             self._sample()
-            self._halt.wait(self.INTERVAL_S)
+            next_due += self.INTERVAL_S
+            self._halt.wait(max(0.0, next_due - time.monotonic()))
 
     def _sample(self) -> None:
         try:
@@ -1570,6 +1574,15 @@ class ReplicaSampler(threading.Thread):
         self._halt = threading.Event()
 
     def run(self) -> None:
+        # Wall-clock cadence (session 48): the wait used to start AFTER the
+        # kubectl call returned, so the period was latency + interval. On the
+        # rented box kubectl answers in well under a second and coverage was
+        # ~100%; on a Windows laptop against Docker Desktop's kind it takes
+        # ~20 s, the sampler covered 37% of the window, and the coverage guard
+        # -- correctly -- voided the run. The next sample is due `interval_s`
+        # after the previous one was DUE, not after it finished; a call that
+        # overruns starts the next one immediately.
+        next_due = time.monotonic()
         while not self._halt.is_set():
             try:
                 proc = subprocess.run(
@@ -1589,7 +1602,8 @@ class ReplicaSampler(threading.Thread):
                 # however many samples had been taken — a run whose sampler
                 # died three minutes into twenty was priced ~85% too low.
                 self.failures += 1
-            self._halt.wait(self.interval_s)
+            next_due += self.interval_s
+            self._halt.wait(max(0.0, next_due - time.monotonic()))
 
     def stop(self) -> None:
         self._halt.set()

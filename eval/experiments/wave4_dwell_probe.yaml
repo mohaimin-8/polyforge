@@ -1,0 +1,26 @@
+# Plumbing probe for the `jcac-calibrated-dwell` arm on the live cluster
+# backend with MOCK tiers (kaggle_tier_server.py --mock). NOT EVIDENCE: the
+# mock's latencies are fixed sleeps, so there is no oscillation to damp and
+# no comparison number to read. It exists to prove the path
+#   chart planner.replicaDwellSteps -> planner --replica-dwell-steps ->
+#   JCACController(replica_dwell_steps) -> snapshot/restore
+# executes end to end before a GPU sitting is paid for. Output is named
+# *_PROBE_MOCK so the Zenodo bundle and the records index exclude it.
+#
+# RUN (local rehearsal, mock tiers):
+#   python research/calibration/kaggle_tier_server.py --mock --no-tunnel
+#   export POLYFORGE_EVAL_SHARED_PG=1 POLYFORGE_EVAL_LIVE_AI=1
+#   export POLYFORGE_EVAL_FINE_BUCKET_SECONDS=10
+#   export POLYFORGE_EVAL_TIER_BACKENDS='<the mock's printed line>'
+#   python -m harness.runner experiments/wave4_dwell_probe.yaml   # from eval/
+name: wave4_dwell_probe
+backend: cluster
+steps: 30
+reps: 1
+systems: [jcac-calibrated-dwell]
+workloads: [ai_cacheable]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/wave4_dwell_PROBE_MOCK.duckdb
+retries: 0
+timeseries_reps: 0
