@@ -222,9 +222,10 @@ def build() -> str:
          "are prose, and this is the only check that reads it. Three lists: the claims the "
          "adjudications withdrew or bounded and where the tex still makes them; the records "
          "no document cites; the committed figures no document includes.", "",
-         "## Documents", "", "| document | last commit |", "|---|---|"]
-    for p in docs:
-        L.append(f"| `{rel(p)}` | {last_commit_date(p)} |")
+         # No per-document commit dates: they would change on every commit that
+         # touches a chapter and make this report stale without any drift.
+         "## Documents", ""]
+    L += [f"- `{rel(p)}`" for p in docs]
     L += ["", f"Newest record in the gate: **{newest}**. Records known to the gate: **{len(records)}**; "
           f"cited by at least one document: **{len(records) - len(rows_u)}**.", "",
           f"## 1. Contradicted claims — {len(hit_c)} of {len(rows_c)} still made bare in the text", "",
