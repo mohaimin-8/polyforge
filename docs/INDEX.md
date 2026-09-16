@@ -71,6 +71,16 @@ A record is only edited by changing its generator and re-running it. A record
 whose verdict was FAIL or INVALID **stands as committed** — superseding runs get
 a new record, they do not overwrite the old one.
 
+**Figures** live in `../eval/results/figures/` (`fig01`… as PDF + 600-DPI PNG,
+`content/*.json` = what each one plots, `FIGURES.md` = every caption, which is
+what the site prints under each figure). The gate rebuilds all of them and
+compares the plotted content and the captions on every platform, the bytes
+where the renderer matches. `fig18`–`fig21` are drawn by campaign scripts from
+the scored record's own functions (`analysis_risk*.py`,
+`fig_wave4_calibrated.py` → `FIGURE_WAVE4_CALIBRATED.md`, `fig_wave4_dwell.py`
+→ `FIGURE_WAVE4_DWELL.md`); the two `FIGURE_*.md` sheets are captions plus
+plotted numbers, not records.
+
 Supporting analyses in the same directory (not all gated): `THEORY_V2.md`,
 `VTC_FAIRNESS.md`, `EFFECT_SIZES.md`, `SENSITIVITY_J.md`, `COORD_GAP*.md`,
 `FORECAST_*.md`, `PLANNER_*.md`, `SEMANTIC_CACHE.md`, `OSF_REGISTRATION.md`.

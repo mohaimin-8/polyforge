@@ -82,6 +82,55 @@ plt.rcParams.update({
 })
 
 CAPTIONS: list[tuple[str, str]] = []
+INVENTORY = "FIGURES.md"
+INVENTORY_HEADER = ("# W36 figure inventory\n\nEach caption answers: what does this "
+                    "figure prove?\n\n")
+
+
+def caption_line(name: str, caption: str) -> str:
+    return f"- **{name}** — {caption}\n"
+
+
+def read_inventory(path: Path) -> dict[str, str]:
+    """Caption per figure stem, from an inventory file; {} if there is none.
+    One parser for the writer here, the gate and the site build."""
+    found: dict[str, str] = {}
+    if not path.exists():
+        return found
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("- **fig"):
+            continue
+        stem, _, rest = line[4:].partition("**")
+        found[stem] = rest.lstrip(" —-").strip()
+    return found
+
+
+def record_caption(name: str, caption: str) -> None:
+    """Upsert one caption line into FIG_DIR/FIGURES.md.
+
+    The inventory was written once by main() for the base twelve and
+    appended by advanced.py for 13-17; every figure a campaign script saved
+    after that (18, 19, 20 ...) never reached it, because F.CAPTIONS lives in
+    the process that drew the figure and nothing flushed it. The site build
+    reads this file for its captions, so those figures were published with
+    "No caption in FIGURES.md". Now the save that draws a figure is the save
+    that inventories it: a line with this name is replaced in place, a new
+    name is appended, everything else in the file is left as it was.
+    """
+    path = FIG_DIR / INVENTORY
+    if not path.exists():
+        path.write_text(INVENTORY_HEADER, encoding="utf-8")
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    new = caption_line(name, caption)
+    marker = f"- **{name}**"
+    hit = [i for i, line in enumerate(lines) if line.startswith(marker)]
+    if hit:
+        lines[hit[0]] = new
+    else:
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
+        lines.append(new)
+    path.write_text("".join(lines), encoding="utf-8")
 
 
 def _style(ax, xgrid=False):
@@ -104,6 +153,7 @@ def save(fig, name: str, caption: str):
     figure_content.write(fig, name, FIG_DIR)
     plt.close(fig)
     CAPTIONS.append((name, caption))
+    record_caption(name, caption)
     print(f"  wrote {name} (.png 600dpi, .pdf vector)")
 
 
@@ -402,11 +452,19 @@ def main() -> None:
     fig_violation_share(summary)
     fig_objective(df)
 
-    with open(FIG_DIR / "FIGURES.md", "w", encoding="utf-8") as f:
-        f.write("# W36 figure inventory\n\nEach caption answers: what does this "
-                "figure prove?\n\n")
+    # The base twelve open the inventory; save() has already upserted each
+    # of their lines, so this rewrite fixes the header and their order and
+    # keeps, in name order after them, every later figure's line (advanced,
+    # risk, wave-4) that a previous run left in the file -- the same flat
+    # list the gate produces when those scripts append to a fresh file.
+    later = {k: v for k, v in read_inventory(FIG_DIR / INVENTORY).items()
+             if k not in {n for n, _ in CAPTIONS}}
+    with open(FIG_DIR / INVENTORY, "w", encoding="utf-8") as f:
+        f.write(INVENTORY_HEADER)
         for name, caption in CAPTIONS:
-            f.write(f"- **{name}** — {caption}\n")
+            f.write(caption_line(name, caption))
+        for name in sorted(later):
+            f.write(caption_line(name, later[name]))
     print(f"12 figures + FIGURES.md in {FIG_DIR}")
 
 

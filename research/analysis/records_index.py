@@ -41,7 +41,7 @@ RECORD = "RECORDS_INDEX.md"
 TAG = re.compile(r"\b([A-Z]{2,4}[0-9]?-H[0-9][a-z]?)\b")
 # Documents that are protocol, index or narrative rather than measurement.
 NOT_A_RECORD = {"RECORDS_INDEX.md", "RESULTS_MASTER.md", "OSF_REGISTRATION.md",
-                "THEORY_V2.md", "FIGURE_WAVE4_CALIBRATED.md"}  # the last is a figure sheet
+                "THEORY_V2.md", "FIGURE_WAVE4_CALIBRATED.md", "FIGURE_WAVE4_DWELL.md"}  # figure sheets last
 
 
 def record_files() -> list[Path]:

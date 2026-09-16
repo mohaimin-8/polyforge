@@ -273,6 +273,10 @@ CAMPAIGN_RECORDS = [
     # still beats tier-only). Rebuilds from wave4_dwell_plane_runs.csv and
     # wave4_dwell_plane_evidence/runs/.
     ("analysis_wave4_dwell.py", [], "RESULTS_WAVE4_DWELL.md"),
+    # fig21 rides along the frozen B1'' scorer exactly as fig20 does for
+    # B1': the replica trajectory the dwell was meant to calm, the WL-H6
+    # churn against its bound, the WL-H7 deltas against theirs.
+    ("fig_wave4_dwell.py", [], "FIGURE_WAVE4_DWELL.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
@@ -372,6 +376,48 @@ def compare_figure_content(fig_dir: Path) -> tuple[list[tuple[str, str]], int]:
         if committed.read_bytes() != rebuilt.read_bytes():
             drifted.append((rebuilt.name, content_diff(committed, rebuilt)))
     return drifted, checked
+
+
+def read_inventory(path: Path) -> dict[str, str]:
+    """Caption per figure stem from a FIGURES.md; the parser figures.py and
+    build_pages.py use, inlined so the gate imports nothing from the tree it
+    verifies."""
+    found: dict[str, str] = {}
+    if not path.exists():
+        return found
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("- **fig"):
+            continue
+        stem, _, rest = line[4:].partition("**")
+        found[stem] = rest.lstrip(" —-").strip()
+    return found
+
+
+def compare_captions(fig_dir: Path) -> list[tuple[str, str]]:
+    """Every rebuilt figure's caption against the committed inventory, and
+    every committed figure's presence in it.
+
+    Captions are outcome-aware text computed from the data (fig18's names
+    the direction the risk knob moved; fig20's names the arms it beat), so
+    they are content, and they are what the site publishes under each
+    figure. Until now nothing checked them: fig18, fig19 and fig20 were
+    committed without a line in FIGURES.md, and the site showed "No caption"
+    under all three. Compared per figure rather than as a whole file so the
+    git tier, which cannot rebuild fig09, still verifies the rest.
+    """
+    committed = read_inventory(FIGURES / "FIGURES.md")
+    rebuilt = read_inventory(fig_dir / "FIGURES.md")
+    drifted: list[tuple[str, str]] = []
+    for stem, caption in sorted(rebuilt.items()):
+        if stem not in committed:
+            drifted.append((f"{stem} caption", "no caption in the committed FIGURES.md"))
+        elif committed[stem] != caption:
+            drifted.append((f"{stem} caption", "committed FIGURES.md carries a different caption"))
+    for path in sorted(FIGURES.glob("fig*.png")):
+        if path.stem not in committed and path.stem not in rebuilt:
+            drifted.append((f"{path.stem} caption",
+                            "committed figure with no line in FIGURES.md -- the inventory is behind the figure set"))
+    return drifted
 
 
 def content_diff(committed: Path, rebuilt: Path) -> str:
@@ -631,6 +677,16 @@ def main() -> int:
           f"{content_n - len(content_drift)}/{content_n} plot identical data")
     for name, why in content_drift:
         print(f"    DRIFT: {name} ({why})")
+    # Captions are content too: what each figure claims, in the inventory
+    # the site publishes. Counted with the content drift for the verdict.
+    caption_drift = compare_captions(fig_dir)
+    caption_n = len(read_inventory(fig_dir / "FIGURES.md"))
+    print(f"  {'figure captions':<{width}} "
+          f"{caption_n - len([d for d in caption_drift if not d[1].startswith('committed figure')])}/{caption_n} "
+          f"rebuilt captions match the committed FIGURES.md")
+    for name, why in caption_drift:
+        print(f"    DRIFT: {name} ({why})")
+    content_drift += caption_drift
 
     # The strengthening check: the rendered files themselves. Exact where
     # the renderer matches, meaningless where it does not, reported either
@@ -662,7 +718,7 @@ def main() -> int:
     if drifted or failed_campaigns or content_drift or raster_fail or orphans:
         print(f"\nFAILED: {drifted} record(s) not byte-identical, "
               f"{len(failed_campaigns)} campaign script(s) exited nonzero, "
-              f"{len(content_drift)} figure(s) plotting different data, "
+              f"{len(content_drift)} figure(s) plotting different data or captioned differently, "
               f"{len(raster_fail)} figure file(s) not identical on a "
               f"matching renderer, {len(orphans)} record(s) covered by no gate.")
         return 1
