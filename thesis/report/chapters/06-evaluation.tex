@@ -52,7 +52,18 @@ that tested it: v1 ($p \le 4.6{\times}10^{-25}$), v2
 ($p \le 6.7{\times}10^{-25}$), v3 overload ($p \le 1.3{\times}10^{-11}$),
 the VTC slice ($p = 3.3{\times}10^{-19}$), and the real-demand replay
 ($p \le 5.5{\times}10^{-5}$) --- and is the only Pareto-undominated system
-in the matrix (Figure~\ref{fig:pareto}).
+in the matrix (Figure~\ref{fig:pareto}). Figure~\ref{fig:composite-objective}
+is that single-number ranking; every other figure in this chapter decomposes
+it.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.78\textwidth]{fig12_composite_objective.pdf}
+  \caption{The composite objective ($J = \text{cost} + 2\cdot\text{violation}
+  + 0.5\cdot(1-\text{Jain})$, normalized per tenant-step): the single-number
+  ranking every other figure decomposes.}
+  \label{fig:composite-objective}
+\end{figure}
 
 \section{The headline matrix: 1{,}800 runs plus 500 ablations}
 \label{sec:eval-v1}
@@ -61,8 +72,17 @@ The blocked factorial of Section~\ref{sec:method-matrix} with all baselines
 grid-tuned on $J$. \polyforge{} beats every tuned baseline on composite $J$
 ($p \le 4.6{\times}10^{-25}$, $|\dz|$ 0.66--1.44) and on cost against all
 five (Figure~\ref{fig:cost-by-system}); it holds violations near the
-over-provisioned floor at a fraction of that floor's cost, and sits alone on
-the cost--violation frontier (Figure~\ref{fig:pareto}).
+over-provisioned floor at a fraction of that floor's cost
+(Figure~\ref{fig:violation-by-system}), and sits alone on the
+cost--violation frontier (Figure~\ref{fig:pareto}). The two views of SLO
+compliance are complementary: Figure~\ref{fig:violation-by-system} is
+severity, Figure~\ref{fig:violation-step-share} is incidence --- how often
+anyone is violating at all. Tail latency by traffic family
+(Figure~\ref{fig:latency-p95}) and cost scaling with cluster headroom
+(Figure~\ref{fig:cost-by-cluster}) complete the per-metric picture: the
+static and cache-max policies pay for whatever exists, the feedback
+controllers' spend is demand-shaped, and \polyforge{} is lowest at every
+size.
 
 \begin{figure}[htbp]
   \centering
@@ -81,6 +101,41 @@ the cost--violation frontier (Figure~\ref{fig:pareto}).
   \label{fig:pareto}
 \end{figure}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.78\textwidth]{fig02_violation_by_system.pdf}
+  \caption{SLO violations by system (mean $\pm$ 95\% CI): \polyforge{} holds
+  violations near the over-provisioned floor at a fraction of its cost.}
+  \label{fig:violation-by-system}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.78\textwidth]{fig11_violation_step_share.pdf}
+  \caption{How often anyone is violating at all: the incidence view of SLO
+  compliance, complementing Figure~\ref{fig:violation-by-system}'s severity
+  view.}
+  \label{fig:violation-step-share}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig10_latency_p95.pdf}
+  \caption{Tail latency by traffic family (mean $\pm$ 95\% CI, log):
+  \polyforge{} holds both families' tails near the SLO-clean systems while
+  spending an order of magnitude less than they do.}
+  \label{fig:latency-p95}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig06_cost_by_cluster_size.pdf}
+  \caption{Cost scaling with cluster headroom: static and cache-max policies
+  pay for whatever exists; feedback controllers' spend is demand-shaped, and
+  \polyforge{} stays lowest at every size.}
+  \label{fig:cost-by-cluster}
+\end{figure}
+
 One pre-committed gate \textbf{fails as measured} and is reported: the
 roadmap's raw per-metric gate (win every metric outright) is structurally
 impossible against by-construction winners --- over-provisioned Static and
@@ -95,7 +150,31 @@ agentic latency, because it needs the tier knob
 composed behavior directly: within the first minute of an agentic run,
 \polyforge{} fills its replica budget \emph{and} quadruples the semantic
 cache, while HPA chases each burst with the only knob it has
-(Figure~\ref{fig:adaptation}).
+(Figure~\ref{fig:adaptation}). Two more per-metric views are
+class-structured the same way: fairness by tenant composition
+(Figure~\ref{fig:jain-by-mix}) --- the whale mix is where fairness is hard,
+and where the fairness-aware objective earns its term --- and the realized
+semantic-cache hit share on AI traffic (Figure~\ref{fig:cache-hit}), where
+adaptive sizing doubles the fixed-cache baselines on cacheable workloads and
+correctly declines to spend memory on uncacheable ones.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig04_jain_by_tenant_mix.pdf}
+  \caption{Fairness by tenant composition (mean $\pm$ 95\% CI): the whale
+  mix is where fairness is hard, and where the fairness-aware objective earns
+  its term.}
+  \label{fig:jain-by-mix}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig05_cache_hit_by_workload.pdf}
+  \caption{Realized semantic-cache hit share on AI traffic: adaptive cache
+  sizing doubles the fixed-cache baselines on cacheable workloads and
+  correctly declines to spend memory on uncacheable ones.}
+  \label{fig:cache-hit}
+\end{figure}
 
 \begin{figure}[htbp]
   \centering
@@ -141,7 +220,8 @@ and half-warm caches, billed immediately), reactive scalers pay for capacity
 that misses the burst it was bought for, while \polyforge{}'s hysteresis
 holds the frontier; self-calibration (Proposition~\ref{prop:calibration})
 earns $\dz{=}{+}0.46$ ($p=0.029$), concentrated on the bursty classes where
-trusting nominal capacity hurts most.
+trusting nominal capacity hurts most (Figures~\ref{fig:realism-pareto}
+and~\ref{fig:adaptive-realism}).
 
 \begin{figure}[htbp]
   \centering
@@ -150,6 +230,81 @@ trusting nominal capacity hurts most.
   violation at equal cost; online-seasonal helps only where a period
   exists.}
   \label{fig:forecast-ablation}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig14_realism_pareto.pdf}
+  \caption{Under reconfiguration realism (replica startup lag $+$ cache
+  warm-up, billed immediately): reactive scalers pay for capacity that misses
+  the burst it was bought for, so their violations rise; \polyforge{}'s
+  hysteresis and the self-calibrating variant hold the frontier.}
+  \label{fig:realism-pareto}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig15_adaptive_under_realism.pdf}
+  \caption{Self-calibration under realism: learning effective capacity from
+  realized-vs-projected feedback lowers violations most on the bursty
+  classes, where startup lag hurts a model that trusts nominal capacity.}
+  \label{fig:adaptive-realism}
+\end{figure}
+
+\subsection{Risk-aware planning: the quantile knob, twice pre-registered}
+\label{sec:eval-risk}
+
+The published controller plans at the \emph{expected} demand, so realized
+demand lands above plan roughly half the time --- the mechanism behind the
+disclosed attainment-for-spend trade. Two pre-registered campaigns
+(\evfile{PREREG\_RISK\_MPC.md}, \evfile{PREREG\_RISK\_BUDGET.md}; 2{,}400
+runs each over eight arms) scored a planning quantile as an explicit
+risk knob. The first moved the controller the wrong way
+(Figure~\ref{fig:risk-frontier}): inflating projected demand also inflates
+projected tier spend, which trips the per-tenant budget guardrail into its
+shed fallback, so a higher quantile \emph{lowered} spend and \emph{raised}
+violation --- \textbf{RQ-H1/RQ-H2 FAIL}, published as a null
+(\evfile{RESULTS\_RISK.md}). The one-changed-factor follow-up sizes capacity
+at the quantile but projects cost and checks the budget at the point
+forecast (Figure~\ref{fig:risk-budget-frontier}): \textbf{RB-H1 PASS} at the
+pre-declared $q=0.90$, but the violation curve turns back up at $q=0.95$, so
+the monotone frontier RB-H2 required is not claimed
+(\textbf{RB-H2 FAIL}) and strict domination of the reactive arms is not
+either (\textbf{RB-H3 FAIL}; \evfile{RESULTS\_RISK\_BUDGET.md}).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig18_risk_frontier.pdf}
+  \caption{The risk knob moved the controller the \textbf{wrong way} (blue,
+  mean $\pm$ 95\% CI): raising the planning quantile \emph{lowered} spend
+  and \emph{raised} violation, monotonically. Diagnosis --- inflating demand
+  also inflates projected tier spend, tripping the per-tenant budget
+  guardrail into its shed fallback (tier=``none'', a designed AI outage),
+  which is both cheap and a total SLO miss. Published as measured; RQ-H1/H2
+  FAIL. The tuned reactive scalers (squares) remain far to the right: every
+  \polyforge{} arm is substantially cheaper at comparable violation.
+  Down-and-left is better.}
+  \label{fig:risk-frontier}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.95\textwidth]{fig19_risk_budget_frontier.pdf}
+  \caption{One changed factor reverses the mechanism. \textbf{(a)} The
+  landscape: every \polyforge{} arm (blue) sits far left of the tuned
+  reactive stack (squares) --- the separation that survives pairing is cost,
+  33--39\% less spend at the declared operating point --- while the corrected
+  frontier now runs downward where the uncorrected null (grey dashes) ran up
+  and to the left. Down-and-left is better. \textbf{(b)} What the quantile
+  buys, as the gates measure it: violation paired against each campaign's
+  own point-forecast arm, 95\% bootstrap CI. The correction flips the sign
+  of the mechanism (blue below zero, grey above), and RB-H1 passes at the
+  pre-declared $q=0.90$ --- but the curve turns back up at $q=0.95$, an
+  interior optimum rather than the monotone frontier RB-H2 required, so no
+  frontier claim is made. Against the reactive arms the violation
+  differences do not separate, so RB-H3's strict domination is not claimed
+  either.}
+  \label{fig:risk-budget-frontier}
 \end{figure}
 
 \section{The v2 pre-registered matrix: an SLO hypothesis fails in public}
@@ -414,6 +569,82 @@ establish: reproduction of the simulator's ranking on the replica-only
 projection at this amplitude. That result is published per the frozen
 protocol, and it is the single strongest argument for the three-knob live
 substrate named in future work (Section~\ref{ch:conclusion}).
+
+\subsection{The three-knob live plane on a rented GPU host: B1, B1$'$, B1$''$}
+\label{sec:eval-live-plane}
+
+That substrate was subsequently rented: one L40S host (8 vCPU, 62 GiB) with
+a real inference tier behind the gateway, so that all three knobs are live
+and every arm is scored on the same four cells (\texttt{ai\_cacheable},
+\texttt{tier\_mixed}, \texttt{crud\_bursty}, \texttt{joint\_stress}) under
+protocols frozen before any number existed.
+
+\textbf{B1} (\evfile{PREREG\_WAVE4\_LIVE\_PLANE.md} $\to$
+\evfile{RESULTS\_WAVE4\_LIVE\_PLANE.md}): the published joint controller
+\emph{lost} its primary reading. In \texttt{joint\_stress} it cost \$0.3651
+against \$0.2960 for the cheapest single-knob arm (tier-only, $+23.3\%$ for
+\jcac{}) at equal fairness --- \textbf{WL-H1 FAIL}, with the knob-liveness
+gate WL-H2 passing in all sixteen windows. Losing to one's own ablation is a
+defect in the optimisation, not a fact about jointness, and the defect was
+found in two parts (an open-loop plant model and a hysteresis ratchet) and
+corrected as an opt-in arm, \texttt{jcac-calibrated}, under a new frozen
+protocol.
+
+\textbf{B1$'$} (\evfile{PREREG\_WAVE4\_CALIBRATED.md} $\to$
+\evfile{RESULTS\_WAVE4\_CALIBRATED.md}; Figure~\ref{fig:calibrated-plane}):
+the corrected controller beats every one of the four comparators on cost at
+iso-fairness in \texttt{joint\_stress}, each with a paired-bootstrap CI
+excluding zero --- \textbf{WL-H1$'$ PASS} (\$0.2650, Jain 1.000); the
+per-cell ablation dominance WL-H4 passes in all four cells. The record also
+prints, beside the win, that the corrected controller oscillates its
+replica count (8--24 replicas in \texttt{tier\_mixed};
+\evfile{CHURN\_WAVE4\_CALIBRATED.md}).
+
+\textbf{B1$''$} (\evfile{PREREG\_WAVE4\_DWELL.md} $\to$
+\evfile{RESULTS\_WAVE4\_DWELL.md}; Figure~\ref{fig:dwell-plane}) tested the
+obvious damper, a three-cycle replica dwell, against the arm it damps. It
+caps the largest single jump but does not halve the churn
+(\textbf{WL-H6 FAIL}), and its cost is not shown non-inferior to the
+calibrated arm's (\textbf{WL-H7 FAIL}; it still beats tier-only by
+$-31.4\%$). The oscillation is a slow swing, not chatter, so the next
+damper must act on the plant-estimate feedback rather than on move
+reversals --- not built, and not pre-registered.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{fig20_calibrated_plane.pdf}
+  \caption{B1$'$ on one L40S host, five arms $\times$ four cells $\times$
+  two reps. Left: total cost per run at iso-fairness (every arm's Jain index
+  is within 0.01 of the calibrated arm's in every cell shown; the record
+  lists the exceptions). Dots are the mean of two reps, ticks the reps.
+  Right: the pre-registered primary reading --- in \texttt{joint\_stress}
+  the calibrated joint controller's cost per 10-s bucket minus each arm's,
+  paired by position within the load window, as a percentage of that arm's
+  mean bucket cost, with the 95\% paired-bootstrap CI (10,000 resamples,
+  seed 20260915); a CI entirely left of zero is a win. Won against
+  \polyforge{} (published), replica-only, cache-only, tier-only.}
+  \label{fig:calibrated-plane}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{fig21_dwell_plane.pdf}
+  \caption{B1$''$ on one L40S host, three arms $\times$ four cells $\times$
+  two reps, scored from the load window only. Left: the replica count every
+  10 s through the \texttt{joint\_stress} window for the dwell-damped
+  controller and the calibrated controller it damps (solid rep 0, dashed
+  rep 1) --- the oscillation is a slow swing, which a dwell on reversals
+  cannot remove. Middle: WL-H6 --- replica-count changes per window in the
+  three AI cells, both controllers; the tick is the pre-registered bound,
+  half the calibrated arm's changes, and the dwell arm must sit left of it:
+  FAIL. Right: WL-H7 --- the dwell arm's cost per 10-s bucket minus each
+  arm's, paired by position within the window, as a percentage of that arm's
+  mean bucket cost, with the 95\% paired-bootstrap CI (10,000 resamples,
+  seed 20260915); the tick on the calibrated row is the $+5\%$
+  non-inferiority bound. Non-inferior to the calibrated arm: not shown;
+  beats tier-only: yes.}
+  \label{fig:dwell-plane}
+\end{figure}
 
 \section{Summary: which number to cite}
 \label{sec:eval-summary}
