@@ -1387,3 +1387,11 @@ Appended by the runner every progress tick.
 | 2026-09-09 10:51 | wave4_jointstress_probe | 1/1 | 1 | 11 runs/h |
 | 2026-09-15 07:47 | wave4_sim_ref | 25/48 | 0 | 12306 runs/h |
 | 2026-09-15 07:47 | wave4_sim_ref | 48/48 | 0 | 15885 runs/h |
+| 2026-09-15 22:49 | wave4_sim_transfer_ai_cacheable | 15/15 | 0 | 11877 runs/h |
+| 2026-09-15 22:49 | wave4_sim_transfer_tier_mixed | 15/15 | 0 | 11621 runs/h |
+| 2026-09-15 22:49 | wave4_sim_transfer_crud_bursty | 15/15 | 0 | 13843 runs/h |
+| 2026-09-15 22:50 | wave4_sim_transfer_joint_stress | 15/15 | 0 | 11432 runs/h |
+| 2026-09-15 22:50 | wave4_sim_transfer_control | 25/60 | 0 | 7453 runs/h |
+| 2026-09-15 22:50 | wave4_sim_transfer_control | 50/60 | 0 | 13191 runs/h |
+| 2026-09-15 22:50 | wave4_sim_transfer_control | 60/60 | 0 | 14515 runs/h |
+| 2026-09-16 04:59 | wave4_dwell_probe | 1/1 | 1 | 7 runs/h |
