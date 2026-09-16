@@ -1,0 +1,536 @@
+{
+  "total_cost_usd": 0.850867,
+  "cost_tier_usd": 0.7826000000000001,
+  "cost_infra_usd": 0.068267,
+  "mean_violation": 0.0002610738839091463,
+  "violation_step_share": 0,
+  "mean_jain": 0.9999998301968772,
+  "cache_hit_rate": 0.2866648436787895,
+  "crud_p95_ms": 1.005823,
+  "ai_p95_ms": 621.695,
+  "crud_p99_ms": 1.012623,
+  "ai_p99_ms": 874.765,
+  "tier_requests": {
+    "small": 7826
+  },
+  "buckets": [
+    {
+      "bucket_start_utc": "2026-09-16T11:56:10Z",
+      "n_events": 208,
+      "crud_p95_ms": 1.006033,
+      "crud_p99_ms": 1.024314,
+      "ai_p95_ms": 636.998,
+      "ai_p99_ms": 799.452,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0098,
+      "tier_requests": {
+        "small": 98
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.011933
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:56:20Z",
+      "n_events": 668,
+      "crud_p95_ms": 1.005773,
+      "crud_p99_ms": 1.007863,
+      "ai_p95_ms": 707.091,
+      "ai_p99_ms": 980.118,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.031400000000000004,
+      "tier_requests": {
+        "small": 314
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.033533
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:56:30Z",
+      "n_events": 673,
+      "crud_p95_ms": 1.005623,
+      "crud_p99_ms": 1.007113,
+      "ai_p95_ms": 636.375,
+      "ai_p99_ms": 858.776,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0298,
+      "tier_requests": {
+        "small": 298
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.031933
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:56:40Z",
+      "n_events": 668,
+      "crud_p95_ms": 1.005753,
+      "crud_p99_ms": 1.008463,
+      "ai_p95_ms": 668.164,
+      "ai_p99_ms": 905.913,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0268,
+      "tier_requests": {
+        "small": 268
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.028933
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:56:50Z",
+      "n_events": 662,
+      "crud_p95_ms": 1.005893,
+      "crud_p99_ms": 1.006833,
+      "ai_p95_ms": 614.051,
+      "ai_p99_ms": 728.06,
+      "mean_violation": 0.0015105740181268882,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.028300000000000002,
+      "tier_requests": {
+        "small": 283
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.030433
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:57:00Z",
+      "n_events": 674,
+      "crud_p95_ms": 1.006113,
+      "crud_p99_ms": 1.089127,
+      "ai_p95_ms": 725.424,
+      "ai_p99_ms": 1043.508,
+      "mean_violation": 0.001483679525222552,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.026000000000000002,
+      "tier_requests": {
+        "small": 260
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.028133
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:57:10Z",
+      "n_events": 676,
+      "crud_p95_ms": 1.005983,
+      "crud_p99_ms": 1.011133,
+      "ai_p95_ms": 644.039,
+      "ai_p99_ms": 950.766,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0258,
+      "tier_requests": {
+        "small": 258
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.027933
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:57:20Z",
+      "n_events": 680,
+      "crud_p95_ms": 1.005483,
+      "crud_p99_ms": 1.006203,
+      "ai_p95_ms": 627.397,
+      "ai_p99_ms": 756.428,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0263,
+      "tier_requests": {
+        "small": 263
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.028433
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:57:30Z",
+      "n_events": 664,
+      "crud_p95_ms": 1.005603,
+      "crud_p99_ms": 1.026504,
+      "ai_p95_ms": 591.376,
+      "ai_p99_ms": 810.119,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.023100000000000002,
+      "tier_requests": {
+        "small": 231
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.025233
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:57:40Z",
+      "n_events": 682,
+      "crud_p95_ms": 1.006143,
+      "crud_p99_ms": 1.012283,
+      "ai_p95_ms": 641.475,
+      "ai_p99_ms": 752.574,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0256,
+      "tier_requests": {
+        "small": 256
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.027733
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:57:50Z",
+      "n_events": 692,
+      "crud_p95_ms": 1.005623,
+      "crud_p99_ms": 1.006613,
+      "ai_p95_ms": 629.254,
+      "ai_p99_ms": 726.709,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0269,
+      "tier_requests": {
+        "small": 269
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.029033
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:58:00Z",
+      "n_events": 705,
+      "crud_p95_ms": 1.005713,
+      "crud_p99_ms": 1.007313,
+      "ai_p95_ms": 686.421,
+      "ai_p99_ms": 901.474,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0244,
+      "tier_requests": {
+        "small": 244
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.026533
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:58:10Z",
+      "n_events": 711,
+      "crud_p95_ms": 1.005763,
+      "crud_p99_ms": 1.006443,
+      "ai_p95_ms": 603.006,
+      "ai_p99_ms": 770.547,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0236,
+      "tier_requests": {
+        "small": 236
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.025733
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:58:20Z",
+      "n_events": 706,
+      "crud_p95_ms": 1.006133,
+      "crud_p99_ms": 1.012493,
+      "ai_p95_ms": 630.897,
+      "ai_p99_ms": 785.409,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0252,
+      "tier_requests": {
+        "small": 252
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.027333
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:58:30Z",
+      "n_events": 709,
+      "crud_p95_ms": 1.006033,
+      "crud_p99_ms": 1.017193,
+      "ai_p95_ms": 633.355,
+      "ai_p99_ms": 1043.602,
+      "mean_violation": 0.0014104372355430183,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0247,
+      "tier_requests": {
+        "small": 247
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.026833
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:58:40Z",
+      "n_events": 720,
+      "crud_p95_ms": 1.005823,
+      "crud_p99_ms": 1.010783,
+      "ai_p95_ms": 570.693,
+      "ai_p99_ms": 764.538,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0241,
+      "tier_requests": {
+        "small": 241
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.026233
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:58:50Z",
+      "n_events": 731,
+      "crud_p95_ms": 1.005572,
+      "crud_p99_ms": 1.006382,
+      "ai_p95_ms": 621.108,
+      "ai_p99_ms": 1160.552,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0246,
+      "tier_requests": {
+        "small": 246
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.026733
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:59:00Z",
+      "n_events": 737,
+      "crud_p95_ms": 1.006252,
+      "crud_p99_ms": 1.030074,
+      "ai_p95_ms": 569.801,
+      "ai_p99_ms": 876.449,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.023100000000000002,
+      "tier_requests": {
+        "small": 231
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.025233
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:59:10Z",
+      "n_events": 749,
+      "crud_p95_ms": 1.005643,
+      "crud_p99_ms": 1.013094,
+      "ai_p95_ms": 593.148,
+      "ai_p99_ms": 1041.502,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.025400000000000002,
+      "tier_requests": {
+        "small": 254
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.027533
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:59:20Z",
+      "n_events": 765,
+      "crud_p95_ms": 1.005863,
+      "crud_p99_ms": 1.010994,
+      "ai_p95_ms": 621.695,
+      "ai_p99_ms": 930.534,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.027100000000000003,
+      "tier_requests": {
+        "small": 271
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.029233
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:59:30Z",
+      "n_events": 774,
+      "crud_p95_ms": 1.005443,
+      "crud_p99_ms": 1.006283,
+      "ai_p95_ms": 608.832,
+      "ai_p99_ms": 1139.494,
+      "mean_violation": 0.0012919896640826874,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0247,
+      "tier_requests": {
+        "small": 247
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.026833
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:59:40Z",
+      "n_events": 774,
+      "crud_p95_ms": 1.005854,
+      "crud_p99_ms": 1.006393,
+      "ai_p95_ms": 570.695,
+      "ai_p99_ms": 794.464,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.023,
+      "tier_requests": {
+        "small": 230
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.025133
+    },
+    {
+      "bucket_start_utc": "2026-09-16T11:59:50Z",
+      "n_events": 787,
+      "crud_p95_ms": 1.005793,
+      "crud_p99_ms": 1.006252,
+      "ai_p95_ms": 603.433,
+      "ai_p99_ms": 872.387,
+      "mean_violation": 0.0012706480304955528,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.023,
+      "tier_requests": {
+        "small": 230
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.025133
+    },
+    {
+      "bucket_start_utc": "2026-09-16T12:00:00Z",
+      "n_events": 798,
+      "crud_p95_ms": 1.006073,
+      "crud_p99_ms": 1.018923,
+      "ai_p95_ms": 690.588,
+      "ai_p99_ms": 1000.28,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0252,
+      "tier_requests": {
+        "small": 252
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.027333
+    },
+    {
+      "bucket_start_utc": "2026-09-16T12:00:10Z",
+      "n_events": 803,
+      "crud_p95_ms": 1.005734,
+      "crud_p99_ms": 1.007323,
+      "ai_p95_ms": 611.095,
+      "ai_p99_ms": 998.172,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0251,
+      "tier_requests": {
+        "small": 251
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.027233
+    },
+    {
+      "bucket_start_utc": "2026-09-16T12:00:20Z",
+      "n_events": 823,
+      "crud_p95_ms": 1.005753,
+      "crud_p99_ms": 1.019624,
+      "ai_p95_ms": 572.858,
+      "ai_p99_ms": 710.578,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.024300000000000002,
+      "tier_requests": {
+        "small": 243
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.026433
+    },
+    {
+      "bucket_start_utc": "2026-09-16T12:00:30Z",
+      "n_events": 823,
+      "crud_p95_ms": 1.005783,
+      "crud_p99_ms": 1.019114,
+      "ai_p95_ms": 606.232,
+      "ai_p99_ms": 735.7,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0263,
+      "tier_requests": {
+        "small": 263
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.028433
+    },
+    {
+      "bucket_start_utc": "2026-09-16T12:00:40Z",
+      "n_events": 824,
+      "crud_p95_ms": 1.005862,
+      "crud_p99_ms": 1.009743,
+      "ai_p95_ms": 572.803,
+      "ai_p99_ms": 733.998,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0217,
+      "tier_requests": {
+        "small": 217
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.023833
+    },
+    {
+      "bucket_start_utc": "2026-09-16T12:00:50Z",
+      "n_events": 825,
+      "crud_p95_ms": 1.005753,
+      "crud_p99_ms": 1.012553,
+      "ai_p95_ms": 648.866,
+      "ai_p99_ms": 924.422,
+      "mean_violation": 0.0012121212121212121,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.025500000000000002,
+      "tier_requests": {
+        "small": 255
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.027633
+    },
+    {
+      "bucket_start_utc": "2026-09-16T12:01:00Z",
+      "n_events": 842,
+      "crud_p95_ms": 1.005943,
+      "crud_p99_ms": 1.032344,
+      "ai_p95_ms": 553.271,
+      "ai_p99_ms": 688.78,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0222,
+      "tier_requests": {
+        "small": 222
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.024333
+    },
+    {
+      "bucket_start_utc": "2026-09-16T12:01:10Z",
+      "n_events": 855,
+      "crud_p95_ms": 1.005933,
+      "crud_p99_ms": 1.045124,
+      "ai_p95_ms": 597.375,
+      "ai_p99_ms": 784.095,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0221,
+      "tier_requests": {
+        "small": 221
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.024233
+    },
+    {
+      "bucket_start_utc": "2026-09-16T12:01:20Z",
+      "n_events": 574,
+      "crud_p95_ms": 1.005813,
+      "crud_p99_ms": 1.007913,
+      "ai_p95_ms": 569.958,
+      "ai_p99_ms": 866.489,
+      "mean_violation": 0,
+      "violation_step_share": 0,
+      "cost_tier_usd": 0.0175,
+      "tier_requests": {
+        "small": 175
+      },
+      "cost_infra_usd": 0.002133,
+      "cost_usd": 0.019633
+    }
+  ],
+  "n_events": 22982,
+  "n_tenants": 8,
+  "generated_at_utc": "2026-09-16T12:01:29Z",
+  "scored_since_utc": "2026-09-16T11:56:13Z",
+  "cost_infra_source_note": "infra component injected via --infra-cost-usd; replica-hours are not visible in-pod",
+  "bucket_seconds": 10
+}

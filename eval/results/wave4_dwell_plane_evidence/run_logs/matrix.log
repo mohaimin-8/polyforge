@@ -1,0 +1,111 @@
+experiment=wave4_dwell_plane backend=cluster total=24 already-valid=0 pending=24 db=/home/ubuntu/polyforge/eval/results/wave4_dwell_plane.duckdb
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 316.4 ms vs large 2392.6 ms (delta 2076.2 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-84aa856ad8be9a3e-d382g5y0/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 255.5 ms vs large 2047.2 ms (delta 1791.7 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-55922bfbbe043645-dx4tmlip/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 194.6 ms vs large 1818.8 ms (delta 1624.2 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-28bea76ba433373f-weauk_k5/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 314.2 ms vs large 2233.6 ms (delta 1919.4 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-45fbd989c6f2dbb6-m2_b3z93/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 190.3 ms vs large 2392.9 ms (delta 2202.6 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-3d6ac5f41de7b0db-6rwz7xbc/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 242.2 ms vs large 2468.8 ms (delta 2226.6 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-09a78f5bb3f46ece-vu6sond1/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 258.9 ms vs large 3588.3 ms (delta 3329.4 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-6c4032e332dd25e1-bbj_jpmq/knob_preflight.json)
+[audit] 256 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 242.6 ms vs large 1906.5 ms (delta 1664.0 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-d16df157565a988b-i06jmvz8/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 263.8 ms vs large 2166.0 ms (delta 1902.2 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-a2d3b655c43948b9-eeh63rvw/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 313.8 ms vs large 2174.5 ms (delta 1860.6 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-5d1c82a244da48d1-h_ra8gze/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 259.4 ms vs large 2082.8 ms (delta 1823.4 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-8063bb76d80a405a-bddvd77k/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 272.4 ms vs large 2147.1 ms (delta 1874.7 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-422f2d4603e586d1-u2qi_1k1/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 251.8 ms vs large 2115.0 ms (delta 1863.2 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-bc84c4bd7a6372e0-ayak75ts/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 280.2 ms vs large 2397.8 ms (delta 2117.6 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-8de54b0318f1a171-p_iiss46/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 225.3 ms vs large 2370.9 ms (delta 2145.6 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-8d875d5b541bba80-4dxog12s/knob_preflight.json)
+[audit] 256 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 209.0 ms vs large 1923.3 ms (delta 1714.3 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-8578d11102a74b24-3rgrl2se/knob_preflight.json)
+[audit] 256 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 197.9 ms vs large 2296.1 ms (delta 2098.3 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-980c07cd81b32902-9uy80wcv/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 338.0 ms vs large 2228.7 ms (delta 1890.7 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-bbe222bd768f62fd-hjqpy7s7/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 247.8 ms vs large 2126.9 ms (delta 1879.1 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-1f771d84654e91b1-0pi5g2e0/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 216.4 ms vs large 1674.4 ms (delta 1458.0 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-eaa5346c7a2a20e6-4qoed4vr/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 306.9 ms vs large 2105.1 ms (delta 1798.2 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-a9ab2611e5869b19-6p3ksc9u/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 256.0 ms vs large 2416.4 ms (delta 2160.5 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-b5bc850144bcf196-l7bcxxng/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 238.0 ms vs large 1903.1 ms (delta 1665.2 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-9520ed87721668d8-1sm8qofd/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+cache knob: hit 1.00 @64MB vs 0.00 @0MB (delta 1.00, margin 0.5) -> LIVE
+tier knob: small 201.0 ms vs large 2408.9 ms (delta 2207.9 ms), routing moved: True -> LIVE
+verdict: WL-H2 PASS (both knobs live)  (report: /tmp/pf-eval-5b06a62de16a33da-a722tcyz/knob_preflight.json)
+[audit] 248 record(s) on the backbone
+  [24/24] not-valid=0 (13984s elapsed)
+{
+  "experiment": "wave4_dwell_plane",
+  "expected_runs": 24,
+  "valid_runs": 24,
+  "failed_runs": 0,
+  "duplicate_run_ids": 0,
+  "orphan_metrics": 0,
+  "valid_without_metrics": 0,
+  "distinct_backends": 1,
+  "distinct_harness_versions": 1,
+  "null_metrics": 0,
+  "ok": true
+}

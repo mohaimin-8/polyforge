@@ -267,6 +267,12 @@ CAMPAIGN_RECORDS = [
     # reps, against a five-arm published-plant control. Rebuilds from the
     # committed export wave4_sim_transfer_runs.csv and the live B1' export.
     ("analysis_wave4_sim_transfer.py", [], "RESULTS_WAVE4_SIM_TRANSFER.md"),
+    # B1'' (PREREG_WAVE4_DWELL): the calibrated arm with a three-cycle replica
+    # dwell, 3 arms x 4 cells x 2 reps, window-scoped export. WL-H6 FAIL (the
+    # dwell does not halve the churn), WL-H7 FAIL (non-inferiority not shown;
+    # still beats tier-only). Rebuilds from wave4_dwell_plane_runs.csv and
+    # wave4_dwell_plane_evidence/runs/.
+    ("analysis_wave4_dwell.py", [], "RESULTS_WAVE4_DWELL.md"),
 ]
 
 CORE_EXPORTS = ["metrics_full.csv.gz", "metrics_ablations.csv.gz",
