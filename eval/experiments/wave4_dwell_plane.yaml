@@ -1,0 +1,28 @@
+# Wave 4 follow-up: the damped joint controller on the live plane (B1'').
+# Pre-registration: research/analysis/PREREG_WAVE4_DWELL.md -- read it
+# before running; this file is only the matrix.
+#
+# 3 arms x 4 cells x 2 reps = 24 runs, one sitting, the runner resumes.
+# jcac-calibrated-dwell is jcac-calibrated with a three-cycle replica dwell
+# (eval/harness/systems.py; the operator chart's planner.replicaDwellSteps);
+# jcac-calibrated is the B1' winner, unchanged; tier-only is the cheapest
+# single-knob arm live.
+#
+# RUN REQUIREMENTS -- live-AI plane, as B1':
+#   POLYFORGE_EVAL_LIVE_AI=1  POLYFORGE_EVAL_SHARED_PG=1
+#   POLYFORGE_EVAL_TIER_BACKENDS='<the line b1_tier_host.sh printed>'
+#   POLYFORGE_EVAL_FINE_BUCKET_SECONDS=10
+# The harness scores the load window only (--since), scrapes the clause-4
+# histogram in-run, and keeps each run's evidence under
+# wave4_dwell_plane_evidence/runs/.
+name: wave4_dwell_plane
+backend: cluster
+steps: 30
+reps: 2
+systems: [jcac-calibrated-dwell, jcac-calibrated, tier-only]
+workloads: [ai_cacheable, tier_mixed, crud_bursty, joint_stress]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/wave4_dwell_plane.duckdb
+retries: 0
+timeseries_reps: 0
