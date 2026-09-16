@@ -39,23 +39,26 @@ version predated the evidence site, the AWS sittings and the caption gate.)
 - A new version (new DOI under the same concept) is needed only if the
       bundle changes — rebuild, upload as *New version*, update the DOI here.
 
-## 4. Evidence site — done, needs the repo public
+## 4. Evidence site — LIVE (2026-09-17)
 
-- `scripts/build_pages.py` renders every record, pre-registration and figure
-  (with its caption) as a static site; `.github/workflows/pages.yml` deploys
-  it. `scripts/test_build_pages.py` fails on a gated record without a page, a
-  dead link, or two builds that differ.
-- [ ] **human:** make the repository public (also unblocks CI minutes), enable
-      GitHub Pages on the workflow, put the URL in the paper.
+- **https://mohaimin-8.github.io/polyforge/** — every record, pre-registration
+  and figure with its caption, rebuilt by `.github/workflows/pages.yml` on
+  every push to main (`PAGES_ENABLED=true`, source: GitHub Actions).
+- [x] Repository public (2026-09-17); CI green on main, 12/12 jobs.
+- [x] `scripts/test_build_pages.py` fails on a gated record without a page, a
+      dead link, or two builds that differ.
 
-## 5. Images and chart — human (GHCR org)
+## 5. Images and chart — built and signed (v1.0.0, 2026-09-17); visibility is the one human step
 
-- [ ] Build and push `ghcr.io/<user>/polyforge-operator` and
-      `ghcr.io/<user>/polyforge-planner` (`release.yml` signs with cosign;
-      align tags with the chart's `appVersion`)
-- [ ] `helm package deploy/helm/polyforge-operator`; host the chart index on
-      the Pages branch; register it on artifacthub.io
-- [ ] Update `deploy/helm/polyforge-operator/values.yaml` if the GHCR org differs
+- [x] Tag `v1.0.0` → `release.yml` built, SBOM'd and cosign-signed
+      `ghcr.io/mohaimin-8/polyforge/{control-plane,ai-gateway,operator,planner}:v1.0.0`;
+      charts `polyforge-operator` 0.3.0 / `polyforge` 0.2.0 point at appVersion 1.0.0.
+- [ ] **human (no API exists for this):** for each of the four packages,
+      github.com/mohaimin-8?tab=packages → package → Package settings →
+      Danger Zone → Change visibility → **Public**. Until then the images are
+      pullable only with a token; the paper does not depend on them.
+- [ ] Optional: `helm package deploy/helm/polyforge-operator`, host the index
+      on Pages, register on artifacthub.io.
 
 ## 6. Live evidence — done
 
