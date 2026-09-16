@@ -124,9 +124,23 @@ def test_malformed_creators_refuse_the_build(tmp_path):
         "unknown field": '[{"name": "Doe, Jane", "email": "x@y"}]',
         "empty": '[]',
         "not a list": '{"name": "Doe, Jane"}',
+        "unknown contributor type": '[{"name": "Doe, Jane"}, {"name": "Roe, Ann", "type": "Boss"}]',
+        "only contributors": '[{"name": "Roe, Ann", "type": "Supervisor"}]',
     }
     for label, text in cases.items():
         f = tmp_path / f"{label}.json"
         f.write_text(text, encoding="utf-8")
         with pytest.raises(SystemExit):
             az.creators(f)
+
+
+def test_a_supervisor_is_a_contributor_not_a_creator(tmp_path):
+    """The supervisor is on the record with the Supervisor role and does not
+    join the citation; the student stays the sole creator."""
+    f = tmp_path / "zenodo_creators.json"
+    f.write_text('[{"name": "Doe, Jane", "affiliation": "RUET"}, '
+                 '{"name": "Roe, Ann", "affiliation": "RUET", "type": "Supervisor"}]', encoding="utf-8")
+    meta = az.deposit_metadata(az.creators(f))["metadata"]
+    assert meta["creators"] == [{"name": "Doe, Jane", "affiliation": "RUET"}]
+    assert meta["contributors"] == [{"name": "Roe, Ann", "affiliation": "RUET", "type": "Supervisor"}]
+    assert "contributors" not in az.deposit_metadata([{"name": "Doe, Jane"}])["metadata"]
