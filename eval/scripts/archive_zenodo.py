@@ -173,7 +173,12 @@ DEPOSIT_METADATA = {
 # the names live in a tracked file and are read at build time, once.
 CREATORS_FILE = EVAL_DIR / "zenodo_creators.json"
 PLACEHOLDER_CREATORS = [{"name": "PolyForge author"}]
-CREATOR_FIELDS = {"name", "affiliation", "orcid"}
+CREATOR_FIELDS = {"name", "affiliation", "orcid", "type"}
+# An entry with a "type" is a Zenodo *contributor* (e.g. "Supervisor"), not a
+# creator: it is listed on the record with that role and does not join the
+# citation. Types are Zenodo's vocabulary; the ones a thesis needs are here.
+CONTRIBUTOR_TYPES = {"Supervisor", "ContactPerson", "DataCollector", "DataCurator",
+                     "Editor", "ProjectLeader", "ProjectMember", "Researcher", "Other"}
 _ORCID = re.compile(r"^[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]$")
 
 
@@ -200,13 +205,23 @@ def creators(path: Path = CREATORS_FILE) -> list[dict]:
         orcid = c.get("orcid")
         if orcid is not None and not _ORCID.match(str(orcid)):
             raise SystemExit(f"{path}: creator {i} orcid {orcid!r} is not 0000-0000-0000-000X")
+        ctype = c.get("type")
+        if ctype is not None and ctype not in CONTRIBUTOR_TYPES:
+            raise SystemExit(f"{path}: creator {i} type {ctype!r} is not one of {sorted(CONTRIBUTOR_TYPES)}")
+    if not any("type" not in c for c in data):
+        raise SystemExit(f"{path}: every entry is a contributor; at least one creator (no 'type') is required")
     return data
 
 
 def deposit_metadata(creator_list: list[dict]) -> dict:
     """DEPOSIT_METADATA with the creators filled in; a new dict, the template
-    is never written to."""
-    return {"metadata": {**DEPOSIT_METADATA["metadata"], "creators": creator_list}}
+    is never written to. Entries carrying a "type" become Zenodo contributors."""
+    creators_only = [c for c in creator_list if "type" not in c]
+    contributors = [c for c in creator_list if "type" in c]
+    meta = {**DEPOSIT_METADATA["metadata"], "creators": creators_only}
+    if contributors:
+        meta["contributors"] = contributors
+    return {"metadata": meta}
 
 
 def sha256(path: Path) -> str:
@@ -312,7 +327,9 @@ def main() -> None:
         print(f"creators: PLACEHOLDER -- write {CREATORS_FILE.relative_to(REPO_DIR).as_posix()} "
               "and rebuild before upload")
     else:
-        print(f"creators: {len(creator_list)} from {CREATORS_FILE.relative_to(REPO_DIR).as_posix()}")
+        n_contrib = sum("type" in c for c in creator_list)
+        print(f"creators: {len(creator_list) - n_contrib} (+{n_contrib} contributor(s)) from "
+              f"{CREATORS_FILE.relative_to(REPO_DIR).as_posix()}")
     print("next (human): create Zenodo deposit, attach the zip, paste deposit.json "
           "metadata, publish -> DOI for paper §Reproducibility")
 
