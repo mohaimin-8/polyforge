@@ -1,0 +1,28 @@
+{
+  "captured_at": "2026-09-16T04:59:24Z",
+  "hostname": "DESKTOP-TAO5U83",
+  "os": "Windows 11",
+  "machine": "AMD64",
+  "cpu_count": 8,
+  "mem_total_gib": null,
+  "gpus": [
+    {
+      "name": "NVIDIA GeForce MX330",
+      "memory_total": "2048 MiB",
+      "memory_used": "0 MiB",
+      "driver": "517.63"
+    }
+  ],
+  "tools": {
+    "docker": "Docker version 29.6.2, build dfc4efb",
+    "kind": "kind version 0.32.0",
+    "k6": "k6.exe v2.1.0 (commit/83a87a41e2, go1.26.4, windows/amd64)",
+    "kubectl": "Client Version: v1.36.1",
+    "helm": "v4.2.3+g43e8b7f"
+  },
+  "env": {
+    "POLYFORGE_EVAL_LIVE_AI": "1",
+    "POLYFORGE_EVAL_SHARED_PG": "1",
+    "POLYFORGE_EVAL_GATEWAY_REPLICAS": null
+  }
+}
