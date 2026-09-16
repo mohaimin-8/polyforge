@@ -24,14 +24,20 @@ version predated the evidence site, the AWS sittings and the caption gate.)
 - `research/analysis/RECORDS_INDEX.md` (generated) enumerates all of them;
   `OSF_REGISTRATION.md` carries the 29 OSF rows.
 
-## 3. Zenodo deposit — human (name + account)
+## 3. Zenodo deposit — done, published 2026-09-17
 
-- [ ] Write `eval/zenodo_creators.json`
-      (`[{"name": "Family, Given", "affiliation": "...", "orcid": "..."}]`)
-- [ ] `cd eval && python scripts/archive_zenodo.py` — rebuilds the bundle
-      (last build 2026-09-16: 1023 files, 49.8 MB, creators PLACEHOLDER)
-- [ ] zenodo.org → New upload → attach the zip → paste `deposit.json` → publish
-- [ ] Put the DOI in the paper's Reproducibility section and in `README.md`
+- [x] `eval/zenodo_creators.json` (author as creator with ORCID
+      0009-0003-3254-9532; supervisor as contributor, role Supervisor)
+- [x] `cd eval && python scripts/archive_zenodo.py` — 1023 files, 49.8 MB,
+      SHA-256 manifest, no placeholder
+- [x] Published: **https://doi.org/10.5281/zenodo.22801196**
+      (Islam, M. M. (2026). PolyForge evaluation artifact: pre-registered
+      controller-comparison campaigns (harness, baselines, raw results,
+      live-run data, IaC) [Dataset]. Zenodo.)
+- [x] DOI in `README.md`, `docs/REPRODUCE.md`, the thesis (traceability
+      appendix, discussion, `references.bib` entry `polyforge2026zenodo`)
+- A new version (new DOI under the same concept) is needed only if the
+      bundle changes — rebuild, upload as *New version*, update the DOI here.
 
 ## 4. Evidence site — done, needs the repo public
 

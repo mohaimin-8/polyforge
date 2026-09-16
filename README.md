@@ -236,6 +236,17 @@ Real datasets (BurstGPT v2.0, gated LMSYS-Chat-1M, Azure LLM inference
 2024) are downloaded, never committed; the ETLs under `research/traces/`
 are the committed artifacts.
 
+**Archived evaluation artifact (DOI):** the raw run databases, every
+pre-registration and record, the live-campaign evidence and the IaC are
+deposited at [https://doi.org/10.5281/zenodo.22801196](https://doi.org/10.5281/zenodo.22801196)
+(Islam, 2026, CC BY 4.0; 1,023 files, SHA-256 manifest). Restoring its
+DuckDB files into `eval/results/` enables the archive tier of
+`docs/REPRODUCE.md`. Cite the dataset as:
+
+> Islam, M. M. (2026). *PolyForge evaluation artifact: pre-registered
+> controller-comparison campaigns (harness, baselines, raw results,
+> live-run data, IaC)* [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.22801196
+
 ## Limitations (honest boundaries)
 
 - **Substrate.** All headline numbers are simulator-backend decision
