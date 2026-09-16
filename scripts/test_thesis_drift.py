@@ -63,9 +63,24 @@ def test_the_azure_pattern_ignores_another_papers_minus_42():
     assert not re.search(pattern, r"service gaps $-42\%$ vs.\ VTC; locality; efficiency)")
 
 
-def test_a_record_the_thesis_cites_is_not_listed_as_uncited():
+def test_uncited_means_named_by_neither_file_nor_hypothesis_tag(tmp_path):
+    """Independent of what the thesis cites today: a document naming a
+    record by its tex-escaped file name excludes it, one naming a hypothesis
+    tag the record carries excludes it, and an empty corpus excludes none."""
+    mod = _mod()
+    records = mod.gate_records()
+    everything = {name for _, name, _ in mod.uncited({}, records)}
+    assert everything == {r.name for r in records}
+    by_file = {tmp_path / "a.tex": r"see \evfile{RESULTS\_V2.md} for the v2 matrix"}
+    assert "RESULTS_V2.md" not in {n for _, n, _ in mod.uncited(by_file, records)}
+    by_tag = {tmp_path / "b.tex": "the damped controller failed WL-H6 and WL-H7"}
+    assert "RESULTS_WAVE4_DWELL.md" not in {n for _, n, _ in mod.uncited(by_tag, records)}
+
+
+def test_the_thesis_cites_the_records_behind_every_figure_it_includes():
     mod = _mod()
     docs = {p: p.read_text(encoding="utf-8", errors="replace") for p in mod.DOCUMENTS if p.exists()}
     names = {name for _, name, _ in mod.uncited(docs, mod.gate_records())}
-    assert "RESULTS_V2.md" not in names and "RESULTS.md" not in names
-    assert "RESULTS_WAVE4_DWELL.md" in names, "B1'' is not in the thesis yet; the check should say so"
+    for record in ("RESULTS.md", "ADVANCED.md", "RESULTS_RISK.md", "RESULTS_RISK_BUDGET.md",
+                   "RESULTS_WAVE4_CALIBRATED.md", "RESULTS_WAVE4_DWELL.md"):
+        assert record not in names, f"a figure from {record} is in the thesis but the record is never cited"
