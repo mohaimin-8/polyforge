@@ -311,9 +311,15 @@ window alone and the preflight's spend is gone from every metric; a new
 pre-registration must say so, because its run-level numbers will not be
 comparable to B1/B1′'s without the offset.
 
-**The next sitting, if one is paid for:** `jcac-calibrated-dwell` (the
-calibrated arm plus a three-cycle replica dwell, `6ca8626`) against the
-five B1′ arms, under its own pre-registration; the plumbing was exercised
+**B1″ (executed 2026-09-16, 24/24 valid, ~2.7 h, ~$6.5):**
+`jcac-calibrated-dwell` (the calibrated arm plus a three-cycle replica
+dwell, `6ca8626`) against `jcac-calibrated` and `tier-only`, under
+`PREREG_WAVE4_DWELL.md`, scored **WL-H6 FAIL, WL-H7 FAIL**
+(`RESULTS_WAVE4_DWELL.md`): the dwell caps the largest jump but does not
+halve the churn, and non-inferiority on cost was not shown. The cycle is a
+long swing, not chatter; the next damper must act on the plant-estimate
+feedback (the offset's fast-up / slow-down learning), not on move reversals.
+Before that sitting the plumbing was exercised
 on the mock (`wave4_dwell_probe.yaml`, NOT EVIDENCE) before any GPU time:
 on a Windows laptop's kind cluster the chart set `--replica-dwell-steps=3`
 on the planner, the planner booted with it and passed WL-H2, and the window

@@ -504,10 +504,10 @@ against by-construction winners; framing documented in `RESULTS.md`), **cache hi
 ## Cross-campaign ground rules
 
 1. Every campaign's protocol was committed and pushed **before** its first run.
-   **28 pre-registration protocols** live in `research/analysis/PREREG_*.md`, and
+   **29 pre-registration protocols** live in `research/analysis/PREREG_*.md`, and
    `OSF_REGISTRATION.md` carries a row per protocol with its verified anchor commit
    and authored timestamp (`git log --diff-filter=A`), so the count is auditable
-   rather than asserted: **23 pushed under the prospective-OSF commitment** and **5
+   rather than asserted: **24 pushed under the prospective-OSF commitment** and **5
    prior-campaign protocols** (PREREG_V2, V3, VTC, TRACE, TRACE2) that predate that
    commitment and remain git-anchored only — disclosed in DEFENSE_QA #17. The
    GPU-gated one, PREREG_WAVE4_LIVE_PLANE, was executed on a rented L40S host on
@@ -517,11 +517,11 @@ against by-construction winners; framing documented in `RESULTS.md`), **cache hi
    became a 27th protocol, PREREG_WAVE4_CALIBRATED (`6b2de57`), one changed factor,
    whose sitting the same day scored **WL-H1′ PASS** (RESULTS_WAVE4_CALIBRATED.md:
    the corrected controller beats every arm in joint_stress with paired-bootstrap
-   CIs below zero; four dated amendments sit after its registered text). Its evidence then fitted the simulator's plant under a 28th, frozen rule — PREREG_WAVE4_SIM_TRANSFER (`10febd3`) — and the fitted simulator's cost winner matched live in 3 of 4 cells where the published plant matched 1 (RESULTS_WAVE4_SIM_TRANSFER.md: WL-H3′ PASS; in `joint_stress` the ranking is live's, arm for arm). The two
+   CIs below zero; four dated amendments sit after its registered text). Its evidence then fitted the simulator's plant under a 28th, frozen rule — PREREG_WAVE4_SIM_TRANSFER (`10febd3`) — and the fitted simulator's cost winner matched live in 3 of 4 cells where the published plant matched 1 (RESULTS_WAVE4_SIM_TRANSFER.md: WL-H3′ PASS; in `joint_stress` the ranking is live's, arm for arm). A 29th, PREREG_WAVE4_DWELL (`34ea69d`), tested a three-cycle replica dwell as the damper for the corrected controller's replica oscillation and scored **WL-H6 FAIL, WL-H7 FAIL** (RESULTS_WAVE4_DWELL.md): the cycle is a long swing, not chatter, and a reversal ban does not damp it — a negative result, reported as scored. The two
    live protocols PREREG_WIRE_ATTACK and PREREG_LIVE_CHAOS_P99 were pushed before
    any live number existed and have since been executed. The v1 gate and Phase 4 acceptance are
    frozen separately in the roadmap/V2_README.
-   **Four of the 28 are follow-ups in the same discipline** — a new pre-registration
+   **Five of the 29 are follow-ups in the same discipline** — a new pre-registration
    testing exactly *one changed factor* identified by a published null's own
    diagnosis, never a silent re-run of the null: PREREG_PLANNER_CELLS_DEALIAS
    (the whale/cell-count aliasing confound in PLANNER_CELLS) and PREREG_RISK_BUDGET
