@@ -2,5 +2,5 @@ apiVersion: v2
 name: polyforge
 description: PolyForge control-plane — multi-tenant AI workload control plane (thesis W10 chart)
 type: application
-version: 0.1.0
-appVersion: "0.9.0"
+version: 0.2.0
+appVersion: "1.0.0"
