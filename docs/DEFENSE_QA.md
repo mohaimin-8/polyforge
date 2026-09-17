@@ -246,7 +246,7 @@ the advantage is not an 8-tenant artifact — and portfolio fairness holds
 ## 14. "Your live ordinal check disagreed with the simulator."
 
 It did, and it is published as measured (`PHASE7_ORDINAL.md`, protocol
-frozen at 650ce29 before any live number existed): the J winner flips in
+frozen at f0157cd before any live number existed): the J winner flips in
 both cells. The content of the disagreement matters: live, the two arms
 land at *parity* on every metric — J separations of 0.002 with overlapping
 rep ranges, violations zero for both arms in both cells — while the sim
@@ -285,7 +285,7 @@ the point is that measured serving ratios are far flatter than the
 the grid that was tested, and the analysis below therefore never evaluated
 the true hardware ratio. That is being closed under a new pre-registration
 with exactly one changed factor, not by re-running a frozen grid. Two closures, pre-registered before either
-ran (`PREREG_TIER_RATIO.md`, pushed at 7deb6a3): the *accounting* reading
+ran (`PREREG_TIER_RATIO.md`, pushed at d34a9ce): the *accounting* reading
 (`BREAKEVEN_TIER.md`, decisions frozen, exact re-pricing over 60 price
 vectors) finds no aggregate cost win reversed anywhere in the grid; the
 *decision* reading (`RESULTS_TIER_RATIO.md`, the full 1,800-run headline
@@ -303,7 +303,7 @@ The congestion fit (a=0.86) errs against PolyForge's lean postures; the
 assumed cache curve erred *for* the in-matrix cache benefit (measured h(K):
 hmax 0.285 vs the assumed 0.85 — `SEMANTIC_CACHE.md`). Both directions are
 documented, and the second is now quantified rather than conceded. The named
-closure ran: `PREREG_HK_ADOPTION.md` (pushed at 7deb6a3), the full 1,800-run
+closure ran: `PREREG_HK_ADOPTION.md` (pushed at d34a9ce), the full 1,800-run
 headline matrix rerun under the *measured* curve — pessimistic for every
 cache-using system, ours included (`RESULTS_HK_ADOPTION.md`). Effect as
 expected and as measured: realized cache hit rate halves (jcac 0.106 → 0.051),
@@ -336,7 +336,7 @@ Yes — BurstGPT and the Azure workloads are aggregate demand streams, not
 per-tenant SaaS series. "The winner tracks each stream's measured
 periodicity" supports per-tenant forecasting by extrapolation across one
 aggregation level, and the thesis says so. That extrapolation is now
-measured one level down (`PREREG_PSEUDO_TENANT.md` pushed at 7deb6a3,
+measured one level down (`PREREG_PSEUDO_TENANT.md` pushed at d34a9ce,
 `PSEUDO_TENANT.md`): the same traces split by Model × Log Type into 19
 qualifying sub-streams, driven through the identical frozen forecast
 protocol. The boundary reproduces with **zero counterexamples** — no weakly
@@ -352,7 +352,7 @@ two. True per-tenant SaaS series remain unavailable and that limit stands.
 
 Both boundaries are now addressed — one measured in sim, both live halves
 pre-registered with the desk work landed. Failure injection: the sim chaos
-campaign ran (`PREREG_CHAOS_SIM.md` at 7deb6a3, `RESULTS_CHAOS_SIM.md`,
+campaign ran (`PREREG_CHAOS_SIM.md` at d34a9ce, `RESULTS_CHAOS_SIM.md`,
 540/540) — planner-outage and replica-kill injected into the scoring engine,
 controllers blind. A dead planner for one minute still beats a *healthy* HPA
 (CH-H1 PASS, dz −1.69); under an identical 50% replica kill jcac keeps its J
@@ -398,7 +398,7 @@ rather than the question deflected.*
 
 This is the deepest question in the defense, and "we scoped it out" is not the
 answer. The disagreement is real, pre-registered, and published
-(`PHASE7_ORDINAL.md`, protocol frozen at 650ce29 before any live number
+(`PHASE7_ORDINAL.md`, protocol frozen at f0157cd before any live number
 existed): the simulator's J winner flips in both cells. What earns the
 simulator its remaining credibility is the *direction and mechanism* of the
 flip, not a hand-wave past it.
@@ -691,7 +691,7 @@ failed the per-tenant budget filter, and the controller took its designed
 shed fallback (`tier="none"` — an AI outage). **The knob was fighting the
 Budget CRD, not the demand.**
 
-`PREREG_RISK_BUDGET` (campaign 20, pushed at 701d29b before any run) tested
+`PREREG_RISK_BUDGET` (campaign 20, pushed at 7595819 before any run) tested
 exactly **one changed factor**: size capacity at the risk quantile, but
 project cost and check the budget at the *point* forecast — you are billed
 for demand that arrives, not demand you provisioned against. As measured over

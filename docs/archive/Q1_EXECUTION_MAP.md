@@ -40,11 +40,11 @@ task, report, do not improvise.**
   never mix substrates or pool samples.
 - **R8** Thesis/manuscript prose is author-owned. The desk does engineering only.
 
-## T0 — commit session-31 security work ✅ DONE (acec891, pushed)
+## T0 — commit session-31 security work ✅ DONE (9431553, pushed)
 
 ## Phase 1 — artifact integrity ✅ DONE (session 32)
 
-### T1 — CSV fallback loaders ✅ DONE (654a765)
+### T1 — CSV fallback loaders ✅ DONE (0d012d4)
 Delivered wider than specified. Findings that changed the plan:
 
 * **The map said 7 scripts; the real split was different.** Five share one
@@ -67,7 +67,7 @@ Delivered wider than specified. Findings that changed the plan:
   the DuckDB was present when the question is whether the data is loadable;
   now `runs_available()`.
 
-### T2 — reproduce.py covers everything ✅ DONE (654a765)
+### T2 — reproduce.py covers everything ✅ DONE (0d012d4)
 **16/16 records byte-identical, 19/19 figures, on a tree with zero DuckDBs**
 (the map's "20/20" counted campaigns, not records; 16 is the true corpus).
 Two defects found while verifying:
@@ -81,7 +81,7 @@ Two defects found while verifying:
   overwritten the frozen record it was meant to be diffed against. All now
   go through `stats.record_path()`.
 
-### T3 — controller invariant property tests ✅ DONE (3fc418c)
+### T3 — controller invariant property tests ✅ DONE (608eb5b)
 `research/jcac_sim/test_invariants.py`, 9 tests, 192 total pass.
 **Lesson worth carrying:** the first draft derived `MAX_REPLICA_STEP` from
 `DELTA_REPLICAS`, which made the tests tautological — mutating the lattice
@@ -172,7 +172,7 @@ new RESULTS file; reconcile `RESULTS_MASTER.md`, `DEFENSE_QA.md`,
 `REMAINING_WORK.md`. Never edit the prereg (R1).
 DONE-WHEN: RESULTS committed + ledgers reconciled.
 
-## Phase 3 — ship planning cells ✅ DONE (session 33, 99a2d5e)
+## Phase 3 — ship planning cells ✅ DONE (session 33, 81dd3d5)
 
 Done ahead of T4 (user opened the gate). **T5/T6/T7 all complete.** Findings:
 
@@ -280,7 +280,7 @@ R5 + R6 mandatory.
 ## Order summary
 
 **Done:** T0–T3 (Phase 0 security + Phase 1 artifact integrity), pushed
-through 3fc418c.
+through 608eb5b.
 
 **Next:** T4 (B1). The $20-60 gate is gone -- `docs/WAVE4_FREE_ROUTE.md`
 runs it at $0 on Kaggle + Codespaces, and T4a checks the path is good enough

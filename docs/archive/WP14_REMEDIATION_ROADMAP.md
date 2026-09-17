@@ -297,7 +297,7 @@ Roles granting `pods: get/list/watch`, so the apiserver rejected every one —
 deployment**. Fixed in both shipped manifests, rules extracted to
 `TenantRoleRules()`, invariant pinned by
 `TestOperatorClusterRoleCoversTenantRoleRules`, verified RED before GREEN.
-**Complete (`e25314f`).**
+**Complete (`908cd0d`).**
 
 ### 4.2 Policy status write contention
 

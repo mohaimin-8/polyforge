@@ -60,7 +60,7 @@ import sys
 from pathlib import Path
 
 # The one campaign whose prereg carries no independent anchor, named here
-# rather than left for a reader to find. Commit ec7a230 added, in a single
+# rather than left for a reader to find. Commit 33bd83c added, in a single
 # commit: the experiment config, the metrics export, PREREG_EVICTION_PARITY.md
 # and RESULTS_EVICTION_PARITY.md. The prereg was therefore not pushed before
 # that campaign ran, and for this one result the freeze rests on the document
@@ -97,7 +97,7 @@ RECORD_FOR = {
 NO_RECORD = {
     "PREREG_VIOLATION_PARITY":
         "premise falsified before the ladder ran: the frozen beta ladder is "
-        "inert (mean_excess 4.8319 -> 4.8314 across a 32x increase, f045e68). "
+        "inert (mean_excess 4.8319 -> 4.8314 across a 32x increase, b184aee). "
         "The prereg stays frozen and PREREG_BUDGET_PARITY discloses that its "
         "ladder is not run.",
     "PREREG_LIVE_SOAK_V6":
@@ -108,7 +108,7 @@ NO_RECORD = {
 
 DISCLOSED = {
     "PREREG_EVICTION_PARITY":
-        "committed in the same commit (ec7a230) as its own record and data; "
+        "committed in the same commit (33bd83c) as its own record and data; "
         "no independent timestamp anchor for this campaign",
 }
 

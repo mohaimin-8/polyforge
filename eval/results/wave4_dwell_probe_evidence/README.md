@@ -14,4 +14,4 @@ planner booted with it beside `--headroom-calibration`, `--headroom-cap=4.0`
 and `--switch-penalty=0.006667`, and the WL-H2 knob-liveness gate PASSED
 under that controller (`runs/*/knob_preflight.json`). That is the path
 `PREREG_WAVE4_DWELL.md` relies on, exercised before any GPU time. The
-sampler-coverage failure led to the wall-clock cadence fix (`71d6ea7`).
+sampler-coverage failure led to the wall-clock cadence fix (`48efa40`).

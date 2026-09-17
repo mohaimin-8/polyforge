@@ -8,7 +8,7 @@ Five executions of `eval/experiments/wave4_jointstress_probe.yaml` against
 follower on the gateway pod's log. **Nothing here measures PolyForge on a
 real substrate** — the tier delays are the mock's fixed sleeps — and no
 scored record derives from it. It is kept because it is the raw proof
-behind commit `4e499ef`, which changed what B1 needs.
+behind commit `87bc889`, which changed what B1 needs.
 
 | rung | change since previous rung | requests | failed | status codes |
 |---|---|---|---|---|
