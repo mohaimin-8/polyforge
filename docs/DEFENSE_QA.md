@@ -326,7 +326,7 @@ in full. The named upgrade is now in motion: `OSF_REGISTRATION.md` is the
 registry-ready mirror index, carrying every Wave 2/3 protocol with its git
 push anchor (commit + ISO timestamp) so an OSF registration is a
 transcription, not a re-derivation. Submitting to OSF needs a browser and an
-account and is the one human step, flagged there exactly as the Zenodo/GHCR
+account and is the one manual step, flagged there exactly as the Zenodo/GHCR
 items are in `docs/RELEASE_CHECKLIST.md`; until each DOI lands the git anchor
 stands and is independently checkable.
 

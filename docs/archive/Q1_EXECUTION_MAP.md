@@ -8,13 +8,13 @@
 > strengthener); **T18 energy/admission** added (optional); the **leakage-budget
 > controller is spun off to a separate project** (TDSC) and is NOT a task here.
 
-Purpose: every remaining weakness, as executable steps. Written so any agent
+Purpose: every remaining weakness, as executable steps. Written so anyone
 can follow it without re-deriving context. Rationale lives in
 `docs/archive/Q1_ROADMAP.md` (v2); this file is the *what to do*. No submission is
 guaranteed acceptance; completing ALL tasks (incl. Phase 4) before
 submitting to FGCS/TCC/TSC (formal Q1 / Transactions) maximizes the probability.
 
-Execute tasks in ID order. `[GATE:user]` tasks wait for the user; skip and
+Execute tasks in ID order. `[GATE:author]` tasks wait for the author; skip and
 continue. Each task: DO → VERIFY → DONE-WHEN. **If VERIFY fails: stop that
 task, report, do not improvise.**
 
@@ -38,7 +38,7 @@ task, report, do not improvise.**
   chart's generated token as `POLYFORGE_PLANNER_TOKEN` in the harness env.
 - **R7** Cite numbers only per `RESULTS_MASTER.md` §"Which number to cite";
   never mix substrates or pool samples.
-- **R8** Thesis/manuscript prose is user-owned. Agents do engineering only.
+- **R8** Thesis/manuscript prose is author-owned. The desk does engineering only.
 
 ## T0 — commit session-31 security work ✅ DONE (acec891, pushed)
 
@@ -219,7 +219,7 @@ numbers committed.
 ### T7 — honest scoping docs
 DO: one paragraph each in `values.yaml` comment + `ARCHITECTURE.md`:
 fairness under cells is **per-cell, not global** (measured cost ΔJain
-−0.0053, `PLANNER_CELLS_DEALIAS.md`). Flag for the user's manuscript text.
+−0.0053, `PLANNER_CELLS_DEALIAS.md`). Flag for the author's manuscript text.
 
 ## Phase 3.5 — Transactions strengtheners (desk, parallel; added 2026-08-05)
 
@@ -239,7 +239,7 @@ VERIFY: checker + validation green on all campaigns; **mutation-test the
 checker** (widen the disturbance bound ⇒ recursive-feasibility must fail, per
 the T3 lesson); R3/R4 green; default OFF/no-op (bit-identical).
 DONE-WHEN: bound derived, checker committed, validation green, `DEFENSE_QA`
-entry recorded. Theorem/proof PROSE is user-owned (R8).
+entry recorded. Theorem/proof PROSE is author-owned (R8).
 RISK: must be a real proof, not a heuristic — the accept-vs-major-revision
 line. If the terminal set can't be built cleanly over the actual lattice,
 report the obstruction; do not paper over it.
@@ -284,13 +284,13 @@ through 3fc418c.
 
 **Next:** T4 (B1). The $20-60 gate is gone -- `docs/WAVE4_FREE_ROUTE.md`
 runs it at $0 on Kaggle + Codespaces, and T4a checks the path is good enough
-before any GPU hour is spent. Run it the moment the user has an hour free — it preempts everything,
+before any GPU hour is spent. Run it the moment the author has an hour free — it preempts everything,
 because T5 modifies the operator→planner path B1's frozen WL-H2 preflight
 was verified against. If the gate stays shut, T5–T7 can proceed first, but
 then re-run the WL-H2 preflight before T4.
 
 Then T8–T10 if maximum acceptance probability is wanted (Track B).
-T11–T16 run on the user's clock in parallel and none of them block T4–T10.
+T11–T16 run on the author's clock in parallel and none of them block T4–T10.
 **T17 (formal guarantee) runs in parallel with everything** — it is the primary
 Transactions/TPDS strengthener and touches only `research/jcac_sim/`. T18
 optional.

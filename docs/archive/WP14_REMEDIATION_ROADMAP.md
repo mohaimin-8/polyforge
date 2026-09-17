@@ -144,7 +144,7 @@ path. The end-of-run capture lost that race and hours 17–24 are gone forever.
   name and the command to remove it manually. Default stays delete-on-exit so
   CI does not leak clusters.
 - Set it for every soak. Delete the cluster **after** the record is generated
-  and the reproduction gate passes, as an explicit human step.
+  and the reproduction gate passes, as an explicit manual step.
 - With 2.1 landed this is belt-and-braces rather than load-bearing, which is
   the right relationship to have with a teardown race.
 

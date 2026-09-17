@@ -100,7 +100,7 @@ project's security posture was already strong; these were the real gaps.
 
 ---
 
-## Phase 1 — Artifact integrity (agent; ~3 sessions; no gate)
+## Phase 1 — Artifact integrity (desk; ~3 sessions; no gate)
 
 Journals award reproducibility badges rather than run conference-style
 artifact tracks, but the real consumers — referees who clone the repo, and
@@ -119,7 +119,7 @@ dependencies: do it first.
 
 ---
 
-## Phase 2 — B1, the live three-knob plane (USER-GATED; open the gate early; ~1 GPU day + 2 agent sessions)
+## Phase 2 — B1, the live three-knob plane (AUTHOR-GATED; open the gate early; ~1 GPU day + 2 desk sessions)
 
 The single highest-value item in the entire project, **moved ahead of cell
 sharding in v2** for three reasons:
@@ -155,7 +155,7 @@ between "we simulate a joint controller" and "we built one and it works."
 
 ---
 
-## Phase 3 — Ship planning cells (agent; ~4–5 sessions; no gate; required for Track B, strengthening for Track A)
+## Phase 3 — Ship planning cells (desk; ~4–5 sessions; no gate; required for Track B, strengthening for Track A)
 
 The paper will claim planning cells scale the controller to 1024 tenants.
 The shipped operator has no cell logic at all. A reviewer who runs the
@@ -177,7 +177,7 @@ required.
 
 ---
 
-## Phase 4 — Multi-node live validation (USER-GATED; Track B's gate; ~2 weeks + €50–150)
+## Phase 4 — Multi-node live validation (AUTHOR-GATED; Track B's gate; ~2 weeks + €50–150)
 
 Phases 0–3 produce a strong, defensible **Track A** submission. Phase 4 is
 what makes **Track B** genuinely likely rather than a coin flip — "we ran
@@ -195,9 +195,9 @@ manuscript instead.
 
 ---
 
-## Phase 5 — Manuscript and submission mechanics (USER-OWNED)
+## Phase 5 — Manuscript and submission mechanics (AUTHOR-OWNED)
 
-Writing is explicitly outside the agent's scope. Listed for completeness and
+Writing is explicitly outside this plan's scope. Listed for completeness and
 sequencing only.
 
 | Item | Owner | Notes |
@@ -221,10 +221,10 @@ Two clocks run here, and conflating them is how people end up disappointed.
 | Phase | Owner | Elapsed |
 |---|---|---|
 | 0. Security | ✅ done | — |
-| 1. Artifact integrity | agent | ~1 week |
-| 2. B1 live plane | user gate + agent | ~1 week once the gate opens (overlaps Phase 1) |
-| 3. Planning cells shipped | agent | ~2 weeks |
-| 4. Multi-node validation | user gate + agent | ~2 weeks |
+| 1. Artifact integrity | desk | ~1 week |
+| 2. B1 live plane | author gate + desk | ~1 week once the gate opens (overlaps Phase 1) |
+| 3. Planning cells shipped | desk | ~2 weeks |
+| 4. Multi-node validation | author gate + desk | ~2 weeks |
 | 5. Manuscript + mechanics | user | ~4–6 weeks |
 
 - **Track A minimum path (FGCS/TCC/TSC):** Phases 0–2 + 5, with Phase 3 if

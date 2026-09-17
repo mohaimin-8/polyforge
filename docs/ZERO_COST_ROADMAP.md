@@ -273,7 +273,7 @@ headlines the limitations and is **not re-run, re-tuned, or widened.**
 |---|---|---|
 | 5a | Commit the `archive_zenodo.py` fix + attempt-10 evidence | fix done session 42, uncommitted |
 | 5b | Zenodo bundle | **built and verified** — 404 files, 41 preregs, all records, manifest consistent. User publishes -> DOI |
-| 5c | GHCR images + Helm chart (Track B2) | agent builds; user pushes with their token |
+| 5c | GHCR images + Helm chart (Track B2) | built at the desk; pushed with the author's token |
 | 5d | Coverage 60% -> 70%+ | `internal/operator/controllers` conflict paths are envtest-only |
 | 5e | WP10 stats family decision | RB-H1 p=0.0073 survives Holm in its own 6-family (0.00833), fails against all 48 (0.00104). Author declares the family |
 | 5f | Fold session-41/42 corrections into `PUBLICATION_ROADMAP.md` §6 | mechanical |

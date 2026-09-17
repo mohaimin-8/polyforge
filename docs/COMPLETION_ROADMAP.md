@@ -1,7 +1,7 @@
 # Completion roadmap — the two tracks that are not the thesis
 
 Written 2026-08-30 (session 41), after WP14 closed and WP8b ran.
-**Scope: everything that is not WP9–11 (the writing, user-owned).**
+**Scope: everything that is not WP9–11 (the writing, author-owned).**
 
 `docs/PUBLICATION_ROADMAP.md` remains the source of truth for what has been
 done and why. This document covers only what is left, and it is written to be
@@ -18,7 +18,7 @@ All sixteen work packages have run and returned a verdict. The R4 gate passes
 | **A** | B1 unscored — **WL-H2 now PASSES**; the knobs are live | substrate THROUGHPUT (a free P100 serialises generation) |
 | **B** | Reproducibility + comparator gaps for a Q1 venue | mostly accounts, one open design question |
 
-Track A is engineering and is fully agent-executable up to the re-sit.
+Track A is engineering and is fully desk-executable up to the re-sit.
 Track B is mostly account actions with a small amount of engineering.
 
 ---
@@ -168,14 +168,14 @@ false pass.
 
 ## Track B — the Q1 gaps that are not B1
 
-`docs/RELEASE_CHECKLIST.md` already enumerates the human-action items. This
+`docs/RELEASE_CHECKLIST.md` already enumerates the manual items. This
 track adds only what is needed for a Q1 submission and says who can do each.
 
-### B1. Zenodo deposit — **agent prepares, user publishes**
+### B1. Zenodo deposit — **prepared at the desk; publishing needs the author's account**
 
 Tooling exists: `eval/scripts/archive_zenodo.py`.
 
-1. *(agent)* `cd eval && python scripts/archive_zenodo.py` → bundle, manifest
+1. *(desk)* `cd eval && python scripts/archive_zenodo.py` → bundle, manifest
    and `deposit.json` land in `eval/results/zenodo/`. Verify the bundle
    actually contains the records and figures the paper cites.
 2. *(user)* zenodo.org → New upload → attach the zip → paste metadata from
@@ -184,10 +184,10 @@ Tooling exists: `eval/scripts/archive_zenodo.py`.
 **Done when:** a DOI exists and is quoted in the paper's Reproducibility
 section. **Blocked on:** a Zenodo account. Nothing else.
 
-### B2. Container images + Helm chart — **agent builds, user pushes**
+### B2. Container images + Helm chart — **built at the desk; pushing needs the author's token**
 
-Steps 2 and 3 of `RELEASE_CHECKLIST.md`. The agent can build and package
-locally; pushing to GHCR and registering on Artifact Hub needs the user's
+Steps 2 and 3 of `RELEASE_CHECKLIST.md`. The images and charts can be built and packaged
+locally; pushing to GHCR and registering on Artifact Hub needs the author's
 account and tokens.
 
 **Done when:** `helm install polyforge-operator polyforge/polyforge-operator`
@@ -264,7 +264,7 @@ conclusion.
 
 1. **A1–A2** — diagnose and fix the tier pin. No GPU, no accounts, highest
    value: it is the only thing between the project and a scored B1.
-2. **B1** — the Zenodo bundle. Agent-preparable today; the user's part is
+2. **B1** — the Zenodo bundle. Preparable at the desk today; the author's part is
    ten minutes.
 3. **A3–A5** — re-sit B1 once the fix is tested.
 4. **B4** — scope the Azure gap (may close for free).

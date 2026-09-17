@@ -8,7 +8,7 @@ pushed before its first run** (or, for the deferred live protocols, before
 any live number exists); the git push is the primary timestamp anchor and
 the OSF registration is the independent secondary witness.
 
-## USER ACTION REQUIRED (the one human step)
+## AUTHOR ACTION REQUIRED (the one manual step)
 
 OSF registration needs an account and a browser; it cannot be scripted from
 here. To register:
@@ -24,8 +24,8 @@ here. To register:
    resulting OSF DOI back into the "OSF DOI" column here and into the thesis
    reproducibility section. Until then the git anchor stands.
 
-This is the only item in Wave 1–4 that the agent cannot complete; it is
-listed for the user exactly as the Zenodo/GHCR/video items are in
+This is the only item in Wave 1–4 that cannot be completed from the desk; it is
+listed for the author exactly as the Zenodo/GHCR/video items are in
 `docs/RELEASE_CHECKLIST.md`.
 
 ## Registry rows (git anchor is authoritative until an OSF DOI exists)
