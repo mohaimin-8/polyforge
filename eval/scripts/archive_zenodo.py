@@ -82,6 +82,12 @@ REPO_INCLUDE = [
     # and fixed the identical glob in build_pages.py; this file had it too.
     "research/analysis/PREREG_*.md",
     "docs/REPRODUCE.md",
+    # The commit hashes the pre-registrations and records cite are anchors
+    # into the repository history. That history was rewritten once
+    # (message-only, 2026-09-17); the map resolves every old hash to its
+    # current one, so a reader of the deposit can follow the anchors.
+    "docs/COMMIT_MAP.md",
+    "docs/commit-map.txt",
     # RESULTS_SEPARATION_MT_V3.md reads its expensive rows from this artifact
     # (the 268,435,456-vector walk is ~2 h and cannot live in the gate). Ship it
     # or the deposit carries a record nobody can regenerate -- the same defect
