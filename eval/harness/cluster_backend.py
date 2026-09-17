@@ -13,13 +13,15 @@ it (retry, then `failed`). Requires Docker, kind, kubectl, helm, and k6 on
 PATH; `preflight()` reports exactly what is missing instead of crashing
 mid-provision.
 
-Status: VERIFIED live for the hpa arm (session 16d, GitHub Codespace):
-phase7_smoke.yaml recorded a valid run with metrics matching the replay
-endpoint's physics. The jcac arm is wired in code (session 17: operator
-chart install, Tenant/Policy/Budget CRs, admin-key demand plumbing, and a
-`kubectl wait --for=condition=Applied` actuation gate before any load) but
-has NOT run live yet — phase7_jcac_smoke.yaml is the first thing the next
-cluster session should execute.
+Status: VERIFIED live for both arms. hpa: phase7_smoke.yaml (session
+16d, GitHub Codespace) recorded a valid run with metrics matching the
+replay endpoint's physics. jcac: phase7_jcac_smoke.yaml passed first try and
+the 12/12 phase-7 slice ran to PHASE7_ORDINAL.md (session 22, ordinal
+verdict DISAGREE, published as measured); since then this backend has
+carried the 24 h soak (RESULTS_LIVE_SOAK_V8.md), the multi-node and
+trace-live sittings, and the three-knob live plane B1/B1'/B1'' on a
+rented L40S host (RESULTS_WAVE4_LIVE_PLANE.md, _CALIBRATED.md,
+_DWELL.md) -- see docs/WAVE4_RENTED_HOST_RUNBOOK.md.
 """
 
 from __future__ import annotations
