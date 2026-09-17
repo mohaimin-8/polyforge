@@ -626,11 +626,15 @@ run whose slowest tier exceeds 2500 ms and `mid` measures 2310 ms pinned
 pushes `mid` to 3285 ms at batch 32. **No batch size satisfies both gates** —
 see `WAVE4_FREE_ROUTE.md` and `TIER_BENCH.md`.
 
-So the three are: **rent a GPU host for B1** (~$5–15; substrate, pre-run
-amendment and runbook are prepped and committed — `WAVE4_RENTED_HOST_RUNBOOK.md`,
-`scripts/b1_tier_host.sh`), **publish the Zenodo bundle**, and **make the GHCR
-packages public / set `PAGES_ENABLED=true`** if the supplement should be
-reachable.
+So the three were: rent a GPU host for B1, publish the Zenodo bundle, and
+make the supplement reachable. **All three are DONE (status 2026-09-17):**
+B1 ran on a rented g6e.2xlarge on 2026-09-15 and is scored
+(`RESULTS_WAVE4_LIVE_PLANE.md`, WL-H1 FAIL), followed by B1'
+(`RESULTS_WAVE4_CALIBRATED.md`, WL-H1' PASS) and B1'' (`RESULTS_WAVE4_DWELL.md`,
+WL-H6/H7 FAIL); the Zenodo deposit is published (DOI 10.5281/zenodo.22801196);
+the repository is public, CI is green, and the evidence site is live at
+https://mohaimin-8.github.io/polyforge/ (`PAGES_ENABLED=true`). Only the GHCR
+package visibility (a UI click) and the OSF upload remain, both user-gated.
 
 Rationale: the four desk items at the top need no external resource and two of
 them (T1, M3) can produce *positive* results. L3 is the cheapest thing that
