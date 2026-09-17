@@ -3,8 +3,7 @@
 **Status: Phases 0–5 + 8 complete (2026-07-11, sessions 12–13); Phases 6–7 and the
 real-dataset halves of Phase 3 remain (need free GPU / HF token / Docker VM).**
 Drafted 2026-07-11. This document is the working README for the post-roadmap v2 phase;
-it extends (does not replace) `docs/EXECUTION_PLAN.md` and the W47 baseline in
-`docs/THESIS_DETAILS.html`.
+it extends (does not replace) `docs/EXECUTION_PLAN.md`.
 
 ## Why v2
 
@@ -231,7 +230,7 @@ model GPT-3.5/4, request/response tokens).
 ## Out of scope for v2
 
 Production-scale evaluation, formal scheduling-theory bounds beyond Phase 8,
-paper/thesis prose (explicitly user-owned), and any modification to committed v1
+paper/thesis prose (explicitly author-owned), and any modification to committed v1
 results.
 
 ## External anchors (verified 2026-07-11)

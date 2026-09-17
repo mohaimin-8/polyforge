@@ -12,7 +12,7 @@ looks the way it does, not for what to do next. Its "next action: M3" is stale.
 > clone — no DuckDBs, no raw trace — now rebuilds **38/38 byte-identical**.
 > L6's live verification measured the W5 gap at +21.0% mean / +238.7% p95 and
 > uncovered two metric-cardinality memory leaks (`SECURITY.md` §Session-43).
-> Nothing on the desk route is left but writing and the user's three gates.
+> Nothing on the desk route is left but writing and the author's three gates.
 
 This is the top-level route that
 reconciles every open work item into one dependency-ordered path. It sits
@@ -60,8 +60,8 @@ the scope is the unauthenticated surface.
 
 **Roadmap consequence: WP8 split.** The GPU is only needed for real model
 tiers (`POLYFORGE_EVAL_LIVE_AI` is opt-in), so **WP8a — the live actuation
-dry-run — is now desk-doable and is the next agent-executable item after
-Track 1.** WP8b (the scored matrix) stays user-gated on the GPU.
+dry-run — is now desk-doable and is the next desk-executable item after
+Track 1.** WP8b (the scored matrix) stays author-gated on the GPU.
 
 ## 0a. EXECUTION ROUTE: `docs/PUBLICATION_ROADMAP.md` — start there
 
@@ -184,7 +184,7 @@ machine); that check rides with M2's sitting.
 ## 2. The main path — six milestones in dependency order
 
 ```
-        DESK (agent)                         GATED / USER
+        DESK                         GATED / AUTHOR
   M1 ── B1 ablation arms ───► M2 ── B1 live run ──┐
   (unblocks live evidence)     (1 GPU sitting)     │
                                                    ├──► M6 ── manuscript + submit
@@ -200,10 +200,10 @@ machine); that check rides with M2's sitting.
 
 | # | Milestone | Owner | Gate | Maps to | Exit criterion |
 |---|---|---|---|---|---|
-| **M1** | B1 live ablation arms + CRD knob bounds | agent (desk) | none | T4-prerequisite | **DESK-COMPLETE 2026-08-06** — arms wired + CRD bounds + tests green; live actuation dry-run deferred into M2 (needs a cluster) |
+| **M1** | B1 live ablation arms + CRD knob bounds | desk | none | T4-prerequisite | **DESK-COMPLETE 2026-08-06** — arms wired + CRD bounds + tests green; live actuation dry-run deferred into M2 (needs a cluster) |
 | **M2** | Execute B1 three-knob live plane | user opens gate | free Kaggle+Codespace | T4a, T4 | RESULTS committed PASS/FAIL; ledgers reconciled |
-| **M3** | Formal SLO guarantee (bounded-violation proof + checker) | agent (desk) | none | **T17 (new)** | invariant checker + validation show measured violation ≤ bound on all campaigns |
-| **M4** | Energy/carbon + admission-control knobs *(optional)* | agent (desk) | none | **T18 (new)** | new constraint added off-by-default; R3/R4 bit-identical |
+| **M3** | Formal SLO guarantee (bounded-violation proof + checker) | desk | none | **T17 (new)** | invariant checker + validation show measured violation ≤ bound on all campaigns |
+| **M4** | Energy/carbon + admission-control knobs *(optional)* | desk | none | **T18 (new)** | new constraint added off-by-default; R3/R4 bit-identical |
 | **M5** | Submission mechanics | user | accounts | T11–T14 | OSF DOIs, Zenodo DOI, GHCR images, tokens rotated |
 | **M6** | Manuscript carve + submit | **user** | M1–M5 done | T15, T16 | arXiv + venue submission with artifact/prereg DOIs |
 
@@ -211,7 +211,7 @@ machine); that check rides with M2's sitting.
 live-evidence gap, and B1's frozen WL-H2 preflight was verified against the
 operator→planner path, so M1 must land before any later change reopens it.
 M3 runs fully in parallel (touches only `research/jcac_sim/`, not the live
-path). M6 (manuscript) is the calendar long pole and is user-owned (R8).
+path). M6 (manuscript) is the calendar long pole and is author-owned (R8).
 
 ## 3. Detailed specs for the NEW work
 
@@ -281,7 +281,7 @@ controller.py`) with **per-interval actuation clamps already pinned** by
 foundation a recursive-feasibility argument stands on.
 
 **Engineering deliverable (R8-clean — code, not prose):** the *theorem
-statement* is user-written; the agent delivers the verified model and the
+statement* is author-written; the desk delivers the verified model and the
 numbers.
 - **DO:**
   1. Formalize the disturbance bound: the max per-interval demand change the
@@ -437,8 +437,8 @@ weaker than a validated correspondence, and must be cited that way.
 
 **M3 CLOSED 2026-08-06** — `DEFENSE_QA` #28 records the vacuity finding, the
 replacement theorem, the retracted sign agreement and the coupling gap, with an
-explicit do-not-say list. Theorem prose stays user-owned (R8); the numbers and
-the verified model were the agent's deliverable and are committed.
+explicit do-not-say list. Theorem prose stays author-owned (R8); the numbers and
+the verified model were the desk's deliverable and are committed.
 
 **Open item carried forward (not part of M3):** the multi-tenant extension.
 Cluster caps couple tenants and destroy the independence that makes the
@@ -488,12 +488,12 @@ Full detail in `PolyForge_Research_Gap_Analysis.docx` (Downloads).
 
 | Week | Milestone(s) active | Owner | Blocks |
 |---|---|---|---|
-| 1–2 | **M1** B1 ablation arms + CRD bounds | agent (desk) | unblocks M2 |
-| 2–4 | **M3** formal guarantee (parallel to M1) | agent (desk) | feeds M6 |
-| 3 | **M2** B1 live run (1 sitting) | user gate + desk | feeds M6 |
+| 1–2 | **M1** B1 ablation arms + CRD bounds | desk | unblocks M2 |
+| 2–4 | **M3** formal guarantee (parallel to M1) | desk | feeds M6 |
+| 3 | **M2** B1 live run (1 sitting) | author gate + desk | feeds M6 |
 | 3–4 | **M5** OSF / Zenodo / images / token rotation | user | feeds M6 |
 | 4–8 | **M6** manuscript carve (~25–30 pp) + submit | **user** | terminal |
-| any | **M4** energy/admission (optional) | agent (desk) | none |
+| any | **M4** energy/admission (optional) | desk | none |
 
 **~6 weeks** if the manuscript is written in parallel with the last
 engineering weeks; **~8 weeks** sequential. The engineering critical path
@@ -512,13 +512,13 @@ R1 preregs/RESULTS immutable once closed · R2 new scored measurement needs a
 pushed prereg first · R3 universal regression gate before commit · R4 sim/
 harness changes default OFF, bit-identical · R5 live runs export
 `POLYFORGE_EVAL_SHARED_PG=1` · R6 planner auth posture · R7 cite numbers per
-`RESULTS_MASTER.md` · **R8 manuscript prose is user-owned; agents do
+`RESULTS_MASTER.md` · **R8 manuscript prose is author-owned; the desk does
 engineering only.**
 
 ## 6. Next action
 
 ~~Start M1~~ — **done at the desk 2026-08-06** (see the M1 status block in §3).
-The critical path is now **M2**, which is user-gated: B1 needs a GPU host, and
+The critical path is now **M2**, which is author-gated: B1 needs a GPU host, and
 its first step is the live actuation dry-run M1 could not run here.
 
 ~~**Next desk action: M3**~~ — **stale, corrected 2026-08-11.** M3 closed in
@@ -529,7 +529,7 @@ DEFENSE_QA #28). Two things now supersede this section:
 1. **The execution level is `docs/PUBLICATION_ROADMAP.md`**, written after
    this file. Its §6 progress table is the live status; read it, not this
    paragraph. Milestone-level, the map is unchanged: **M2 (B1) is the
-   critical path and is user-gated on a GPU**; WP8a, its live actuation
+   critical path and is author-gated on a GPU**; WP8a, its live actuation
    dry-run, became desk-doable when Docker landed in session 36.
 2. **The next desk action is WP1** (trace-replay eviction parity), not M3.
    It is the highest-value open item: `RESULTS_EVICTION_PARITY.md` showed

@@ -136,7 +136,7 @@ precision — the ceiling is response stochasticity).
 [archive/](archive/) — superseded planning documents, kept for provenance and
 not maintained: `Q1_ROADMAP.md`, `Q1_EXECUTION_MAP.md` (both superseded by
 `PUBLICATION_ROADMAP.md`), `V3_SEGMENT_WIN_PLAN.md`, `WP14_REMEDIATION_ROADMAP.md`
-(WP14 is closed), `SESSION_LOG.md`, `SERVICE_TEMPLATE.md`, `SLO.md`.
+(WP14 is closed), `SERVICE_TEMPLATE.md`, `SLO.md`.
 
 ---
 

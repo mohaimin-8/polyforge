@@ -201,7 +201,7 @@ at $0, on the Docker that now works locally. Neither blocks FGCS; both are
 specifically for the TCC/TSC bar.
 
 **Execute order, reprioritized session 37 for a Transactions-tier target
-(TCC/TSC, not just FGCS/Q1).** The user's actual target is Transactions,
+(TCC/TSC, not just FGCS/Q1).** The actual target is Transactions,
 not a Q1-safe fallback, so B1 — the only live evidence for the joint
 controller and the single highest-uncertainty item on the whole path — is
 pulled forward instead of trailing behind the desk-only polish work that a
@@ -210,14 +210,14 @@ of each other; nothing is lost by running them after, and everything is
 gained by learning B1's outcome (and whether the live plane needs a
 follow-up rep — see the §8b note) before investing further desk time:
 
-**EVERY agent-executable work package is CLOSED as of session 39
+**EVERY desk-executable work package is CLOSED as of session 39
 (2026-08-24).** WP1, WP2, WP3, WP4, WP5, WP6, WP7, WP8a, WP12, WP13, WP14 and
 WP15 are all done — see §6 for each one's outcome, which is NOT uniformly
 "succeeded": WP13 step 1 was falsified, WP14's sitting is invalid, and WP15
 withdrew the comparative cost claim.
 
-**What is left: WP8b (blocked — user opens the GPU gate; agent then runs it)
-and WP9–11 (user-owned writing).** Nothing else is executable by the agent.
+**What is left: WP8b (blocked — the author opens the GPU gate; the desk then runs it)
+and WP9–11 (author-owned writing).** Nothing else is executable at the desk.
 
 WP13 touches only `research/jcac_sim/` and blocks nothing — run it in any
 gap (e.g. while a campaign is in flight). WP14 must come AFTER WP8a: the
@@ -229,7 +229,7 @@ Note for WP8b specifically: `eval/experiments/wave4_live_plane.yaml` is
 frozen at `reps: 1` (the prereg's stopping rule) — a single confirmatory
 sitting, which is thin evidence by Transactions standards even though it is
 honestly pre-registered. Do not edit that frozen design. If the first B1
-result lands clean and the user wants stronger-than-single-sitting
+result lands clean and the author wants stronger-than-single-sitting
 evidence, the correct move is a NEW small follow-up prereg (one changed
 factor: more reps or longer duration), mirroring the RB-H1 follow-up
 pattern (session 30) — frozen and pushed before it runs, decided only
@@ -237,7 +237,7 @@ pattern (session 30) — frozen and pushed before it runs, decided only
 
 ---
 
-## §3 Track 1 — desk work packages (agent-executable, $0)
+## §3 Track 1 — desk work packages (desk-executable, $0)
 
 ### WP1 — Trace-replay eviction parity (adjudicates the −70% / −42% headlines)
 
@@ -328,7 +328,7 @@ this is a self-contradiction a reviewer finds in minutes.
 5. `tier=none` step-share disclosure line (7.3% jcac / 0.0% reactive).
 6. Do NOT touch any generated record. MASTER is hand-curated — that is why
    this is allowed. Keep edits additive + dated ("Adjudication, session 35:").
-**Effort:** ~1 hour. **The narrative reframe stays user-owned (WP9).**
+**Effort:** ~1 hour. **The narrative reframe stays author-owned (WP9).**
 
 ### WP3 — Fix the layered/gptcache absorbing-tier baseline; re-run the ablation
 
@@ -366,7 +366,7 @@ tier is not a competent implementation.
 
 ### WP4 — Planning cells vs forecast state (audit C6) — VERIFY, then fix or adjudicate
 
-**Why.** The architect-agent audit claimed: with planning cells enabled
+**Why.** The architecture audit claimed: with planning cells enabled
 (`PLANNER_CELLS.md` campaign, PS-H1 1024-tenant scaling), each re-partition
 wipes per-tenant forecast history, degrading the forecaster to persistence —
 which would gut the TPDS scalability story. **This claim was NEVER
@@ -726,7 +726,7 @@ Free disk ≥ 10 GB for metrics + PG.
 Attempt 2's fault-injection mechanism itself worked — 7 of 8 injected faults
 showed verified pod-level recovery (0 restarts, all 8 policies re-applied,
 checked live against the cluster at each occurrence and logged in
-`eval/results/wp14_attempt2/FAULT_JOURNAL.md` — committed, after the user
+`eval/results/wp14_attempt2/FAULT_JOURNAL.md` — committed, after the author
 caught that the journal was first written to `%LOCALAPPDATA%\Temp`, the same
 class of self-cleaning location that lost the k6 summary; the injector logs
 and runner verdict are preserved alongside it in the same directory; fault 8 was
@@ -771,7 +771,7 @@ down after two failed sittings. The plan hardens *reliability*, not scope.
    structural fragility in routing 24 h of traffic through one unsupervised
    `Popen`.
 3. **Independent early-warning probe (~10 min).** Extend the read-only soak
-   watcher (the script itself stays in the session scratchpad,
+   watcher (the script itself stays in a temporary directory,
    self-terminating) to curl the same local port every 5 minutes and tally
    consecutive failures — **with its probe log written under
    `eval/results/wp14_attempt3/`, never `%TEMP%`**. That is the attempt-2
@@ -807,8 +807,8 @@ down after two failed sittings. The plan hardens *reliability*, not scope.
    minimum), cell, fault schedule and offsets, hypotheses SK-H1–H4 and their
    margins all carry over from `PREREG_LIVE_SOAK.md` unchanged — mirrors the
    RB-H1 follow-up pattern (session 30) named in the original prereg.
-7. **Confirm with the user before starting the clock.** Another full 24 h
-   is another day of the user's laptop kept awake with Docker open; restate
+7. **Confirm before starting the clock.** Another full 24 h
+   is another day of the author's laptop kept awake with Docker open; restate
    the constraints and get an explicit go-ahead, exactly as attempt 1 did —
    do not silently relaunch a day-long commitment.
 8. **Run attempt 3.** Same live-reporting cadence proven across attempt 2
@@ -821,7 +821,7 @@ down after two failed sittings. The plan hardens *reliability*, not scope.
    hypotheses against real metrics; register in `reproduce.py`; run the
    byte-identity gate; restore power settings
    (`docs/WP14_SOAK_RESTORE.md` has the exact prior values); stop and
-   delete the scratchpad watcher.
+   delete the temporary watcher script.
 
 **Contingencies.** Instability surfacing mid-soak (planner leak, operator
 crash-loop, PG exhaustion) **is the finding, not a nuisance**: report it,
@@ -836,7 +836,7 @@ reliably. **Effort:** ~2–2.5 h desk work (steps 1–7) + ~30 min smoke test +
 
 ---
 
-## §4 Track 2 — user-gated (agent prepares, user opens the gate)
+## §4 Track 2 — author-gated (prepared at the desk; the author opens the gate)
 
 ### WP7 — PUSH THE BRANCH (do this before anything else, 2 minutes)
 
@@ -844,7 +844,7 @@ reliably. **Effort:** ~2–2.5 h desk work (steps 1–7) + ~30 min smoke test +
 cd "c:/Users/DARKR/Documents/Thesis Project/polyforge"
 git push -u origin v-series-validity-remediation
 ```
-Then (agent, after push): append a one-line disclosure to
+Then (after push): append a one-line disclosure to
 `RESULTS_EVICTION_PARITY.md` + `RESULTS_ORDER_PERMUTATION.md`… **NO — those
 are generated records under the reproduce gate.** The disclosure goes in the
 PREREGS' status lines? Also no — preregs are frozen. Correct mechanism: add
@@ -868,7 +868,7 @@ the harness deploys no AI gateway and needs no `POLYFORGE_EVAL_TIER_BACKENDS`.
 Kubernetes actuation — which is what the dry-run checks — needs a cluster,
 not a GPU.
 
-#### WP8a — live actuation dry-run (**NOW DESK-DOABLE, agent-executable, $0**)
+#### WP8a — live actuation dry-run (**NOW DESK-DOABLE, desk-executable, $0**)
 
 This was deferred out of M1 for want of Docker and is the last item standing
 between the repo and a scored B1. Non-scored; it proves the plumbing.
@@ -891,7 +891,7 @@ Constraint: `~/.wslconfig` gives Docker 9.7 GB, so `small` (2 nodes) and
 `medium` (4) are comfortable and `large` (6) is tight. The dry-run does not
 need `large`.
 
-#### WP8b — the scored matrix (**still user-gated on a GPU**)
+#### WP8b — the scored matrix (**still author-gated on a GPU**)
 
 Substrate (all free): `docs/WAVE4_FREE_ROUTE.md` — Kaggle P100 (30 GPU-h/wk,
 tier bench already proven there) runs `kaggle_tier_server.py` → tunnel URL →
@@ -923,7 +923,7 @@ never "the API passed a pen test".
 
 ---
 
-## §5 Track 3 — user-owned (writing + accounts; agent does NOT do these)
+## §5 Track 3 — author-owned (writing + accounts; not desk work)
 
 - **WP9 Reframe** thesis + `research/paper/main.tex`: the claim is now
   *"joint control at cost parity with a competently-configured reactive
@@ -960,14 +960,14 @@ never "the API passed a pen test".
     `valid_runs: 1, ok: true` (`RESULTS_LIVE_SOAK_V8.md`). The soak landed,
     on this hardware.
 
-    So the hatch now rests on **B1 alone — WP8b**, which is user-gated on a
+    So the hatch now rests on **B1 alone — WP8b**, which is author-gated on a
     GPU whose free substrate is already documented
     (`docs/WAVE4_FREE_ROUTE.md`: Kaggle P100, 30 GPU-h/wk).
 
     **The roadmap does NOT decide the venue, and this correction does not
     decide it either.** It only records that the factual premise the rule
     keyed on has changed. Two things the author must weigh, neither of which
-    an agent should settle: the cost condition still **FAILS** (BP-H1, both
+    the desk should settle: the cost condition still **FAILS** (BP-H1, both
     traces), which is what sent the rule to FGCS in the first place and is
     untouched by the soak; and attempt 10 scored **SK-H1 FAIL and SK-H3
     FAIL** alongside its SK-H2/SK-H4 passes, so "the soak landed" means the
@@ -1011,7 +1011,7 @@ never "the API passed a pen test".
 | **WP13 step 3** | **DONE (session 42). S3 is EVALUABLE after all — computed, and FAILED.** | `RESULTS_SEPARATION_MT_V3.md` + committed artifact `separation_mt_v3_walk.json`. v2's blocker was the enumeration **loop**, not the problem: `guarantee.trajectory_violation_batch` vectorises the offset-vector axis while keeping the tenant sweep sequential (S2's order dependency is preserved, not assumed away), so the exact ordered walk over **268,435,456 vectors** runs in **119.9 min**. Eight-tenant floor = **0.126189**. Series: 0.000000 (n≤4) → 0.016514 → 0.049058 → 0.090102 → 0.126189. **S1 PASS, S2 FAIL (carried forward), S3 FAIL, S5 PASS.** S3's FAIL was **predicted in the script docstring before the walk finished**. Two arms below the floor, differently: `hpa` 0.126042 (**0.12%** below — on the floor) vs `keda` 0.001886 (**67x** below — the floor does not describe it). Theorem scope unchanged; **v2's "not computed" sentence is now wrong and must not be repeated.** New: `BatchedOrderedWalkTests` (4 tests, per-vector exact vs the scalar walk at binding caps); S5 re-derives rows 1–6 at gate time so a stale artifact fails R4. |
 | **WP14 attempts 5-7** | **CLOSED. Ladder PASSED, three sittings INVALID — but the cause is now ELIMINATED rather than suspected.** | `RESULTS_LIVE_SOAK_V5.md`: attempt 7 ran **11 h 47 m**, **12,645,794 requests**, **0.0005% failed**, ended by a **51.4 s stall**. V4 blamed PostgreSQL durability; attempt 7 disabled `fsync`, `full_page_writes` and `synchronous_commit` together and the stall grew 19.5 s → 51.4 s, so **the storage hypothesis is FALSIFIED**. All 13 pod restarts landed in ONE sample at T+11.9 h after eleven clean hours, at 15% node memory — a host freeze signature, not degradation. **SK-H3 PASS with 37% headroom** (5.076 vs 8.0072 ms), **SK-H2 PASS** (four planner injections across two sittings, all +72/+72). The controller is not the constraint and that is now evidenced. Next step: different hardware. |
 | **WP14 attempts 8–10** | **DONE (session 41, 2026-08-30). The 24 h sitting is COMPLETE and VALID — the first in the work package.** | `RESULTS_LIVE_SOAK_V8.md`: attempt 10 ran **24 h 00 m 11 s**, **25,806,353 requests** at 298.646/s, **0.0012% failed**, **ZERO dropped iterations**, **ZERO pod restarts**, 8 of 8 faults on the registered schedule. Harness verdict **`valid_runs: 1, ok: true`** — attempts 1–9 all returned `valid_runs: 0`. **SK-H4 PASS** (the absolute gate that ended six sittings, never relaxed). **SK-H2 PASS**, **SK-H6 clean** (3.7% CPU spread over 16 pods). **SK-H1 FAIL** (1 of 8; the frozen rule compares a recovery MAX against a pre-window MEDIAN across a metric oscillating 8→14 ms on a ~4 min cycle present before, during and after the fault). **SK-H3 FAIL** (6 of 25 hourly buckets over 8.0072 ms; the margin was disclosed pre-run as "0.003 ms with no headroom", exceedances are 0.001–0.21 ms, aggregate 8.004009 would have passed). Both failures stand as scored. Attempt 9 is **VOID** (`RESULTS_LIVE_SOAK_V7.md`) — a stray launcher deleted the lock files and ran a second injector for 13 h 42 m, applying four unregistered faults; fixed by a liveness heartbeat the launcher cannot delete plus a launcher trap that kills its instruments. **No further sitting: V8 pre-committed this as the last on this machine.** |
-| WP9–11 | user-owned; **WP9 waits on WP1's record (venue decision rule, §5)** | — |
+| WP9–11 | author-owned; **WP9 waits on WP1's record (venue decision rule, §5)** | — |
 
 ### WP14's outcome (session 39) — what the live plane can and cannot claim
 

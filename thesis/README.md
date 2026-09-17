@@ -28,7 +28,7 @@ after any record lands or any chapter changes; a new record shows up there
 as uncited until a chapter names it. `docs/DEFENSE_QA.md` (#29) carries the
 adjudication for the podium.
 
-## Before submission (human fill-ins)
+## Before submission (author fill-ins)
 
 1. `report/main.tex` — the `\thesisauthor`/`\thesisdegree`/`\thesisuniversity`/
    `\thesisdepartment`/`\thesissupervisor` macros are placeholders.

@@ -48,7 +48,7 @@ version predated the evidence site, the AWS sittings and the caption gate.)
 - [x] `scripts/test_build_pages.py` fails on a gated record without a page, a
       dead link, or two builds that differ.
 
-## 5. Images and chart — built and signed (v1.0.0, 2026-09-17); visibility is the one human step
+## 5. Images and chart — built and signed (v1.0.0, 2026-09-17); visibility is the one manual step
 
 - [x] Tag `v1.0.0` → `release.yml` built, SBOM'd and cosign-signed
       `ghcr.io/mohaimin-8/polyforge/{control-plane,ai-gateway,operator,planner}:v1.0.0`;
@@ -78,7 +78,7 @@ feasibility result, every gated record is cited, all 21 figures are in.
 `docs/THESIS_DRIFT.md` (generated; CI keeps it current) reads 0 bare claims /
 0 uncited records / 0 unplaced figures. `research/paper/main.tex` is still the
 FGCS skeleton with TODO blocks — carve it from the thesis chapters when a
-venue is chosen. Human fill-ins remain: author/degree/university macros in
+venue is chosen. Author fill-ins remain: author/degree/university macros in
 `thesis/report/main.tex`.
 
 ## 8. Submission-adjacent — human

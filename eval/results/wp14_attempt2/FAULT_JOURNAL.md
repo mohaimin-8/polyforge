@@ -160,7 +160,7 @@ without intervention.
 | 18:57 | 2h08m | 19/19 | 1.46 GiB | drop = fault 1 pod replacement |
 | 21:00 | 4h10m | 19/19 | 1.49 GiB | |
 | 22:32 | 5h42m | 19/19 | 1.54 GiB | |
-| 00:14 | 7h24m | 19/19 | 1.59 GiB | after a Claude session exit — run unaffected |
+| 00:14 | 7h24m | 19/19 | 1.59 GiB | after the terminal session exited — run unaffected |
 | 00:51 | 8h01m | 19/19 | 1.64 GiB | fault 3 |
 | 01:47 | 8h57m | 19/19 | 1.63 GiB | |
 | 03:50 | 11h00m | 19/19 | 1.64 GiB | fault 4 |
@@ -178,5 +178,5 @@ Pods never dropped below 19 outside injected windows. Memory range
 
 ## Interruptions to REPORTING (not to the run)
 
-- 23:34 → 00:14: Claude Code process exited, watcher died. Runner, k6,
+- 23:34 → 00:14: the terminal session exited, watcher died. Runner, k6,
   containers and all four injectors survived; no fault fell in the gap.

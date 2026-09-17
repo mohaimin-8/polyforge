@@ -67,7 +67,7 @@ same experiment: **new cells, not new tuning.**
 
 ## Phase B — Cache headline on real LMSYS-Chat-1M — DONE (session 16c, as measured)
 
-- [x] **USER:** token provided 2026-07-12; gate accepted; sentence-transformers
+- [x] **Author:** token provided 2026-07-12; gate accepted; sentence-transformers
       already installed (session 14).
 - [x] Protocol run with one *declared pre-run amendment* (commit 31c73c7, pushed
       **before** the gated download): the committed protocol is infeasible at full
@@ -140,7 +140,7 @@ The scoreboard's named target is VTC's *empirical* side:
 | 14 (this) | scoreboard audit + this plan committed | — |
 | 15 | PREREG_V3.md + matrix_v3_overload.yaml (no runs) | — |
 | 16 | run v3 matrix + RESULTS_V3.md | — |
-| 17 | Phase B cache run | **user: HF token + deps** |
+| 17 | Phase B cache run | **author: HF token + deps** |
 | 18 | Phase C downloads + trace reruns | network (multi-GB) |
 | 19 | Phase D and/or Phase 9 hardening + README v2/v3 numbers | — |
 

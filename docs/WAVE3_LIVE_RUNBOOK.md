@@ -42,7 +42,7 @@ That means:
   partition key instead of `tenantID`. This is the honest shape of the attack —
   you must intentionally *break* isolation to demonstrate the leak the design
   prevents. It is ~20 lines in `cache.go` + a chart value; it does not exist
-  yet and is the first task of the live session (ask the agent to wire it).
+  yet and is the first task of the live session (wire it first).
 
 ```
 # provision the two tenants + keys (both postures)

@@ -11,7 +11,7 @@
 > (`FINAL_ROADMAP.md` §5 R5). L6's live verification measured the W5 gap
 > (+21.0% mean, +238.7% p95) and turned up two metric-cardinality memory
 > leaks, both fixed (`SECURITY.md` §Session-43). What is left that is not
-> writing: B1 (Kaggle `GPU T4 x2`, user-gated), the Zenodo publish, GHCR and
+> writing: B1 (Kaggle `GPU T4 x2`, author-gated), the Zenodo publish, GHCR and
 > Pages visibility.
 
 > **Execution route: `docs/PUBLICATION_ROADMAP.md`** (added end of session
@@ -33,7 +33,7 @@
 Last updated 2026-08-05 (main-path consolidation; prior body last touched
 session 30). This is the single place that answers
 "what is left and who does it." It reconciles `docs/RELEASE_CHECKLIST.md`
-(human-action items), the deferred live campaigns, and the thesis fill-ins into
+(manual items), the deferred live campaigns, and the thesis fill-ins into
 one owner-split view. When it disagrees with a campaign file, the campaign file
 wins.
 
@@ -102,7 +102,7 @@ everything else fell through to the all-free jcac case.
 
 **Severity, stated accurately.** This did **not** corrupt any measurement,
 and no result changes: the live plane has never been run (WP8b is still
-user-gated), and the arm's pin was in fact enforced by a different mechanism
+author-gated), and the arm's pin was in fact enforced by a different mechanism
 — `replica-only` runs `planner.enabled=false` and takes its knobs from
 `push_default_knobs`, so nothing was moving cache or tier regardless of what
 its CRs allowed. The defect is that the invariant lived only in a helm value
@@ -359,7 +359,7 @@ A four-perspective audit found eleven defects. Status of each:
 | D4 | `RPSWindow` never populated → live planner saw zero demand and froze | **DONE** — rate tracker on both emitters, `-race` clean; AI kinds no longer folded into `crud_read` |
 | D5 | `knob_preflight.py` called from no code path | **DONE** — executed by `cluster_backend.execute()` before load, raises on inert substrate |
 | D6 | `check_metrics` could not detect "measured nothing" | **DONE** — rejects zero p95 / zero `n_events`; `n_events` now captured |
-| D7 | 48 hypotheses, no multiple-comparison correction | **DONE** — `holm_bonferroni()` in `stats.py` (6 tests), applied within each V-series prereg's own family. **Precise statement of the RB-H1 concern:** p=0.0073 *survives* Holm inside a small family (0.05/6 = 0.00833) but *fails* against the full 48-hypothesis set (0.05/48 = 0.00104). Whether a marginal result stands is therefore a claim about which family it belongs to — which is why each prereg now declares its own. Deciding RB-H1's family is user-owned |
+| D7 | 48 hypotheses, no multiple-comparison correction | **DONE** — `holm_bonferroni()` in `stats.py` (6 tests), applied within each V-series prereg's own family. **Precise statement of the RB-H1 concern:** p=0.0073 *survives* Holm inside a small family (0.05/6 = 0.00833) but *fails* against the full 48-hypothesis set (0.05/48 = 0.00104). Whether a marginal result stands is therefore a claim about which family it belongs to — which is why each prereg now declares its own. Deciding RB-H1's family is author-owned |
 | D8 | sweep order confounded with priority class | **MEASURED, IMMATERIAL** — `RESULTS_ORDER_PERMUTATION.md` (540/540): OP-H1 fails strictly, but the largest Jain excursion is **0.0001**, an order of magnitude under the pre-registered 0.01 threshold; OP-H2 FAILS (spread < 0.01 on every mix incl. `whale`); OP-H3 PASSES (cost order-independent to 0.91%). The published order is best on one mix and *worst* on another — sensitivity, not bias. **Published fairness results stand**; sweep order is now a seeded parameter (`tenant_order_seed`) with a measured spread on record |
 | D9 | no envtest; fake clients hide conflicts | **CLOSED — EXECUTED AND PASSING.** `envtest_conflict_test.go` (build tag `envtest`), 3/3 pass against a real kube-apiserver 1.31.0: CEL rejects inverted replica and cache bands (asserting on the CEL message, so it cannot pass vacuously), an audit record survives a genuine status 409 with a competing writer racing the plan cycle, and pinned knobs hold through a full apiserver round-trip. Wired into CI. `go test ./...` stays green without the binaries |
 | D10 | `reproduce.py` returned 0 on total failure | **DONE** — exits nonzero on drift or failed campaign scripts |
@@ -425,7 +425,7 @@ generated record and figure from the committed data (verified: 5/5 records
 byte-identical, 17/17 figures; CI proves the clean-clone tier on every
 push — `docs/REPRODUCE.md`), every campaign now has a committed run-level
 csv.gz export, and `research/paper/main.tex` is a compiling FGCS scaffold
-awaiting the user's manuscript carve. **Session 29 closed the
+awaiting the author's manuscript carve. **Session 29 closed the
 learned-control front** — the sharpest remaining *mechanism* objection
 ("why a hand-designed MPC and not a learned policy?"). A strong,
 offline-trained RL controller over the *identical* joint action space and
@@ -455,9 +455,9 @@ project's central novelty and its sharpest open weakness.
 
 ---
 
-## Bucket A — closeable now, at the desk (agent-doable, no gate)
+## Bucket A — closeable now, at the desk (desk-doable, no gate)
 
-These need no account, host, or payment. They are the natural next agent tasks.
+These need no account, host, or payment. They are the natural next desk tasks.
 
 | Item | What it is | Where |
 |---|---|---|
@@ -466,10 +466,10 @@ These need no account, host, or payment. They are the natural next agent tasks.
 | Slides ↔ thesis consistency pass | ensure the deck's numbers match the reconciled discussion chapter (−70% not −76%; eight nulls; over-the-wire done) | `thesis/slides/`, `PolyForge_Pre-defence_Presentation.pptx` |
 | Thesis ↔ Wave 5 reconciliation | fold DEFENSE_QA #24–25 into the discussion/limitations chapters: structural-form robustness, the clamp disclosure + anchored-controller quotability, the coordination-gap result | `thesis/report/`, sources in `RESULTS_MASTER.md` §13 |
 | ~~B2/B3 formal write-up~~ | **DONE (session 27):** `RESULTS_LIVE_CHAOS_P99.md` generated by `live_chaos_p99.py` from the committed CSV — LC-H1 PASS (zero violation through both live faults), P99-H1 recorded (SLO verdict unchanged at p99) | `research/analysis/RESULTS_LIVE_CHAOS_P99.md` |
-| **Formal SLO guarantee** (M3 / T17 — REDIRECTED 2026-08-06) | **The specified theorem is vacuous on this plant and that is committed (b55f91b):** memoryless plant + hold-still actuation + cheap replicas make any SLO-clearing configuration trivially control-invariant, so recursive feasibility here is true and empty. Per the user's call the target became the **reactive-vs-predictive cost separation**, and it is **DONE and executable (bec0f62)**: a floor on reactive cost vs a realised predictive cycle gives **+49.0% on the `flash` orbit** (where the onset climb of 5 exceeds the ±2 authority) against **+2.7%** on the `ramp_gentle` control cell and **−5.9%** once the observational aliasing is removed — i.e. 49.0% derived from the plant constants alone, against the campaigns' measured −44…−50% cost at violation parity. **M3 is closed** (`DEFENSE_QA` #28). Campaign replay done per matched cell on the `uniform` mix across hpa/keda/firm (5 parity pairs): medium/`spike_agentic` derived +43.4% vs measured +53.1%, large/`flash_ai` +42.5% vs +79.1%; small/`flash_crud` not computable; both `ramp_gentle` pairs outside the theorem's scope. **An earlier "all three signs agree" claim is RETRACTED** — it came from comparing one derived cell against a twelve-cell measured average, and `flash_crud` flips once the cells are matched. **The multi-tenant coupling is load-bearing, not optional** (no-cap gives the wrong sign; equal-share makes the cell infeasible; independent per-tenant phases mean neither is right). Status: *suggestive structural corroboration at one operating point*, not a validated correspondence — the open item is the multi-tenant extension. Table, soundness rule and detail in `docs/MAIN_WORKING_PATH.md` §3 M3. Original spec, now superseded: the primary Transactions/TPDS strengthener: terminal invariant set + recursive-feasibility condition over the MPC's already-clamped actuation lattice → a bounded-violation guarantee, shipped as an executable checker + a validation script asserting measured violation ≤ bound on every closed campaign. Theorem prose user-owned (R8). Must be a real proof, not a heuristic | `research/jcac_sim/controller.py`, `research/jcac_sim/test_invariants.py`; spec in `docs/MAIN_WORKING_PATH.md` §3 |
+| **Formal SLO guarantee** (M3 / T17 — REDIRECTED 2026-08-06) | **The specified theorem is vacuous on this plant and that is committed (b55f91b):** memoryless plant + hold-still actuation + cheap replicas make any SLO-clearing configuration trivially control-invariant, so recursive feasibility here is true and empty. Per the author's call the target became the **reactive-vs-predictive cost separation**, and it is **DONE and executable (bec0f62)**: a floor on reactive cost vs a realised predictive cycle gives **+49.0% on the `flash` orbit** (where the onset climb of 5 exceeds the ±2 authority) against **+2.7%** on the `ramp_gentle` control cell and **−5.9%** once the observational aliasing is removed — i.e. 49.0% derived from the plant constants alone, against the campaigns' measured −44…−50% cost at violation parity. **M3 is closed** (`DEFENSE_QA` #28). Campaign replay done per matched cell on the `uniform` mix across hpa/keda/firm (5 parity pairs): medium/`spike_agentic` derived +43.4% vs measured +53.1%, large/`flash_ai` +42.5% vs +79.1%; small/`flash_crud` not computable; both `ramp_gentle` pairs outside the theorem's scope. **An earlier "all three signs agree" claim is RETRACTED** — it came from comparing one derived cell against a twelve-cell measured average, and `flash_crud` flips once the cells are matched. **The multi-tenant coupling is load-bearing, not optional** (no-cap gives the wrong sign; equal-share makes the cell infeasible; independent per-tenant phases mean neither is right). Status: *suggestive structural corroboration at one operating point*, not a validated correspondence — the open item is the multi-tenant extension. Table, soundness rule and detail in `docs/MAIN_WORKING_PATH.md` §3 M3. Original spec, now superseded: the primary Transactions/TPDS strengthener: terminal invariant set + recursive-feasibility condition over the MPC's already-clamped actuation lattice → a bounded-violation guarantee, shipped as an executable checker + a validation script asserting measured violation ≤ bound on every closed campaign. Theorem prose author-owned (R8). Must be a real proof, not a heuristic | `research/jcac_sim/controller.py`, `research/jcac_sim/test_invariants.py`; spec in `docs/MAIN_WORKING_PATH.md` §3 |
 | ~~B1 live ablation arms + CRD bounds (M1)~~ | **DESK-COMPLETE (session 34, 2026-08-06):** live `replica-only`/`cache-only`/`tier-only` arms + Policy-CRD `cacheSizeMBMin/Max` and `modelTierMin/Max` (min==max pins a knob), clamped at the actuation point, forwarded to the planner, mirrored in the sim, with the frozen 4×4 matrix in `eval/experiments/wave4_live_plane.yaml`. R4 holds (16/16 records byte-identical). The **live actuation dry-run is deferred into M2** (no Docker here) | `eval/harness/cluster_backend.py`, `internal/operator/**`, `eval/experiments/` |
 
-## Bucket B — user-gated live-cluster experiments (agent prepares, user opens the gate)
+## Bucket B — author-gated live-cluster experiments (prepared at the desk; the author opens the gate)
 
 All are blocked on a Docker/GPU host this machine does not have. The protocols
 are frozen and pushed; the runbooks are push-button. Each is **confirmatory** —
@@ -486,7 +486,7 @@ the joint controller.
 Notes: B2/B3 share one Codespace sitting and reuse the proven session-19
 harness. B1 additionally needs the Bucket-A harness prep and real model tiers
 on the GPU (tier-bench pair; drop the 7B tier if VRAM is short, per the
-prereg's amendment rule). When the user opens the gate, the ordered steps are
+prereg's amendment rule). When the author opens the gate, the ordered steps are
 in `docs/WAVE3_LIVE_RUNBOOK.md` (for B2/B3) and `PREREG_WAVE4_LIVE_PLANE.md`
 §Substrate (for B1).
 
@@ -504,7 +504,7 @@ Cannot be automated from this repo. Full detail in `docs/RELEASE_CHECKLIST.md`.
 | Paper-supplement site | GitHub Pages from `docs/` with the figure gallery + Zenodo/OSF links |
 | First cloud smoke (~€10) | `terraform apply` on Hetzner, run `smoke.yaml` with `backend: cluster`, `terraform destroy` |
 | Submission | arXiv preprint + venue submission + artifact-track application (W37–W40) |
-| Visual PDF proofread | a human read-through of the compiled thesis PDF (no agent renderer) |
+| Visual PDF proofread | a read-through of the compiled thesis PDF  |
 | Rotate pasted credentials | rotate the Kaggle + HF tokens pasted in chat during data work |
 
 ---
@@ -513,7 +513,7 @@ Cannot be automated from this repo. Full detail in `docs/RELEASE_CHECKLIST.md`.
 
 1. **Bucket A now** (this session and next): the B1 ablation arms + CRD bounds
    landed 2026-08-06, so the next desk item is the **formal SLO guarantee**
-   (M3 / T17) — the only remaining agent-doable item on the main path. The
+   (M3 / T17) — the only remaining desk-doable item on the main path. The
    title page finishes the thesis's own debts (bib authors were filled and
    verified in session 23).
 2. **Bucket B1 next time a GPU host is opened** — the one experiment that

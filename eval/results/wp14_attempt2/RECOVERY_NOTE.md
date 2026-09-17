@@ -1,4 +1,4 @@
-# WP14 soak — recovery note for a fresh Claude session
+# WP14 soak — recovery note for a fresh terminal session
 
 Deliberately OUTSIDE the repo (sits next to the injector logs in Temp) so it
 pollutes nothing and survives this session ending.
@@ -40,12 +40,12 @@ grep -h "=== FAULT" /c/Users/DARKR/AppData/Local/Temp/wp14_inject_*.log
 ```
 
 The soak, k6 and the four injectors are **detached OS processes**. They do not
-depend on Claude Code, and they keep running through a usage limit, a closed
+depend on the terminal session, and they keep running through a usage limit, a closed
 terminal, or a closed session. Only the watcher and the reporting stop.
 
 ## Restarting the watcher in a new session
 
-The watcher script lived in the old session's scratchpad and will be gone.
+The watcher script lived in a temporary directory and will be gone.
 Re-create it or just poll with the commands above. It was read-only: a
 60-second loop emitting a heartbeat every 30 min plus immediate events on
 fault / death / pod loss / memory past 7.0 GiB, self-exiting when the runner
