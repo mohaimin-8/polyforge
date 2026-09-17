@@ -30,14 +30,17 @@ version predated the evidence site, the AWS sittings and the caption gate.)
       0009-0003-3254-9532; supervisor as contributor, role Supervisor)
 - [x] `cd eval && python scripts/archive_zenodo.py` — 1023 files, 49.8 MB,
       SHA-256 manifest, no placeholder
-- [x] Published: **https://doi.org/10.5281/zenodo.22801196**
+- [x] Published. **Cite the concept DOI https://doi.org/10.5281/zenodo.22801195**
+      (always the latest version). Versions: v1 10.5281/zenodo.22801196
+      (2026-09-17, 1023 files); v2 10.5281/zenodo.22807022 (2026-09-17,
+      1025 files, adds docs/COMMIT_MAP.md).
       (Islam, M. M. (2026). PolyForge evaluation artifact: pre-registered
       controller-comparison campaigns (harness, baselines, raw results,
       live-run data, IaC) [Dataset]. Zenodo.)
 - [x] DOI in `README.md`, `docs/REPRODUCE.md`, the thesis (traceability
       appendix, discussion, `references.bib` entry `polyforge2026zenodo`)
-- A new version (new DOI under the same concept) is needed only if the
-      bundle changes — rebuild, upload as *New version*, update the DOI here.
+- A new version is needed only if the bundle changes — rebuild, upload as
+      *New version*, add the version DOI to the list above; citations do not change.
 
 ## 4. Evidence site — LIVE (2026-09-17)
 

@@ -44,7 +44,7 @@ the third only where the renderer matches.
 | tier | inputs | what re-derives |
 |---|---|---|
 | **git** (clean clone) | committed `eval/results/metrics_*.csv.gz` run-level exports, `agg_*.csv.gz` timeseries aggregates, security JSON/CSVs, trace-replay CSVs, and `eval/harness/trace_cache/window0.json.gz` | **everything: all 38 gated records and all 19 figures** |
-| **archive** (Zenodo DuckDBs restored into `eval/results/`; deposit [10.5281/zenodo.22801196](https://doi.org/10.5281/zenodo.22801196)) | + `raw_sim*.duckdb`, `ablations.duckdb`, `forecasters.duckdb`, `realism.duckdb`, `fairness_v2.duckdb`, … | the same 16/19, plus the full timeseries for any *new* analysis |
+| **archive** (Zenodo DuckDBs restored into `eval/results/`; deposit [10.5281/zenodo.22801195](https://doi.org/10.5281/zenodo.22801195)) | + `raw_sim*.duckdb`, `ablations.duckdb`, `forecasters.duckdb`, `realism.duckdb`, `fairness_v2.duckdb`, … | the same 16/19, plus the full timeseries for any *new* analysis |
 | **rerun** (hours of compute) | `eval/experiments/*.yaml` via `python -m harness.runner` | the raw databases themselves, seed-deterministic per run_id |
 | **live** (author-gated hosts) | `docs/WAVE3_LIVE_RUNBOOK.md`, `PREREG_WAVE4_LIVE_PLANE.md` | the live campaign CSVs |
 
