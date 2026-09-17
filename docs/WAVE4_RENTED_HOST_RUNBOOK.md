@@ -19,7 +19,7 @@ batching that would close the throughput gap pushes `mid` to 3285 ms at batch
 | requirement | value | why |
 |---|---|---|
 | GPU VRAM | **≥ 40 GB** (A100 40/80, L40S) | fp16 weights are ~1 + 6 + 15 = 22 GB before any KV cache; 24 GB cannot serve three tiers |
-| vCPU / RAM | **≥ 8** / ≥ 16 GB | the same box runs kind, the operator, the planner, the gateway and k6. **8 is measured sufficient** (session 48): the 12.2–12.4% that sessions 45–47 attributed to host concurrency was the AI gateway's hard-coded 600 RPM per-tenant limiter answering 429, plus three substrate defects — with those fixed (`4e499ef`) the frozen cell ran `valid` on an 8-vCPU `c6i.2xlarge`, 37,269 requests, 1 failure. See the prereg's session-48 pre-run note and `wave4_jointstress_probe_evidence/2026-09-15_ec2_ladder/` |
+| vCPU / RAM | **≥ 8** / ≥ 16 GB | the same box runs kind, the operator, the planner, the gateway and k6. **8 is measured sufficient** (session 48): the 12.2–12.4% that sessions 45–47 attributed to host concurrency was the AI gateway's hard-coded 600 RPM per-tenant limiter answering 429, plus three substrate defects — with those fixed (`87bc889`) the frozen cell ran `valid` on an 8-vCPU `c6i.2xlarge`, 37,269 requests, 1 failure. See the prereg's session-48 pre-run note and `wave4_jointstress_probe_evidence/2026-09-15_ec2_ladder/` |
 | Disk | ≥ 60 GB | three model downloads plus images |
 | Cost | ~$2–5/hr, **~$10–25 total** | setup plus 16 runs at ~708 s each (~3.2 h; cluster setup/teardown dominates, not the 300 s window). A 40 GB GPU with 16–32 vCPU on one box costs more per hour than the GPU alone |
 
@@ -288,7 +288,7 @@ re-scoring pass:
    that sheds replicas inside a 10-s control step leaves pods that
    `kubectl top` sees once at 1 millicore; the guard's population now
    excludes pods seen in fewer than `MIN_PRESENCE_SAMPLES` (3) samples
-   (commit `86c29c5`). The pinning ceiling is still calibrated on a static
+   (commit `1d71f4f`). The pinning ceiling is still calibrated on a static
    Deployment: an HPA arm whose first pod is alone for the early window can
    trip it (one `replica-only` run did, both attempts) — that is a void, not
    a bug to repair after the fact.
@@ -304,7 +304,7 @@ The fine export spans the WL-H2 preflight (five buckets, ~$0.13 of `large`
 tier spend that every arm paid identically inside `total_cost_usd` in B1
 and B1′) and the teardown seconds; the B1′ scorer pairs buckets inside the
 load window (the span from the first to the last bucket at ≥ half the run's
-median event count, troughs included). **Since `e94c3e5` the harness passes
+median event count, troughs included). **Since `7eaba72` the harness passes
 the load window's opening instant to both exports as `--since`**, so on any
 future sitting `total_cost_usd`, latency, violation and cache-hit score the
 window alone and the preflight's spend is gone from every metric; a new
@@ -313,7 +313,7 @@ comparable to B1/B1′'s without the offset.
 
 **B1″ (executed 2026-09-16, 24/24 valid, ~2.7 h, ~$6.5):**
 `jcac-calibrated-dwell` (the calibrated arm plus a three-cycle replica
-dwell, `6ca8626`) against `jcac-calibrated` and `tier-only`, under
+dwell, `759de28`) against `jcac-calibrated` and `tier-only`, under
 `PREREG_WAVE4_DWELL.md`, scored **WL-H6 FAIL, WL-H7 FAIL**
 (`RESULTS_WAVE4_DWELL.md`; `fig_wave4_dwell.py` draws fig21 from the same
 functions): the dwell caps the largest jump but does not
@@ -428,7 +428,7 @@ the constraint.
 
 `eval/experiments/wave4_live_plane_rehearsal.yaml` exists because the scored
 experiment writes its evidence to `eval/results/wave4_live_plane_evidence/`,
-which is **committed evidence from the WP8b run** (`0036be3`). Running the
+which is **committed evidence from the WP8b run** (`e294d5a`). Running the
 scored yaml locally against a mock silently overwrites it — observed in session
 44 and restored with `git checkout`. The rehearsal yaml redirects both the
 database and the evidence directory, so mock output cannot be mistaken for, or

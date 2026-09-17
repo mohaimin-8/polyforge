@@ -24,7 +24,7 @@ package says VERIFY FIRST and gives the command.
    PATH. Sizing: 9.7 GB via `~/.wslconfig`; `small`/`medium` kind clusters
    fit, `large` does not.
 2. `git log --oneline -8` — you should see the session-35 V-series commits
-   (`ec7a230..9f66192`) on branch `v-series-validity-remediation`. If the
+   (`33bd83c..45785ce`) on branch `v-series-validity-remediation`. If the
    branch was merged/pushed since, fine; the WPs below are independent of
    branch topology.
 3. Run the **gate battery** (§0.1) BEFORE touching anything, to prove the
@@ -141,8 +141,8 @@ once, FAIL is publishable, R4 must hold, record joins `reproduce.py`.
 
 ### Session 36 addendum (2026-08-09) — Docker is available locally
 
-`ec7a230..9f66192` (V-series) plus `992f8d7` (this roadmap), `cfeca12`
-(gateway security hardening), `849c478` (security residuals), `2db9c3e`
+`33bd83c..45785ce` (V-series) plus `530c9ac` (this roadmap), `98d8153`
+(gateway security hardening), `5f4e0dd` (security residuals), `5039f26`
 (Docker enablement).
 
 - **Docker Desktop 4.85.0 / engine 29.6.2 + WSL2 work on this machine.** The
@@ -191,7 +191,7 @@ WP12 authenticated ZAP ──► security-section completeness (small)
 
 **Why WP13/WP14 exist (session 37).** The original Transactions-tier
 strengthener — M3's recursive-feasibility theorem — proved vacuous, and its
-replacement (the cost separation, `bec0f62`) is honest but explicitly
+replacement (the cost separation, `f719127`) is honest but explicitly
 "suggestive corroboration at one operating point". A Transactions submission
 resting on one confirmatory B1 sitting plus a single-operating-point theorem
 is thin. WP13 restores theory weight (the multi-tenant extension the M3
@@ -470,7 +470,7 @@ overshoots because shedding is the budget-respecting response to that same
 prohibition. **Cost and severity are not two axes here — they are one
 constraint seen twice.**
 
-This also explains why the pre-registered β sweep is inert (`f045e68`): β
+This also explains why the pre-registered β sweep is inert (`b184aee`): β
 prices a tradeoff, but a hard filter is binding. **Do not run
 `PREREG_VIOLATION_PARITY`'s ladder** — it is measured inert and would burn
 hours restating the probe. That prereg stays frozen and pushed with its
@@ -511,7 +511,7 @@ campaign hours (the ladder's runtime, roughly 2–3 h for both traces).
 
 ### WP13 — Multi-tenant extension of the cost separation (the Transactions theory strengthener)
 
-**Why.** M3's replacement theorem (`bec0f62`, `research/jcac_sim/guarantee.py`,
+**Why.** M3's replacement theorem (`f719127`, `research/jcac_sim/guarantee.py`,
 756 lines) derives the reactive-vs-predictive cost separation for a **single
 tenant** — the per-tenant frontier enumeration is *exact* only because
 tenants are independent. The M3 close-out itself records the gap
@@ -643,7 +643,7 @@ checking; not asserted.
 4. **State the validation reading in writing BEFORE computing it** (in the
    analysis script's docstring, committed first — this is a derivation over
    already-committed campaign data, so no prereg/R2 applies, mirroring how
-   `bec0f62` itself landed; the pre-stated reading is what keeps it
+   `f719127` itself landed; the pre-stated reading is what keeps it
    honest): the derived bracket contains the measured cost delta on ≥4 of
    the 5 matched pairs INCLUDING `flash_crud`'s sign, or the extension is
    reported as failed.
@@ -995,14 +995,14 @@ never "the API passed a pen test".
 
 | WP | Status | Evidence |
 |---|---|---|
-| WP1 trace parity | **DONE (session 37, `5c75e8a`)** — split verdict, see below | `RESULTS_TRACE_PARITY.md`; replication PASS bit-for-bit both traces; gate 21/21 |
-| WP13 step 0 | **DONE (session 37, `67a32a5`)** | `RESULTS_SEPARATION.md` registered; 2 of 3 published rows EXACT, mechanism row not reproducible and replaced by a runnable test |
+| WP1 trace parity | **DONE (session 37, `04de2b8`)** — split verdict, see below | `RESULTS_TRACE_PARITY.md`; replication PASS bit-for-bit both traces; gate 21/21 |
+| WP13 step 0 | **DONE (session 37, `b47b728`)** | `RESULTS_SEPARATION.md` registered; 2 of 3 published rows EXACT, mechanism row not reproducible and replaced by a runnable test |
 | WP2 MASTER reconcile | **DONE (session 37)** | Cost/SLO/Fairness scoreboard rows + ablation annotation + 3 disambiguation-table rows updated with the EP/WP1 adjudications; hand-curated only, no generated record touched |
-| **WP15 budget parity** | **DONE (session 38, `c6a021f` Azure + `b3cd766` BurstGPT)** — BP-H1 FAIL both traces (cost claim withdrawn), BP-H2 PASS both (typical-window only on BurstGPT) | `RESULTS_BUDGET_PARITY.md`; replication EXACT both traces (504 + 672 rows, 0.00e+00); gate 22/22; 14 pinning tests |
-| WP3 layered fix | **DONE (session 38)** — LF-H1 PASS, LF-H2 PASS; +2884% withdrawn, **+318.5%** is the honest number | `RESULTS_LAYERED_FIX.md`; prereg `bedd6ff` pushed before the arms existed; 500/500 valid runs; latch measured 850/960 tenant-steps in `large`, gone after the fix (952/960 in `mid`); gate 23/23 byte-identical |
+| **WP15 budget parity** | **DONE (session 38, `e5ca126` Azure + `619c8d9` BurstGPT)** — BP-H1 FAIL both traces (cost claim withdrawn), BP-H2 PASS both (typical-window only on BurstGPT) | `RESULTS_BUDGET_PARITY.md`; replication EXACT both traces (504 + 672 rows, 0.00e+00); gate 22/22; 14 pinning tests |
+| WP3 layered fix | **DONE (session 38)** — LF-H1 PASS, LF-H2 PASS; +2884% withdrawn, **+318.5%** is the honest number | `RESULTS_LAYERED_FIX.md`; prereg `93d50ce` pushed before the arms existed; 500/500 valid runs; latch measured 850/960 tenant-steps in `large`, gone after the fix (952/960 in `mid`); gate 23/23 byte-identical |
 | WP4 cells verify/fix | **DONE (session 38)** — audit claim **FALSE**, closed as an adjudication, no code change | `REMAINING_WORK.md` §WP4/C6: `planner.py:245-256` keeps the tenant set out of the rebuild signature by design, `:266-289` carries survivor history across both paths, `planner_cells.py:81-88,126-144` partitions by index with cores built once; 3 new `PlanningCellTests` demonstrate partitioned == monolithic history |
 | WP5 O(N²) memoize | **DONE (session 38)** — shipped default-on; R4 gate PASSED | profile before: `evaluate_step` 5,859,776 calls, 35.6% tottime, 84% cumtime on a 64-tenant × 120-step run; after: **54,074 calls (108× fewer), 132.75 s → 9.66 s (13.7×)**; `reproduce.py` 22/22 byte-identical; 3 `ProjectionMemoTests` pin per-cycle clearing + linear scaling |
-| WP6 model mismatch | **DONE (session 38)** — **MM-H1 PASS, MM-H2 PASS**, all 12 sub-tests survive Holm | `RESULTS_MODEL_MISMATCH.md`; prereg `d5101c1` pushed before the run; 1500/1500 valid; ±25% mismatch on every constant leaves the `keda_fair` cost win (−6.2%…−20.9%) and `hpa_fair` severity NI intact; MM-H3 shows no cliff across 0.5–2.0; gate 25/25 |
+| WP6 model mismatch | **DONE (session 38)** — **MM-H1 PASS, MM-H2 PASS**, all 12 sub-tests survive Holm | `RESULTS_MODEL_MISMATCH.md`; prereg `ced9507` pushed before the run; 1500/1500 valid; ±25% mismatch on every constant leaves the `keda_fair` cost win (−6.2%…−20.9%) and `hpa_fair` severity NI intact; MM-H3 shows no cliff across 0.5–2.0; gate 25/25 |
 | WP7 push | **DONE (session 37, 2026-08-11)** | 26 commits pushed to `origin/v-series-validity-remediation`; permanent anchor disclosure for the two session-35 preregs recorded in `REMAINING_WORK.md` §Session 37 |
 | **WP8a dry-run** | **DONE (session 38)** — ran against a real apiserver; found `replica-only` rendering CRs **byte-identical to `jcac`'s** | `eval/scripts/live_actuation_dryrun.py`; 4/4 arms admit, both CEL bound rules fire on negative tests, pin now declared for all four arms; no measurement affected (WP8b never ran, and the pin was already enforced by `planner.enabled=false`); 2 `TestWave4ArmPins` tests; gate 23/23 |
 | **WP8b B1 scored** | **RAN (session 41). WL-H2 now PASSES; B1 still unscored, for a substrate-THROUGHPUT reason.** | `RESULTS_WAVE4_LIVE_PLANE.md`. The first sitting's **SUBSTRATE INADEQUATE was a FALSE NEGATIVE** — the WL-H2 probe was racing the operator's Policy reconciler, which pushes cache/tier levers to the same admin endpoint (`gateway_knobs.go:49` from `policy_controller.go:106`). With the reconciler paused (`_operator_paused`), the same probe returns **WL-H2 PASS**: cache delta **1.00** (1.00 @64 MB vs **0.00** @0 MB), tier pin exclusive **both ways** (`['small']` / `['mid']`), `routing_moved` **true**. The inert-knob reading is withdrawn. **What blocks B1 now:** the free Kaggle P100 serialises generation, so the frozen cell's ~218 concurrent VUs queue until they hit a 60 s timeout — **48.3% requests failed** (2,880/5,963), k6 aborted at 20% of the window. `tunnel_preflight` cannot detect this: it probes **sequentially** and returned TUNNEL OK minutes earlier. `docs/WAVE4_FREE_ROUTE.md` §0a now states the limitation. Scoring B1 needs a substrate that serves that concurrency — rented GPU, batched serving, or a smaller cell under a NEW prereg (the cell is frozen). **R4 gate 34/34 byte-identical** after the correction (`eval/results/r4_gate_session41.log`). **Five** harness defects were found by running this path for the first time; the last two manufactured failures rather than measuring them. |

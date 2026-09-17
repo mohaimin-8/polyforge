@@ -63,7 +63,7 @@ def main() -> None:
     columns = [d[0] for d in con.description]
     con.close()
 
-    # mtime=0, for the reason a8c4098 fixed in the aggregate exporter and
+    # mtime=0, for the reason 8f2eb30 fixed in the aggregate exporter and
     # missed here: gzip stamps the current time into its header, so
     # re-running this script produced a new byte stream from identical
     # data. "Re-export and diff" is the only check a committed export can

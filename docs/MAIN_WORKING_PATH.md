@@ -310,7 +310,7 @@ numbers.
 
 **Status 2026-08-06 — THE SPECIFIED THEOREM IS VACUOUS; DIRECTION CHANGED
 (user decision).** The RISK clause fired. `research/jcac_sim/guarantee.py`
-(committed b55f91b) builds the exact construction and shows a
+(committed a32374b) builds the exact construction and shows a
 recursive-feasibility theorem here would be *true and empty*: the plant is
 memoryless, so no state is a trap; the controller may hold still, so any
 configuration clearing the SLO across the orbit is trivially control-invariant;
@@ -341,7 +341,7 @@ the next slice: prove the gap by comparing a **lower** bound on reactive cost
 (relax the reach constraint) against an **achievable** predictive trajectory
 (respecting reach) — two lower bounds would prove nothing.
 
-**DONE 2026-08-06 (bec0f62) — the theorem is executable and it lands on the
+**DONE 2026-08-06 (f719127) — the theorem is executable and it lands on the
 measured record.** `price_of_reaction` in `guarantee.py` returns a *floor* on
 reactive cost (reach clamp and budget filter relaxed) against a *realised*
 predictive cycle (reach, budget and knob bounds all enforced, trajectory closed
@@ -361,7 +361,7 @@ PREREG_V3's specificity check analytically (`ramp_gentle` shares `flash_crud`'s
 remove the observational aliasing and the separation inverts, so the gap is
 caused by the information asymmetry the theorem names.
 
-**Campaign replay attempted 2026-08-06 (2bc3bf5) — DOES NOT LAND YET; open.**
+**Campaign replay attempted 2026-08-06 (6f26034) — DOES NOT LAND YET; open.**
 Two things block it, both now encoded in the tool rather than argued around:
 
 1. **Regime mismatch.** The separation bounds violation at *every step*; the
@@ -387,7 +387,7 @@ So the derived 49% and the measured −44…−50% are **consistent in sign and
 magnitude but not yet a validated correspondence**, and must not be written up
 as one.
 
-**RESOLVED 2026-08-06 (9081a63).** The reactive frontier is now enumerated
+**RESOLVED 2026-08-06 (f8596c2).** The reactive frontier is now enumerated
 exactly rather than swept: with reach relaxed the observation classes are
 independent, so the achievable set is a Minkowski sum and pruning dominated
 partial sums is lossless. On `spike` that recovers **62 frontier points where
@@ -447,7 +447,7 @@ approximate one — worth doing only if a reviewer presses on it.
 
 ### M4 / T18 — energy/carbon + admission control  *(NEW — optional, survey-blessed)*
 
-**Status 2026-08-06 (51d2f65) — energy/carbon DONE; admission control NOT done,
+**Status 2026-08-06 (0df90c3) — energy/carbon DONE; admission control NOT done,
 deliberately.** Per-step energy and carbon are reported on every `StepMetrics`,
 never priced into `cost_usd`, and the controller has an optional
 `carbon_weight` (guarded, default off — R4 re-verified 16/16 byte-identical
@@ -523,7 +523,7 @@ its first step is the live actuation dry-run M1 could not run here.
 
 ~~**Next desk action: M3**~~ — **stale, corrected 2026-08-11.** M3 closed in
 session 34 (the specified theorem was vacuous; the redirect to the
-reactive-vs-predictive cost separation is done and committed at `bec0f62`,
+reactive-vs-predictive cost separation is done and committed at `f719127`,
 DEFENSE_QA #28). Two things now supersede this section:
 
 1. **The execution level is `docs/PUBLICATION_ROADMAP.md`**, written after
@@ -536,4 +536,4 @@ DEFENSE_QA #28). Two things now supersede this section:
    the *synthetic* cost headline was substantially eviction accounting, and
    the two real-demand headlines (−70.4% / −42.5%) run through the same
    unfair code path and have never been re-scored. WP7 (push) closed
-   2026-08-11; WP1's prereg is anchored at `97f5879`.
+   2026-08-11; WP1's prereg is anchored at `0913f6b`.

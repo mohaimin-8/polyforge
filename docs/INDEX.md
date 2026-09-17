@@ -116,6 +116,7 @@ precision — the ceiling is response stochasticity).
 | [CLICKHOUSE_DESIGN.md](CLICKHOUSE_DESIGN.md) | Telemetry store design |
 | [INFERENCE_BENCH.md](INFERENCE_BENCH.md) | Inference benchmark method |
 | [V2_README.md](V2_README.md) | v2 simulator notes |
+| [COMMIT_MAP.md](COMMIT_MAP.md) | The 2026-09-17 history rewrite (message-only; every tree and timestamp preserved) and the old→new hash table for commits the frozen records cite |
 
 ## 5. Runbooks
 

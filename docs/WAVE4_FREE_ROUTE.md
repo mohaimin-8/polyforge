@@ -329,7 +329,7 @@ handling requires that "any substrate change forced by the provisioned host
 invalidated the run.
 
 That amendment is **already written and pushed** —
-`PREREG_WAVE4_LIVE_PLANE.md` §Amendment (session 33, commit 791f96a). Nothing
+`PREREG_WAVE4_LIVE_PLANE.md` §Amendment (session 33, commit 9053f02). Nothing
 further is needed before the run; the summary below is orientation, and the
 amendment is authoritative wherever the two differ. Restate it in the RESULTS
 file too, but the prereg push is what makes the run valid.

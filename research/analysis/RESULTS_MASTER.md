@@ -104,7 +104,7 @@ term dropped from claims (stays in the system as a configurable weight).
 
 Real MiniLM encoder end-to-end; synthetic prompt set saturates under a semantic encoder
 (its duplicate structure is lexical by design — documented caveat). **Real headline
-(session 16c):** feasibility amendments committed *before* the gated download (31c73c7 —
+(session 16c):** feasibility amendments committed *before* the gated download (6f0c3d4 —
 seeded reservoir sample n=200,000 of 2,015,645 user turns, block-wise exact NN verified
 bit-identical on synthetic, supplementary 10%-fixed baseline). As measured: adaptive
 29.6% @ 0.85 / 48.8% @ 0.70; adaptive +93% vs the 10%-fixed baseline; $0.296/1k queries;
@@ -154,7 +154,7 @@ actuation gate passed before load — the session-17 desk fixes held with zero b
 Full mirrored slice: {jcac, hpa} × {crud_bursty, ai_cacheable} × 3 reps, **12/12 valid**
 (one hpa attempt failed on a pod-level memcg OOM at 22:29:43 and was cleanly retried per
 the retry-then-mark design; the validated data is the clean attempt's). Analyzed by the
-pre-frozen protocol (`phase7_ordinal.py`, commit 650ce29, committed before any live
+pre-frozen protocol (`phase7_ordinal.py`, commit f0157cd, committed before any live
 number existed). **As measured: the primary reading DISAGREES — the J winner flips in
 both cells.** Descriptively, live the two arms land at *parity* on every metric (J
 separations 0.002 with overlapping rep ranges; violations zero for both arms in both
@@ -180,7 +180,7 @@ buy a large fairness win — jcac is *more* fair on Jain (0.9705 vs 0.9599, p=1.
 
 Six DEFENSE_QA audit gaps (§14–19) turned into measurements. Wave 1 re-reads the
 immutable databases only (no new runs); Wave 2 is four pre-registered campaigns, each
-protocol pushed before its run (7deb6a3), the two economy reruns exact 1,800-cell
+protocol pushed before its run (d34a9ce), the two economy reruns exact 1,800-cell
 mirrors of the v1 headline matrix under a changed world, spot-checked bit-identical
 (drift 0.00e+00) on the default path.
 
@@ -216,7 +216,7 @@ mirrors of the v1 headline matrix under a changed world, spot-checked bit-identi
   across streams (PT-H3) — the per-tenant pluggability claim, measured one aggregation
   level down.
 
-Deferred to a live Codespace session, pre-registered and desk-prepared now (c38bce6):
+Deferred to a live Codespace session, pre-registered and desk-prepared now (6c12921):
 the over-the-wire membership attack (`PREREG_WIRE_ATTACK.md`) and live chaos + p99
 (`PREREG_LIVE_CHAOS_P99.md`, p99 export landed and unit-tested at the desk). OSF
 prospective mirror index: `OSF_REGISTRATION.md` (§17), submission is the one user step.
@@ -227,7 +227,7 @@ Executes the scaling lever `PLANNER_SCALING.md` named as future work (DEFENSE_QA
 on the deployed `PlannerCore.plan` code path, single laptop core; two pre-registered
 campaigns.
 
-- **Latency (`PLANNER_CELLS.md`, PREREG_PLANNER_CELLS.md at 264356a).** Partition the
+- **Latency (`PLANNER_CELLS.md`, PREREG_PLANNER_CELLS.md at c898b5a).** Partition the
   portfolio into fixed K=32 planning cells (each planned on an independent replica).
   **PS-H1 PASS:** partitioned per-cell p95 stays flat at ~195 ms through 1024 tenants
   (fitted exponent 0.27) while the monolithic joint plan grows to **71 s at 1024**
@@ -238,7 +238,7 @@ campaigns.
   with the whale period (a whale every 8th tenant), so all whales collapse into a few
   cells whenever the cell count is a multiple of 8 (N ∈ {256,512,1024}). Published as
   measured with the diagnosis (erratum in the file), then the disciplined follow-up
-  (`PREREG_PLANNER_CELLS_DEALIAS.md` at 0a61c6a, one changed factor): a hash-based
+  (`PREREG_PLANNER_CELLS_DEALIAS.md` at 54dde6e, one changed factor): a hash-based
   assignment that decorrelates cell membership from index. **PF-H1 PASS: worst ΔJain
   −0.0053 through 1024** — the fairness cost was the aliasing, not partitioning. The
   engineering lesson (hash cells, not index round-robin) is itself measured.
@@ -266,7 +266,7 @@ export is landed + unit-tested; persisting it through the harness remains). Runb
 ### 13. Wave 5 — structural-form program + solver audit (session 24)
 
 The sensitivity axis Waves 1–2 never varied: the simulator's *functional forms*. Four
-pre-registered campaigns (protocols pushed at `7519958`/`fc7e72c`/`cfab691` before their
+pre-registered campaigns (protocols pushed at `7519958`/`14636fc`/`6cfe29f` before their
 runs), each a full 1,800-run headline-matrix mirror, all validation-green and
 spot-checked bit-identical:
 
@@ -350,7 +350,7 @@ fairness holds (jcac Jain 0.994 / 0.9999). → `RESULTS_TENANT_SCALE.md`
 
 ### 18. Learned joint control — the RL analog of the MPC (session 29)
 
-`PREREG_LEARNED_CONTROL.md` (pushed at 896c896 before the training run, the
+`PREREG_LEARNED_CONTROL.md` (pushed at 3a7528a before the training run, the
 tuning sweep, or any matrix run). The sharpest remaining *mechanism* question:
 every baseline in the matrix is hand-designed, and the one RL arm
 (`firm`, OSDI '20) learns the **replica knob only** — so nothing tested whether
@@ -383,7 +383,7 @@ combos; winner lr 0.3 / replay 16 / β 3.0). 1,200 runs, all valid.
 
 ### 19. Risk-aware (quantile) MPC — published null with a diagnosis (session 29)
 
-`PREREG_RISK_MPC.md` (pushed at b2900b2 before any run). The base controller
+`PREREG_RISK_MPC.md` (pushed at 0e73ec1 before any run). The base controller
 plans at the *expected* demand, so realized demand lands above plan roughly half
 the time — the structural mechanism behind the disclosed attainment-for-spend
 trade. The campaign replaced the point forecast with a **quantile of the
@@ -415,7 +415,7 @@ is affected.
 
 ### 20. Budget-corrected risk MPC — the null's follow-up, one changed factor (session 30)
 
-`PREREG_RISK_BUDGET.md` (pushed at 701d29b before any run). The disciplined
+`PREREG_RISK_BUDGET.md` (pushed at 7595819 before any run). The disciplined
 follow-up the campaign-19 diagnosis identified, in the
 `PREREG_PLANNER_CELLS_DEALIAS` tradition — a **new pre-registration with
 exactly one changed factor**: capacity is still sized against the
@@ -514,10 +514,10 @@ against by-construction winners; framing documented in `RESULTS.md`), **cache hi
    2026-09-15 and scored **WL-H1 FAIL as registered** (RESULTS_WAVE4_LIVE_PLANE.md:
    the joint controller cost 23.3% more than its own tier-only ablation at equal
    fairness); the diagnosis — an open-loop plant model and a hysteresis ratchet —
-   became a 27th protocol, PREREG_WAVE4_CALIBRATED (`6b2de57`), one changed factor,
+   became a 27th protocol, PREREG_WAVE4_CALIBRATED (`dd16920`), one changed factor,
    whose sitting the same day scored **WL-H1′ PASS** (RESULTS_WAVE4_CALIBRATED.md:
    the corrected controller beats every arm in joint_stress with paired-bootstrap
-   CIs below zero; four dated amendments sit after its registered text). Its evidence then fitted the simulator's plant under a 28th, frozen rule — PREREG_WAVE4_SIM_TRANSFER (`10febd3`) — and the fitted simulator's cost winner matched live in 3 of 4 cells where the published plant matched 1 (RESULTS_WAVE4_SIM_TRANSFER.md: WL-H3′ PASS; in `joint_stress` the ranking is live's, arm for arm). A 29th, PREREG_WAVE4_DWELL (`34ea69d`), tested a three-cycle replica dwell as the damper for the corrected controller's replica oscillation and scored **WL-H6 FAIL, WL-H7 FAIL** (RESULTS_WAVE4_DWELL.md): the cycle is a long swing, not chatter, and a reversal ban does not damp it — a negative result, reported as scored. The two
+   CIs below zero; four dated amendments sit after its registered text). Its evidence then fitted the simulator's plant under a 28th, frozen rule — PREREG_WAVE4_SIM_TRANSFER (`fe2d774`) — and the fitted simulator's cost winner matched live in 3 of 4 cells where the published plant matched 1 (RESULTS_WAVE4_SIM_TRANSFER.md: WL-H3′ PASS; in `joint_stress` the ranking is live's, arm for arm). A 29th, PREREG_WAVE4_DWELL (`0000cbe`), tested a three-cycle replica dwell as the damper for the corrected controller's replica oscillation and scored **WL-H6 FAIL, WL-H7 FAIL** (RESULTS_WAVE4_DWELL.md): the cycle is a long swing, not chatter, and a reversal ban does not damp it — a negative result, reported as scored. The two
    live protocols PREREG_WIRE_ATTACK and PREREG_LIVE_CHAOS_P99 were pushed before
    any live number existed and have since been executed. The v1 gate and Phase 4 acceptance are
    frozen separately in the roadmap/V2_README.
@@ -525,7 +525,7 @@ against by-construction winners; framing documented in `RESULTS.md`), **cache hi
    testing exactly *one changed factor* identified by a published null's own
    diagnosis, never a silent re-run of the null: PREREG_PLANNER_CELLS_DEALIAS
    (the whale/cell-count aliasing confound in PLANNER_CELLS) and PREREG_RISK_BUDGET
-   (the budget interaction diagnosed in RESULTS_RISK; pushed 701d29b, and its RB-H1
+   (the budget interaction diagnosed in RESULTS_RISK; pushed 7595819, and its RB-H1
    PASS is what confirms that diagnosis was mechanism rather than story).
    The learned-control RESULTS file carries
    a disclosed arithmetic erratum: the prereg text labels the matrix "1,500 runs" where the

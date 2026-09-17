@@ -69,14 +69,14 @@ one mechanism: the tier knob's price, not control quality.
 
 **Two mechanisms measured inert/inadequate before scoring, both disclosed:**
 `PREREG_VIOLATION_PARITY`'s β ladder moves `mean_excess` 4.8319 → 4.8314
-across a 32× weight increase (`f045e68`) — a weight cannot buy what a filter
+across a 32× weight increase (`b184aee`) — a weight cannot buy what a filter
 forbids, so that prereg stays frozen with its premise falsified and its
 ladder unrun. `PREREG_BUDGET_PARITY`'s first baseline rule ("hold when
 unaffordable") only blocked increases and left `hpa_budget` 2.5% under
 `hpa_fair`; corrected to the controller's own best-affordable-candidate
 semantics as Amendment 1, before any hypothesis was scored.
 
-Mechanisms landed default-OFF at `365ac40`/`38f12ff`; R4 held 21/21
+Mechanisms landed default-OFF at `ab5696f`/`38c591e`; R4 held 21/21
 byte-identical throughout, 143 sim tests green. BP-H2 (is the overshoot
 constraint-induced?) is scoreable as frozen and its campaign is running;
 early single-window evidence says **partly** — lifting the budget takes
@@ -238,7 +238,7 @@ before their campaigns ran but pushed only afterwards, because the branch
 had never been pushed. The registration anchor for those two is the commit
 hash, not the push event.* The frozen files are not edited to say so — that
 would defeat the purpose of freezing them; the disclosure lives here and in
-`RESULTS_MASTER.md`'s adjudication notes. `PREREG_TRACE_PARITY.md` (97f5879)
+`RESULTS_MASTER.md`'s adjudication notes. `PREREG_TRACE_PARITY.md` (0913f6b)
 was pushed before its implementation existed, let alone its run.
 
 **Second finding, recorded rather than fixed silently:** the three trace
@@ -274,7 +274,7 @@ caused by observational aliasing rather than arithmetic. It is not currently
 backed by runnable code. Full detail and the instruction not to silently
 substitute a reproducing number: `PUBLICATION_ROADMAP.md` WP13 step 0.
 
-**WP13 step 0 CLOSED (`67a32a5`).** `analysis_separation.py` now regenerates
+**WP13 step 0 CLOSED (`b47b728`).** `analysis_separation.py` now regenerates
 the whole table from `guarantee.py` alone — `RESULTS_SEPARATION.md`,
 registered in `reproduce.py`. The unreproducible row was not patched to
 match the prose: it is reported as unreproducible in the record itself, with
@@ -292,11 +292,11 @@ why the −70.4% / −42.5% real-demand headlines were never adjudicated. The
 symptom was visible in the published records the whole time: every reactive
 baseline reports `cache_hit_rate` **0.1133** on *both* traces, identical to
 four decimals, because they are pinned at 128 MB for the whole run, while
-PolyForge reports 0.1703 / 0.2182. Wiring fixed and R4-verified at `077be71`
+PolyForge reports 0.1703 / 0.2182. Wiring fixed and R4-verified at `78eb467`
 (19/19 byte-identical; the three trace records byte-identical via
 `--analyze`); campaign running.
 
-**WP1 CLOSED (`5c75e8a`), verdict split by trace.** `RESULTS_TRACE_PARITY.md`
+**WP1 CLOSED (`04de2b8`), verdict split by trace.** `RESULTS_TRACE_PARITY.md`
 is in and registered (`reproduce.py`: 21/21 byte-identical). Replication of
 the five published arms is bit-for-bit exact on both traces before any new
 arm is scored — the substrate is sound. Then: **Azure** shrinks from the
@@ -430,13 +430,13 @@ learned-control front** — the sharpest remaining *mechanism* objection
 ("why a hand-designed MPC and not a learned policy?"). A strong,
 offline-trained RL controller over the *identical* joint action space and
 objective was pre-registered (`PREREG_LEARNED_CONTROL.md`, pushed at
-896c896 before any run), trained, and beaten: MPC J −0.376, p=2.9e-28,
+3a7528a before any run), trained, and beaten: MPC J −0.376, p=2.9e-28,
 d_z=−0.708 over 300 matched cells **at zero training cost**, with the
 learner's lower violation bought at 2.61× the spend — the same
 attainment-for-spend trade the reactive scalers make
 (`RESULTS_LEARNED.md`, DEFENSE_QA #26). **Session 30 closed the risk-control
 line** with the disciplined follow-up its own published null called for
-(`PREREG_RISK_BUDGET.md`, pushed 701d29b before any run; one changed factor,
+(`PREREG_RISK_BUDGET.md`, pushed 7595819 before any run; one changed factor,
 the null never re-run): **RB-H1 PASS** — the reading the null failed *with
 the sign reversed* now lands as designed (−0.00232 violation, p=0.0073),
 confirming the published diagnosis was mechanism and not story — while
@@ -466,7 +466,7 @@ These need no account, host, or payment. They are the natural next desk tasks.
 | Slides ↔ thesis consistency pass | ensure the deck's numbers match the reconciled discussion chapter (−70% not −76%; eight nulls; over-the-wire done) | `thesis/slides/`, `PolyForge_Pre-defence_Presentation.pptx` |
 | Thesis ↔ Wave 5 reconciliation | fold DEFENSE_QA #24–25 into the discussion/limitations chapters: structural-form robustness, the clamp disclosure + anchored-controller quotability, the coordination-gap result | `thesis/report/`, sources in `RESULTS_MASTER.md` §13 |
 | ~~B2/B3 formal write-up~~ | **DONE (session 27):** `RESULTS_LIVE_CHAOS_P99.md` generated by `live_chaos_p99.py` from the committed CSV — LC-H1 PASS (zero violation through both live faults), P99-H1 recorded (SLO verdict unchanged at p99) | `research/analysis/RESULTS_LIVE_CHAOS_P99.md` |
-| **Formal SLO guarantee** (M3 / T17 — REDIRECTED 2026-08-06) | **The specified theorem is vacuous on this plant and that is committed (b55f91b):** memoryless plant + hold-still actuation + cheap replicas make any SLO-clearing configuration trivially control-invariant, so recursive feasibility here is true and empty. Per the author's call the target became the **reactive-vs-predictive cost separation**, and it is **DONE and executable (bec0f62)**: a floor on reactive cost vs a realised predictive cycle gives **+49.0% on the `flash` orbit** (where the onset climb of 5 exceeds the ±2 authority) against **+2.7%** on the `ramp_gentle` control cell and **−5.9%** once the observational aliasing is removed — i.e. 49.0% derived from the plant constants alone, against the campaigns' measured −44…−50% cost at violation parity. **M3 is closed** (`DEFENSE_QA` #28). Campaign replay done per matched cell on the `uniform` mix across hpa/keda/firm (5 parity pairs): medium/`spike_agentic` derived +43.4% vs measured +53.1%, large/`flash_ai` +42.5% vs +79.1%; small/`flash_crud` not computable; both `ramp_gentle` pairs outside the theorem's scope. **An earlier "all three signs agree" claim is RETRACTED** — it came from comparing one derived cell against a twelve-cell measured average, and `flash_crud` flips once the cells are matched. **The multi-tenant coupling is load-bearing, not optional** (no-cap gives the wrong sign; equal-share makes the cell infeasible; independent per-tenant phases mean neither is right). Status: *suggestive structural corroboration at one operating point*, not a validated correspondence — the open item is the multi-tenant extension. Table, soundness rule and detail in `docs/MAIN_WORKING_PATH.md` §3 M3. Original spec, now superseded: the primary Transactions/TPDS strengthener: terminal invariant set + recursive-feasibility condition over the MPC's already-clamped actuation lattice → a bounded-violation guarantee, shipped as an executable checker + a validation script asserting measured violation ≤ bound on every closed campaign. Theorem prose author-owned (R8). Must be a real proof, not a heuristic | `research/jcac_sim/controller.py`, `research/jcac_sim/test_invariants.py`; spec in `docs/MAIN_WORKING_PATH.md` §3 |
+| **Formal SLO guarantee** (M3 / T17 — REDIRECTED 2026-08-06) | **The specified theorem is vacuous on this plant and that is committed (a32374b):** memoryless plant + hold-still actuation + cheap replicas make any SLO-clearing configuration trivially control-invariant, so recursive feasibility here is true and empty. Per the author's call the target became the **reactive-vs-predictive cost separation**, and it is **DONE and executable (f719127)**: a floor on reactive cost vs a realised predictive cycle gives **+49.0% on the `flash` orbit** (where the onset climb of 5 exceeds the ±2 authority) against **+2.7%** on the `ramp_gentle` control cell and **−5.9%** once the observational aliasing is removed — i.e. 49.0% derived from the plant constants alone, against the campaigns' measured −44…−50% cost at violation parity. **M3 is closed** (`DEFENSE_QA` #28). Campaign replay done per matched cell on the `uniform` mix across hpa/keda/firm (5 parity pairs): medium/`spike_agentic` derived +43.4% vs measured +53.1%, large/`flash_ai` +42.5% vs +79.1%; small/`flash_crud` not computable; both `ramp_gentle` pairs outside the theorem's scope. **An earlier "all three signs agree" claim is RETRACTED** — it came from comparing one derived cell against a twelve-cell measured average, and `flash_crud` flips once the cells are matched. **The multi-tenant coupling is load-bearing, not optional** (no-cap gives the wrong sign; equal-share makes the cell infeasible; independent per-tenant phases mean neither is right). Status: *suggestive structural corroboration at one operating point*, not a validated correspondence — the open item is the multi-tenant extension. Table, soundness rule and detail in `docs/MAIN_WORKING_PATH.md` §3 M3. Original spec, now superseded: the primary Transactions/TPDS strengthener: terminal invariant set + recursive-feasibility condition over the MPC's already-clamped actuation lattice → a bounded-violation guarantee, shipped as an executable checker + a validation script asserting measured violation ≤ bound on every closed campaign. Theorem prose author-owned (R8). Must be a real proof, not a heuristic | `research/jcac_sim/controller.py`, `research/jcac_sim/test_invariants.py`; spec in `docs/MAIN_WORKING_PATH.md` §3 |
 | ~~B1 live ablation arms + CRD bounds (M1)~~ | **DESK-COMPLETE (session 34, 2026-08-06):** live `replica-only`/`cache-only`/`tier-only` arms + Policy-CRD `cacheSizeMBMin/Max` and `modelTierMin/Max` (min==max pins a knob), clamped at the actuation point, forwarded to the planner, mirrored in the sim, with the frozen 4×4 matrix in `eval/experiments/wave4_live_plane.yaml`. R4 holds (16/16 records byte-identical). The **live actuation dry-run is deferred into M2** (no Docker here) | `eval/harness/cluster_backend.py`, `internal/operator/**`, `eval/experiments/` |
 
 ## Bucket B — author-gated live-cluster experiments (prepared at the desk; the author opens the gate)
@@ -480,7 +480,7 @@ the joint controller.
 | Item | Status | Gate | Spec |
 |---|---|---|---|
 | **B1. Three-knob live plane** (joint controller, all knobs live) | **UNBLOCKED at the desk (session 34, 2026-08-06).** Session 33's correction — `OPERATOR_SYSTEMS = {"jcac"}`, no CRD bounds, so the prereg's `cache-only`/`tier-only` ablations ("the sharpest test of the central claim") had no live implementation and WL-H1 was not evaluable — is **resolved**: all four frozen arms are wired, the CRD pins a knob at min==max, and every rendered CR validates against the committed CRDs. The GPU half was already solved and free (`docs/WAVE4_FREE_ROUTE.md`; T4a gate PASSED on a real Kaggle P100, gap 647.7 ms vs the bench's 641 ms). **Still owed before scoring, in this order:** (1) the live actuation dry-run of the four arms (deferred from M1 — needs a cluster), (2) `knob_preflight.py` WL-H2 liveness gate, then (3) the frozen matrix once. An inert knob VOIDS WL-H1 — report, do not fake | GPU-capable host (free Kaggle + Codespace route) | `PREREG_WAVE4_LIVE_PLANE.md` §Status update, `docs/MAIN_WORKING_PATH.md` §3 M1 status |
-| **B2. Live chaos campaign** (planner crash + apiserver throttle) | **EXECUTED** (session 23, Codespace, shared-PG data plane): both faults injected live under load, run valid, violations 0 through both — data in `eval/results/live_chaos_p99_runs.csv` (commit 7bdbd4f). Remaining: the formal RESULTS write-up against the prereg's frozen readings | done (write-up = Bucket A) | `PREREG_LIVE_CHAOS_P99.md`, `eval/results/live_chaos_p99_runs.csv` |
+| **B2. Live chaos campaign** (planner crash + apiserver throttle) | **EXECUTED** (session 23, Codespace, shared-PG data plane): both faults injected live under load, run valid, violations 0 through both — data in `eval/results/live_chaos_p99_runs.csv` (commit 523422b). Remaining: the formal RESULTS write-up against the prereg's frozen readings | done (write-up = Bucket A) | `PREREG_LIVE_CHAOS_P99.md`, `eval/results/live_chaos_p99_runs.csv` |
 | **B3. Live p99 number** | **EXECUTED** (same sitting): first real live p99 — ai 20.043 ms / crud 1.191 ms (ai_cacheable), crud 8.01 ms (crud_bursty) — same CSV; write-up rides with B2's | done (write-up = Bucket A) | `PREREG_LIVE_CHAOS_P99.md` Part B |
 
 Notes: B2/B3 share one Codespace sitting and reuse the proven session-19

@@ -133,7 +133,7 @@ VIEWS = [
     # works-here-only shape R5 fixed for four other records.
     # raw_sim_gpu_econ_v2 was missing for the same reason and with the same
     # consequence, one session later: RESULTS_TIER_RATIO_V2.md entered the
-    # gate at f9da4e0 with neither a run-level export nor this aggregate, and
+    # gate at 576254f with neither a run-level export nor this aggregate, and
     # the gate went 52/52 -> 51/52 on the next push.
     for db in ("raw_sim_gpu_econ.duckdb", "raw_sim_gpu_econ_v2.duckdb",
                "raw_sim_hk.duckdb", "raw_sim_lm.duckdb",

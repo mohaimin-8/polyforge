@@ -7,7 +7,7 @@ delays are fixed sleeps that never enter a record, so **nothing here is a
 measurement of PolyForge on a real substrate**. What is real is every
 controller decision — replicas, cache size, tier — taken against the
 cluster's actual CRUD latency and the realized p95s the operator now feeds
-back. This directory is the raw proof behind commit `f1102d6` and the
+back. This directory is the raw proof behind commit `78d7180` and the
 reason a follow-up sitting is pre-registered.
 
 | arm | total $ | tier $ | infra $ | requests on `mid` | cache hit | Jain | violation |

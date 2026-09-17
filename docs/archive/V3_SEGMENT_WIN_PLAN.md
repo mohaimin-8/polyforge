@@ -36,7 +36,7 @@ same experiment: **new cells, not new tuning.**
 ## Phase A — SLO overload + trace-periodicity matrix — DONE (session 14, as measured)
 
 - [x] `research/analysis/PREREG_V3.md` committed **and pushed** before any run
-      (commit 6229b6a); `jcac_seasonal` named in advance as the sole treatment;
+      (commit 5dab1de); `jcac_seasonal` named in advance as the sole treatment;
       analysis_v3.py frozen in the same commit.
 - [x] `eval/experiments/matrix_v3_overload.yaml`: four classes sized by
       model-constant arithmetic (pinned by unit tests, not trial runs) —
@@ -69,7 +69,7 @@ same experiment: **new cells, not new tuning.**
 
 - [x] **Author:** token provided 2026-07-12; gate accepted; sentence-transformers
       already installed (session 14).
-- [x] Protocol run with one *declared pre-run amendment* (commit 31c73c7, pushed
+- [x] Protocol run with one *declared pre-run amendment* (commit 6f0c3d4, pushed
       **before** the gated download): the committed protocol is infeasible at full
       scale (2M+ turns → ~40 TB dense similarity matrix), so — seeded reservoir
       sample n=200,000 of 2,015,645 user turns; block-wise exact NN (verified
@@ -103,8 +103,8 @@ same experiment: **new cells, not new tuning.**
       contiguous segment (104-day collection gap = missing data, not zero demand),
       gap-inclusive numbers alongside.
 - [x] Headline-matrix-on-BurstGPT replay — DONE as measured (session 15,
-      PREREG_TRACE.md committed+pushed 717f8bd before the run; RESULTS_TRACE.md,
-      commit 01cb5ed). **HT FAIL on the p<0.01 bar at n=16 windows — but every
+      PREREG_TRACE.md committed+pushed 050ff63 before the run; RESULTS_TRACE.md,
+      commit 56734b0). **HT FAIL on the p<0.01 bar at n=16 windows — but every
       point estimate matches the v1 headline**: J 0.33 vs 0.57–0.61, cost −76%
       vs HPA/KEDA/FIRM at violation +0.07; the effect concentrates in the
       high-traffic collection period (J diff ≈ −0.5) and vanishes in the quiet
@@ -112,8 +112,8 @@ same experiment: **new cells, not new tuning.**
       seasonal ≈ trend under weak periodicity. A higher-powered replay (more
       windows) is permitted only as a new pre-registration in a new file.
 - [x] Powered second replay — DONE as measured (session 15, `PREREG_TRACE2.md`
-      committed+pushed b09a492 before the run; `RESULTS_TRACE2.md`, commit
-      cb96dfd). **HT2 PASS with disclosure** at n=96 independent seeds: J beats
+      committed+pushed 825c349 before the run; `RESULTS_TRACE2.md`, commit
+      3ff5b6d). **HT2 PASS with disclosure** at n=96 independent seeds: J beats
       HPA/KEDA/FIRM at p ≤ 5.5e-05, **cost −70%** (p ≤ 4.3e-06), violation
       trade +0.07 disclosed as pre-registered. The real-demand headline is now
       confirmatory; samples never pooled. **−70% is the citable number**, not
@@ -125,9 +125,9 @@ same experiment: **new cells, not new tuning.**
 
 The segment is already resolved (Jain win vs FIRM at dz=0.95; γ honestly nulled).
 The scoreboard's named target is VTC's *empirical* side:
-- [x] `vtc_replica` implemented and tuned per TUNING.md (commit acb792b);
+- [x] `vtc_replica` implemented and tuned per TUNING.md (commit 1ff8a0d);
       comparison pre-registered in `PREREG_VTC.md` before the run.
-- [x] Outcome as measured (`VTC_FAIRNESS.md`, commit bfb70fc): **HV1 PASS,
+- [x] Outcome as measured (`VTC_FAIRNESS.md`, commit 5e0914d): **HV1 PASS,
       HV2 PASS** — jcac beats the dedicated fair divider on composite J
       (d_z=−1.12, p=3e-19) *and on Jain itself* (0.9705 vs 0.9599, p=1.5e-6)
       at −35% cost, −36% worst-tenant p95.
@@ -144,8 +144,8 @@ The scoreboard's named target is VTC's *empirical* side:
 | 18 | Phase C downloads + trace reruns | network (multi-GB) |
 | 19 | Phase D and/or Phase 9 hardening + README v2/v3 numbers | — |
 
-~~Also outstanding from v2: commits `f8aa8e6`+`1388a59` are unpushed.~~ Resolved:
-all work through `cb96dfd` is pushed, CI green (session 15).
+~~Also outstanding from v2: commits `9c85610`+`3e57552` are unpushed.~~ Resolved:
+all work through `3ff5b6d` is pushed, CI green (session 15).
 
 ## What this plan will not do
 
