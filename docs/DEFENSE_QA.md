@@ -325,10 +325,15 @@ produced — failed confirmatory hypotheses and further negatives, published
 in full. The named upgrade is now in motion: `OSF_REGISTRATION.md` is the
 registry-ready mirror index, carrying every Wave 2/3 protocol with its git
 push anchor (commit + ISO timestamp) so an OSF registration is a
-transcription, not a re-derivation. Submitting to OSF needs a browser and an
-account and is the one manual step, flagged there exactly as the Zenodo/GHCR
-items are in `docs/RELEASE_CHECKLIST.md`; until each DOI lands the git anchor
-stands and is independently checkable.
+transcription, not a re-derivation. **Done 2026-09-19:** all 48 protocols,
+the index and the commit map are registered on OSF as one frozen, public
+mirror — DOI https://doi.org/10.17605/OSF.IO/DYZKV. Say exactly what it is:
+a post-run, independent, non-editable witness of the protocols as pushed;
+the git push timestamps remain the pre-run anchor, and
+`scripts/check_preregs.py` (CI, full history) is what proves no registered
+text moved after its result. **Do not say** "pre-registered on OSF before
+the runs" — they were pre-registered in git before the runs and mirrored to
+OSF after.
 
 ## 18. "Your per-tenant forecasting claim rests on aggregate streams."
 

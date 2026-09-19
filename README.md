@@ -251,6 +251,11 @@ DuckDB files into `eval/results/` enables the archive tier of
 > controller-comparison campaigns (harness, baselines, raw results,
 > live-run data, IaC)* [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.22801195
 
+**Pre-registrations on OSF:** all 48 protocols are mirrored, frozen and
+public at [https://doi.org/10.17605/OSF.IO/DYZKV](https://doi.org/10.17605/OSF.IO/DYZKV) (registered after the
+campaigns ran; the git push timestamps remain the pre-run anchor, and
+`scripts/check_preregs.py` proves no protocol changed after its result).
+
 ## Limitations (honest boundaries)
 
 - **Substrate.** All headline numbers are simulator-backend decision

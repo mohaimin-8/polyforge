@@ -23,6 +23,10 @@ version predated the evidence site, the AWS sittings and the caption gate.)
   proves no registered text moved after its result existed.
 - `research/analysis/RECORDS_INDEX.md` (generated) enumerates all of them;
   `OSF_REGISTRATION.md` carries the 29 OSF rows.
+- [x] OSF mirror registered 2026-09-19: **https://doi.org/10.17605/OSF.IO/DYZKV**
+      (all 48 protocols + index + commit map, frozen and public; project
+      https://osf.io/wt7em/). A post-run witness, stated as such; the git
+      push timestamps stay the pre-run anchor.
 
 ## 3. Zenodo deposit — done, published 2026-09-17
 
