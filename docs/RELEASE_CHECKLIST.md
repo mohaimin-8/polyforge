@@ -51,17 +51,18 @@ version predated the evidence site, the AWS sittings and the caption gate.)
 - [x] `scripts/test_build_pages.py` fails on a gated record without a page, a
       dead link, or two builds that differ.
 
-## 5. Images and chart — built and signed (v1.0.0, 2026-09-17); visibility is the one manual step
+## 5. Images and charts — public (2026-09-19)
 
 - [x] Tag `v1.0.0` → `release.yml` built, SBOM'd and cosign-signed
-      `ghcr.io/mohaimin-8/polyforge/{control-plane,ai-gateway,operator,planner}:v1.0.0`;
-      charts `polyforge-operator` 0.3.0 / `polyforge` 0.2.0 point at appVersion 1.0.0.
-- [ ] **human (no API exists for this):** for each of the four packages,
-      github.com/mohaimin-8?tab=packages → package → Package settings →
-      Danger Zone → Change visibility → **Public**. Until then the images are
-      pullable only with a token; the paper does not depend on them.
-- [ ] Optional: `helm package deploy/helm/polyforge-operator`, host the index
-      on Pages, register on artifacthub.io.
+      `ghcr.io/mohaimin-8/polyforge/{control-plane,ai-gateway,operator,planner}:v1.0.0`
+      and pushed both charts as OCI packages
+      `oci://ghcr.io/mohaimin-8/polyforge/charts/{polyforge-operator,polyforge}:1.0.0`
+      (the chart's OCI tag is the release tag, not `Chart.yaml`'s `version`).
+- [x] All six packages set to Public by the owner (2026-09-19); verified
+      anonymously: every tag list answers HTTP 200 and
+      `helm pull oci://ghcr.io/mohaimin-8/polyforge/charts/polyforge-operator --version 1.0.0`
+      succeeds with no login.
+- [ ] Optional: register the chart on artifacthub.io.
 
 ## 6. Live evidence — done
 
