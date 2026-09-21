@@ -1,0 +1,140 @@
+\section{Methodology}
+\label{sec:method}
+
+The credibility of what follows rests on rules that were fixed before any
+result existed. We state them here; Section~\ref{sec:eval} reports what
+happened under them, including the hypotheses that failed.
+
+\subsection{Pre-registration}
+\label{sec:method-prereg}
+
+Every confirmatory campaign's protocol---hypotheses, sole treatment,
+analysis script and stopping rule---was committed and pushed to the public
+repository before its first run, in the spirit of the pre-registration
+practice that other empirical fields adopted a decade ago
+\citep{nosek2018prereg}. Forty-eight such protocols exist, each anchored by
+its push timestamp; all are mirrored, frozen and public with a DOI on the
+Open Science Framework, a mirror made after the campaigns ran and stated
+as such. A gate script proves from the git history that no registered text
+was altered after its result existed. Protocol changes forced by
+feasibility---the LMSYS similarity matrix that would not fit in 40\,TB, for
+one---were committed as declared pre-run amendments before the gated data
+was downloaded; the amendment chain is the registration's continuation and
+is visible in the history. Closed campaigns are immutable: stopping rules
+forbid re-running, widening or post-hoc tuning, and a campaign's result
+file is never edited after its run. When a confound was found after a
+campaign had closed---three were, in an audit of the baseline
+implementations---the response was a new pre-registration whose outcome
+for the published claim was committed before the re-scoring ran, and a new
+record beside the old one. The published record stands; the paper quotes
+the surviving claim.
+
+\subsection{Baselines, tuned on our own objective}
+\label{sec:method-baselines}
+
+Five baselines carry the headline matrix: HPA-style reactive scaling,
+KEDA-style event-driven scaling, a FIRM-style replica controller
+\citep{firm2020}, GPTCache-style fixed semantic caching with LRU
+\citep{gptcache2023}, and static provisioning. Later campaigns add a
+VTC-style least-service-first replica divider \citep{vtc2024}, a
+concurrency scaler in the Knative-KPA/AIBrix shape, a layered stack of
+three locally tuned single-knob controllers, an offline-trained learned
+joint controller, and iso-cost variants of the by-construction winners.
+Every baseline is grid-search tuned on the composite objective this paper
+is graded on, with the sweeps committed. Grids are bounded at a
+vendor-sane envelope because $J$ improves monotonically toward
+over-provisioning: an unbounded grid would tune every baseline into a cost
+blow-out and flatter the joint controller. Iso-cost variants exist to
+remove the ``it just spends less'' objection, and where their gate fails
+it is reported as a failure. Two comparator corrections were added after
+the audit of Section~\ref{sec:eval-adjudication}: \texttt{hpa\_fair} and
+\texttt{keda\_fair}, which carry no eviction charge and a competently
+pre-sized cache, and budget-carrying variants that apply the joint
+controller's own per-tenant budget rule verbatim.
+
+\subsection{Substrates, never mixed}
+\label{sec:method-substrates}
+
+Three substrates carry the evidence, and no table in this paper mixes
+them. The \emph{simulator} (Section~\ref{sec:system-model}) is the
+decision-quality substrate. \emph{Real data replayed through the
+simulator}: BurstGPT v2.0 demand \citep{burstgpt2024} (10,632,194 requests
+over 335 days), Azure LLM inference 2024 demand \citep{azurellmtrace2024}
+(44.1M requests, two production streams), and LMSYS-Chat-1M prompts
+\citep{lmsyschat1m2024} embedded with a real MiniLM encoder
+\citep{minilm2020,sbert2019}. And \emph{live clusters}: a kind cluster with
+a real scheduler, real HPA and real load for the replica-only campaigns,
+and a rented L40S host with a real inference tier behind the gateway for
+the three-knob plane. Claims from the kind cluster are ordinal only---does
+the simulator's ranking reproduce?---and absolutes are never compared
+across substrates. Replay dollars are model-scale; the claim is always the
+ranking. Samples from different replays are never pooled: the $n = 16$ and
+$n = 96$ BurstGPT samples are separate experiments with separate
+registrations.
+
+\subsection{Statistics}
+\label{sec:method-stats}
+
+Runs are paired by seed: every system sees identical demand realisations,
+including arrival jitter drawn once per window and shared across systems.
+Significance is assessed with Wilcoxon or paired tests at the
+pre-registered gate, Holm-corrected \citep{holm1979} where a hypothesis
+spans several comparators. At hundreds of paired seeded simulator runs,
+however, vanishing p-values measure the simulator's determinism rather
+than the effect, so the citable unit throughout is the paired effect size
+$\dz$ with a 95\% bootstrap confidence interval, following the reporting
+discipline of Hoefler and Belli~\citep{hoefler2015benchmarking}: ratios are stated with
+their absolute base, means are used for costs, tails get their own
+statistic, and every varied factor is documented. All $n = 96$ confirmatory
+intervals exclude zero, and the one violation trade that rides along
+carries its own interval. P-values appear once, as gate outcomes, and are
+never headlined below about $10^{-6}$. A weight-sensitivity sweep declared
+before it ran perturbs the objective weights across 425 cells spanning
+every campaign: the win direction never flips, and 416 of 425 cells keep
+$p < 0.01$.
+
+\subsection{Metrics}
+\label{sec:method-metrics}
+
+Cost in USD (replica-hours at \$0.048 per replica-hour; model-tier calls
+at market ratios $1{:}10{:}100$), SLO violation rate, semantic-cache hit
+rate, Jain's index over per-tenant SLO satisfaction, and the composite
+\begin{equation}
+\label{eq:J}
+J = \mathrm{cost} + 2\cdot\mathrm{violation} + 0.5\cdot(1 - \mathrm{Jain}),
+\end{equation}
+normalised per tenant-step---the objective every baseline was tuned on.
+Latency is reported at p95, not p99: the simulator's latency estimator is a
+queueing approximation whose tail beyond p95 is not credible, and
+pretending otherwise would be false precision. The live path measures
+wall-clock latency and can report any percentile. After the adjudication
+the saturating violation rate was joined by an unbounded severity metric,
+mean SLO excess, on which some readings reverse; both are reported.
+
+\subsection{The workload matrix}
+\label{sec:method-matrix}
+
+The headline matrix is a blocked factorial: 5 workload classes $\times$ 4
+tenant-mix profiles $\times$ 3 cluster sizes $\times$ 6 systems $\times$ 5
+repetitions, 1,800 runs, plus 500 ablation runs. Eight tenants per cluster
+is the studied factor---composition, not population---and the planner's
+tenant-count scaling is measured separately
+(Section~\ref{sec:impl-scaling}). The overload cells of the third campaign
+were sized by arithmetic on committed model constants---burst climbs that
+exceed the shared $\pm 2$-replicas-per-interval actuation clamp---pinned
+by unit tests rather than tuned by trial runs, with a same-envelope
+control cell where the hypothesised advantage should not appear.
+
+\subsection{Honest nulls}
+\label{sec:method-nulls}
+
+Negative and failed results are published with the prominence of wins, in
+a dedicated ledger (\evfile{research/analysis/RESULTS\_MASTER.md}). The
+ledger carries the two confirmatory SLO failures, the under-powered first
+replay, the fairness-term null, the seasonal-forecasting non-transfer from
+synthetic to real demand, the structurally impossible raw per-metric gate,
+the cache hit-quality result, the live ordinal disagreement, the risk-knob
+reversal, the withdrawn cost percentages, the published controller's loss
+on the live plane and the damper's failure. Goalpost-moving is invisible
+when it happens in private; here it happened in public, in git history,
+where a reader can diff it.

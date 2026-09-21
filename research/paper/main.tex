@@ -1,50 +1,36 @@
 % =============================================================================
 % PolyForge — FGCS manuscript (Elsevier, elsarticle).
 %
-% FORMAT ONLY. The author writes the prose. Every section below is a placeholder
-% with a comment naming the adjudicated source it should be carved from.
+% Build (from research/paper/):   .\build.ps1
+%   or: pdflatex main && bibtex main && pdflatex main && pdflatex main
 %
-% Build (from research/paper/):
-%   pdflatex main && bibtex main && pdflatex main && pdflatex main
-%
-% FGCS requirements (Guide for Authors, Elsevier house rules; confirm on the live
-% guide before submission — the page is browser-only):
-%   * Abstract: concise and factual, MAXIMUM 250 WORDS, no references,
-%     no undefined abbreviations; must stand alone.
-%   * Keywords: 6 TO 10, single concepts preferred (avoid "and"/"of"),
-%     abbreviations only if firmly established.
-%   * Highlights: MANDATORY, separate file named "Highlights" (see highlights.txt),
-%     3 to 5 bullets, MAX 85 CHARACTERS EACH INCLUDING SPACES, results only.
-%   * Graphical abstract: optional; if supplied, one image made with an
-%     illustration tool (not AI-generated), min 531 x 1328 px, separate file.
-%   * No page limit for regular articles; be as long as the evidence needs
-%     and no longer.
-%   * Peer review: single-anonymized (author names stay on the manuscript;
-%     verify on the live guide).
+% FGCS house rules (recorded from the Guide for Authors; the live page is
+% browser-only, re-confirm on the day of submission):
+%   * Abstract: concise and factual, at most 250 words, no references, no
+%     undefined abbreviations; must stand alone.
+%   * Keywords: 6 to 10, single concepts.
+%   * Highlights: MANDATORY, separate file named "Highlights" (highlights.txt),
+%     3 to 5 bullets, at most 85 characters each including spaces.
+%   * Graphical abstract: optional.
+%   * No page limit for regular articles.
+%   * Peer review: single-anonymized (author names stay on the manuscript).
 %   * Reference style: numbered, elsarticle-num.
-%   * Required back matter, in this order: CRediT authorship contribution
-%     statement; Declaration of competing interest; Funding; Data availability;
-%     Acknowledgements (optional); Declaration of generative AI and AI-assisted
-%     technologies in the manuscript preparation process (REQUIRED if any AI
-%     tool changed text substantively — drafting help counts; grammar checks
-%     do not; AI is never an author); then References.
-%   * Submission: initial = one PDF built from these sources (item "Manuscript");
-%     revision = all source files in ONE FLAT ARCHIVE (no subfolders): .tex,
-%     .bib, .bst, .cls, figures. Separate items: Highlights, Cover letter,
-%     Declaration of interest, Graphical abstract (if any).
+%   * Back matter, in this order: CRediT; Declaration of competing interest;
+%     Funding; Data availability; Acknowledgements; Declaration of generative
+%     AI and AI-assisted technologies; References.
+%   * Submission: initial = one PDF ("Manuscript"); revision = all sources in
+%     ONE FLAT ARCHIVE. For the flat archive copy the used figure PDFs into
+%     this directory and drop the second \graphicspath entry.
 %
 % Class options:
-%   [preprint,review,12pt]  single column, double spaced, LINE NUMBERS — use for
-%                           submission (reviewers cite line numbers).
-%   [final,5p,times,twocolumn] the journal's two-column look — for a length
-%                           check only; submit the preprint form.
+%   [preprint,review,12pt]      single column, double spaced, line numbers —
+%                               the submission form.
+%   [final,5p,times,twocolumn]  the journal's two-column look — length check.
 %
-% Figures: \graphicspath resolves the committed, gate-verified evaluation figures
-% (eval/results/figures; regenerable by scripts/reproduce.py). For the FLAT
-% revision archive, copy the used PDFs into this directory and drop the path.
-% Bibliography: single source of truth is thesis/report/references.bib.
-% Drift gate: after editing, run `python scripts/thesis_drift.py` from the repo
-% root — this file is in its scan; withdrawn claims must never appear bare.
+% Sources of truth: every number in the text traces to a record under
+% research/analysis/ (RESULTS_MASTER.md reconciles them). The drift gate,
+% `python scripts/thesis_drift.py` from the repo root, scans this directory:
+% withdrawn claims must never appear without their withdrawal beside them.
 % =============================================================================
 \documentclass[preprint,review,12pt]{elsarticle}
 
@@ -53,19 +39,34 @@
 \usepackage{lmodern}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage{amsmath,amssymb}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{amsmath,amssymb,amsthm}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc}
 \usepackage{xurl}
 \usepackage[hidelinks]{hyperref}
-\usepackage{orcidlink}   % \orcidlink{...} icon next to an author
-\usepackage{lineno}      % elsarticle's [review] option numbers lines via lineno
+\usepackage{orcidlink}
+\usepackage{lineno}
 
 \graphicspath{{figures/}{../../eval/results/figures/}}
 
 \newcommand{\polyforge}{PolyForge}
 \newcommand{\jcac}{JCAC}
 \newcommand{\dz}{d_z}
+\newcommand{\evfile}[1]{\texttt{#1}}
+% Record file names are long and unbreakable in \texttt; let them break after
+% an underscore in text (math-mode \_ is left alone).
+\let\origunderscore\_
+\renewcommand{\_}{\ifmmode\origunderscore\else\textunderscore\allowbreak\fi}
+% Tables are single-spaced and small even under the double-spaced review option.
+\newcommand{\tablefont}{\renewcommand{\baselinestretch}{1}\selectfont\small}
+\newcommand{\tablefontsmall}{\renewcommand{\baselinestretch}{1}\selectfont\footnotesize}
+\emergencystretch=1.5em
+\newtheorem{proposition}{Proposition}
 
 \journal{Future Generation Computer Systems}
 
@@ -73,148 +74,64 @@
 
 \begin{frontmatter}
 
-% Title: state the central contribution, not the topic. ≤ ~15 words is ideal.
-\title{PolyForge: Joint Cross-Layer Control of Replicas, Semantic Cache,
-and Model Tier for Multi-Tenant Hybrid AI Serving}
+\title{Per-layer optima do not compose: joint replica, semantic-cache and
+model-tier control for multi-tenant AI serving, under pre-registration}
 
-% Authors. FGCS is single-anonymized: names stay. One corresponding author.
 \author[ete]{Md.\ Mohaiminul Islam\corref{cor1}%
   \orcidlink{0009-0003-3254-9532}}
 \ead{AUTHOR-EMAIL@example.com}          % TODO(author): institutional e-mail
-\author[ete]{Farzana Akter}             % TODO(author): keep or move to Acknowledgements
+\author[ete]{Farzana Akter}
 \cortext[cor1]{Corresponding author.}
 \affiliation[ete]{organization={Department of Electronics \& Telecommunication
   Engineering, Rajshahi University of Engineering \& Technology},
   city={Rajshahi}, postcode={6204}, country={Bangladesh}}
 
 \begin{abstract}
-% ≤ 250 words. Context → gap → approach → results → significance.
-% The cost claim is FEASIBILITY (only a tier-holding controller meets the
-% per-tenant budget); the −70%/−42% percentages are withdrawn and do not
-% belong here. Numbers with scope: composite-J win in every campaign incl.
-% vs the RL controller; non-dominated in 48/60 cells; Jain 0.9705 vs 0.9599;
-% AUC 0.88 → 0.502 over the wire; B1 WL-H1 FAIL → B1' WL-H1' PASS.
-% Source: thesis/report/chapters/01-introduction.tex (adjudicated) and
-% thesis/report/chapters/06-evaluation.tex §6.1 scoreboard.
-TODO(author): abstract.
+Platforms that serve web traffic and AI inference for the same tenants are
+steered by three controllers that never consult one another: a replica
+autoscaler, a semantic response cache and a model-tier router. Each is
+sound alone; whether their local optima compose had not been tested. We
+built \polyforge{}, a Kubernetes-native
+control plane whose planner chooses replicas, cache budget and model tier
+for every tenant at once by receding-horizon optimisation of one objective
+in cost, SLO violation and Jain fairness, and evaluated it under
+forty-eight pre-registered protocols against baselines grid-tuned on that
+objective. On the composite objective the joint controller wins in every
+campaign that tested it---a 1,800-run factorial, two real demand traces, a
+concurrency scaler, a 32-tenant slice and a learned controller over the
+same action space---and is non-dominated in 48 of 60 cells under any
+weighting. The comparative cost percentages we first obtained are
+withdrawn: three pre-registered re-scorings against corrected comparators
+showed they do not survive. What stands is a feasibility result: a
+per-tenant budget can be kept only by a controller that holds the tier
+knob. Two attempts to beat tuned reactive scalers on SLO attainment failed
+and are reported as failures. On real LMSYS prompts the cache reaches
+29.6\% hits at cosine 0.85, with measured precision and its ceiling;
+per-tenant partitioning returns a timing side channel from AUC 0.88 to
+chance, confirmed over the wire. On a rented GPU host the published
+controller lost to its own tier-only ablation; a corrected controller then
+beat every arm at equal fairness.
 \end{abstract}
 
 \begin{keyword}
-% 6 to 10 keywords, single concepts.
 multi-tenant serving \sep LLM inference \sep autoscaling \sep semantic caching
-\sep model routing \sep model-predictive control \sep SLO management
+\sep model routing \sep model predictive control \sep SLO management
 \sep cloud cost \sep pre-registration
 \end{keyword}
 
 \end{frontmatter}
 
-% Line numbers for submission, so reviewers can cite lines (remove for final).
 \linenumbers
 
-\section{Introduction}
-\label{sec:intro}
-% Peyton Jones ladder: problem / interesting / unsolved / idea / works /
-% compares / contributions list (each bullet = claim + §).
-% Source: thesis/report/chapters/01-introduction.tex (adjudicated contributions
-% 1–9). No table-of-contents paragraph. No "grandmothering".
-TODO(author).
-
-\section{Related work}
-\label{sec:related}
-% Source: thesis/report/chapters/02-background.tex + docs/RELATED_WORK.md.
-% Rule: other papers' numbers are their numbers on their substrate — never in
-% the same table as ours. One line what each does, one line the axis we differ on.
-TODO(author).
-
-\section{Problem setting and workload taxonomy}
-\label{sec:problem}
-% Source: research/TAXONOMY.md; the five-class taxonomy and its control
-% implication column; the 12-feature windows. The measured tier table
-% (research/calibration/TIER_BENCH.md: small/mid/large 1241.9/1882.8/20665.1 ms)
-% lives here as Table~\ref{tab:tiers}.
-TODO(author).
-
-\section{Design}
-\label{sec:design}
-% Source: thesis/report/chapters/03-design.tex — the control loop (architecture
-% figure), the JCAC formulation (objective, lattice, two-sweep solver), the two
-% construction-level propositions, fairness and security design.
-% sec-jcac.tex (W30) carries an older horizon-based formulation and a stale
-% "7x layered" evaluation paragraph: reuse its solver/guardrail text only.
-TODO(author).
-
-\subsection{Cost-aware semantic-cache eviction}
-\label{sec:eviction}
-% Source: sec-eviction.tex problem + algorithm (Eq. and Algorithm); DROP its
-% synthetic evaluation table — the real LMSYS results in §\ref{sec:eval-cache}
-% supersede it.
-TODO(author).
-
-\section{Implementation}
-\label{sec:impl}
-% Source: thesis/report/chapters/04-implementation.tex — components, engineering
-% gates, the live evaluation arm, planner scaling (128-tenant wall, cells).
-TODO(author).
-
-\section{Methodology}
-\label{sec:method}
-% Source: thesis/report/chapters/05-methodology.tex — pre-registration (48
-% protocols; OSF mirror 10.17605/OSF.IO/DYZKV, post-run, say so), tuned
-% baselines, substrates never mixed, statistics (d_z + CI as citable unit),
-% metrics, the matrix, honest-nulls policy, adjudication by new record.
-TODO(author).
-
-\section{Evaluation}
-\label{sec:eval}
-% Source: thesis/report/chapters/06-evaluation.tex. Each subsection opens with
-% its question and closes with the answer. Figures from eval/results/figures
-% with the FIGURES.md caption (converted to LaTeX): fig03, fig12, fig08, fig13,
-% fig14, fig17, fig20, fig21.
-
-\subsection{Scoreboard}
-\label{sec:eval-scoreboard}
-TODO(author).
-
-\subsection{The headline matrix}
-\label{sec:eval-v1}
-TODO(author).
-
-\subsection{Real-demand replays}
-\label{sec:eval-replay}
-TODO(author).
-
-\subsection{Adjudication under fair comparators}
-\label{sec:eval-adjudication}
-% Source: thesis §6.7 — eviction parity, trace parity, budget parity
-% (Amendment 1), order permutation, model mismatch. The withdrawn claims are
-% reported here as history beside the surviving feasibility claim.
-TODO(author).
-
-\subsection{SLO, forecasting, cache}
-\label{sec:eval-cache}
-TODO(author).
-
-\subsection{Fairness and security}
-\label{sec:eval-security}
-TODO(author).
-
-\subsection{Live evidence}
-\label{sec:eval-live}
-% Source: thesis §6.10 — ordinal check, 24 h soak, node spread, trace-live,
-% the three-knob live plane B1 / B1' / B1''.
-TODO(author).
-
-\section{Threats to validity and limitations}
-\label{sec:threats}
-% Source: thesis/report/chapters/07-discussion.tex — internal / external /
-% construct / conclusion; each concrete, each bounded.
-TODO(author).
-
-\section{Conclusion}
-\label{sec:conclusion}
-% Source: thesis/report/chapters/08-conclusion.tex — return to each
-% contribution bullet with its verdict; what is now known; what is not covered.
-TODO(author).
+\input{sec-intro}
+\input{sec-related}
+\input{sec-problem}
+\input{sec-design}
+\input{sec-impl}
+\input{sec-method}
+\input{sec-eval}
+\input{sec-threats}
+\input{sec-conclusion}
 
 % ---------------------------------------------------------------------------
 % Back matter required by FGCS, in this order.
@@ -225,7 +142,6 @@ TODO(author).
 Validation, Formal analysis, Investigation, Data curation, Writing -- original
 draft, Writing -- review \& editing, Visualization.
 \textbf{Farzana Akter:} Supervision, Writing -- review \& editing.
-% TODO(author): confirm roles with the supervisor.
 
 \section*{Declaration of competing interest}
 The authors declare that they have no known competing financial interests or
@@ -234,31 +150,38 @@ in this paper.
 
 \section*{Funding}
 This research did not receive any specific grant from funding agencies in the
-public, commercial, or not-for-profit sectors. The rented-host experiments were
-self-funded; all other computation ran on free tiers.
+public, commercial, or not-for-profit sectors. The rented-host experiments
+were paid for by the first author; all other computation ran on free tiers.
 
 \section*{Data availability}
 All raw run databases, committed run-level exports, pre-registrations, scored
 records and live-campaign evidence are archived at Zenodo,
 \url{https://doi.org/10.5281/zenodo.22801195} (CC BY 4.0). The 48
-pre-registered protocols are additionally registered, frozen and public, on the
-Open Science Framework, \url{https://doi.org/10.17605/OSF.IO/DYZKV}. Source
-code, the reproduction gate (\texttt{python scripts/reproduce.py} re-derives
-every gated record and figure from the committed data) and the evidence site
-are at \url{https://github.com/mohaimin-8/polyforge} and
+pre-registered protocols are additionally registered, frozen and public, on
+the Open Science Framework, \url{https://doi.org/10.17605/OSF.IO/DYZKV}; that
+registration was made after the campaigns ran and is a witness to the git
+history, not a substitute for it. Source code, the reproduction gate
+(\texttt{python scripts/reproduce.py} re-derives every gated record and
+figure from the committed data) and the evidence site are at
+\url{https://github.com/mohaimin-8/polyforge} and
 \url{https://mohaimin-8.github.io/polyforge/}.
 
 \section*{Acknowledgements}
-% TODO(author): optional (people, institutions, compute providers).
+The GPU tier bench ran on Kaggle's free GPU pool; the three-knob live plane
+ran on a rented L40S host. We thank the maintainers of BurstGPT, the Azure
+public datasets and LMSYS-Chat-1M for releasing the traces this evaluation
+rests on.
 
 \section*{Declaration of generative AI and AI-assisted technologies in the
 manuscript preparation process}
-% REQUIRED by Elsevier if an AI tool made substantive changes to the text.
-% Suggested wording (edit the TOOL and REASON to what is true):
-During the preparation of this work the author(s) used Claude (Anthropic) in
-order to draft and edit text from the authors' thesis and evidence records.
-After using this tool, the author(s) reviewed and edited the content as needed
-and take full responsibility for the content of the publication.
+During the preparation of this work the authors used Claude (Anthropic) to
+draft and edit text from the first author's thesis and from the project's
+committed evidence records. After using this tool, the authors reviewed and
+edited the content as needed and take full responsibility for the content of
+the publication.
+
+\appendix
+\input{sec-appendix}
 
 \bibliographystyle{elsarticle-num}
 \bibliography{../../thesis/report/references}

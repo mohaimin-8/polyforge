@@ -1,0 +1,795 @@
+\section{Evaluation}
+\label{sec:eval}
+
+We report every campaign in the order it was run, under the rules of
+Section~\ref{sec:method}: wins, nulls and failures alike. Every number
+traces to a committed, machine-generated record under
+\evfile{research/analysis/} (\ref{app:traceability}); where a
+sentence here and a record could disagree, the record wins. Each
+subsection opens with the question it answers and closes with the answer.
+
+\subsection{Does joint control win the objective it was built for?}
+\label{sec:eval-scoreboard}
+
+Yes, in every campaign that tested it, and the scoreboard in
+Table~\ref{tab:scoreboard} states what survives in each of the six
+contested segments after the adjudication of
+Section~\ref{sec:eval-adjudication}.
+
+\begingroup\tablefontsmall
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.11\textwidth}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.67\textwidth}@{}}
+\caption{Verdicts across the six contested segments, as reconciled in
+\evfile{RESULTS\_MASTER.md}. The cost row states the withdrawn history
+beside the surviving claim, as every mention of it in this paper does.}
+\label{tab:scoreboard}\\
+\toprule
+\textbf{Segment} & \textbf{Verdict} & \textbf{The citable claim} \\
+\midrule
+\endfirsthead
+\caption[]{Verdicts across the six contested segments (continued).}\\
+\toprule
+\textbf{Segment} & \textbf{Verdict} & \textbf{The citable claim} \\
+\midrule
+\endhead
+Cost & closed: feasibility, not performance (adjudicated) &
+Against the originally tuned baselines the joint controller beat all five
+on cost in the 1,800-run matrix and by $-70\%$ on replayed BurstGPT
+demand. All of that is withdrawn as a like-for-like comparison: every
+comparator carried an eviction charge and a pinned cache no \jcac{} arm
+paid, and only \jcac{} was subject to the per-tenant budget filter. Against
+fair comparators the matrix is cost-neutral versus \texttt{hpa\_fair}
+($+0.8\%$, EP-H1a FAIL) with $-14.1\%$ versus \texttt{keda\_fair} surviving;
+the BurstGPT figure shrinks to $-52.2\%$ and fails its own rank test;
+against comparators carrying the budget rule BP-H1a/b FAIL on both traces.
+What stands: the per-tenant budget is satisfiable only by a controller
+holding the tier knob. \\
+SLO & closed honestly: parity, bounded &
+Violation parity with tuned HPA/KEDA at $-43$ to $-48\%$ cost; beats FIRM.
+In overload, reactive scalers buy attainment at 3.2--3.4$\times$ the spend
+(H1$'$ FAIL); the forecast mechanism is confirmed (H2$'$ PASS). On the
+unbounded severity metric the synthetic advantage is understated by the
+published metric and holds on Azure, but reverses on BurstGPT (TP-H3a/b
+FAIL); lifting the budget cap removes 79\% of that gap as a typical-window
+claim (BP-H2 PASS) whose tail still breaches the margin in 22\% of windows. \\
+Fairness & won, two dedicated baselines &
+Beats FIRM on Jain ($\dz = 1.0$); beats tuned VTC-replica on Jain itself
+(0.9705 vs.\ 0.9599) at $-35\%$ cost. The controller's own $\gamma$ term
+is a published null. \\
+Forecasting & won, on real data &
+Damped Holt $-26.9\%$ RMSE on real BurstGPT; the synthetic seasonal
+prediction did not transfer and is published as such; on Azure LLM 2024
+the mechanism boundary reproduces---the winner tracks measured periodicity. \\
+Cache & closed, real-data headline &
+29.6\% hits at cosine 0.85 and 48.8\% at 0.70 on real LMSYS-Chat-1M;
+$+93\%$ over a 10\%-of-working-set fixed cache; \$0.296 saved per 1,000
+queries; precision measured with its stochasticity ceiling. \\
+Security & won, uncontested &
+Timing side channel at AUC 0.88; per-tenant partitioning restores chance
+at 24\% latency cost, dominating padding and TTL jitter; AUC 0.502 over
+the wire. \\
+\bottomrule
+\end{longtable}
+\endgroup
+
+On the composite objective $J$ of Eq.~\eqref{eq:J}---the objective every
+baseline was tuned on---the joint controller wins against every baseline
+in every campaign that tested it: the 1,800-run matrix ($p \le
+4.6{\times}10^{-25}$), the second matrix ($p \le 6.7{\times}10^{-25}$), the
+overload matrix ($p \le 1.3{\times}10^{-11}$), the VTC slice ($p =
+3.3{\times}10^{-19}$), the BurstGPT and Azure replays, the 2026-stack
+concurrency arm ($p = 1.3{\times}10^{-44}$ at violation parity,
+\evfile{RESULTS\_CONCURRENCY.md}), the 32-tenant slice ($p \le
+2.2{\times}10^{-4}$, \evfile{RESULTS\_TENANT\_SCALE.md}), and an
+offline-trained learned (RL) joint controller over the identical action
+space ($p = 2.9{\times}10^{-28}$, $\dz = -0.708$, 95\% CI on the paired $J$
+difference $[-0.437, -0.318]$; LR-H1/LR-H2 PASS,
+\evfile{RESULTS\_LEARNED.md}). The learned policy is instructive rather
+than merely beaten: it attains slightly lower violation than the MPC and
+pays $2.61\times$ the spend for it, rediscovering the buy-headroom posture
+of the reactive scalers instead of the cheap joint one. Finding the cheap
+configuration, not meeting the SLO, is what the optimiser contributes.
+Figure~\ref{fig:composite-objective} is the single-number ranking;
+Figure~\ref{fig:pareto} shows that the joint controller is the only system
+on the cost--violation frontier, and, read with no weights at all, it is
+non-dominated in 48 of 60 cells---the most of any arm
+(\evfile{RESULTS\_DOMINANCE.md}). These composite wins are scored against
+the originally tuned baselines; the adjudication re-scores the cost and
+SLO components separately, and Table~\ref{tab:scoreboard} already reflects
+it.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{fig12_composite_objective.pdf}
+  \caption{The composite objective ($J = \mathrm{cost} +
+  2\cdot\mathrm{violation} + 0.5\cdot(1-\mathrm{Jain})$, normalised per
+  tenant-step): the single-number ranking every other figure decomposes.}
+  \label{fig:composite-objective}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{fig03_pareto_cost_violation.pdf}
+  \caption{The cost--violation plane (means $\pm$ 95\% CI over 300 cells
+  per system): every baseline is dominated on at least one axis without
+  winning the other.}
+  \label{fig:pareto}
+\end{figure}
+
+\subsection{The headline matrix: where baselines break, and what each component is worth}
+\label{sec:eval-matrix}
+
+Does the taxonomy's control-implication column predict where single-knob
+controllers fail, and does each of the controller's components carry
+independent weight? Both, with one number that must not travel without its
+caveat.
+
+The blocked factorial of Section~\ref{sec:method-matrix}, all baselines
+grid-tuned on $J$, gives the joint controller the composite win ($|\dz|$
+0.66--1.44 against the five) and a violation rate held near the
+over-provisioned floor at a fraction of that floor's cost. Where baselines
+break is class-structured exactly as Table~\ref{tab:taxonomy} predicts:
+replica-only controllers cannot fix agentic latency, because it needs the
+tier knob (Figure~\ref{fig:violation-by-workload}). The single-trace view
+shows the composed behaviour directly---within the first minute of an
+agentic run the joint controller fills its replica budget and quadruples
+the semantic cache while HPA chases each burst with the only knob it has.
+Adaptive cache sizing doubles the fixed-cache baselines' hit share on
+cacheable workloads and correctly declines to spend memory on uncacheable
+ones. One pre-committed gate fails as measured and is reported: the
+roadmap's raw per-metric gate (win every metric outright) is structurally
+impossible against by-construction winners, since over-provisioned static
+and cache-maxed GPTCache arms take the SLO and hit-rate columns at 12--30
+times the joint controller's spend. The iso-cost variants exist for that
+comparison (Section~\ref{sec:eval-slo}).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.88\textwidth]{fig07_violation_by_workload.pdf}
+  \caption{SLO violation by workload class (mean $\pm$ 95\% CI): the
+  taxonomy's control implications made measurable. Agentic latency is a
+  tier-knob problem no replica-only controller solves.}
+  \label{fig:violation-by-workload}
+\end{figure}
+
+\paragraph{Ablations (500 runs)} Removing joint control costs $+2884\%$
+on the cost metric as published; removing cost-aware eviction $+35.7\%$;
+removing the classifier $+2.1\%$ cost and $-45\%$ relative hit rate. Each
+of the four components carries independent, statistically significant
+weight (Figure~\ref{fig:ablations}). The first figure must not be cited
+without its caveat. It rests on a defect in the layered/GPTCache
+comparator: that arm ranks tiers by name and de-escalates only below
+$0.3\times$ target, so on agentic traffic it escalates past the fastest
+tier and sticks at the dearest one. A pre-registered re-scoring against a
+competent layer-local tier rule (\evfile{PREREG\_LAYERED\_FIX.md}
+$\to$ \evfile{RESULTS\_LAYERED\_FIX.md}) shrinks the ablation's cost delta
+by $-86.4\%$ (LF-H1 PASS, $p = 1.2{\times}10^{-11}$); the composite win
+over the corrected arm survives at the smaller margin (LF-H2 PASS, $p =
+8.4{\times}10^{-16}$). The composition claim of this paper is the smaller,
+surviving measurement, not the published multiple.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.85\textwidth]{fig08_ablation_deltas.pdf}
+  \caption{Ablation deltas (red $=$ worse than the full controller; $* =
+  p < 0.01$). The $-$joint bar is measured against the published layered
+  comparator; against a competent tier rule it is 86\% smaller
+  (Section~\ref{sec:eval-matrix}).}
+  \label{fig:ablations}
+\end{figure}
+
+\subsection{SLO attainment: two failures, one mechanism, and a risk knob that moved the wrong way}
+\label{sec:eval-slo}
+
+Can the joint controller beat tuned reactive scalers on SLO attainment? We
+tried twice under pre-registration, failed twice, and stopped by rule.
+What holds is parity at much lower cost and a confirmed forecasting
+mechanism.
+
+\paragraph{Forecasters, realism, self-calibration} The in-loop forecast
+ablation found headroom in the system's own default: the linear-trend
+forecaster overreacts to bucket noise, and damped Holt smoothing beats it
+by $-16.3\%$ SLO violation at equal cost ($p = 0.0027$;
+Figure~\ref{fig:forecast-ablation}). Holt became the documented
+recommended default; trend stays the code default so the committed
+1,800-run headline remains bit-reproducible. Under reconfiguration realism
+(replica start-up lag and half-warm caches, billed immediately), reactive
+scalers pay for capacity that misses the burst it was bought for, while
+the joint controller's hysteresis holds the frontier
+(Figure~\ref{fig:realism-pareto}); self-calibration
+(Proposition~\ref{prop:calibration}) earns $\dz = +0.46$ ($p = 0.029$),
+concentrated on the bursty classes where trusting nominal capacity hurts
+most.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{fig13_forecast_ablation.pdf}
+  \caption{Forecast ablation: damped Holt beats the trend default on
+  violation at equal cost; online-seasonal detection helps only where a
+  period exists.}
+  \label{fig:forecast-ablation}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{fig14_realism_pareto.pdf}
+  \caption{Under reconfiguration realism (replica start-up lag and cache
+  warm-up, billed immediately): reactive scalers pay for capacity that
+  misses the burst it was bought for, so their violations rise; the joint
+  controller's hysteresis and the self-calibrating variant hold the
+  frontier.}
+  \label{fig:realism-pareto}
+\end{figure}
+
+\paragraph{The second matrix (\evfile{PREREG\_V2.md}, 2,100 runs)} The
+protocol froze \texttt{jcac\_v2} (Holt plus adaptive capacity) and two
+hypotheses. H1 failed: SLO violation is not significantly below tuned
+HPA/KEDA. What holds is violation parity at $-43$ to $-48\%$ cost and a
+clear win over FIRM ($p = 2{\times}10^{-19}$). H2 passed: no large-effect
+self-regression, and cost improves $-11\%$ over the first controller
+($p = 4{\times}10^{-36}$). The iso-cost gate reshapes the by-construction
+winners: budget-matching turns static provisioning from a win-by-spending
+into a three-of-five loss, and 36 of 60 cells are budget-infeasible for
+the cache-max posture, which outspends the budget $36\times$. Per the
+stopping rule, \texttt{jcac\_v2} was not re-tuned after the H1 failure.
+
+\paragraph{The overload matrix (\evfile{PREREG\_V3.md}, 1,200 runs)}
+The second matrix's demand shapes are smooth enough that reactive scalers
+keep up; when everyone can react in time, everyone ties on violation and
+cost is the only degree of freedom left. The third campaign therefore
+constructed overload cells where demand climbs faster than the shared
+actuation clamp, sized by arithmetic on committed constants
+(Section~\ref{sec:method-matrix}), with \texttt{jcac\_seasonal} named in
+advance as the sole treatment. H1$'$ failed, and the failure is
+informative: tuned HPA and KEDA buy overload attainment with 3.2--3.4
+times the joint controller's spend (seasonal is $-69$/$-71\%$ on cost at
+$+0.05$/$+0.09$ violation), and only the joint controller honours the
+cluster capacity cap at these amplitudes---a disclosed harness asymmetry,
+strict against us. H2$'$ passed: seasonal forecasting reduces violations
+against trend ($p = 6{\times}10^{-4}$) at no cost regression, so the
+mechanism is real. In the declared-exploratory spike class, where reaction
+is structurally impossible, the full predicted phenomenon appears:
+seasonal beats HPA on violation ($p = 5{\times}10^{-5}$, $\dz = 0.57$) at
+$-46\%$ cost. The pre-registered stopping rule closes confirmatory SLO
+attempts: two attempts, two published failures, one confirmed mechanism.
+
+\paragraph{The risk knob, twice} The published controller plans at the
+expected demand, so realised demand lands above plan roughly half the
+time---the mechanism behind the attainment-for-spend trade above. Two
+pre-registered campaigns of 2,400 runs each scored a planning quantile as
+an explicit risk knob. The first moved the controller the wrong way:
+inflating projected demand also inflates projected tier spend, which trips
+the per-tenant budget guardrail into its shed fallback, so a higher
+quantile lowered spend and raised violation, monotonically---RQ-H1/RQ-H2
+FAIL, published as a null (\evfile{RESULTS\_RISK.md}). The
+one-changed-factor follow-up sizes capacity at the quantile but projects
+cost and checks the budget at the point forecast: RB-H1 PASS at the
+pre-declared $q = 0.90$, but the violation curve turns back up at $q =
+0.95$, so the monotone frontier RB-H2 required is not claimed (RB-H2
+FAIL), and strict domination of the reactive arms is not either (RB-H3
+FAIL; \evfile{RESULTS\_RISK\_BUDGET.md}).
+
+The answer to this subsection's question is no. The joint controller does
+not beat tuned reactive scalers on attainment; it matches them at roughly
+half the cost, the forecasting mechanism it relies on is real, and the
+regime in which it wins on attainment---spikes that no reactive controller
+can answer in time---is stated as exploratory.
+
+\subsection{Real demand: two traces replayed}
+\label{sec:eval-replay}
+
+Does the ranking survive real demand? On the composite objective, yes, on
+both traces. The cost percentages that came with it did not survive the
+adjudication, and this subsection reports them as the history of the
+claim.
+
+Real BurstGPT v2.0 demand \citep{burstgpt2024}---10,632,194 requests over
+335 days, normalised deterministically---was replayed through the
+committed system model in six-hour windows, demand scale frozen pre-run,
+arrival jitter drawn once per window and shared across systems. The first
+sample ($n = 16$) failed its gate at $p < 0.01$, under-powered at $p
+\approx 0.07$--$0.11$, though every point estimate reproduced the matrix
+ranking; it stands as measured and is not the headline. The powered
+second sample (\evfile{PREREG\_TRACE2.md}, $n = 96$ independent seeds,
+about 94\% power) passed with disclosure: $J$ beats HPA, KEDA and FIRM
+($\dz$ $-0.43$ to $-0.47$), cost was $-70\%$ against the baselines as tuned
+(a figure withdrawn below), and the pre-registered disclosure was
+honoured---a violation trade of $+0.07$ rides along, the same
+attainment-for-spend trade quantified everywhere else. The second real
+trace, Azure LLM inference 2024 \citep{azurellmtrace2024}, reproduced the
+pattern at $-42\%$ per window against the same comparators as tuned
+(\evfile{RESULTS\_TRACE\_AZURE.md}), a figure withdrawn on the same grounds.
+
+Neither cost figure is this paper's claim. Both were re-scored after the
+campaigns closed against comparators corrected for the confounds an audit
+found (Section~\ref{sec:eval-adjudication}): the BurstGPT advantage
+shrinks from $-70.4\%$ to $-52.2\%$ at eviction parity and fails its own
+pre-registered rank test; Azure shrinks from $-42.5\%$ to a real but small
+$-7.1\%$; and against comparators carrying the joint controller's own
+budget rule both fail. The replay records stand exactly as committed, as
+the ground rules require; the numbers in them are reported here as
+history, not as results.
+
+\subsection{Adjudication: the cost and SLO claims under fair comparators}
+\label{sec:eval-adjudication}
+
+What survives when the baselines are corrected for every asymmetry an
+audit could find? A feasibility statement about the budget, a bounded SLO
+reading, and nothing of the comparative cost percentages.
+
+After the campaigns above had closed, an audit of the baseline
+implementations found three asymmetries between the joint controller and
+every comparator it had been scored against. Each was addressed by a
+pre-registered re-scoring against a corrected comparator, with the outcome
+for the published claim committed before the run. None of the original
+records was edited; every re-scoring is a new record.
+
+\paragraph{Eviction parity} (\evfile{PREREG\_EVICTION\_PARITY.md} $\to$
+\evfile{RESULTS\_EVICTION\_PARITY.md}.) Every reactive comparator
+carried a $1.4581\times$ LRU inference charge that no \jcac{} arm paid, and
+was pinned at a 128\,MB cache it could not move. Against \texttt{hpa\_fair}
+and \texttt{keda\_fair}---no charge, competently pre-sized at 512\,MB---the
+1,800-run matrix is cost-neutral against \texttt{hpa\_fair} ($+0.8\%$,
+EP-H1a FAIL) while $-14.1\%$ against \texttt{keda\_fair} survives ($p =
+3.8{\times}10^{-16}$). The same record introduces the unbounded severity
+metric, mean SLO excess, on which the synthetic SLO advantage is understated
+by the published rate: 0.2143 against 0.4288 for \texttt{hpa\_fair}, roughly
+half.
+
+\paragraph{Trace parity} (\evfile{PREREG\_TRACE\_PARITY.md} $\to$
+\evfile{RESULTS\_TRACE\_PARITY.md}.) The two real-demand headlines
+re-scored against the fair comparators. Azure: $-7.1\%$, real and
+pervasive (TP-H1a/b PASS, $p \le 9.5{\times}10^{-5}$, 69.4\% of windows
+favour the joint controller), with the SLO pattern holding within margin
+(TP-H3a/b PASS). BurstGPT: $-52.2\%$ on the mean but TP-H1a FAIL ($p =
+0.0133$ against a Holm threshold of $0.01250$)---the advantage is
+concentrated in a minority of windows, and the joint controller is the
+dearer system in 57.3\% of six-hour windows. On severity BurstGPT
+reverses: the joint controller's mean excess is 0.5134 against 0.0088 for
+\texttt{hpa\_fair}, $58\times$ worse, breaching the 0.05 non-inferiority
+margin in 41.7\% of windows, with AI requests shed on 9.3\% of
+tenant-steps against none for any reactive arm (TP-H3a/b FAIL). The ``half
+the overshoot'' reading is therefore synthetic-and-Azure only, and it is
+never stated in this paper without the BurstGPT reversal beside it.
+
+\paragraph{Budget parity} (\evfile{PREREG\_BUDGET\_PARITY.md} $\to$
+\evfile{RESULTS\_BUDGET\_PARITY.md}.) The fair comparators removed the
+eviction and cache-posture confounds but not a third: only the joint
+controller was ever subject to the per-tenant budget filter---it rejects
+over-budget candidates before its objective is evaluated, and no baseline
+planner has a cost term at all. Scored against comparators carrying the
+controller's own budget rule verbatim, BP-H1a/b FAIL on both traces
+(Azure $-3.3\%$/$-1.3\%$, $p = 0.379$/$0.91$; BurstGPT
+$-50.2\%$/$-49.8\%$, $p = 0.112$/$0.191$---again a minority-of-windows mean
+that does not survive the rank gate). Per the response committed before
+the run, the like-for-like cost claim is withdrawn, not restated.
+Amendment~1, disclosed before scoring, explains why no better comparator
+can rescue it: at the per-tenant cap, tier spend dominates infrastructure
+spend by three orders of magnitude, and capping a replica-only arm moves
+its infrastructure spend by $-45.7\%$/$-57.4\%$ and its tier spend by
+exactly 0.00\% on both traces. No budget-respecting comparator exists in
+the replica-only class. That is the claim that survives, and it is sharper
+than a percentage: the per-tenant budget is a promise only a controller
+holding the tier knob can keep. On the SLO side, lifting the joint
+controller's budget cap removes 79\% of the BurstGPT severity gap (BP-H3)
+and BP-H2a/b PASS on both traces---bounded, on BurstGPT, to a
+typical-window claim: the median difference is exactly 0.0000 and 51\% of
+windows are no worse, but the mean difference ($+0.1037$) exceeds the
+margin the rank test passed, 22\% of windows breach it, and the worst
+breaches it $59\times$. A descriptive follow-up, not pre-registered and
+quotable only as characterisation, finds that the cost win and the SLO
+penalty are the same windows.
+
+\paragraph{Robustness of what remains} The sweep-order confound the same
+audit raised is real but immaterial: permuting the tenant sweep moves Jain
+by at most 0.0001 against a pre-registered 0.01 threshold (OP-H1 fails
+strictly as a sensitivity bound; OP-H3 PASS on cost;
+\evfile{RESULTS\_ORDER\_PERMUTATION.md}), and the sweep seed is now an
+explicit parameter. The controller also survives being wrong about its own
+plant: with each plant constant perturbed $\pm 25\%$ one at a time, the
+cost win over \texttt{keda\_fair} survives on every constant (MM-H1 PASS)
+and severity stays within the inherited margin (MM-H2 PASS;
+\evfile{RESULTS\_MODEL\_MISMATCH.md})---mismatch-robust within that band,
+one constant at a time, and quoted with that scope.
+
+\subsection{Forecasting on real traces: a prediction fails to transfer, a boundary reproduces}
+\label{sec:eval-forecast}
+
+Does the forecaster that wins on synthetic demand win on real demand? No;
+and the reason it does not is the result.
+
+The synthetic stand-in (a textbook diurnal with autocorrelation 0.85 at
+24\,h) predicted that seasonal forecasting would dominate, at $-44.8\%$
+RMSE. On real BurstGPT the periodicity is weak (best autocorrelation $\le
+0.49$ at 8\,h) and the prediction does not transfer: seasonal never beats
+trend; damped Holt wins the first segment ($-26.9\%$ RMSE), persistence
+wins the second ($-16.6\%$), and trend is the worst choice on real data.
+The recommendation followed the data. The Azure LLM 2024 trace---44.1M
+requests, two production streams---reproduces the mechanism boundary
+through the identical frozen decomposition: seasonal wins exactly on the
+stream with a genuine daily cycle (the code stream, $-15.6\%$ RMSE at
+autocorrelation 0.57, lag 24), loses on the weakly periodic conversation
+stream ($+48.5\%$; persistence wins), and pooling the streams destroys
+forecastability (seasonal $+104\%$). Across three real streams no fixed
+forecaster dominates, and the winner tracks measured periodicity. The
+same traces split by model and log type into 19 sub-streams reproduce the
+boundary with zero counter-examples, every periodic sub-stream shows the
+seasonal win, and three different forecasters win across sub-streams
+(PT-H1/H2/H3; \evfile{PSEUDO\_TENANT.md})---exactly what a pluggable
+per-tenant forecasting layer exists to exploit. That is the external
+support for the per-stream design, and it is the scoped version of the
+H2$'$ result.
+
+\subsection{The semantic cache on real prompts}
+\label{sec:eval-cache}
+
+What does the cache deliver on real prompts, and how often is a hit the
+wrong answer? A 29.6\% hit rate at cosine 0.85, dollar-weighted; and a
+precision that a stochasticity ceiling, not the retrieval, bounds.
+
+On LMSYS-Chat-1M \citep{lmsyschat1m2024} (a seeded reservoir sample of
+200,000 from 2,015,645 user turns; MiniLM embeddings; block-wise exact
+nearest neighbour verified bit-identical against the dense computation;
+feasibility amendments committed before the gated download), adaptive
+sizing reaches 29.6\% hits at cosine 0.85 and 48.8\% at 0.70. InstCache's
+51.34\% on the same dataset \citep{instcache2024} is a different mechanism
+(pre-populated predicted instructions) and is placed beside, never
+head-to-head. Against a non-strawman fixed baseline---a cache at 10\% of
+the inserted working set---adaptive sizing is $+93\%$ (29.6\% against
+15.3\%); in the matrix it is $+83\%$ over fixed (0.106 against 0.058). The
+saving is \$0.296 per 1,000 queries at mid-tier pricing, a figure
+cache-only papers cannot produce because it needs the tenant-tier
+accounting. The empirical capacity curve fits $h_{\max} = 0.285$ with
+half-saturation at about 6,569 entries (roughly 19\,MB); the simulator's
+assumed curve was optimistic, the fit is documented beside it, and the
+committed constants are unchanged for bit-reproducibility.
+
+\paragraph{Hit quality} A hit that serves the wrong answer is not a
+saving, so precision was measured under a frozen protocol
+(\evfile{CACHE\_PRECISION.md}): the probability, given a hit, that the
+served response agrees with the actually received response at agreement
+threshold 0.70, with same-model and first-turn strata declared pre-run. At
+$\tau = 0.85$ precision is 0.313 overall, 0.443 same-model and 0.353
+first-turn; 165.5 incorrect hits per 1,000 queries are reported beside the
+savings. The built-in calibration bounds the reading: near-duplicate
+prompts at $\tau \ge 0.95$ agree only 33.8\% of the time, because 25
+models and sampling temperature dominate the absolute level. The citable
+claims are therefore relative: precision rises monotonically as $\tau$
+tightens (0.249 to 0.338) while hit rate falls, and same-model precision
+is about twice cross-model (0.443 against 0.223), so a deployment caching
+one model's responses sits in the most favourable stratum. A later
+pre-registered probe located the ceiling itself
+(\evfile{RESULTS\_CACHE\_CEILING.md}, C1 PASS): with perfect retrieval---oracle
+same-model duplicate pairs---precision reaches only 0.4898, so removing
+every retrieval error recovers $+0.047$. The binding constraint on hit
+quality is response stochasticity, not the embedder or the threshold.
+
+\subsection{Fairness: two dedicated baselines beaten, the controller's own term nulled}
+\label{sec:eval-fairness}
+
+Is the joint controller fairer than controllers built for fairness, at
+the altitude it works at? Yes, on Jain's index against both, and the win
+is an emergent property of joint allocation rather than of the designed
+fairness term.
+
+Against FIRM-style control the joint controller wins Jain's index 0.9689
+against 0.9294 in the headline matrix ($\dz = 1.0$, $p =
+4.5{\times}10^{-47}$), replicated in the second matrix (0.9672 against
+0.929, $\dz = 0.95$). Against the tuned VTC-style replica divider
+\citep{vtc2024} under interference injection (\evfile{PREREG\_VTC.md}, 200
+runs): HV1 PASS---the dedicated fair divider loses the composite objective
+($\dz = -1.12$, $p = 3{\times}10^{-19}$)---and HV2 PASS: it does not buy a
+fairness win either, since the joint controller is more fair on Jain
+itself (0.9705 against 0.9599, $p = 1.5{\times}10^{-6}$) at $-35\%$ cost and
+$-36\%$ worst-tenant p95. This is capacity-allocation fairness at the
+control plane, not token-level service fairness
+(Section~\ref{sec:threats}).
+
+The controller's own $\gamma$ term is a published null: under injected
+noisy-neighbour interference the $\gamma$-ablation shows no significant
+contribution, even in the whale-only subgroup where the injection fires
+(\evfile{FAIRNESS\_V2.md}). The term stays in the system as a configurable
+weight and is dropped from the claims. Fairness is claimed as a measured
+outcome, not as a mechanism.
+
+\subsection{Security: a timing side channel and its defence frontier}
+\label{sec:eval-security}
+
+Can a shared semantic cache leak which tenant asked what, and what does
+closing the leak cost? Yes, from response time alone, at AUC 0.88; and
+per-tenant partitioning closes it at 24\% latency cost while every other
+defence stays leaky or discards most of the cache.
+
+A shared semantic cache leaks prompt membership across tenants: an
+attacker distinguishing whether a victim tenant inserted a prompt reaches
+AUC 0.88 from timing alone (compare the API-layer audit of
+Gu et al.~\citep{promptcacheaudit2025}). Per-tenant partitioning returns the attacker
+to chance (AUC 0.50) at 24\% latency cost while keeping 76\% of hits,
+strictly dominating response-time padding (never below AUC 0.73 at any
+cost) and TTL jitter (chance only at about 90\% hit loss) on the
+leakage-versus-benefit frontier (Figure~\ref{fig:defense-frontier}). This
+measurement is what made the gateway's cache per-tenant by default. The
+frontier was then confirmed over the wire, against the real gateway process
+rather than the simulator (\evfile{RESULTS\_WIRE\_ATTACK.md}): with the
+per-tenant posture the membership attack lands at AUC 0.502 (95\% CI
+$[0.384, 0.612]$)---chance, on the real HTTP and cache path---WA-H1 PASS,
+while the deliberately shared posture leaks perfectly on loopback (AUC
+1.000, all 50 victim secrets recovered; WA-H2, reported as measured).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{fig17_defense_frontier.pdf}
+  \caption{Defence frontier: worst-case membership-inference AUC against
+  the share of the cache's latency benefit given up, same attack for every
+  defence. Per-tenant partitioning reaches chance at a fraction of the
+  cost padding and TTL jitter require, and dominates the frontier rather
+  than joining it.}
+  \label{fig:defense-frontier}
+\end{figure}
+
+\subsection{Live evidence}
+\label{sec:eval-live}
+
+Does any of this survive a real scheduler, a real autoscaler and a real
+inference tier? In the order the campaigns ran: the replica-only ordinal
+check recorded a disagreement; a 24-hour soak was valid with two of four
+hypotheses failed; a real trace drove the real cluster and the cost
+ordering matched; and on the three-knob live plane the published
+controller lost to its own ablation, a corrected controller then beat
+every arm at equal fairness, and the obvious damper failed. Absolutes are
+never compared across substrates anywhere in this subsection.
+
+\paragraph{The ordinal check, and its disagreement} The kind-cluster
+experiment asks only whether the simulator's \jcac{}-versus-HPA ranking
+reproduces under a real scheduler, real HPA and real load. The joint
+controller's first live execution passed its smoke on the first attempt,
+with the actuation gate passed before load, and the mirrored slice
+completed with 12 of 12 valid runs (two arms $\times$ two cells $\times$
+three repetitions), analysed by a protocol frozen before any live number
+existed (\evfile{PHASE7\_ORDINAL.md}). As measured, the primary reading is
+a disagreement: the $J$ winner flips in both cells
+(Table~\ref{tab:ordinal}). The descriptive detail the protocol permits is
+that live, the two arms land at parity on every metric---$J$ separations
+of 0.002 with overlapping ranges, zero violations for both arms in both
+cells---while the simulator separates them decisively. Two mechanisms
+account for it. In the cacheable cell the simulator's win flows through the
+cache economy, and the live cache knob is inert by construction on this
+substrate, as the caption frozen before the run discloses. In the bursty
+CRUD cell the simulator's HPA concedes 0.0417 violation under the burst
+while real HPA at this amplitude, under the small-cluster capacity cap,
+never violates: the simulator overestimates reactive-scaler lateness in
+this cell, a model datum recorded as such, in a direction that favoured
+the joint controller in-simulator. The verdict is DISAGREE and it stands.
+What the campaign establishes is that the full loop runs live---features
+to planner to operator actuation, mechanically gated---with capacity
+parity held and neither arm degrading; what it does not establish is
+reproduction of the simulator's ranking on the replica-only projection at
+this amplitude.
+
+\begin{table}[htbp]
+\centering\tablefont
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+\textbf{Cell / substrate} & \textbf{arm} & $J$ \textbf{mean [min..max]} & \textbf{cost \$} & \textbf{violation} \\
+\midrule
+ai\_cacheable, sim  & jcac & 0.596 [0.593..0.601] & 5.66 & 0.0006 \\
+                    & hpa  & 0.921 [0.917..0.924] & 8.77 & 0.0000 \\
+ai\_cacheable, live & jcac & 0.739 [0.738..0.739] & 7.03 & 0.0000 \\
+                    & hpa  & 0.737 [0.735..0.740] & 7.02 & 0.0000 \\
+\addlinespace
+crud\_bursty, sim   & jcac & 0.040 [0.040..0.040] & 0.38 & 0.0000 \\
+                    & hpa  & 0.136 [0.136..0.136] & 0.30 & 0.0417 \\
+crud\_bursty, live  & jcac & 0.027 [0.027..0.027] & 0.26 & 0.0000 \\
+                    & hpa  & 0.025 [0.023..0.027] & 0.24 & 0.0000 \\
+\bottomrule
+\end{tabular}
+\caption{Live ordinal check on a kind cluster: does the simulator's
+jcac-versus-HPA ranking reproduce under a real scheduler, real HPA and real
+load? Absolutes are not comparable across substrates and are not compared.
+The live data plane burns fixed CPU per request kind, so the cache and tier
+knobs are inert here; this table validates the replica-control projection
+of the joint controller only. The caption's disclosure was frozen verbatim
+before the run.}
+\label{tab:ordinal}
+\end{table}
+
+\paragraph{Endurance, placement, and a real trace live} The live CRUD
+plane was held under load for a full day (\evfile{PREREG\_LIVE\_SOAK\_V8.md}
+$\to$ \evfile{RESULTS\_LIVE\_SOAK\_V8.md}): 24\,h\,00\,m\,11\,s, 25,806,353
+requests at 298.6 per second, 0.0012\% failed, zero dropped iterations and
+zero pod restarts---SK-H4 PASS on the absolute validity rule that had ended
+four earlier attempts and was never relaxed, and SK-H2 (audit continuity)
+PASS. The result is split and both halves are the finding: SK-H1 FAIL
+(recovery within a 20\% band after fault injection fails on one of eight
+injections) and SK-H3 FAIL (hourly CRUD p95 $\le 8.0072$\,ms exceeded in
+six of 25 buckets). The earlier attempts are published as INVALID or VOID
+with their causes traced---a port-forward that pinned all load to one pod
+of sixteen, then host power-source flapping that opened 48--51\,s
+scheduling gaps---none of them the controller. A descriptive follow-up
+shows the frozen SK-H1 rule scores peak-against-trough on a four-minute
+latency oscillation present before, during and after the failing
+injection, so it cannot tell that fault from a quiet minute; SK-H1 stays
+failed as scored. On a four-node cluster the load actually spread: three
+nodes carried work and the busiest held 0.3815 of it, below the frozen
+0.90 pinning threshold (MN-H1 PASS; \evfile{RESULTS\_MULTINODE.md}). And
+window 0 of the BurstGPT trace drove the real cluster
+(\evfile{RESULTS\_TRACE\_LIVE.md}): the live cost ordering matches the
+simulator's (TL-H1 PASS); on violation both substrates rank the arms equal
+(TL-H2 vacuous); the substrate delivered the registered demand within the
+quantisation of a one-minute time unit (TL-H3 PASS).
+
+\paragraph{The three-knob live plane: B1, B1$'$, B1$''$} That substrate
+was then rented: one L40S host (8 vCPU, 62\,GiB) with a real inference tier
+behind the gateway, so that all three knobs are live and every arm is
+scored on the same four cells (\texttt{ai\_cacheable}, \texttt{tier\_mixed},
+\texttt{crud\_bursty}, \texttt{joint\_stress}) under protocols frozen before
+any number existed.
+
+\emph{B1} (\evfile{PREREG\_WAVE4\_LIVE\_PLANE.md} $\to$
+\evfile{RESULTS\_WAVE4\_LIVE\_PLANE.md}): the published joint controller
+lost its primary reading. In \texttt{joint\_stress} it cost \$0.3651 against
+\$0.2960 for the cheapest single-knob arm (tier-only, $+23.3\%$ for the
+joint controller) at equal fairness---WL-H1 FAIL---with the knob-liveness
+gate WL-H2 passing in all sixteen windows. Losing to one's own ablation is
+a defect in the optimisation, not a fact about jointness. The defect was
+found in two parts---an open-loop plant model that was pessimistic by three
+orders of magnitude about the live tier's latency, and a hysteresis ratchet
+that let a pessimistic plan lock in---and corrected as an opt-in arm,
+\texttt{jcac-calibrated}, under a new frozen protocol.
+
+\emph{B1$'$} (\evfile{PREREG\_WAVE4\_CALIBRATED.md} $\to$
+\evfile{RESULTS\_WAVE4\_CALIBRATED.md}; Table~\ref{tab:b1prime},
+Figure~\ref{fig:calibrated-plane}): the corrected controller beats every one
+of the four comparators on cost at iso-fairness in \texttt{joint\_stress},
+each with a paired-bootstrap interval excluding zero---WL-H1$'$ PASS
+(\$0.2650, Jain 1.000)---and the per-cell ablation dominance WL-H4 passes
+in all four cells. The paired bootstrap assumes independent buckets and the
+deltas are autocorrelated (lag-1 autocorrelation up to $+0.81$); a
+moving-block bootstrap at block lengths 5 and 10 leaves every interval
+below zero (\evfile{SENSITIVITY\_WAVE4\_CALIBRATED.md}). The record also
+prints, beside the win, that the corrected controller oscillates its
+replica count (8--24 replicas in \texttt{tier\_mixed};
+\evfile{CHURN\_WAVE4\_CALIBRATED.md}). With its plant fitted to this live
+evidence under a rule frozen beforehand, the simulator's cost winner then
+matches the live one in three of four cells, against one of four for the
+published plant (WL-H3$'$ PASS; \evfile{RESULTS\_WAVE4\_SIM\_TRANSFER.md}).
+The ordinal disagreement of the earlier campaigns was a plant-calibration
+gap, not a ranking the simulator cannot express.
+
+\begin{table}[htbp]
+\centering\tablefontsmall\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrl@{}}
+\toprule
+\textbf{versus arm} & \textbf{arm cost \$} & $\Delta$\textbf{cost \$} & $\Delta\%$ & \textbf{95\% CI, $\Delta$/bucket} & \textbf{beats} \\
+\midrule
+\polyforge{} (published) & 0.3332  & $-0.0682$  & $-20.5\%$ & $[-0.0030, -0.0016]$ & yes \\
+replica-only             & 26.7047 & $-26.4397$ & $-99.0\%$ & $[-1.0781, -0.6507]$ & yes \\
+cache-only               & 1.5120  & $-1.2470$  & $-82.5\%$ & $[-0.0451, -0.0347]$ & yes \\
+tier-only                & 0.3220  & $-0.0570$  & $-17.7\%$ & $[-0.0027, -0.0009]$ & yes \\
+\bottomrule
+\end{tabular}
+\caption{B1$'$, the pre-registered primary reading (WL-H1$'$): the
+calibrated joint controller (\$0.2650, Jain 1.000) against every other arm
+in \texttt{joint\_stress} on one L40S host. ``Beats'' requires lower mean
+cost, Jain within 0.01, and a 95\% paired-bootstrap interval on the
+per-10-s-bucket cost delta (calibrated minus arm, paired by position, reps
+pooled, 10,000 resamples, seed 20260915) entirely below zero. Every arm's
+Jain is within 0.004 of the calibrated arm's.}
+\label{tab:b1prime}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{fig20_calibrated_plane.pdf}
+  \caption{B1$'$ on one L40S host, five arms $\times$ four cells $\times$
+  two reps. Left: total cost per run at iso-fairness (every arm's Jain index
+  is within 0.01 of the calibrated arm's in every cell shown; the record
+  lists the exceptions); dots are the mean of two reps, ticks the reps.
+  Right: the pre-registered primary reading---in \texttt{joint\_stress} the
+  calibrated joint controller's cost per 10-s bucket minus each arm's,
+  paired by position within the load window, as a percentage of that arm's
+  mean bucket cost, with the 95\% paired-bootstrap CI; a CI entirely left of
+  zero is a win. Won against the published controller, replica-only,
+  cache-only and tier-only.}
+  \label{fig:calibrated-plane}
+\end{figure}
+
+\emph{B1$''$} (\evfile{PREREG\_WAVE4\_DWELL.md} $\to$
+\evfile{RESULTS\_WAVE4\_DWELL.md}; Figure~\ref{fig:dwell-plane}) tested the
+obvious damper, a three-cycle replica dwell, against the arm it damps. It
+caps the largest single jump but does not halve the churn (WL-H6 FAIL:
+20.0 against 22.0 changes per window in \texttt{joint\_stress}, 12.0
+against 8.0 in \texttt{ai\_cacheable}), and its cost is not shown
+non-inferior to the calibrated arm's (WL-H7 FAIL: $+2.0\%$, interval
+$[-0.0006, +0.0012]$ per bucket against a bound of $+0.0002$; it still
+beats tier-only by $-31.4\%$). The oscillation is a slow swing, not
+chatter, so the next damper must act on the plant-estimate feedback rather
+than on move reversals. It has not been built and is not pre-registered.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{fig21_dwell_plane.pdf}
+  \caption{B1$''$ on one L40S host, three arms $\times$ four cells $\times$
+  two reps, scored from the load window only. Left: the replica count every
+  10\,s through the \texttt{joint\_stress} window for the dwell-damped
+  controller and the calibrated controller it damps (solid rep 0, dashed
+  rep 1)---the oscillation is a slow swing, which a dwell on reversals
+  cannot remove. Middle: WL-H6---replica-count changes per window in the
+  three AI cells; the tick is the pre-registered bound, half the calibrated
+  arm's changes, and the dwell arm must sit left of it: FAIL. Right:
+  WL-H7---the dwell arm's cost per 10-s bucket minus each arm's, with the
+  95\% paired-bootstrap CI; the tick on the calibrated row is the $+5\%$
+  non-inferiority bound. Non-inferior to the calibrated arm: not shown;
+  beats tier-only: yes.}
+  \label{fig:dwell-plane}
+\end{figure}
+
+The answer for the live substrate is therefore layered. The replica-only
+projection did not reproduce the simulator's ranking; the three-knob plane
+did, once the plant was calibrated, and the corrected controller's cost win
+at iso-fairness is the one live result in this paper on which every knob
+was live and every arm was scored on the same cells. It comes with an
+oscillation the first damper did not fix.
+
+\subsection{Which number to cite}
+\label{sec:eval-summary}
+
+Table~\ref{tab:which-number} is the disambiguation a reader needs to quote
+this paper correctly. The conservative column is the claim; the right-hand
+column is what a hurried reading might take away and should not.
+
+\begingroup\tablefontsmall
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.42\textwidth}>{\raggedright\arraybackslash}p{0.37\textwidth}@{}}
+\caption{Disambiguation table, from \evfile{RESULTS\_MASTER.md}. The cost
+rows quote withdrawn figures only to name them as withdrawn.}
+\label{tab:which-number}\\
+\toprule
+\textbf{Claim} & \textbf{Cite} & \textbf{Not} \\
+\midrule
+\endfirsthead
+\caption[]{Disambiguation table (continued).}\\
+\toprule
+\textbf{Claim} & \textbf{Cite} & \textbf{Not} \\
+\midrule
+\endhead
+Cost, the claim & the per-tenant budget is satisfiable only by a
+controller holding the tier knob; no replica-only reactive controller can
+meet it (tier spend moves 0.00\% under any replica cap) & any comparative
+percentage against the originally tuned baselines \\
+Cost, real demand & Azure $-7.1\%$ at eviction parity (TP-H1a/b PASS);
+BurstGPT: no rank-test-surviving advantage & the withdrawn $-70\%$ and
+$-42\%$; $-52.2\%$ (mean only, fails its rank test) \\
+Cost, synthetic matrix & $-14.1\%$ vs.\ \texttt{keda\_fair}; cost-neutral
+vs.\ \texttt{hpa\_fair} & the matrix percentages vs.\ HPA/KEDA/FIRM as
+tuned; any mixing with replay numbers \\
+Composition (ablation) & removing joint control worsens cost at the margin
+that survives a competent tier rule (LF-H1: delta $-86.4\%$ vs.\ published)
+& $+2884\%$ without its comparator caveat \\
+Forecasting & Holt $-26.9\%$ RMSE on real BurstGPT; the winner tracks
+measured periodicity across three traces & seasonal $-44.8\%$ (synthetic;
+did not transfer); ``Holt is best'' \\
+SLO & parity at $-43$ to $-48\%$ cost; mechanism $p = 6{\times}10^{-4}$;
+severity half of \texttt{hpa\_fair}'s on synthetic and Azure with the
+BurstGPT reversal ($58\times$) beside it & ``beats HPA/KEDA on violation'';
+``half the overshoot'' alone \\
+Fairness & Jain 0.9705 vs.\ VTC 0.9599; FIRM $\dz = 1.0$ & the
+$\gamma$-ablation (published null) \\
+Cache & 29.6\% at 0.85 on real LMSYS, $+93\%$ vs.\ 10\%-fixed;
+precision-vs-$\tau$ shape and strata & synthetic saturation; ``69\% of hits
+are wrong'' (ignores the ceiling) \\
+Security & AUC 0.88 $\to$ 0.50 at 24\% latency, 76\% hits kept; 0.502 over
+the wire & --- \\
+Live, replica-only & loop verified end to end; ordinal check DISAGREE; 24\,h
+soak valid (SK-H4 PASS) with SK-H1/SK-H3 FAIL; MN-H1 PASS; TL-H1 PASS &
+``sim ranking confirmed live'' from the ordinal check alone \\
+Live, three knobs & published controller loses to tier-only (WL-H1 FAIL);
+corrected controller beats all four arms at iso-fairness (WL-H1$'$ PASS,
+block-bootstrap robust); fitted simulator matches live in 3/4 cells; dwell
+damper fails (WL-H6/H7) & any claim for the published controller on the
+live plane; any absolute dollar transfer \\
+Effect sizes & $\dz$ with 95\% bootstrap CI & bare p-values below
+$10^{-6}$ \\
+Planner scale & exponent 1.45; 3\,s timeout crossed at 128 tenants &
+``linear in tenants'' \\
+\bottomrule
+\end{longtable}
+\endgroup

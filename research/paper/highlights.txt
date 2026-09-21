@@ -1,7 +1,9 @@
 Highlights — Future Generation Computer Systems submission
-(3 to 5 bullets; each at most 85 characters INCLUDING spaces; results only,
-no jargon; upload as a separate file named "Highlights" — Word or text.)
+(3 to 5 bullets; each at most 85 characters INCLUDING spaces; results only;
+upload as a separate file named "Highlights".)
 
-- TODO(author): bullet 1 (<= 85 chars)
-- TODO(author): bullet 2 (<= 85 chars)
-- TODO(author): bullet 3 (<= 85 chars)
+- Joint replica, cache and model-tier control wins the composite objective everywhere
+- A per-tenant dollar budget can be kept only by a controller that holds the tier knob
+- Two pre-registered attempts to beat tuned scalers on SLO attainment failed; published
+- A shared semantic cache leaks membership at AUC 0.88; partitioning restores chance
+- On a live GPU host the first controller lost to its ablation; the corrected one won

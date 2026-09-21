@@ -1,0 +1,143 @@
+\section{Claim-to-record map}
+\label{app:traceability}
+
+Every claim in this paper maps to a committed, machine-generated record in
+the public repository, regenerable by a named script from the archived run
+databases. The consolidated entry point is
+\evfile{research/analysis/RESULTS\_MASTER.md}; per-campaign records are
+immutable once their campaign closes; \texttt{python scripts/reproduce.py}
+re-derives every gated record and figure from the committed data. Paths
+are relative to \evfile{research/analysis/} unless prefixed. The Zenodo
+deposit \citep{polyforge2026zenodo} bundles the raw DuckDB databases with
+a SHA-256 manifest.
+
+\begin{small}
+\begin{longtable}{@{}p{0.40\textwidth}p{0.28\textwidth}p{0.26\textwidth}@{}}
+\caption{Claim-to-evidence map for the load-bearing claims.}
+\label{tab:traceability}\\
+\toprule
+\textbf{Claim} & \textbf{Record} & \textbf{Protocol / regeneration} \\
+\midrule
+\endfirsthead
+\caption[]{Claim-to-evidence map (continued).}\\
+\toprule
+\textbf{Claim} & \textbf{Record} & \textbf{Protocol / regeneration} \\
+\midrule
+\endhead
+Composite $J$ and cost vs.\ all five tuned baselines, 1,800-run matrix;
+raw per-metric gate FAIL &
+\evfile{RESULTS.md} &
+v1 gate frozen in the roadmap; \evfile{run\_analysis.py} \\
+\addlinespace
+Ablations as published ($-$joint, $-$eviction, $-$classifier) &
+\evfile{RESULTS.md} (ablation tables) &
+\evfile{run\_analysis.py} \\
+\addlinespace
+$-$joint ablation re-scored against a competent tier rule: delta shrinks
+$-86.4\%$ (LF-H1 PASS); GPTCache $J$ comparison survives (LF-H2 PASS) &
+\evfile{RESULTS\_LAYERED\_FIX.md} &
+\evfile{PREREG\_LAYERED\_FIX.md}; \evfile{analysis\_layered\_fix.py} \\
+\addlinespace
+Weight-free dominance: non-dominated in 48/60 cells &
+\evfile{RESULTS\_DOMINANCE.md} &
+\evfile{analysis\_dominance.py} (descriptive) \\
+\addlinespace
+Holt $-16.3\%$ violation in-loop; realism ablation; self-calibration
+$\dz = +0.46$; side channel AUC 0.88 $\to$ 0.50 &
+\evfile{ADVANCED.md} &
+\evfile{advanced.py} \\
+\addlinespace
+Second matrix: H1 FAIL (parity at $-43$ to $-48\%$ cost), H2 PASS;
+iso-cost gate outcomes &
+\evfile{RESULTS\_V2.md} &
+\evfile{PREREG\_V2.md}; \evfile{analysis\_v2.py} \\
+\addlinespace
+Overload matrix: H1$'$ FAIL (3.2--3.4$\times$ spend), H2$'$ PASS
+($p = 6{\times}10^{-4}$); spike-class exploratory win &
+\evfile{RESULTS\_V3.md} &
+\evfile{PREREG\_V3.md}; \evfile{analysis\_v3.py} \\
+\addlinespace
+Risk knob: RQ-H1/H2 FAIL; corrected: RB-H1 PASS, RB-H2/H3 FAIL &
+\evfile{RESULTS\_RISK.md}, \evfile{RESULTS\_RISK\_BUDGET.md} &
+\evfile{PREREG\_RISK\_MPC.md}, \evfile{PREREG\_RISK\_BUDGET.md} \\
+\addlinespace
+BurstGPT replay $n = 16$: HT FAIL; $n = 96$: HT2 PASS on $J$ with the
+cost figure withdrawn as a like-for-like claim below &
+\evfile{RESULTS\_TRACE.md}, \evfile{RESULTS\_TRACE2.md} &
+\evfile{PREREG\_TRACE.md}, \evfile{PREREG\_TRACE2.md} \\
+\addlinespace
+Azure replay (as tuned; withdrawn as a like-for-like claim below) &
+\evfile{RESULTS\_TRACE\_AZURE.md} &
+\evfile{PREREG\_TRACE\_AZURE.md} \\
+\addlinespace
+Eviction parity: cost-neutral vs.\ \texttt{hpa\_fair} (EP-H1a FAIL),
+$-14.1\%$ vs.\ \texttt{keda\_fair}; severity 0.2143 vs.\ 0.4288 &
+\evfile{RESULTS\_EVICTION\_PARITY.md} &
+\evfile{PREREG\_EVICTION\_PARITY.md}; \evfile{analysis\_eviction\_parity.py} \\
+\addlinespace
+Trace parity: Azure $-7.1\%$ (TP-H1a/b PASS); BurstGPT TP-H1a FAIL;
+severity reverses on BurstGPT (TP-H3a/b FAIL) &
+\evfile{RESULTS\_TRACE\_PARITY.md} &
+\evfile{PREREG\_TRACE\_PARITY.md}; \evfile{analysis\_trace\_parity.py} \\
+\addlinespace
+Budget parity: BP-H1a/b FAIL on both traces, claim withdrawn;
+Amendment~1: no budget-respecting replica-only comparator exists; BP-H2a/b
+PASS bounded; BP-H3 79\% &
+\evfile{RESULTS\_BUDGET\_PARITY.md} &
+\evfile{PREREG\_BUDGET\_PARITY.md}; \evfile{analysis\_budget\_parity.py} \\
+\addlinespace
+Sweep order immaterial (OP-H1 strict FAIL, OP-H3 PASS); plant mismatch
+$\pm 25\%$ (MM-H1/H2 PASS) &
+\evfile{RESULTS\_ORDER\_PERMUTATION.md}, \evfile{RESULTS\_MODEL\_MISMATCH.md} &
+\evfile{PREREG\_ORDER\_PERMUTATION.md}, \evfile{PREREG\_MODEL\_MISMATCH.md} \\
+\addlinespace
+Concurrency arm (CQ-H1/H2 PASS); 32-tenant slice; learned (RL) joint
+controller (LR-H1/H2 PASS, $\dz = -0.708$) &
+\evfile{RESULTS\_CONCURRENCY.md}, \evfile{RESULTS\_TENANT\_SCALE.md},
+\evfile{RESULTS\_LEARNED.md} &
+\evfile{PREREG\_CONCURRENCY.md}, \evfile{PREREG\_TENANT\_SCALE.md},
+\evfile{PREREG\_LEARNED\_CONTROL.md} \\
+\addlinespace
+Forecasting on real traces; pseudo-tenant sub-streams (PT-H1/H2/H3) &
+\evfile{FORECAST\_TRACE\_REAL.md}, \evfile{FORECAST\_AZURE.md},
+\evfile{PSEUDO\_TENANT.md} &
+\evfile{PREREG\_TRACE\_AZURE.md}, \evfile{PREREG\_PSEUDO\_TENANT.md} \\
+\addlinespace
+Cache on LMSYS: hit rate, capacity curve, precision, ceiling (C1 PASS) &
+\evfile{CACHE\_PRECISION.md}, \evfile{RESULTS\_CACHE\_CEILING.md} &
+\evfile{analysis\_cache\_ceiling.py} (needs LMSYS; outside the gate) \\
+\addlinespace
+Fairness vs.\ VTC-replica (HV1/HV2 PASS); $\gamma$-term null &
+\evfile{VTC\_FAIRNESS.md}, \evfile{FAIRNESS\_V2.md} &
+\evfile{PREREG\_VTC.md} \\
+\addlinespace
+Side channel over the wire: per-tenant AUC 0.502 (WA-H1 PASS); shared
+posture AUC 1.000 &
+\evfile{RESULTS\_WIRE\_ATTACK.md} (under \evfile{eval/\allowbreak results/\allowbreak security/}) &
+\evfile{PREREG\_WIRE\_ATTACK.md} \\
+\addlinespace
+Live ordinal check: DISAGREE; 24\,h soak (SK-H4 PASS, SK-H1/H3 FAIL);
+multi-node (MN-H1 PASS); trace live (TL-H1 PASS) &
+\evfile{PHASE7\_ORDINAL.md}, \evfile{RESULTS\_LIVE\_SOAK\_V8.md},
+\evfile{RESULTS\_MULTINODE.md}, \evfile{RESULTS\_TRACE\_LIVE.md} &
+\evfile{PREREG\_LIVE\_SOAK\_V8.md}, \evfile{PREREG\_MULTINODE.md},
+\evfile{PREREG\_TRACE\_LIVE.md} \\
+\addlinespace
+Live plane: B1 WL-H1 FAIL; B1$'$ WL-H1$'$/H4 PASS, WL-H3$'$ PASS; B1$''$
+WL-H6/H7 FAIL &
+\evfile{RESULTS\_WAVE4\_LIVE\_PLANE.md}, \evfile{RESULTS\_WAVE4\_CALIBRATED.md},
+\evfile{RESULTS\_WAVE4\_SIM\_TRANSFER.md}, \evfile{RESULTS\_WAVE4\_DWELL.md} &
+\evfile{PREREG\_WAVE4\_LIVE\_PLANE.md}, \evfile{PREREG\_WAVE4\_CALIBRATED.md},
+\evfile{PREREG\_WAVE4\_SIM\_TRANSFER.md}, \evfile{PREREG\_WAVE4\_DWELL.md} \\
+\addlinespace
+Sensitivity reruns: tier ratio (TR/TR2), cache curve (HK), latency model
+(LM), mixture p95, structural forms; coordinate gap (CG-H1); planner cells
+(PS/PF); chaos in simulation (CH-H1/H2) &
+\evfile{RESULTS\_TIER\_RATIO.md}, \evfile{RESULTS\_TIER\_RATIO\_V2.md},
+\evfile{RESULTS\_HK\_ADOPTION.md}, \evfile{RESULTS\_LM\_ADOPTION.md},
+\evfile{RESULTS\_MIXTURE\_P95.md}, \evfile{COORD\_GAP.md},
+\evfile{PLANNER\_CELLS\_DEALIAS.md}, \evfile{RESULTS\_CHAOS\_SIM.md} &
+their \evfile{PREREG\_*.md} counterparts; \evfile{scripts/reproduce.py} \\
+\bottomrule
+\end{longtable}
+\end{small}
