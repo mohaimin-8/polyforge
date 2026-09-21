@@ -27,7 +27,47 @@ campaign had closed---three were, in an audit of the baseline
 implementations---the response was a new pre-registration whose outcome
 for the published claim was committed before the re-scoring ran, and a new
 record beside the old one. The published record stands; the paper quotes
-the surviving claim.
+the surviving claim. Figure~\ref{fig:evidence-flow} is the path every
+number in this paper took.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{0.99\linewidth}{!}{%
+\begin{tikzpicture}[
+  stage/.style={draw, rounded corners=2pt, align=center, font=\small,
+               minimum height=11mm, text width=36mm, inner sep=4pt, fill=gray!8},
+  gate/.style={stage, fill=orange!12},
+  emit/.style={stage, fill=blue!8},
+  bad/.style={stage, fill=red!8},
+  arr/.style={-{Stealth[length=2.5mm]}, thick},
+  node distance=5mm and 6mm
+]
+\node[stage] (prereg) {Write the protocol\\ \scriptsize hypotheses $\cdot$ sole treatment $\cdot$ analysis script $\cdot$ stopping rule};
+\node[gate, right=of prereg] (push) {Commit and push\\ \scriptsize timestamp is the anchor; \texttt{check\_preregs.py} proves the text never changed after its result};
+\node[stage, right=of push] (run) {Run the campaign\\ \scriptsize paired seeds; identical demand for every arm; no widening, no re-runs};
+\node[emit, right=of run] (rec) {Record\\ \scriptsize \texttt{RESULTS\_*.md} written by the frozen script; PASS and FAIL alike; immutable};
+\node[gate, below=of rec] (gate) {Reproduction gate\\ \scriptsize \texttt{reproduce.py} re-derives every record and figure byte for byte from the committed data};
+\node[emit, left=of gate] (paper) {The paper\\ \scriptsize quotes the record; effect size with CI is the citable unit; nulls at the prominence of wins};
+\node[bad, left=of paper] (conf) {Confound found after the campaign closed?\\ \scriptsize three were, in the baseline audit};
+\node[stage, left=of conf] (re) {New registration\\ \scriptsize outcome for the published claim committed before the re-scoring runs};
+\draw[arr] (prereg) -- (push);
+\draw[arr] (push) -- (run);
+\draw[arr] (run) -- (rec);
+\draw[arr] (rec) -- (gate);
+\draw[arr] (gate) -- (paper);
+\draw[arr] (paper) -- (conf);
+\draw[arr] (conf) -- node[above, font=\scriptsize]{yes} (re);
+\draw[arr] (re.west) -- ++(-6mm,0) |- (prereg.west);
+\node[font=\scriptsize, align=center, anchor=east] at ([xshift=-7mm]$(prereg.west)!0.5!(re.west)$) {new record\\ beside the old;\\ the old one\\ stands};
+\end{tikzpicture}%
+}
+\caption{How a number reaches this paper. Orange boxes are gates a
+machine checks; the red box is the one human judgement in the chain, and
+its only permitted exit is a new registration. Forty-eight protocols took
+this path; the withdrawn cost percentages of
+Section~\ref{sec:eval-adjudication} are the loop's third pass.}
+\label{fig:evidence-flow}
+\end{figure}
 
 \subsection{Baselines, tuned on our own objective}
 \label{sec:method-baselines}
@@ -51,6 +91,33 @@ the audit of Section~\ref{sec:eval-adjudication}: \texttt{hpa\_fair} and
 \texttt{keda\_fair}, which carry no eviction charge and a competently
 pre-sized cache, and budget-carrying variants that apply the joint
 controller's own per-tenant budget rule verbatim.
+Table~\ref{tab:baselines} lists the grids and their winners; where a
+vendor default exists, the tuned setting beats it on $J$, which is the
+point of tuning.
+
+\begin{table}[htbp]
+\centering\tablefontsmall\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{0.13\textwidth}rr@{}}
+\toprule
+\textbf{Baseline} & \textbf{Grid} & \textbf{Winner} & $J$ \textbf{best} & $J$ \textbf{default} \\
+\midrule
+HPA-style & target utilisation $\rho \in \{0.3, \dots, 0.8\}$ & $\rho = 0.3$ & 0.555 & 0.628 ($\rho = 0.8$) \\
+KEDA-style & requests per replica $\in \{2, \dots, 16\}$ & 2.0 & 0.573 & --- \\
+FIRM-style & learning rate $\times$ $\epsilon$ $\times$ SLO weight, 27 combinations & $0.1$, $0.1$, $4$ & 0.619 & 0.632 \\
+GPTCache-style & target $\rho \in \{0.3, \dots, 0.8\}$, cache at maximum & $\rho = 0.3$ & 7.362 & 7.58 \\
+VTC-replica & target $\rho \in \{0.3, \dots, 0.8\}$ & $\rho = 0.3$ & 0.555 & 0.628 \\
+Concurrency (KPA shape) & target concurrency $\{0.5, \dots, 4.0\}$ $\times$ stable window $\{1, 3, 6\}$ intervals & $0.5$, $6$ & 0.543 & --- \\
+Static & no knob: over-provisioned to the replica cap & --- & --- & --- \\
+\bottomrule
+\end{tabularx}
+\caption{Baselines and their grid search on the composite objective
+(\evfile{eval/baselines/TUNING.md}; tuning-slice $J$, lower is better).
+The concurrency arm tunes to a stronger $J$ than tuned HPA or KEDA, so it
+is not a straw man; KEDA and the concurrency scaler have no universal
+vendor default. The winning stable window of six intervals is Knative's
+60\,s.}
+\label{tab:baselines}
+\end{table}
 
 \subsection{Substrates, never mixed}
 \label{sec:method-substrates}

@@ -92,10 +92,42 @@ Figure~\ref{fig:composite-objective} is the single-number ranking;
 Figure~\ref{fig:pareto} shows that the joint controller is the only system
 on the cost--violation frontier, and, read with no weights at all, it is
 non-dominated in 48 of 60 cells---the most of any arm
-(\evfile{RESULTS\_DOMINANCE.md}). These composite wins are scored against
-the originally tuned baselines; the adjudication re-scores the cost and
-SLO components separately, and Table~\ref{tab:scoreboard} already reflects
-it.
+(\evfile{RESULTS\_DOMINANCE.md}). Table~\ref{tab:composite-campaigns}
+collects the composite verdicts with their paired effect sizes. These
+composite wins are scored against the originally tuned baselines; the
+adjudication re-scores the cost and SLO components separately, and
+Table~\ref{tab:scoreboard} already reflects it.
+
+\begin{table}[htbp]
+\centering\tablefontsmall\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.24\textwidth}r>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{0.24\textwidth}l@{}}
+\toprule
+\textbf{Campaign} & \textbf{pairs} & \textbf{Comparators} & $\dz$ \textbf{(paired)} & \textbf{gate} $p$ \\
+\midrule
+Headline matrix, 1,800 runs & 300 & HPA, KEDA, FIRM, Static, GPTCache & $-0.99$, $-1.12$, $-1.44$, $-1.09$, $-0.66$ & $\le 4.6{\times}10^{-25}$ \\
+Second matrix (\texttt{jcac\_v2}) & 300 & same five & $-1.12$, $-1.29$, $-1.51$, $-1.10$, $-0.65$ & $\le 6.7{\times}10^{-25}$ \\
+Overload matrix (\texttt{jcac\_seasonal}) & 240 & HPA, KEDA, FIRM & $-0.53$, $-0.46$, $-0.86$ & $\le 1.3{\times}10^{-11}$ \\
+VTC slice, interference injected & 100 & VTC-replica & $-1.12$ & $3.3{\times}10^{-19}$ \\
+BurstGPT replay, $n = 96$ & 96 & HPA, KEDA, FIRM & $-0.43$, $-0.43$, $-0.47$ & $\le 5.5{\times}10^{-5}$ \\
+Azure LLM 2024 replay & 72 & HPA, KEDA, FIRM & $-1.64$, $-1.64$, $-1.85$ & $\le 5.3{\times}10^{-22}$ \\
+2026-stack concurrency arm & 300 & tuned concurrency scaler (KPA/AIBrix shape) & $-0.96$ & $1.3{\times}10^{-44}$ \\
+32-tenant slice & 20 & HPA, KEDA, concurrency & $-1.19$, $-1.02$, $-1.22$ & $\le 2.2{\times}10^{-4}$ \\
+Learned (RL) joint controller & 300 & offline-trained Q-learning over the same lattice & $-0.71$ & $2.9{\times}10^{-28}$ \\
+\bottomrule
+\end{tabularx}
+\caption{The composite objective $J$ across every campaign that tested
+it: the joint controller's paired effect size against each comparator
+(negative is better for the joint controller), the pre-registered gate
+$p$-value (the largest over the row's comparators). Records, in row order:
+\evfile{RESULTS.md}, \evfile{RESULTS\_V2.md}, \evfile{RESULTS\_V3.md},
+\evfile{VTC\_FAIRNESS.md}, \evfile{RESULTS\_TRACE2.md},
+\evfile{RESULTS\_TRACE\_AZURE.md}, \evfile{RESULTS\_CONCURRENCY.md},
+\evfile{RESULTS\_TENANT\_SCALE.md}, \evfile{RESULTS\_LEARNED.md}. All
+comparators are grid-tuned on $J$; the replay rows use the comparators as
+tuned, whose cost and SLO components are re-scored in
+Section~\ref{sec:eval-adjudication}.}
+\label{tab:composite-campaigns}
+\end{table}
 
 \begin{figure}[htbp]
   \centering
@@ -126,21 +158,45 @@ caveat.
 The blocked factorial of Section~\ref{sec:method-matrix}, all baselines
 grid-tuned on $J$, gives the joint controller the composite win ($|\dz|$
 0.66--1.44 against the five) and a violation rate held near the
-over-provisioned floor at a fraction of that floor's cost. Where baselines
-break is class-structured exactly as Table~\ref{tab:taxonomy} predicts:
-replica-only controllers cannot fix agentic latency, because it needs the
-tier knob (Figure~\ref{fig:violation-by-workload}). The single-trace view
-shows the composed behaviour directly---within the first minute of an
-agentic run the joint controller fills its replica budget and quadruples
-the semantic cache while HPA chases each burst with the only knob it has.
-Adaptive cache sizing doubles the fixed-cache baselines' hit share on
-cacheable workloads and correctly declines to spend memory on uncacheable
-ones. One pre-committed gate fails as measured and is reported: the
-roadmap's raw per-metric gate (win every metric outright) is structurally
-impossible against by-construction winners, since over-provisioned static
-and cache-maxed GPTCache arms take the SLO and hit-rate columns at 12--30
-times the joint controller's spend. The iso-cost variants exist for that
+over-provisioned floor at a fraction of that floor's cost
+(Figure~\ref{fig:violation-by-system}). Tail latency tells the same story
+by traffic family: the joint controller holds both families' p95 near the
+SLO-clean systems while spending an order of magnitude less than they do
+(Figure~\ref{fig:latency-p95}). Where baselines break is class-structured
+exactly as Table~\ref{tab:taxonomy} predicts: replica-only controllers
+cannot fix agentic latency, because it needs the tier knob
+(Figure~\ref{fig:violation-by-workload}). The single-trace view shows the
+composed behaviour directly---within the first minute of an agentic run
+the joint controller fills its replica budget and quadruples the semantic
+cache, because the forecast says the bursts will keep coming, while HPA
+chases each burst with the only knob it has and never touches the cache
+(Figure~\ref{fig:adaptation}). Adaptive cache sizing doubles the
+fixed-cache baselines' hit share on cacheable workloads and correctly
+declines to spend memory on uncacheable ones (Figure~\ref{fig:cache-hit}).
+One pre-committed gate fails as measured and is reported: the roadmap's
+raw per-metric gate (win every metric outright) is structurally impossible
+against by-construction winners, since over-provisioned static and
+cache-maxed GPTCache arms take the SLO and hit-rate columns at 12--30 times
+the joint controller's spend. The iso-cost variants exist for that
 comparison (Section~\ref{sec:eval-slo}).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{fig02_violation_by_system.pdf}
+  \caption{SLO violation by system (mean $\pm$ 95\% CI over 300 cells per
+  system): the joint controller holds violations near the over-provisioned
+  floor at a fraction of that floor's cost.}
+  \label{fig:violation-by-system}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig10_latency_p95.pdf}
+  \caption{Tail latency by traffic family (p95, mean $\pm$ 95\% CI, log
+  scale): the joint controller holds both families' tails near the
+  SLO-clean systems while spending an order of magnitude less than they do.}
+  \label{fig:latency-p95}
+\end{figure}
 
 \begin{figure}[htbp]
   \centering
@@ -151,12 +207,38 @@ comparison (Section~\ref{sec:eval-slo}).
   \label{fig:violation-by-workload}
 \end{figure}
 
-\paragraph{Ablations (500 runs)} Removing joint control costs $+2884\%$
-on the cost metric as published; removing cost-aware eviction $+35.7\%$;
-removing the classifier $+2.1\%$ cost and $-45\%$ relative hit rate. Each
-of the four components carries independent, statistically significant
-weight (Figure~\ref{fig:ablations}). The first figure must not be cited
-without its caveat. It rests on a defect in the layered/GPTCache
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.88\textwidth]{fig09_adaptation_trace.pdf}
+  \caption{One agentic run, step by step: within the first minute the
+  joint controller fills its replica budget \emph{and} quadruples the
+  semantic cache---the forecast says the bursts will keep coming---while
+  HPA chases every burst with the only knob it has and never touches the
+  cache. Joint control in a single trace.}
+  \label{fig:adaptation}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig05_cache_hit_by_workload.pdf}
+  \caption{Realised semantic-cache hit share on AI traffic, by workload
+  class: adaptive cache sizing doubles the fixed-cache baselines on
+  cacheable workloads and correctly declines to spend memory on uncacheable
+  ones.}
+  \label{fig:cache-hit}
+\end{figure}
+
+\paragraph{Ablations (500 runs)} Table~\ref{tab:ablations} and
+Figure~\ref{fig:ablations} give the full-controller-minus-one-component
+deltas. Removing joint control costs $+2884\%$ as published (the layered
+comparator's number, with its caveat below); removing cost-aware eviction
+$+35.7\%$; removing the classifier $+2.1\%$ cost and $-3.4\%$ hit rate.
+Three of the four components carry
+independent, statistically significant weight; the fourth, the
+$\gamma$-weighted fairness term, degrades nothing at $p < 0.01$ when
+removed---the same null Section~\ref{sec:eval-fairness} reports from the
+other side. The first figure must not be cited without its caveat. It
+rests on a defect in the layered/GPTCache
 comparator: that arm ranks tiers by name and de-escalates only below
 $0.3\times$ target, so on agentic traffic it escalates past the fastest
 tier and sticks at the dearest one. A pre-registered re-scoring against a
@@ -166,6 +248,29 @@ by $-86.4\%$ (LF-H1 PASS, $p = 1.2{\times}10^{-11}$); the composite win
 over the corrected arm survives at the smaller margin (LF-H2 PASS, $p =
 8.4{\times}10^{-16}$). The composition claim of this paper is the smaller,
 surviving measurement, not the published multiple.
+
+\begin{table}[htbp]
+\centering\tablefontsmall\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Component removed} & \textbf{cost} & \textbf{SLO viol.} & \textbf{Jain} & \textbf{hit rate} \\
+\midrule
+$-$ joint control (as published) & $+2883.7\%^{*}$ & $+9.3\%$ & $-1.9\%^{*}$ & $+25.8\%^{*}$ \\
+$-$ cost-aware eviction          & $+35.7\%^{*}$   & $+1.6\%$ & $-0.1\%$      & $-0.1\%$ \\
+$-$ classifier                   & $+2.1\%^{*}$    & $-5.8\%^{*}$ & $+0.1\%$  & $-3.4\%^{*}$ \\
+$-$ fairness term ($\gamma$)     & $+0.2\%$        & $+2.9\%$ & $-0.1\%$      & $-1.2\%$ \\
+\bottomrule
+\end{tabular}
+\caption{Ablations, 500 runs: relative change in each metric when one
+component is removed from the full controller, paired by cell
+(\evfile{RESULTS.md}); $^{*}$ marks $p < 0.01$. A positive cost or
+violation change and a negative Jain or hit-rate change mean removal
+hurt. The $-$joint cost figure is measured against the published layered
+comparator and shrinks by 86.4\% against a competent tier rule
+(\evfile{RESULTS\_LAYERED\_FIX.md}); the fairness-term row is the published
+$\gamma$ null.}
+\label{tab:ablations}
+\end{table}
 
 \begin{figure}[htbp]
   \centering
@@ -198,7 +303,7 @@ the joint controller's hysteresis holds the frontier
 (Figure~\ref{fig:realism-pareto}); self-calibration
 (Proposition~\ref{prop:calibration}) earns $\dz = +0.46$ ($p = 0.029$),
 concentrated on the bursty classes where trusting nominal capacity hurts
-most.
+most (Figure~\ref{fig:adaptive-realism}).
 
 \begin{figure}[htbp]
   \centering
@@ -218,6 +323,16 @@ most.
   controller's hysteresis and the self-calibrating variant hold the
   frontier.}
   \label{fig:realism-pareto}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{fig15_adaptive_under_realism.pdf}
+  \caption{Self-calibration under realism: learning effective capacity
+  from realised-versus-projected feedback lowers violations most on the
+  bursty classes, where start-up lag hurts a model that trusts nominal
+  capacity.}
+  \label{fig:adaptive-realism}
 \end{figure}
 
 \paragraph{The second matrix (\evfile{PREREG\_V2.md}, 2,100 runs)} The
@@ -256,17 +371,48 @@ attempts: two attempts, two published failures, one confirmed mechanism.
 expected demand, so realised demand lands above plan roughly half the
 time---the mechanism behind the attainment-for-spend trade above. Two
 pre-registered campaigns of 2,400 runs each scored a planning quantile as
-an explicit risk knob. The first moved the controller the wrong way:
-inflating projected demand also inflates projected tier spend, which trips
-the per-tenant budget guardrail into its shed fallback, so a higher
-quantile lowered spend and raised violation, monotonically---RQ-H1/RQ-H2
-FAIL, published as a null (\evfile{RESULTS\_RISK.md}). The
-one-changed-factor follow-up sizes capacity at the quantile but projects
-cost and checks the budget at the point forecast: RB-H1 PASS at the
+an explicit risk knob. The first moved the controller the wrong way
+(Figure~\ref{fig:risk-frontier}): inflating projected demand also inflates
+projected tier spend, which trips the per-tenant budget guardrail into its
+shed fallback, so a higher quantile lowered spend and raised violation,
+monotonically---RQ-H1/RQ-H2 FAIL, published as a null
+(\evfile{RESULTS\_RISK.md}). The one-changed-factor follow-up sizes
+capacity at the quantile but projects cost and checks the budget at the
+point forecast (Figure~\ref{fig:risk-budget-frontier}): RB-H1 PASS at the
 pre-declared $q = 0.90$, but the violation curve turns back up at $q =
 0.95$, so the monotone frontier RB-H2 required is not claimed (RB-H2
 FAIL), and strict domination of the reactive arms is not either (RB-H3
 FAIL; \evfile{RESULTS\_RISK\_BUDGET.md}).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{fig18_risk_frontier.pdf}
+  \caption{The risk knob moved the controller the wrong way (blue, mean
+  $\pm$ 95\% CI): raising the planning quantile lowered spend and raised
+  violation, monotonically. Inflating demand also inflates projected tier
+  spend, which trips the per-tenant budget guardrail into its shed fallback
+  (tier ``none'', a designed AI outage)---cheap, and a total SLO miss.
+  Published as measured; RQ-H1/H2 FAIL. The tuned reactive scalers
+  (squares) remain far to the right. Down and left is better.}
+  \label{fig:risk-frontier}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.95\textwidth]{fig19_risk_budget_frontier.pdf}
+  \caption{One changed factor reverses the mechanism. (a) Every joint
+  controller arm (blue) sits far left of the tuned reactive stack
+  (squares)---the separation that survives pairing is cost, 33--39\% less
+  spend at the declared operating point---and the corrected frontier runs
+  downward where the uncorrected null (grey dashes) ran up and left. (b)
+  What the quantile buys, as the gates measure it: violation paired against
+  each campaign's own point-forecast arm, 95\% bootstrap CI. The correction
+  flips the sign of the mechanism, and RB-H1 passes at the pre-declared
+  $q = 0.90$, but the curve turns back up at $q = 0.95$---an interior
+  optimum, not the monotone frontier RB-H2 required. Against the reactive
+  arms the violation differences do not separate, so RB-H3 is not claimed.}
+  \label{fig:risk-budget-frontier}
+\end{figure}
 
 The answer to this subsection's question is no. The joint controller does
 not beat tuned reactive scalers on attainment; it matches them at roughly
@@ -322,6 +468,48 @@ every comparator it had been scored against. Each was addressed by a
 pre-registered re-scoring against a corrected comparator, with the outcome
 for the published claim committed before the run. None of the original
 records was edited; every re-scoring is a new record.
+Table~\ref{tab:adjudication} lists every hypothesis with its outcome; the
+paragraphs that follow read them.
+
+\begingroup\tablefontsmall\setlength{\tabcolsep}{4pt}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.15\textwidth}>{\raggedright\arraybackslash}p{0.1\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.1\textwidth}@{}}
+\caption{The adjudication, hypothesis by hypothesis. Each re-scoring was
+pre-registered with its outcome for the published claim committed before
+the run (\evfile{RESULTS\_EVICTION\_PARITY.md},
+\evfile{RESULTS\_TRACE\_PARITY.md}, \evfile{RESULTS\_BUDGET\_PARITY.md},
+\evfile{RESULTS\_ORDER\_PERMUTATION.md}, \evfile{RESULTS\_MODEL\_MISMATCH.md}).
+Rows marked descriptive are quoted as characterisation, not as results.}
+\label{tab:adjudication}\\
+\toprule
+\textbf{Re-scoring} & \textbf{Tag} & \textbf{Reading} & \textbf{Measured} & \textbf{Verdict} \\
+\midrule
+\endfirsthead
+\caption[]{The adjudication (continued).}\\
+\toprule
+\textbf{Re-scoring} & \textbf{Tag} & \textbf{Reading} & \textbf{Measured} & \textbf{Verdict} \\
+\midrule
+\endhead
+Eviction parity (no LRU charge; 512\,MB cache) & EP-H1a & matrix cost vs.\ \texttt{hpa\_fair} & $+0.8\%$, $\dz = +0.03$, $p = 0.995$ & FAIL \\
+ & EP-H1b & matrix cost vs.\ \texttt{keda\_fair} & $-14.1\%$, $\dz = -0.44$, $p = 3.8{\times}10^{-16}$ & PASS \\
+ & EP-H3 & severity (mean excess) vs.\ \texttt{hpa\_fair} & 0.2143 vs.\ 0.4288, $\dz = -0.44$ & PASS (NI 0.05) \\
+ & EP-H2 & share of the published $-36.0\%$ that was accounting & 36.8 points & descriptive \\
+\addlinespace
+Trace parity (same fair comparators) & TP-H1a/b & Azure cost & $-7.1\%$, 69.4\% of windows favour \jcac{} & PASS \\
+ & TP-H1a & BurstGPT cost & $-52.2\%$ mean; $p = 0.0133$ vs.\ Holm 0.0125; \jcac{} dearer in 57.3\% of windows & FAIL \\
+ & TP-H3a/b & Azure severity & within the 0.05 margin & PASS \\
+ & TP-H3a/b & BurstGPT severity & 0.5134 vs.\ 0.0088 ($58\times$); margin breached in 41.7\% of windows; AI shed on 9.3\% of tenant-steps & FAIL \\
+\addlinespace
+Budget parity (comparators carry \jcac{}'s budget rule) & BP-H1a/b & Azure cost & $-3.3\%$ / $-1.3\%$, $p = 0.379$ / $0.91$ & FAIL \\
+ & BP-H1a/b & BurstGPT cost & $-50.2\%$ / $-49.8\%$ mean, $p = 0.112$ / $0.191$ & FAIL \\
+ & Amend.~1 & replica-only arm under the cap & infra spend $-45.7\%$ / $-57.4\%$; tier spend $0.00\%$ on both traces & no comparator exists \\
+ & BP-H2a/b & severity with \jcac{}'s cap lifted & PASS on both; BurstGPT median 0.0000, mean $+0.1037$, 22\% of windows breach & PASS (bounded) \\
+ & BP-H3 & share of the BurstGPT severity gap the cap explains & 79\% & descriptive \\
+\addlinespace
+Robustness & OP-H1 / OP-H3 & tenant sweep order & Jain moves $\le 0.0001$ (strict bound FAIL); cost unchanged & FAIL / PASS \\
+ & MM-H1 / MM-H2 & plant constants $\pm 25\%$, one at a time & cost win vs.\ \texttt{keda\_fair} on every constant; severity within margin & PASS / PASS \\
+\bottomrule
+\end{longtable}
+\endgroup
 
 \paragraph{Eviction parity} (\evfile{PREREG\_EVICTION\_PARITY.md} $\to$
 \evfile{RESULTS\_EVICTION\_PARITY.md}.) Every reactive comparator
@@ -409,15 +597,38 @@ through the identical frozen decomposition: seasonal wins exactly on the
 stream with a genuine daily cycle (the code stream, $-15.6\%$ RMSE at
 autocorrelation 0.57, lag 24), loses on the weakly periodic conversation
 stream ($+48.5\%$; persistence wins), and pooling the streams destroys
-forecastability (seasonal $+104\%$). Across three real streams no fixed
-forecaster dominates, and the winner tracks measured periodicity. The
-same traces split by model and log type into 19 sub-streams reproduce the
-boundary with zero counter-examples, every periodic sub-stream shows the
-seasonal win, and three different forecasters win across sub-streams
-(PT-H1/H2/H3; \evfile{PSEUDO\_TENANT.md})---exactly what a pluggable
-per-tenant forecasting layer exists to exploit. That is the external
-support for the per-stream design, and it is the scoped version of the
-H2$'$ result.
+forecastability (seasonal $+104\%$). Table~\ref{tab:forecast} puts the
+six streams side by side: across three real traces no fixed forecaster
+dominates, and the winner tracks measured periodicity. The same traces
+split by model and log type into 19 sub-streams reproduce the boundary
+with zero counter-examples, every periodic sub-stream shows the seasonal
+win, and three different forecasters win across sub-streams (PT-H1/H2/H3;
+\evfile{PSEUDO\_TENANT.md})---exactly what a pluggable per-tenant
+forecasting layer exists to exploit. That is the external support for the
+per-stream design, and it is the scoped version of the H2$'$ result.
+
+\begin{table}[htbp]
+\centering\tablefontsmall\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\textwidth}{@{}Xrrlrr@{}}
+\toprule
+\textbf{Stream} & \textbf{buckets} & \textbf{lag (ACF)} & \textbf{winner} & $\Delta$ \textbf{winner} & $\Delta$ \textbf{seasonal} \\
+\midrule
+Synthetic diurnal stand-in & --- & 24 (0.85) & seasonal & $-44.8\%$ & $-44.8\%$ \\
+BurstGPT, segment 1 & 2,904 & 8 (0.49) & damped Holt & $-26.9\%$ & $-0.1\%$ \\
+BurstGPT, segment 2 & 2,640 & 8 (0.36) & persistence & $-16.6\%$ & $+2.1\%$ \\
+Azure 2024, code stream & 168 & 24 (0.57) & seasonal & $-15.6\%$ & $-15.6\%$ \\
+Azure 2024, conv.\ stream & 169 & 8 (0.35) & persistence & $-19.5\%$ & $+48.5\%$ \\
+Azure 2024, streams pooled & 216 & 24 (0.58) & persistence & $-3.4\%$ & $+104.4\%$ \\
+\bottomrule
+\end{tabularx}
+\caption{Forecasting under the identical frozen decomposition, one stream
+per row: hourly buckets, the strongest autocorrelation lag and its value,
+the lowest-RMSE forecaster, and RMSE relative to the linear-trend code
+default (\evfile{FORECAST\_TRACE\_REAL.md}, \evfile{FORECAST\_AZURE.md}).
+Seasonal forecasting wins only where a genuine daily cycle exists; the
+synthetic prediction is shown as the history it is.}
+\label{tab:forecast}
+\end{table}
 
 \subsection{The semantic cache on real prompts}
 \label{sec:eval-cache}
@@ -462,6 +673,33 @@ pre-registered probe located the ceiling itself
 same-model duplicate pairs---precision reaches only 0.4898, so removing
 every retrieval error recovers $+0.047$. The binding constraint on hit
 quality is response stochasticity, not the embedder or the threshold.
+Table~\ref{tab:precision} gives the full threshold sweep.
+
+\begin{table}[htbp]
+\centering\tablefontsmall\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+$\tau$ & \textbf{hit rate} & \textbf{prec.}\ $\rho{=}0.60$ & \textbf{prec.}\ $\rho{=}0.70$ & \textbf{prec.}\ $\rho{=}0.80$ & \textbf{wrong hits / 1k} \\
+\midrule
+0.70 & 0.411 & 0.366 & 0.249 & 0.144 & 308.6 \\
+0.75 & 0.347 & 0.385 & 0.273 & 0.164 & 252.1 \\
+0.80 & 0.291 & 0.401 & 0.293 & 0.184 & 205.6 \\
+0.85 & 0.241 & 0.416 & \textbf{0.313} & 0.205 & 165.5 \\
+0.90 & 0.197 & 0.419 & 0.328 & 0.224 & 132.3 \\
+0.95 & 0.156 & 0.417 & 0.338 & 0.247 & 103.4 \\
+\bottomrule
+\end{tabular}
+\caption{Hit precision on real LMSYS-Chat-1M prompts under the frozen
+protocol (\evfile{CACHE\_PRECISION.md}): 100,000 prompt--response pairs,
+first half inserted, second half queried, MiniLM on both sides. A hit at
+prompt cosine $\tau$ serves the nearest neighbour's stored response and
+counts as correct when the response-agreement cosine reaches $\rho$; the
+headline $\rho = 0.70$ was declared pre-run. The hit-rate column is this
+protocol's own, not the adaptive-sizing headline. At $\tau = 0.85$ the
+same-model stratum reaches 0.443 and the first-turn stratum 0.353; the
+oracle ceiling with perfect retrieval is 0.4898.}
+\label{tab:precision}
+\end{table}
 
 \subsection{Fairness: two dedicated baselines beaten, the controller's own term nulled}
 \label{sec:eval-fairness}
@@ -484,12 +722,32 @@ $-36\%$ worst-tenant p95. This is capacity-allocation fairness at the
 control plane, not token-level service fairness
 (Section~\ref{sec:threats}).
 
+The FIRM result holds in every tenant composition
+(Figure~\ref{fig:jain-by-mix}): across the uniform, premium-heavy,
+best-effort-heavy and whale mixes the joint controller sits level with the
+tuned reactive scalers on Jain and clearly above FIRM, whose per-tenant
+learning is what the mix exposes; the premium-heavy mix is where every
+controller's index drops most. Only over-provisioned static provisioning
+is uniformly fairer, at the spend Figure~\ref{fig:pareto} shows.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig04_jain_by_tenant_mix.pdf}
+  \caption{Fairness by tenant composition (Jain's index over per-tenant
+  SLO satisfaction, mean $\pm$ 95\% CI): the joint controller is level with
+  the tuned reactive scalers and above FIRM in every mix; premium-heavy is
+  the hardest composition for every controller; static provisioning buys
+  its near-perfect index with over-provisioning.}
+  \label{fig:jain-by-mix}
+\end{figure}
+
 The controller's own $\gamma$ term is a published null: under injected
 noisy-neighbour interference the $\gamma$-ablation shows no significant
 contribution, even in the whale-only subgroup where the injection fires
-(\evfile{FAIRNESS\_V2.md}). The term stays in the system as a configurable
-weight and is dropped from the claims. Fairness is claimed as a measured
-outcome, not as a mechanism.
+(\evfile{FAIRNESS\_V2.md}), and in the headline matrix its removal degrades
+no metric at $p < 0.01$ (Table~\ref{tab:ablations}). The term stays in the
+system as a configurable weight and is dropped from the claims. Fairness
+is claimed as a measured outcome, not as a mechanism.
 
 \subsection{Security: a timing side channel and its defence frontier}
 \label{sec:eval-security}
@@ -501,19 +759,55 @@ defence stays leaky or discards most of the cache.
 
 A shared semantic cache leaks prompt membership across tenants: an
 attacker distinguishing whether a victim tenant inserted a prompt reaches
-AUC 0.88 from timing alone (compare the API-layer audit of
-Gu et al.~\citep{promptcacheaudit2025}). Per-tenant partitioning returns the attacker
-to chance (AUC 0.50) at 24\% latency cost while keeping 76\% of hits,
-strictly dominating response-time padding (never below AUC 0.73 at any
-cost) and TTL jitter (chance only at about 90\% hit loss) on the
-leakage-versus-benefit frontier (Figure~\ref{fig:defense-frontier}). This
-measurement is what made the gateway's cache per-tenant by default. The
-frontier was then confirmed over the wire, against the real gateway process
-rather than the simulator (\evfile{RESULTS\_WIRE\_ATTACK.md}): with the
-per-tenant posture the membership attack lands at AUC 0.502 (95\% CI
-$[0.384, 0.612]$)---chance, on the real HTTP and cache path---WA-H1 PASS,
-while the deliberately shared posture leaks perfectly on loopback (AUC
-1.000, all 50 victim secrets recovered; WA-H2, reported as measured).
+AUC 0.88 from timing alone, and the leakage grows as cross-tenant warming
+proceeds (Figure~\ref{fig:side-channel}, left; compare the API-layer audit
+of Gu et al.~\citep{promptcacheaudit2025}). Per-tenant partitioning
+returns the attacker to chance (AUC 0.50) at 24\% latency cost while
+keeping 76\% of hits, strictly dominating response-time padding (never
+below AUC 0.73 at any cost) and TTL jitter (chance only at about 90\% hit
+loss) on the leakage-versus-benefit frontier
+(Table~\ref{tab:defences}, Figure~\ref{fig:defense-frontier}). Isolation
+costs hit rate---a naive equal split gives up 29\% of the aggregate hit
+rate---and demand-proportional sizing recovers 18\% of that penalty
+(Figure~\ref{fig:side-channel}, right). This measurement is what made the
+gateway's cache per-tenant by default. The frontier was then confirmed
+over the wire, against the real gateway process rather than the simulator
+(\evfile{RESULTS\_WIRE\_ATTACK.md}): with the per-tenant posture the
+membership attack lands at AUC 0.502 (95\% CI $[0.384, 0.612]$)---chance,
+on the real HTTP and cache path---WA-H1 PASS, while the deliberately
+shared posture leaks perfectly on loopback (AUC 1.000, all 50 victim
+secrets recovered; WA-H2, reported as measured).
+
+\begin{table}[htbp]
+\centering\tablefontsmall\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Defence} & \textbf{worst-case AUC} & \textbf{benefit given up} & \textbf{hits kept} \\
+\midrule
+none                         & 0.88 & 0\%  & 100\% \\
+response-time padding (best of grid) & 0.73 & 28\% & 100\% \\
+TTL jitter (best of grid)    & 0.53 & 90\% & 10\% \\
+per-tenant partitioning      & 0.50 & 24\% & 76\% \\
+\bottomrule
+\end{tabular}
+\caption{Defences against the timing side channel, scored on the identical
+attack over committed, untuned grids (\evfile{ADVANCED.md}). Padding
+equalises hit and miss latency only by padding everything to the miss
+time; TTL jitter reaches chance only by discarding nine hits in ten.
+Per-tenant partitioning is strictly lower-left of both curves.}
+\label{tab:defences}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\textwidth]{fig16_cache_side_channel.pdf}
+  \caption{Left: a shared semantic cache leaks tenant prompt membership
+  from response time alone, and the attacker's AUC rises with cross-tenant
+  warming; the per-tenant cache pins the attacker at chance. Right:
+  isolation costs hit rate, and demand-proportional sizing recovers part
+  of the naive equal-split penalty.}
+  \label{fig:side-channel}
+\end{figure}
 
 \begin{figure}[htbp]
   \centering
@@ -537,6 +831,34 @@ ordering matched; and on the three-knob live plane the published
 controller lost to its own ablation, a corrected controller then beat
 every arm at equal fairness, and the obvious damper failed. Absolutes are
 never compared across substrates anywhere in this subsection.
+Table~\ref{tab:live-campaigns} is the ledger; the paragraphs that follow
+read it.
+
+\begin{table}[htbp]
+\centering\tablefontsmall\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Campaign} & \textbf{Substrate} & \textbf{Design} & \textbf{Pre-registered verdicts} \\
+\midrule
+Ordinal check & kind cluster, real HPA, k6 load & 2 arms $\times$ 2 cells $\times$ 3 reps, 12/12 valid & DISAGREE: $J$ winner flips in both cells; live arms at parity on every metric \\
+24\,h soak & kind cluster, CRUD plane & 1 arm, 24\,h\,00\,m\,11\,s, 25.8M requests & SK-H1 FAIL (recovery band, 1 of 8 injections); SK-H2 PASS; SK-H3 FAIL (hourly p95 $\le 8.0072$\,ms, 6 of 25 buckets); SK-H4 PASS (0 dropped, 0 restarts) \\
+Multi-node placement & four-node kind cluster & 1 sitting & MN-H1 PASS (busiest node 0.3815 $< 0.90$); MN-H2 PASS \\
+Real trace, live & kind cluster; BurstGPT window 0 & 2 arms & TL-H1 PASS (cost ordering matches the simulator); TL-H2 vacuous (both rank equal on violation); TL-H3 PASS (demand delivered within 1/60-rps quantisation) \\
+Live chaos and p99 & kind cluster, shared-PostgreSQL data plane & joint arm only, 1 execution per cell & LC-H1 PASS (planner crash and 60\,s API-server throttle absorbed at zero violation; degenerate form); P99-H1: live p99 verdict matches p95 \\
+B1, three-knob plane & one L40S host, real inference tier & 4 arms $\times$ 4 cells $\times$ 1 rep & WL-H1 FAIL (published controller $+23.3\%$ vs.\ tier-only at equal fairness); WL-H2 PASS in all 16 windows \\
+B1$'$, calibrated controller & same host & 5 arms $\times$ 4 cells $\times$ 2 reps & WL-H1$'$ PASS (beats all four arms, CIs $< 0$, block-bootstrap robust); WL-H4 PASS in 4/4 cells; WL-H3$'$ PASS (fitted simulator matches live winner in 3/4 cells) \\
+B1$''$, dwell damper & same host & 3 arms $\times$ 4 cells $\times$ 2 reps & WL-H6 FAIL (churn not halved); WL-H7 FAIL (non-inferiority to the calibrated arm not shown; beats tier-only $-31.4\%$) \\
+\bottomrule
+\end{tabularx}
+\caption{Every live campaign, in the order run, with its substrate, design
+and pre-registered verdicts (\evfile{PHASE7\_ORDINAL.md},
+\evfile{RESULTS\_LIVE\_SOAK\_V8.md}, \evfile{RESULTS\_MULTINODE.md},
+\evfile{RESULTS\_TRACE\_LIVE.md}, \evfile{RESULTS\_LIVE\_CHAOS\_P99.md},
+\evfile{RESULTS\_WAVE4\_LIVE\_PLANE.md}, \evfile{RESULTS\_WAVE4\_CALIBRATED.md},
+\evfile{RESULTS\_WAVE4\_DWELL.md}). Four earlier soak attempts are
+published as INVALID or VOID with their causes traced.}
+\label{tab:live-campaigns}
+\end{table}
 
 \paragraph{The ordinal check, and its disagreement} The kind-cluster
 experiment asks only whether the simulator's \jcac{}-versus-HPA ranking

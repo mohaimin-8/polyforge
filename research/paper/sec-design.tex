@@ -146,7 +146,53 @@ one tenant with the others held fixed. The solve takes microseconds per
 tenant per cycle and is deterministic, which is what makes every controller
 decision in the evaluation reproducible bit for bit. An architecture
 decision record explains why enumeration beat a solver dependency at this
-lattice size.
+lattice size. Figure~\ref{fig:planning-cycle} follows one control step
+from the telemetry window to actuation.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{0.99\linewidth}{!}{%
+\begin{tikzpicture}[
+  stage/.style={draw, rounded corners=2pt, align=center, font=\small,
+               minimum height=11mm, text width=34mm, inner sep=4pt, fill=gray!8},
+  gate/.style={stage, fill=orange!12},
+  emit/.style={stage, fill=blue!8},
+  arr/.style={-{Stealth[length=2.5mm]}, thick},
+  node distance=5mm and 6mm
+]
+\node[stage] (win) {Telemetry window\\ \scriptsize 15\,min, 12 features per tenant};
+\node[stage, right=of win] (clf) {Classify\\ \scriptsize five-class label; PSI drift flag};
+\node[stage, right=of clf] (fc) {Forecast demand\\ \scriptsize per tenant: trend $\cdot$ damped Holt $\cdot$ seasonal};
+\node[stage, right=of fc] (lat) {Enumerate lattice\\ \scriptsize $\Delta r \in \{-2..2\}$, cache $\pm 1$ level, 4 tiers: $\le 60$ per tenant};
+\node[gate, below=of lat] (bud) {Budget filter\\ \scriptsize drop candidates with $\mathrm{cost}_i > B_i$; none affordable $\Rightarrow$ tier ``none''};
+\node[stage, left=of bud] (s1) {Sweep 1\\ \scriptsize each tenant: $\arg\min J$ over its slice, others fixed};
+\node[stage, left=of s1] (s2) {Sweep 2\\ \scriptsize same order; every tenant ends at a best response (Prop.~1)};
+\node[emit, left=of s2] (plan) {Plan\\ \scriptsize $(r_i, c_i, \tau_i)$ per tenant; first action only};
+\node[gate, below=of plan] (grd) {Operator guardrails\\ \scriptsize replica bounds $\cdot$ one cache level $\cdot$ cluster caps $\cdot$ last-good-plan fallback};
+\node[emit, right=of grd] (act) {Actuate\\ \scriptsize scale replicas $\cdot$ resize caches $\cdot$ retier models};
+\node[stage, right=of act] (cal) {Self-calibrate\\ \scriptsize realised vs.\ projected load $\to$ capacity scale $g_i \in [0.5, 1]$ (Prop.~2)};
+\draw[arr] (win) -- (clf);
+\draw[arr] (clf) -- (fc);
+\draw[arr] (fc) -- (lat);
+\draw[arr] (lat) -- (bud);
+\draw[arr] (bud) -- (s1);
+\draw[arr] (s1) -- (s2);
+\draw[arr] (s2) -- (plan);
+\draw[arr] (plan) -- (grd);
+\draw[arr] (grd) -- (act);
+\draw[arr] (act) -- (cal);
+\draw[arr] (cal.south) -- ++(0,-4mm) -| ([xshift=-7mm]grd.west) |- (win.west);
+\node[font=\scriptsize, align=center, anchor=east] at ([xshift=-8mm]plan.west) {next step,\\ 10\,s later};
+\end{tikzpicture}%
+}
+\caption{One \jcac{} control step. Grey boxes are computation, orange
+boxes are the two hard filters (the per-tenant budget inside the planner
+and the operator's guardrails outside it), blue boxes are what leaves the
+planner. Only the first action of the plan is applied; the loop closes
+through the self-calibration scale, which can only make the next plan more
+conservative.}
+\label{fig:planning-cycle}
+\end{figure}
 
 \subsection{Construction-level guarantees}
 \label{sec:design-theory}
