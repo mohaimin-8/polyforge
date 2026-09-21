@@ -1,0 +1,7 @@
+Highlights — Future Generation Computer Systems submission
+(3 to 5 bullets; each at most 85 characters INCLUDING spaces; results only,
+no jargon; upload as a separate file named "Highlights" — Word or text.)
+
+- TODO(author): bullet 1 (<= 85 chars)
+- TODO(author): bullet 2 (<= 85 chars)
+- TODO(author): bullet 3 (<= 85 chars)
