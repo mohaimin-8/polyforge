@@ -1,0 +1,105 @@
+\section{Implementation}
+\label{sec:impl}
+
+\polyforge{} is a working system, not a simulator with a paper around it.
+This section records what was built, the gates it is held to, and the two
+defects that wiring the live evaluation arm surfaced before any cluster
+time was spent.
+
+\paragraph{Components} The control plane (Go; \evfile{cmd/control-plane},
+\evfile{internal/}) exposes tenant, project and API-key APIs over
+PostgreSQL with row-level security (an SQLite path exists for
+development), rate limiting, telemetry ingestion, and canary and
+isolation-ladder admin APIs. The AI gateway (Go; \evfile{cmd/ai-gateway},
+\evfile{internal/ai}) routes chat across backends by plan, length and
+budget, and hosts the semantic cache, vector search and the agent loop.
+The classifier (\evfile{internal/classifier}, trained by
+\evfile{cmd/classifier-train}) turns 12-feature windows into taxonomy
+labels every 10\,s with PSI drift detection. The \jcac{} planner
+(\evfile{services/planner}) imports the simulator's controller from
+\evfile{research/jcac\_sim}, so offline and online planning are one code
+path. The operator (Go; \evfile{cmd/operator}, Helm chart under
+\evfile{deploy/helm}) reconciles the four custom resources with the
+guardrails of Section~\ref{sec:design-loop}, tears down in finalizer
+order, and traces every reconcile. The evaluation harness (\evfile{eval/})
+is YAML-driven, carries the tuned baselines, writes DuckDB results, and
+has a kind-cluster live backend.
+
+\paragraph{Engineering gates} Every change passes the same battery before
+commit: \texttt{gofmt}, \texttt{go vet}, \texttt{go build}, \texttt{go
+test ./... -count=1} across 26 Go packages, the Python suites for the
+harness, planner and analysis, and OpenAPI linting. Continuous integration
+additionally runs the race detector, a coverage gate, golangci-lint and the
+row-level-security suite against a live PostgreSQL service. Tests that only
+CI can execute are reported as unproven until a green CI run, and the
+session log records how every change was verified. Security-relevant
+details received the treatment of research claims: API-key identifiers are
+drawn independently of the secret after an audit found the identifier
+leaked 64 of 192 entropy bits; keys are hashed with SHA-256 rather than
+argon2id, sound because the secrets are 192-bit random strings, and
+recorded as a deliberate deviation precisely because it invites the
+question; a recovery middleware returns structured errors without stack
+details; the authentication packages are held at roughly 95\% coverage.
+
+\paragraph{Deviations from the original plan} Three tools named in the
+original roadmap were replaced with equivalent outcomes and the
+replacement recorded rather than silently made: the chi router by Go
+1.22's standard-library method patterns; sqlc and golang-migrate by
+hand-written SQL behind repository interfaces plus an idempotent migrator
+(type-safe access and a versioned schema still hold, and row-level
+security is proven by test); argon2id by SHA-256 as above. The evaluation
+reports latency at p95 rather than the roadmap's p99, for a reason
+Section~\ref{sec:method-metrics} gives.
+
+\subsection{The live arm, and two defects found at the desk}
+\label{sec:impl-live}
+
+The live campaigns (Section~\ref{sec:eval-live}) run on a kind cluster
+with harness-built images, a k6 load generator, real HPA for the baseline
+arm, and the operator plus planner for the \jcac{} arm. Wiring that arm
+surfaced two defects, each of which would have silently invalidated a
+cluster session.
+
+The first was demand plumbing that could never have authenticated. The
+operator's feature-demand source sent its token as a bearer, which the
+control plane treats strictly as a JWT; every read would have returned
+401, and because the \jcac{} loop degrades by design into silent fallback,
+the arm would have run ``live'' while planning nothing. The features
+endpoint---that endpoint only---now accepts the platform admin key, and
+the change is unit-tested in both directions: the admin key reads any
+tenant's features and still cannot touch other tenant routes.
+
+The second was last-writer-wins actuation on a shared target. All eight
+evaluation tenants' Policies name one shared Deployment, and each
+reconcile overwrote the others' replica counts, which would have pinned
+the target at a single tenant's share---the joint controller crippled by
+wiring and labelled as the joint controller. Policies that resolve to the
+same target now sum their clamped contributions, deletion re-enqueues the
+siblings, and the behaviour is unit-tested.
+
+Both fixes travel with a more general honesty mechanism. The harness ends
+operator installation with \texttt{kubectl wait --for=condition=Applied}
+on every Policy, so a run in which the operator never actuated fails
+before any load is generated; ``the controller was actually in the loop''
+is an executable gate rather than a promise. Capacity parity is a cell
+property under test: every arm starts at the same replica count and is
+ceilinged by the same cluster limits, so no arm can win by being handed
+more cluster.
+
+\subsection{Scale behaviour of the deployed planner}
+\label{sec:impl-scaling}
+
+The deployed \texttt{PlannerCore.plan} path was driven from 8 to 256
+tenants on one laptop core. The fitted growth exponent is 1.45: the joint
+fairness term couples tenants, and super-linearity is the measured price of
+jointness. The p95 cycle time first exceeds the operator's 3\,s request
+timeout at 128 tenants and the 10\,s control period at 256. Past the
+timeout the failure mode is the designed one---the operator holds the last
+good plan and reports fallback status. The levers past the crossover were
+then measured rather than named: hash-based planning cells hold the
+per-cell p95 under the timeout through 1,024 tenants, at a global-Jain
+cost the first cell assignment exceeded and a de-aliased assignment brings
+within bound; the wall reproduces at the same width through the shipped Go
+operator (Section~\ref{sec:threats}). Coordination costs outside the
+planner---custom-resource write fan-out, telemetry aggregation---are not
+covered by this microbenchmark.

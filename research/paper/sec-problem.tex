@@ -1,0 +1,123 @@
+\section{Problem setting}
+\label{sec:problem}
+
+\subsection{Three knobs, one bill}
+
+A cluster serves $m$ tenants. Each tenant's traffic is a mix of CRUD
+requests and AI requests (chat completions, embeddings, agent chains), and
+each tenant has an SLO expressed as a p95 latency target per traffic
+class and a monthly budget expressed in dollars. Three control surfaces
+determine what serving the tenant costs and how it feels:
+
+\begin{enumerate}
+  \item \emph{Replicas} $r_i$: how many instances of the serving path the
+        tenant's traffic can use. Priced as infrastructure, per
+        replica-hour.
+  \item \emph{Semantic-cache budget} $c_i$: how much memory the gateway
+        devotes to embedding-similarity lookups of past AI responses. A
+        hit costs no model call; a miss costs one at the tenant's tier.
+  \item \emph{Model tier} $\tau_i \in \{\text{none}, \text{small},
+        \text{mid}, \text{large}\}$: which model class answers the tenant's
+        AI requests. Priced per request at market API ratios of
+        $1{:}10{:}100$; ``none'' is a designed AI outage that sheds AI
+        requests and costs nothing.
+\end{enumerate}
+
+The knobs interact through the plant. Cache hits remove work that would
+otherwise need replicas or a model call. A larger tier raises per-request
+latency \emph{and} cost, and the latency it adds is exactly the signal a
+utilisation-driven autoscaler reads as a need for more replicas. A budget
+cap on the tenant binds on tier spend long before it binds on replica
+spend: at the caps we study, tier spend dominates infrastructure spend by
+three orders of magnitude (Section~\ref{sec:eval-adjudication}). A
+controller that holds only one knob can therefore be locally optimal and
+still make the wrong decision for the tenant's bill.
+
+\subsection{Workload taxonomy}
+\label{sec:taxonomy}
+
+Hybrid tenants are not one workload. Over a 15-minute telemetry window we
+reduce each tenant's traffic to a 12-feature vector---request rate and its
+coefficient of variation, log mean payload and payload variation, mean and
+p95 latency, observed cache-hit rate, mean embedding density and the
+fraction of high-density prompts, mean child spans and the multi-step
+fraction, and the AI-request fraction---and a softmax classifier maps the
+window onto one of five classes (Table~\ref{tab:taxonomy}). Windows that
+mix classes, as real tenants' windows do, are labelled by majority
+composition; population-stability-index drift detection flags a tenant
+whose feature distribution moves. Each class carries a control implication,
+and that column is what the evaluation later makes measurable: replica-only
+controllers cannot fix agentic latency because agentic latency is a tier
+problem (Figure~\ref{fig:violation-by-workload}).
+
+\begin{table}[htbp]
+\centering\tablefont
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}p{0.44\textwidth}X@{}}
+\toprule
+\textbf{Class} & \textbf{Defining window statistics} & \textbf{Control implication} \\
+\midrule
+CRUD-steady & rate CV $\le 0.9$; mean payload $< 5$\,KB; no cache hits; no
+model-tier traffic & steady replicas, minimal headroom \\
+CRUD-bursty & rate CV $> 0.9$; otherwise as CRUD-steady & scale replicas
+fast; no cache budget \\
+AI-cacheable & model-tier traffic; embedding density $\ge 0.5$ or
+high-density fraction $\ge 0.5$; observed hit rate $\ge 0.3$ & grow the
+cache budget; prefer a cheap tier \\
+AI-uncacheable & model-tier traffic; density $< 0.5$; hit rate $< 0.1$ &
+shrink the cache; route by cost/quality \\
+Agentic & mean child spans $\ge 3$ within the request's 10\,s window &
+latency budget dominates; the tier knob, not replicas \\
+\bottomrule
+\end{tabularx}
+\caption{The five-class workload taxonomy and what each class asks of the
+controller. The classifier is the single implementation of these criteria;
+on a held-out synthetic set of 500 contaminated windows the learned
+boundary separates the classes where fixed-threshold rules do not, which
+says the pipeline works and nothing yet about real traffic.}
+\label{tab:taxonomy}
+\end{table}
+
+\subsection{System model and its calibration}
+\label{sec:system-model}
+
+The evaluation's decision-quality substrate is a discrete-event simulator
+of this plant. Demand per tenant is aggregated to work units per second; a
+congestion factor maps utilisation to latency inflation; the semantic cache
+absorbs a fraction $h(c_i)\,\kappa_k$ of AI-kind $k$'s demand, with $h$ a
+saturating hit-rate curve; each tier adds its base latency and its price on
+every miss; replica changes and cache growth take effect with the
+reconfiguration lag the realism variant bills (Section~\ref{sec:eval-slo}).
+Two constants were checked against hardware before any confirmatory
+campaign ran. The congestion form was fitted against a real inference
+server under Poisson load: the fitted exponent ($a = 0.86$ against an
+assumed $1.0$) means the model over-penalises high utilisation, which errs
+against the lean postures the joint controller prefers. The tier latencies
+were measured on a GPU (Table~\ref{tab:tiers}): the ordering the model
+asserts holds, and the measured slope is flatter than the priced one. The
+price table is a pricing assumption---bigger models run on bigger,
+costlier fleets---not a hardware claim, and the matrix was re-run at the
+measured corner as a sensitivity check (Section~\ref{sec:threats}). The
+simulator's assumed cache curve, by contrast, turned out optimistic against
+the curve later measured on real prompts; that asymmetry and its
+pre-registered rerun are reported in Section~\ref{sec:threats} as well.
+
+\begin{table}[htbp]
+\centering\tablefont
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+\textbf{Tier} & \textbf{Model} & $n$ & \textbf{mean (ms)} & \textbf{p95 (ms)} & \textbf{tokens/s} \\
+\midrule
+small & Qwen2.5-0.5B-Instruct & 25 & 1241.9 & 1282.7 & 38.65 \\
+mid   & Qwen2.5-3B-Instruct   & 25 & 1882.8 & 1923.0 & 25.49 \\
+large & Qwen2.5-7B-Instruct   & 25 & 20665.1 & 20738.0 & 2.32 \\
+\bottomrule
+\end{tabular}
+\caption{Measured tier latencies, fixed 48-token completions, greedy
+decoding, three warm-ups then 25 sequential runs per tier on a free Kaggle
+GPU (\evfile{research/calibration/TIER\_BENCH.md}). The large row is an
+upper bound: the 7B fp16 weights spilled to CPU on the granted card, and a
+later two-GPU rerun with nothing offloaded brought it to 3171.5\,ms. An
+independent replication on a fresh session reproduced every row within
+3\%.}
+\label{tab:tiers}
+\end{table}

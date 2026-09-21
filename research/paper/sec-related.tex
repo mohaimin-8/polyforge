@@ -1,0 +1,108 @@
+\section{Related work}
+\label{sec:related}
+
+We position \polyforge{} against four bodies of work. One reading rule
+applies throughout, and it is the same rule the evaluation enforces:
+numbers from other papers are their numbers on their substrate---real GPU
+fleets, their traces, their baselines---while ours are decision quality on
+our own matrix and traces. Nothing in this section is a head-to-head cell.
+Where a published system can be reproduced at simulator scale we carry it
+as a tuned in-matrix baseline instead (Section~\ref{sec:method-baselines}).
+
+\paragraph{Autoscaling for inference serving}
+HPA \citep{k8shpa} and KEDA \citep{keda} are the production defaults:
+reactive controllers on utilisation or event-lag signals. FIRM
+\citep{firm2020} brought fine-grained, SLO-oriented resource management to
+microservices. The LLM-serving generation is forecast-aware and
+hierarchical. SageServe \citep{sageserve2025} reports roughly 25\% GPU-hour
+savings on ten million production requests through demand forecasting;
+Chiron \citep{chiron2025} reports up to $+90\%$ SLO attainment and $+70\%$
+GPU efficiency through hierarchical autoscaling; Aladdin
+\citep{aladdin2024} places and scales jointly for up to $-71\%$ serving
+cost; an SLO-driven Kubernetes autoscaler \citep{k8sslo2025} reports
+$-31\%$ violation duration at $-18\%$ cost. Horizontal-plus-vertical
+scaling \citep{taleoftwoscales2024} and SLO-constrained joint allocation
+\citep{jointalloc2026} widen one layer's action space; INFaaS
+\citep{infaas2019} introduced model-variant selection; Faro
+\citep{faro2024} targets on-premise inference clusters. Two observations
+shape this paper. The systems closest to ``joint''---Aladdin, the
+horizontal-plus-vertical scalers, INFaaS-style variant selection---each
+co-optimise within one layer; none controls a semantic cache and none
+carries cross-tenant fairness in its objective. And the published wins are
+typically measured against default or non-SLO-tuned baselines, whereas
+every baseline here is grid-tuned on the objective we are graded on.
+
+\paragraph{Semantic caching}
+GPTCache \citep{gptcache2023} set the pattern---embed the prompt, serve a
+stored response on similarity---and reports 61.6--68.8\% hit rates on its
+own benchmark. SCALM \citep{scalm2024} reports $+63\%$ hits over GPTCache;
+InstCache \citep{instcache2024} pre-populates predicted instructions and
+reports 51.34\% on LMSYS-Chat-1M; MeanCache \citep{meancache2024} moves the
+cache to the user side; Liu et al.~\citep{semcacheadapt2025} study offline-to-online
+adaptation of the similarity threshold. In all of these the cache is the
+system: its size is an input, and its interaction with capacity and model
+choice is out of scope. \polyforge{} treats the cache budget as one of three
+jointly planned knobs, prices its benefit per tenant in dollars, and adds
+two measurements the cache literature does not publish---hit precision
+against the actually received response on the same real dataset
+(Section~\ref{sec:eval-cache}), and a timing side channel with its defence
+frontier (Section~\ref{sec:eval-security}; compare the API-layer
+prompt-cache audit of Gu et al.~\citep{promptcacheaudit2025}). The eviction policy
+inherits GreedyDual's inflation idea \citep{cao1997greedydual} and adds
+the two terms a semantic cache needs and a proxy cache does not: staleness
+under topic drift and substitutability between near-duplicate entries.
+
+\paragraph{Multi-tenant fairness}
+VTC \citep{vtc2024} defined service fairness for LLM serving at token
+granularity inside a continuous-batching engine and proved a $2\times$
+service bound; Equinox \citep{equinox2025}, D$^2$LPM \citep{d2lpm2025} and
+Justitia \citep{justitia2025} extend it. \polyforge{}'s fairness sits at a
+different altitude: capacity allocation across tenants at the control
+plane, scored by Jain's index \citep{jain1984} over per-tenant SLO
+satisfaction. The evaluation carries a replica-level transplant of VTC's
+least-service-first rule as a tuned baseline; beating it on Jain says the
+joint controller allocates capacity more evenly, not that it schedules
+tokens more fairly. Token-level fair schedulers would run inside each
+replica pool \polyforge{} sizes, and the two compose.
+
+\paragraph{The 2026 serving substrate}
+llm-d, AIBrix, Dynamo and the Gateway API Inference Extension actuate on
+signals our system model does not name---queue depth, in-flight requests,
+KV-cache pressure, prefill/decode pool split. That is an altitude
+difference. \polyforge{} is the portfolio controller above that actuation
+layer, and each knob has a direct target in it: replicas map to decode-pool
+size or vLLM pod count, the cache budget to the gateway's semantic-cache
+budget, and the tier to model routing of the kind AIBrix and INFaaS
+perform. Two design decisions keep that mapping honest: the demand signal
+sits behind an interface, so a token-level source (time to first token,
+queue depth, KV pressure) replaces the request-rate source without touching
+the planner; and latency claims stay request-level, scoped away from
+continuous-batching token dynamics. What the 2026 stack does not do is
+decide jointly, across a tenant portfolio, in dollars, with per-tenant
+budget guardrails. That is where this work sits.
+
+Table~\ref{tab:capability} states the four axes on which no surveyed system
+overlaps with ours. The rows on which surveyed systems dominate
+\polyforge{}---live GPU fleets, production scale, proven scheduling
+bounds---are stated with equal care in Section~\ref{sec:threats}.
+
+\begin{table}[htbp]
+\centering\tablefont
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Axis} & \textbf{What no surveyed system does, and this one does} \\
+\midrule
+Architectural & co-optimise replicas, semantic-cache budget and model tier
+against one multi-tenant objective \\
+Economic & account per-tenant spend in dollars, with per-tenant budget
+guardrails inside the controller's feasible set \\
+Adversarial & publish a security evaluation of the cache layer (timing side
+channel; defence frontier; over-the-wire confirmation) \\
+Methodological & pre-register every confirmatory hypothesis before its run
+and publish the failures at the prominence of the wins \\
+\bottomrule
+\end{tabularx}
+\caption{The four axes that position this work. Each is a capability
+statement about the surveyed literature, not a performance comparison.}
+\label{tab:capability}
+\end{table}

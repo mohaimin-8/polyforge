@@ -1,0 +1,138 @@
+\section{Introduction}
+\label{sec:intro}
+
+A tenant on a modern SaaS platform issues a database read, an embedding
+lookup and a chat completion inside one user-facing transaction, and the
+cluster that serves all three is steered by three controllers that have
+never met. A replica autoscaler---the Kubernetes Horizontal Pod Autoscaler
+\citep{k8shpa}, KEDA \citep{keda} or a research successor
+\citep{firm2020,sageserve2025,chiron2025,aladdin2024}---decides how much
+capacity each service holds. A semantic response cache
+\citep{gptcache2023,scalm2024,instcache2024,meancache2024} decides which AI
+answers are served from an embedding-similarity store instead of a model
+call. A model-tier router in the INFaaS tradition \citep{infaas2019} decides
+which of several differently priced model classes answers each request.
+Each layer has a mature literature. In every system we surveyed, each also
+has its own controller: an autoscaler that has never heard of the cache, a
+cache that does not know what a replica costs, a router that optimises one
+request at a time.
+
+The three layers nonetheless share one budget, one latency target and one
+set of tenants, and they interact in ways none of the three controllers can
+see. Growing the cache absorbs load that would otherwise demand replicas.
+Escalating a tenant to a larger model raises per-request cost that a budget
+must absorb, and changes the very latency signal the replica controller
+scales on. A locally optimal decision at each layer can therefore be
+collectively wasteful, and the waste lands on the platform's bill and on
+the tenants' SLOs. This matters more every year: inference is now the
+dominant line item for many platforms, model-tier prices span two orders of
+magnitude, and the shift to agentic workloads---multi-step chains whose
+latency is dominated by the model tier rather than by queueing---puts the
+layers' interaction on the critical path.
+
+The literature has moved toward joint decisions, but always within a layer.
+Aladdin \citep{aladdin2024} co-optimises placement and scaling; horizontal
+and vertical scaling have been reconciled \citep{taleoftwoscales2024}; SLO
+constrained joint allocation widens a single layer's action space
+\citep{jointalloc2026}; INFaaS chooses among model variants. None of these
+controls a semantic cache, none carries cross-tenant fairness in its
+objective, and none accounts per-tenant spend in dollars against a budget.
+The 2025--26 production stack---llm-d \citep{llmd2025}, AIBrix
+\citep{aibrix2025}, NVIDIA Dynamo \citep{dynamo2025}, the Gateway API
+Inference Extension \citep{gatewayapi2025}---actuates on engine-level
+signals (queue depth, KV-cache pressure, prefill/decode split) and leaves
+the portfolio decision above it to whoever operates the cluster. Whether
+per-layer optima compose into a good joint decision has, as far as we can
+find, never been measured.
+
+Our idea is to treat the three knobs as one decision. \polyforge{}'s
+planner, \jcac{} (Joint Cache--Autoscaling Control), holds for every tenant
+a triple---replicas, semantic-cache budget, model tier---and every ten
+seconds solves one receding-horizon problem over a move-blocked action
+lattice, minimising a single objective in cost, SLO violation and Jain
+fairness under per-tenant budget caps and cluster caps. The solver is two
+exact Gauss--Seidel sweeps over tenants; it is deterministic, runs in
+microseconds, and is the same code offline and online. A Kubernetes
+operator actuates the plan under guardrails.
+
+The idea was tested rather than asserted, and we report what the test
+found. Every confirmatory campaign was pre-registered: hypotheses, sole
+treatment, analysis script and stopping rule were committed and pushed to a
+public repository before the first run---seven protocols at the first
+campaign, forty-eight by the last. The baselines were grid-tuned on our own
+composite objective. On that objective the joint controller wins in every
+campaign that tested it, including against an offline-trained learned
+controller over the identical action space, and it is the only
+Pareto-undominated system in the matrix. The evaluation also found things
+we would rather not have found, and they are here at the same prominence:
+two pre-registered attempts to beat tuned reactive scalers on SLO
+attainment failed; the comparative cost percentages we first published were
+withdrawn once an audit of the baselines found three asymmetries and three
+pre-registered re-scorings showed the percentages did not survive; and on a
+rented GPU host the published controller lost to its own tier-only
+ablation before a corrected controller won.
+
+What separates this work from its neighbours is compact. Against
+autoscalers, it controls two knobs they do not have and prices decisions
+per tenant in dollars. Against cache papers, the cache budget is a decision
+variable rather than an input, and hit \emph{precision} is measured on the
+same real prompts as hit rate. Against fairness schedulers, it works at the
+control-plane altitude---capacity across tenants---and says so. Against
+every surveyed system, it publishes its nulls under protocols frozen before
+the data existed.
+
+The paper makes the following contributions, each of which is a claim tied
+to the section that carries its evidence:
+
+\begin{itemize}
+  \item \textbf{Joint cross-layer control} (Section~\ref{sec:design}). The
+        first surveyed controller to co-optimise replicas, semantic-cache
+        budget and model tier against one multi-tenant objective, with two
+        construction-level guarantees on the deployed solver. Ablating
+        jointness worsens the cost term---by $+2884\%$ against the published
+        layered comparator, and by a margin 86\% smaller once that
+        comparator's absorbing-tier defect is repaired; the smaller number
+        is the claim (Section~\ref{sec:eval-matrix}).
+  \item \textbf{A measured composition result and its adjudication}
+        (Sections~\ref{sec:eval-matrix} and~\ref{sec:eval-adjudication}).
+        The composite-objective win against every tuned baseline in every
+        campaign; non-dominance in 48 of 60 cells; and the withdrawal of the
+        like-for-like cost percentages under three pre-registered
+        re-scorings, leaving a feasibility result: the per-tenant budget is
+        satisfiable only by a controller holding the tier knob.
+  \item \textbf{An honest SLO account} (Sections~\ref{sec:eval-slo}
+        and~\ref{sec:eval-forecast}). Two confirmatory failures published as
+        failures; violation parity with tuned HPA/KEDA at $-43$ to
+        $-48\%$ cost; a confirmed forecasting mechanism whose winner tracks
+        measured periodicity across three real traces.
+  \item \textbf{Real-data cache results with a quality denominator}
+        (Section~\ref{sec:eval-cache}). 29.6\% adaptive hit rate at cosine
+        0.85 on LMSYS-Chat-1M, dollar-weighted savings, an empirical
+        capacity curve, and---unique among surveyed cache papers---hit
+        precision with the stochasticity ceiling that bounds it.
+  \item \textbf{Fairness at the control-plane altitude}
+        (Section~\ref{sec:eval-fairness}). Wins over a FIRM-style and a
+        VTC-style baseline on Jain's index, with the controller's own
+        fairness term honestly nulled.
+  \item \textbf{A security frontier for shared semantic caches}
+        (Section~\ref{sec:eval-security}). A timing side channel at AUC
+        0.88 and a defence comparison in which per-tenant partitioning
+        dominates padding and TTL jitter, confirmed at chance over the wire.
+  \item \textbf{Live evidence at three depths}
+        (Section~\ref{sec:eval-live}). A replica-only ordinal check that
+        recorded a disagreement, a valid 24-hour soak with two of four
+        hypotheses failed, a real trace driving the real cluster, and a
+        three-knob live plane on which the published controller lost, the
+        corrected controller won at iso-fairness, and the obvious damper
+        failed.
+  \item \textbf{A pre-registered systems methodology}
+        (Section~\ref{sec:method}). Forty-eight protocols pushed before
+        their runs, tuned baselines, paired effect sizes with bootstrap
+        intervals, substrate separation, adjudication by new record rather
+        than by edit, and a published ledger of nulls---a contribution that
+        stands independently of any performance number.
+\end{itemize}
+
+Section~\ref{sec:threats} confronts the threats to these claims in their
+strongest form, and Section~\ref{sec:conclusion} returns to each
+contribution with its verdict.

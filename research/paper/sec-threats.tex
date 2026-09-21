@@ -1,0 +1,212 @@
+\section{Threats to validity and limitations}
+\label{sec:threats}
+
+We take each objection in its strongest form, say what bounds it, and say
+what it leaves open. Before the list, the one claim everything else
+supports: \emph{under a stated, partially calibrated system model, jointly
+controlling replicas, cache and model tier across a tenant portfolio
+yields strictly better cost-at-fixed-fairness decision quality than any
+single-knob reactive baseline tuned on the same objective, without a
+fairness or---outside the overload regime---SLO regression.} The real-trace
+replays, the forecasting decomposition, the cache and isolation
+measurements and the live campaigns are supporting or scope-bounding
+evidence for that claim. The threats below are read against it.
+
+\subsection{Internal validity}
+
+\paragraph{The headline numbers come from our own simulator} True, and
+framed that way everywhere: decision quality under a stated system model.
+Three things bound the gap. The congestion form was fitted against a real
+inference server and over-penalises high utilisation ($a = 0.86$ against
+an assumed $1.0$), which errs against the joint controller's lean
+postures. The cost, forecasting and cache claims are restated on real
+data---BurstGPT and Azure demand at $n = 96$ confirmatory, real LMSYS
+prompts. And the live campaigns ask whether the ranking reproduces, with
+the joint arm gated behind an executable actuation check. What is not
+claimed is any absolute dollar or latency transferring to a production
+fleet.
+
+\paragraph{The economy and the model constants are convenient} Each was
+replaced by the measured value under a frozen protocol and the headline
+direction re-scored. At the measured GPU tier corner the full 1,800-run
+matrix holds: the cost win against all five baselines survives (TR-H1
+PASS, 5/5) and so does the composite (TR-H2 PASS, 5/5), and given cheap
+mid-tier inference the controller re-plans into it (mid-tier steps 1.7\%
+to 13.7\%) and still wins (\evfile{RESULTS\_TIER\_RATIO.md}); at the
+flatter corner a two-GPU rerun later measured ($1{:}1.475{:}1.518$) the
+same holds (\evfile{RESULTS\_TIER\_RATIO\_V2.md}). With tier-scaled work
+units, with the AI p95 taken as the true hit/miss mixture percentile, and
+with the measured latency model adopted, the composite win against all
+five reproduces at $p < 0.01$ in every rerun---the same direction against
+the originally tuned comparators, and therefore carrying the same
+adjudication as the headline. The simulator's assumed cache curve was
+optimistic ($h_{\max} = 0.85$ assumed against 0.285 measured); the
+pre-registered rerun under the measured curve
+(\evfile{RESULTS\_HK\_ADOPTION.md}) is pessimistic for every cache-using
+system, halves the realised hit rate, devalues the cache-centric baseline
+most, and leaves HK-H1 and HK-H2 passing 5/5: the margin against HPA
+narrows ($-27.5\%$ to $-19.4\%$ aggregate) and does not close, because the
+advantage was never primarily cache-driven. The objective's form is a
+separate axis from its weights: across 85 campaign--baseline--form
+combinations, 69 preserve the published direction at $p < 0.01$, and the
+non-wins sit under forms that deliberately compress cost-driven
+separation or demand strict violation-then-cost dominance
+(\evfile{OBJECTIVE\_FORM.md}; exploratory). The solver is not the exact
+joint optimum, and the gap is measured: the two-sweep result lands within
+1\% median and 5\% maximum of an exhaustive joint optimum at every tenant
+count tested (CG-H1 PASS; \evfile{COORD\_GAP.md}).
+
+\paragraph{The overload cells were designed so the controller would win}
+They were sized by arithmetic on committed model constants and pinned by
+unit tests, not tuned by trial runs. Three protections: the registration
+named the sole treatment and the hypotheses before any run; a
+same-envelope control cell exists where the alleged advantage should not
+appear, and it does not; and the confirmatory hypothesis still failed. A
+designed regime with a published null inside it is evidence of measurement,
+not of rigging.
+
+\paragraph{The baselines are strawmen} Every one is grid-searched on our
+own composite objective, per baseline, with the sweeps committed. Grids
+are bounded at a vendor-sane envelope because $J$ improves monotonically
+toward over-provisioning; an unbounded grid would tune every baseline into
+a cost blow-out and flatter the joint controller. Iso-cost variants remove
+the ``it just spends less'' objection. And the audit that found three
+asymmetries in the baselines was ours, and its re-scorings are the reason
+the cost percentages are gone from this paper.
+
+\paragraph{The SLO story moved the goalposts} The ledger answers: two
+confirmatory SLO failures published as failures, one mechanism
+confirmation, a stopping rule that forbade a third attempt, and forty-eight
+registrations pushed before their runs. The final SLO claim is what
+survived, not what was hoped for.
+
+\subsection{Construct validity}
+
+\paragraph{Fairness altitude} Jain's index over SLO satisfaction is not
+fairness as VTC and its successors define it; theirs is service fairness
+at token granularity inside a batching engine. Ours is capacity allocation
+across tenants at the control plane, and the VTC-replica baseline is a
+transplant of the least-service-first rule to that altitude, stated as
+such. Beating it on Jain says the joint controller allocates capacity more
+evenly at lower cost, not that it schedules tokens more fairly.
+
+\paragraph{Two economies in one cost model} Replica-hours are priced as
+infrastructure while tier calls are priced at market API ratios. A
+self-hosting operator should read the tier ratios as relative GPU-time
+costs; the bench measured a compressed scale with the same ordering, and
+the matrix reruns above are the sensitivity evidence. Spot pricing, MIG
+partitioning and fractional GPUs sit below the model's altitude. The
+realism variant bills start-up lag and cold caches; multi-minute
+large-model pulls exceed what it models.
+
+\paragraph{Cache hits that are wrong answers} Anticipated and measured
+(Section~\ref{sec:eval-cache}): precision with strata, an incorrect-hits
+figure beside the savings, and the stochasticity ceiling. No
+``quality-adjusted dollar'' is invented, because pricing a wrong answer is
+application-specific. Staleness and TTL are out of scope.
+
+\paragraph{p-values of $10^{-33}$} At hundreds of paired seeded simulator
+runs, tiny p-values measure the simulator's determinism. The citable unit
+is the paired effect size with its bootstrap interval; p-values appear
+once, as gate outcomes.
+
+\subsection{External validity}
+
+\paragraph{Substrate} The headline numbers are simulator decision
+quality. The replica-only live check recorded a disagreement, so the
+simulator's ranking on that projection is unconfirmed live and the thesis
+claims stand on the simulator and replay substrates. The three-knob plane
+is the one place where every knob was live and every arm was scored on the
+same cells; there the corrected controller won at iso-fairness and the
+published controller lost, both under frozen protocols, and the fitted
+simulator then matched the live cost winner in three of four cells. That
+is reproduction of a ranking on one host over eight cells; it is not
+absolute transfer, and the corrected controller oscillates.
+
+\paragraph{Latency is p95 and request-level} The simulator's tail beyond
+p95 is not credible and is not reported; token-level dynamics (time to
+first token, decode-length tails, head-of-line blocking under continuous
+batching) are outside the model. The live path can report any percentile.
+
+\paragraph{Trace scope} Demand claims rest on BurstGPT and Azure LLM 2024;
+prompt claims on LMSYS-Chat-1M. One generalisation failure is already
+published (the seasonal non-transfer), which is the strongest available
+evidence that the remaining claims are scoped honestly. Per-tenant
+forecasting is supported one aggregation level down---19 sub-streams by
+model and log type---not at true per-tenant SaaS granularity, and no such
+series was available.
+
+\paragraph{Tenant count and production scale} Eight tenants per cluster
+is the studied composition factor. The planner's measured scaling
+(exponent 1.45; 3\,s timeout crossed at 128 tenants) bounds the gap to
+production populations without removing it; planning cells hold the
+per-cell p95 under the timeout through 1,024 tenants at a global-Jain cost
+a de-aliased assignment brings within bound (PS-H1, PF-H1 PASS;
+\evfile{PLANNER\_CELLS\_DEALIAS.md}), and the wall reproduces through the
+shipped Go operator (\evfile{CELLS\_SHIPPED.md}). Coordination costs
+outside the planner are unmeasured. SageServe-class fleets serve more in a
+day than the entire replay; the 10.63M-request replay is the honest analog
+at decision level.
+
+\paragraph{The cost result is against orchestration-layer baselines}
+\polyforge{} is a control plane. Its feasibility statement---only a
+tier-holding controller can keep a per-tenant budget---is made against
+reactive autoscalers that over-provision, not against a well-provisioned
+2026 serving engine whose efficiency comes from disaggregated
+prefill/decode, continuous batching and KV-cache management. Those systems
+are the actuation level the three knobs sit above, and the mapping is
+direct (Section~\ref{sec:related}); what fraction of the orchestration-level
+advantage survives on top of an engine-optimised stack is untested.
+
+\paragraph{The advantage is conditional on SLO tolerance} Attainment is
+a published parity, and the composite advantage narrows under
+violation-first weightings: the nine losses in the 425-cell weight sweep
+all sit at a violation weight of 4, the profile of a latency-strict
+operator. The joint controller wins for cost-sensitive, SLO-tolerant
+tenant portfolios; an operator who prices a violation far above a dollar
+of spend sits outside the regime where the trade is favourable, and we
+say so rather than averaging that operator away.
+
+\paragraph{Chaos is measured in simulation; live chaos is a demonstration,
+not a comparison} The failure-injection campaign ran in the scoring
+engine with controllers blind (\evfile{RESULTS\_CHAOS\_SIM.md}, 540/540
+valid): a dead planner for one minute still beats a healthy HPA (CH-H1
+PASS, $\dz = -1.69$), the joint controller keeps its $J$ win under an
+identical 50\% replica kill (CH-H2 PASS), and a one-minute freeze costs it
+less than a frozen HPA. Live, one pre-registered sitting injected a planner
+crash and a 60\,s API-server throttle into the joint arm under bursty CRUD
+load (\evfile{RESULTS\_LIVE\_CHAOS\_P99.md}): violation stayed at zero
+through both faults, so the last-known-good plan hold carried them (LC-H1
+PASS in its strongest, degenerate form), and the live p99 verdict matched
+the p95 one in both cells. That sitting was a single execution of one arm,
+scoped in its registration as a demonstration that the designed fallback
+works over the wire; a powered live comparison of controllers under
+injected faults has not run.
+
+\paragraph{The isolation threat model is narrow} The side channel and its
+defence were confirmed against the real gateway process over loopback,
+which has no WAN jitter---a condition that would only weaken the shared
+posture's leak, never the defence---and the deployed offline embedder is
+lexical, so the measured threat is exact-prompt membership, the
+conservative form. Membership inference is the only threat class studied;
+whether a shared cache can be defended without forfeiting its benefit
+(noise, bucketing, differential privacy) is open.
+
+\subsection{Conclusion validity}
+
+\paragraph{Pre-registration is anchored in git forensics} Protocols were
+pushed before runs, amendments were self-adjudicated, and the OSF mirror
+was made after the fact and says so. The strongest counter-evidence to
+the circularity this implies is the record itself: two failed confirmatory
+hypotheses and a dozen further negatives published in full, under
+protocols a reader can diff.
+
+\paragraph{The evidence chain is self-contained} Simulator, baselines,
+objective, trace ETL and analysis are one author's code on one machine;
+the GPU bench replication reproduces the author's own kernel. Independent
+replication is what the archived artifact exists to enable---every raw
+database, registration and record with a SHA-256 manifest at the Zenodo
+DOI, and a reproduction gate that re-derives every gated record and figure
+from the committed data. Until a third party re-runs the campaigns, the
+published nulls and the immutable history are the strongest available
+answer.

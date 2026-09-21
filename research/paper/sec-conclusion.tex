@@ -1,0 +1,79 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We set out to test whether per-layer local optima compose in multi-tenant
+hybrid serving, and answered with a built system and a pre-registered
+campaign. They do not compose. Returning to the contributions of
+Section~\ref{sec:intro} with their verdicts:
+
+\emph{Joint cross-layer control.} A controller that plans replicas,
+semantic-cache budget and model tier together beats every tuned per-layer
+baseline on the composite objective in every campaign that tested it---the
+1,800-run matrix, two real-trace replays, the concurrency arm, the
+tenant-scale slice, and an offline-trained learned controller over the
+same action space---and it is the only Pareto-undominated system in the
+matrix, non-dominated in 48 of 60 cells under any weighting. The two
+propositions hold by construction, and the coordinate-descent gap to the
+exact joint optimum is measured at 1\% median. Removing jointness worsens
+the cost term against the published layered comparator by $+2884\%$, and by
+a margin 86\% smaller once that comparator's tier defect is repaired; the
+smaller number is the composition gap made honest.
+
+\emph{The composition result and its adjudication.} The cost percentage
+that once headlined this work is withdrawn. An audit after the campaigns
+closed found that every comparator carried an eviction charge and a pinned
+cache no joint arm paid, and that only the joint controller was ever held to
+the per-tenant budget; re-scored under three pre-registered corrections,
+the like-for-like advantage does not survive its own rank tests. What
+survives is sharper than a percentage: the per-tenant budget is a promise
+only a controller holding the tier knob can keep, because capping a
+replica-only controller moves its tier spend by exactly nothing.
+
+\emph{The SLO account.} Parity with tuned reactive scalers at $-43$ to
+$-48\%$ cost; a confirmed forecasting mechanism whose winner tracks
+measured periodicity across three real traces; two published confirmatory
+failures and a stopping rule; a severity reversal on one real trace stated
+beside the advantage on the other; a risk knob that moved the wrong way
+once and, corrected, yielded an interior optimum rather than a frontier.
+
+\emph{The cache.} 29.6\% hits at cosine 0.85 on real prompts,
+dollar-weighted, with a precision that a response-stochasticity ceiling,
+not the retrieval, bounds. \emph{Fairness.} Wins over a FIRM-style and a
+VTC-style baseline at the control-plane altitude, with the controller's own
+fairness term honestly nulled. \emph{Security.} A demonstrated AUC-0.88
+timing side channel, a defence frontier on which per-tenant partitioning
+dominates, and chance confirmed over the wire.
+
+\emph{Live evidence.} A replica-only ordinal check that disagreed with the
+simulator; a valid 24-hour soak with two hypotheses failed; a real trace
+whose live cost ordering matched; and a three-knob plane on which the
+published controller lost to its own tier-only ablation, the corrected
+controller then beat every arm at iso-fairness with intervals that survive
+a block bootstrap, the fitted simulator matched the live winner in three of
+four cells, and a dwell damper failed to remove a slow replica swing.
+
+\emph{Methodology.} Forty-eight registrations pushed before their runs,
+immutable closed campaigns, effect sizes over p-values, substrates never
+mixed, adjudication by new record rather than by edit, a published ledger
+of nulls, and a reproduction gate that re-derives every record and figure
+from the committed data. This result may outlast the numbers.
+
+What the reader knows now that they did not: that the cheap configuration
+of a hybrid serving cluster is a joint property of three knobs, not a sum
+of three locally good choices; that a per-tenant dollar budget cannot be
+kept by any controller that lacks the tier knob; that the price of
+jointness on this substrate is a super-linear planner and a slow
+oscillation the first damper did not fix; and that a systems evaluation
+can be pre-registered, can fail in public, and be the stronger for it.
+
+Three things are next, in order of what the evidence asks for. A damper
+that acts on the plant-estimate feedback---asymmetric fast-up, slow-down
+learning of the tier-latency offset---is a new controller design with a new
+registration, not a knob. The feasibility result should be re-asked on top
+of a serving engine that already batches, disaggregates and manages its KV
+cache, by swapping the request-rate demand source for token-level signals
+and leaving the planner unchanged. And a third party should re-run the
+campaigns from the archived artifact; every number in this paper can be
+traced to a protocol committed before the run, a script that regenerates
+it, and a history that would have exposed any other way of obtaining it,
+and that standard is the practice we most hope to see reused.
