@@ -54,7 +54,11 @@ N_SECRET = 50
 # once; N_SECRET distinct secrets + N_SECRET distinct unrelated give the power,
 # and the bootstrap CI gives the uncertainty.
 REPS = 1
-CACHE_THRESHOLD = 0.85  # the deployed DefaultCacheThreshold
+# The research operating threshold (MiniLM, CACHE_PRECISION.md), recorded in
+# the committed fixture. It is NOT the deployed gateway's DefaultCacheThreshold,
+# which is 0.95 (internal/ai/gateway/cache.go); the live probe always runs
+# against the deployed gateway (audit 2026-09-26: this comment said otherwise).
+CACHE_THRESHOLD = 0.85
 BOOTSTRAP = 2000
 CHANCE_BAND = (0.45, 0.55)  # WA-H1 indistinguishable-from-chance band
 SEED = 1729
@@ -219,7 +223,8 @@ class MockGatewayClient:
     victim-warmed secret, so it hits), PER-TENANT does not (attacker only ever
     sees its own cold cache). Fixture-aware so the paraphrase→secret semantic
     match is modeled by identity rather than surface string, exactly what the
-    real embedder does at threshold 0.85."""
+    real MiniLM embedder does at the research threshold 0.85 (the deployed
+    gateway's n-gram embedder runs at 0.95)."""
 
     def __init__(self, posture: str, fixture: dict, seed: int = SEED):
         self.posture = posture

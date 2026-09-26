@@ -34,9 +34,97 @@ def test_run_instances_request_cannot_leave_a_billing_volume_behind():
     assert xvda["BlockDeviceMappings"][0]["DeviceName"] == "/dev/xvda"
 
 
-def test_only_ssh_is_opened():
-    rules = ab.ssh_ingress()
+def test_only_ssh_is_opened_and_only_to_one_address():
+    # Audit 2026-09-26: the rule was 0.0.0.0/0 -- ssh open to the internet.
+    rules = ab.ssh_ingress("203.0.113.9/32")
     assert len(rules) == 1 and rules[0]["FromPort"] == rules[0]["ToPort"] == 22
+    assert [r["CidrIp"] for r in rules[0]["IpRanges"]] == ["203.0.113.9/32"]
+
+
+def test_the_callers_address_becomes_a_slash_32(monkeypatch):
+    class _Resp:
+        def __init__(self, body):
+            self.body = body
+
+        def read(self):
+            return self.body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    monkeypatch.setattr(ab, "urlopen", lambda *_a, **_k: _Resp(b"203.0.113.9\n"))
+    assert ab.my_public_cidr() == "203.0.113.9/32"
+    monkeypatch.setattr(ab, "urlopen", lambda *_a, **_k: _Resp(b"<html>captive portal</html>"))
+    with pytest.raises(SystemExit):
+        ab.my_public_cidr()
+
+
+class _SGEC2:
+    """An existing group whose ssh rule is the old 0.0.0.0/0."""
+
+    def __init__(self, cidrs):
+        self.cidrs = cidrs
+        self.calls = []
+
+    def describe_security_groups(self, **_kw):
+        return {"SecurityGroups": [{"GroupId": "sg-1", "IpPermissions": [
+            {"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22,
+             "IpRanges": [{"CidrIp": c} for c in self.cidrs]}]}]}
+
+    def revoke_security_group_ingress(self, **kw):
+        self.calls.append(("revoke", kw))
+
+    def authorize_security_group_ingress(self, **kw):
+        self.calls.append(("authorize", kw))
+
+
+def test_an_existing_group_is_narrowed_to_the_caller():
+    ec2 = _SGEC2(["0.0.0.0/0"])
+    assert ab.ensure_security_group(ec2, "203.0.113.9/32") == "sg-1"
+    kinds = [k for k, _ in ec2.calls]
+    assert kinds == ["revoke", "authorize"]
+    revoked = ec2.calls[0][1]["IpPermissions"][0]["IpRanges"]
+    assert revoked == [{"CidrIp": "0.0.0.0/0"}]
+    granted = ec2.calls[1][1]["IpPermissions"][0]["IpRanges"][0]["CidrIp"]
+    assert granted == "203.0.113.9/32"
+
+
+def test_a_group_already_open_only_to_the_caller_is_left_alone():
+    ec2 = _SGEC2(["203.0.113.9/32"])
+    assert ab.ensure_security_group(ec2, "203.0.113.9/32") == "sg-1"
+    assert ec2.calls == []
+
+
+def test_launch_refuses_while_another_instance_is_alive(monkeypatch):
+    # Audit 2026-09-26: nothing stopped a second launch billing beside the first.
+    launched = []
+
+    class _EC2:
+        def run_instances(self, **kw):
+            launched.append(kw)
+            return {"Instances": [{"InstanceId": "i-new"}]}
+
+    monkeypatch.setattr(ab, "client", lambda *_a, **_k: _EC2())
+    monkeypatch.setattr(ab, "_describe", lambda _ec2, _ids: [{
+        "InstanceId": "i-old", "State": {"Name": "running"}, "InstanceType": "g6e.2xlarge"}])
+    args = type("A", (), {"region": None, "type": "g6e.2xlarge", "disk": 120, "az": None,
+                          "spot": False, "ssh_cidr": "203.0.113.9/32",
+                          "allow_second": False})()
+    with pytest.raises(SystemExit) as exc:
+        ab.cmd_launch(args)
+    assert "i-old" in str(exc.value) and not launched
+
+
+def test_a_terminated_instance_does_not_block_a_launch():
+    alive = ab.alive_instances([
+        {"InstanceId": "i-1", "State": {"Name": "terminated"}},
+        {"InstanceId": "i-2", "State": {"Name": "shutting-down"}},
+        {"InstanceId": "i-3", "State": {"Name": "stopped"}},
+    ])
+    assert [i["InstanceId"] for i in alive] == ["i-3"]
 
 
 def test_ami_resolution_falls_back_and_then_refuses():

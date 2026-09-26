@@ -16,6 +16,8 @@ Usage (from the repo root):
     python scripts/aws_box.py ami                    # resolve the DL Base OSS NVIDIA GPU AMI (free)
     python scripts/aws_box.py key-add PUBFILE        # import the public key as key pair polyforge-b1 (free)
     python scripts/aws_box.py launch [--type g6e.4xlarge] [--disk 120] [--az us-east-1a] [--spot]   # BILLABLE
+        # ssh opens to this machine's public IP/32 only (--ssh-cidr to override);
+        # refuses while another polyforge-b1 instance exists (--allow-second)
     python scripts/aws_box.py status [ID]            # instances tagged polyforge-b1: state, ip
     python scripts/aws_box.py wait ID                # poll until running + status checks ok, print ip
     python scripts/aws_box.py terminate ID           # stop the meter; confirms the terminal state
@@ -25,10 +27,12 @@ Usage (from the repo root):
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import os
 import sys
 import time
 from pathlib import Path
+from urllib.request import urlopen
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
@@ -107,9 +111,47 @@ def run_instances_params(ami: str, instance_type: str, sg_id: str, disk_gib: int
     return params
 
 
-def ssh_ingress() -> list[dict]:
+def ssh_ingress(cidr: str) -> list[dict]:
+    """SSH from `cidr` only. It was 0.0.0.0/0 -- key auth, but a GPU box's
+    sshd open to every scanner on the internet (audit 2026-09-26)."""
     return [{"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22,
-             "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "ssh, key auth only"}]}]
+             "IpRanges": [{"CidrIp": cidr, "Description": "ssh from the operator's address"}]}]
+
+
+CHECKIP_URL = "https://checkip.amazonaws.com"
+
+
+def my_public_cidr() -> str:
+    """This machine's public IPv4 address as a /32, from AWS's own echo
+    service. Anything that is not an address (a captive portal, an outage)
+    stops the launch rather than opening the wrong range."""
+    try:
+        with urlopen(CHECKIP_URL, timeout=10) as resp:
+            text = resp.read().decode("ascii", "replace").strip()
+    except OSError as e:
+        raise SystemExit(f"could not look up this machine's public address ({e}); "
+                         "pass --ssh-cidr") from e
+    try:
+        return f"{ipaddress.IPv4Address(text)}/32"
+    except ValueError:
+        raise SystemExit(f"{CHECKIP_URL} returned {text[:60]!r}, not an IPv4 address; "
+                         "pass --ssh-cidr") from None
+
+
+# States in which an instance still bills (or will, once it starts).
+DEAD_STATES = ("terminated", "shutting-down")
+
+
+def alive_instances(rows: list[dict]) -> list[dict]:
+    return [i for i in rows if i["State"]["Name"] not in DEAD_STATES]
+
+
+def _cidr(text: str) -> str:
+    """argparse type for --ssh-cidr: a valid IPv4 network, normalised."""
+    try:
+        return str(ipaddress.IPv4Network(text, strict=False))
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"not an IPv4 CIDR: {text!r}") from e
 
 
 def instance_row(inst: dict) -> str:
@@ -130,18 +172,30 @@ def resolve_ami(ssm) -> tuple[str, str]:
                      "check the AMI_PARAMS names against the DLAMI release notes")
 
 
-def ensure_security_group(ec2) -> str:
+def ensure_security_group(ec2, cidr: str) -> str:
+    """The SSH group, open to `cidr` alone. An existing group is reconciled
+    on every launch: the operator's address changes between sittings, and a
+    group created before 2026-09-26 still carries 0.0.0.0/0."""
     found = ec2.describe_security_groups(
         Filters=[{"Name": "group-name", "Values": [SG_NAME]}])["SecurityGroups"]
     if found:
-        return found[0]["GroupId"]
+        sg = found[0]
+        ssh = [p for p in sg.get("IpPermissions", [])
+               if p.get("FromPort") == 22 and p.get("ToPort") == 22]
+        current = sorted(r["CidrIp"] for p in ssh for r in p.get("IpRanges", []))
+        if current == [cidr] and not any(p.get("Ipv6Ranges") for p in ssh):
+            return sg["GroupId"]
+        if ssh:
+            ec2.revoke_security_group_ingress(GroupId=sg["GroupId"], IpPermissions=ssh)
+        ec2.authorize_security_group_ingress(GroupId=sg["GroupId"], IpPermissions=ssh_ingress(cidr))
+        return sg["GroupId"]
     vpc = ec2.describe_vpcs(Filters=[{"Name": "isDefault", "Values": ["true"]}])["Vpcs"]
     if not vpc:
         raise SystemExit("no default VPC in this region; create one in the console "
                          "(VPC -> Actions -> Create default VPC) and retry")
     sg = ec2.create_security_group(GroupName=SG_NAME, Description="polyforge B1 ssh",
                                    VpcId=vpc[0]["VpcId"])
-    ec2.authorize_security_group_ingress(GroupId=sg["GroupId"], IpPermissions=ssh_ingress())
+    ec2.authorize_security_group_ingress(GroupId=sg["GroupId"], IpPermissions=ssh_ingress(cidr))
     return sg["GroupId"]
 
 
@@ -224,9 +278,23 @@ def cmd_key_add(a) -> None:
 def cmd_launch(a) -> None:
     region = region_of(a)
     ec2 = client("ec2", region)
+    # One instance, ever, unless the operator says otherwise: nothing used to
+    # stop a second launch billing beside a forgotten first (audit
+    # 2026-09-26). A stopped instance counts -- its EBS still bills.
+    try:
+        alive = alive_instances(_describe(ec2, None))
+    except (ClientError, BotoCoreError, NoCredentialsError) as e:
+        die(e, "describe")
+    if alive and not a.allow_second:
+        raise SystemExit("refusing to launch: a polyforge-b1 instance already exists -- "
+                         + "; ".join(instance_row(i) for i in alive)
+                         + ". Terminate it, or pass --allow-second.")
+    cidr = a.ssh_cidr or my_public_cidr()
+    if cidr.endswith("/0"):
+        print("WARNING: ssh will be open to the whole internet (--ssh-cidr " + cidr + ")", flush=True)
     try:
         ami, _ = resolve_ami(client("ssm", region))
-        sg_id = ensure_security_group(ec2)
+        sg_id = ensure_security_group(ec2, cidr)
         root = ec2.describe_images(ImageIds=[ami])["Images"][0]["RootDeviceName"]
         subnet, az = pick_subnet(ec2, a.type, a.az)
         params = run_instances_params(ami, a.type, sg_id, a.disk, az=az,
@@ -333,6 +401,10 @@ def main(argv: list[str] | None = None) -> None:
     l.add_argument("--az", default=None)
     l.add_argument("--spot", action="store_true",
                    help="one-time Spot request (needs the Spot G/VT quota, L-3819A6DF)")
+    l.add_argument("--ssh-cidr", default=None, type=_cidr,
+                   help="address range allowed to ssh in (default: this machine's public IP/32)")
+    l.add_argument("--allow-second", action="store_true",
+                   help="launch even though a polyforge-b1 instance already exists")
     l.set_defaults(fn=cmd_launch)
     s = sub.add_parser("status")
     s.add_argument("id", nargs="?")
