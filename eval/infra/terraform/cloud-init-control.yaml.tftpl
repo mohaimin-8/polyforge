@@ -8,7 +8,7 @@ runcmd:
   - |
     curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
       --token=${k3s_token} \
-      --node-ip=10.42.1.10 \
+      --node-ip=10.0.1.10 \
       --flannel-iface=enp7s0 \
       --disable=traefik \
       --write-kubeconfig-mode=644" sh -
