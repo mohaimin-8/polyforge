@@ -1,0 +1,30 @@
+# PREREG_FAIR_J.md (audit 2026-09-26, Phase 3) -- the composite objective
+# against fair and tier-capable comparators, on FRESH shared seeds.
+# Frozen and pushed before any run of this experiment.
+#
+#   jcac_converged         treatment: anchored moves, sweeps to a fixed point
+#                          (every plan a best response -- Proposition 1)
+#   jcac_anchored          the published quotable controller, reported beside
+#   hpa_fair, keda_fair    no LRU charge, competently pre-sized 512 MB cache
+#   jcac_nojoint_v2_tuned  the layered stack that ALSO holds the tier knob:
+#                          HPA replica layer at its tuned target, cache rule,
+#                          latency-ranked tier rule -- the test of jointness
+#   hpa_budget_tuned,      the fair comparators carrying the treatment's own
+#   keda_budget_tuned      per-tenant budget rule, at their tuned parameters
+#
+# Cells mirror the headline matrix (PREREG_V2 section 2). The new experiment
+# name gives fresh seeds; shared_seeds gives every arm in a cell identical
+# demand. New output DB; no earlier database is reopened.
+name: matrix_fair_j
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_converged, jcac_anchored, hpa_fair, keda_fair, jcac_nojoint_v2_tuned,
+          hpa_budget_tuned, keda_budget_tuned]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_fair_j.duckdb
+retries: 2
+timeseries_reps: 0
