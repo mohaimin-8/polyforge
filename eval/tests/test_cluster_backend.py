@@ -576,3 +576,28 @@ def test_failed_run_does_not_inherit_the_previous_runs_export(tmp_path, monkeypa
         "a file this run never produced must not be filed under its name"
     assert not (shared / "eval-export.json").exists(), \
         "the shared 'latest run' view must not mix two runs either"
+
+
+def test_the_tuned_live_hpa_arm_carries_the_tuned_target_and_jcacs_floor(tmp_path):
+    """Audit 2026-09-26 (HIGH): the live `replica-only` arm ran the chart's
+    HPA defaults -- 60% CPU target, minReplicas 1 -- while the prereg called
+    it tuned, and JCAC's replica floor is one per tenant. `replica-only-tuned`
+    targets the published tuned utilization (hpa target_rho x 100) with the
+    same floor JCAC's Policies sum to; `replica-only` stays as published."""
+    from harness.systems import tuned_params
+
+    def install(system):
+        plan = cb.command_plan(_run(system=system, workload="joint_stress"), tmp_path)
+        return [" ".join(c) for c in plan if c[:2] == ["helm", "install"]
+                and any("deploy/helm/polyforge" in a.replace("\\", "/") and "operator" not in a
+                        for a in c)][0]
+
+    tuned = install("replica-only-tuned")
+    target = round(100 * tuned_params()["hpa"]["target_rho"])
+    n_tenants = len(cb.workloads.TENANT_MIXES["uniform"])
+    assert f"--set=autoscaling.hpa.targetCPUUtilization={target}" in tuned
+    assert f"--set=autoscaling.hpa.minReplicas={n_tenants}" in tuned
+    assert "--set=autoscaling.hpa.enabled=true" in tuned and "--set=planner.enabled=false" in tuned
+    published = install("replica-only")
+    assert "targetCPUUtilization" not in published and "minReplicas" not in published
+    assert "replica-only-tuned" not in cb.OPERATOR_SYSTEMS

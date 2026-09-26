@@ -92,6 +92,7 @@ def bounds_report(system: str, cluster_size: str) -> dict:
 EXPECTED_PINS = {
     "jcac": set(),
     "replica-only": {"cache", "tier"},
+    "replica-only-tuned": {"cache", "tier"},
     "cache-only": {"replicas", "tier"},
     "tier-only": {"replicas", "cache"},
 }
