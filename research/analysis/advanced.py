@@ -51,13 +51,35 @@ def fig_forecast_ablation():
         ax.set_ylabel(ylabel)
         F._style(ax)
     fig.suptitle("Forecast ablation: same controller, better eyes", fontsize=9.5, y=1.02)
-    F.save(fig, "fig13_forecast_ablation",
-           "The forecast ablation reveals headroom in the system's own default: the "
-           "W30 linear-trend forecaster overreacts to bucket noise, and damped Holt "
-           "smoothing beats it by ~16% on SLO violation at equal cost. Online-seasonal "
-           "detection helps only where a period exists. Holt is the recommended "
-           "default; the headline evaluation used trend, so these gains stack on top.")
+    F.save(fig, "fig13_forecast_ablation", forecast_caption(df))
     return df
+
+
+def _vs_trend(df: pd.DataFrame, system: str) -> tuple[float, float, tuple[float, float, float]]:
+    """(relative violation change, relative cost change, per-cell cost
+    difference (mean, lo, hi)) of `system` against the trend base, paired by
+    matrix cell."""
+    key = ["workload", "tenant_mix", "cluster_size", "rep"]
+    a = df[df.system == system].set_index(key)
+    b = df[df.system == "jcac"].set_index(key)
+    viol = a.mean_violation.mean() / b.mean_violation.mean() - 1.0
+    cost = a.total_cost_usd.mean() / b.total_cost_usd.mean() - 1.0
+    return viol, cost, stats.ci95((a.total_cost_usd - b.total_cost_usd).dropna())
+
+
+def forecast_caption(df: pd.DataFrame) -> str:
+    """fig13's caption, computed (audit 2026-09-26: it read "~16% on SLO
+    violation at equal cost" although cost was never tested)."""
+    parts = []
+    for system in ("jcac_holt", "jcac_seasonal"):
+        viol, cost, (_, lo, hi) = _vs_trend(df, system)
+        tested = ("the paired 95% CI includes zero" if lo <= 0.0 <= hi
+                  else "the paired 95% CI excludes zero")
+        parts.append(f"{FORECASTER_LABELS[system]} changes mean SLO violation by {viol:+.1%} and "
+                     f"mean cost by {cost:+.1%} ({tested}: [{lo:+.4f}, {hi:+.4f}] USD per run)")
+    return ("The forecast ablation, the same controller with four forecasters, paired by matrix "
+            "cell against the W30 linear-trend base the headline evaluation used: "
+            + "; ".join(parts) + ".")
 
 
 def fig_realism():
