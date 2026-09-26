@@ -1,0 +1,27 @@
+# PREREG_STRUCTURAL_MISMATCH.md (audit 2026-09-26, Phase 3). Frozen and pushed
+# before any run. The planner of jcac_converged_blind believes the PUBLISHED
+# model forms; the plant runs the form below. jcac_converged (the oracle) sees
+# the plant. jcac_calibrated_blind adds the B1' online calibration to the blind
+# planner. Comparators observe the plant as every reactive arm does.
+#
+# Plant: the plant fitted to the live B1' evidence (research/calibration/live_plant_b1prime.json): replica capacity 1123 wu, no AI load on replicas, measured tier latencies 261.7 / 751.2 / 2156 ms, uniform cacheability, crud_base_scale 0.013175 (the median of the four per-cell fits)
+name: matrix_sm_live
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_converged_blind, jcac_calibrated_blind, jcac_converged, keda_fair, jcac_nojoint_v2_tuned, hpa_fair]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_matrix_sm_live.duckdb
+retries: 2
+timeseries_reps: 0
+model_form:
+  replica_capacity_wu: 1123
+  wu_ai_scale: 0
+  crud_base_scale: 0.013175
+  tier_latency_small: 261.7
+  tier_latency_mid: 751.2
+  tier_latency_large: 2156
+  cacheable_uniform: 1

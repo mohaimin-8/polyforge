@@ -213,6 +213,24 @@ SYSTEMS: dict[str, SystemSpec] = {
                     "point, so every plan is a best response for every tenant "
                     "(audit 2026-09-26: two fixed sweeps are not, Proposition 1)",
     ),
+    "jcac_converged_blind": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True,
+                        "belief_form": "published"},
+        description="jcac_converged whose planner believes the PUBLISHED model "
+                    "forms while the plant runs the experiment's model_form "
+                    "(audit 2026-09-26: the planner otherwise plans with the "
+                    "very function that scores it). On the published plant it "
+                    "is jcac_converged.",
+    ),
+    "jcac_calibrated_blind": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True,
+                        "belief_form": "published", "headroom_calibration": True,
+                        "headroom_cap": 4.0, "switch_penalty": 0.5 * 0.048 * 10 / 3600 / 0.01},
+        description="jcac_converged_blind plus the B1' online calibration "
+                    "(headroom-calibrated capacity, learned tier-latency offset, "
+                    "half-replica switching penalty): does learning from the "
+                    "plant rescue a planner that believes the wrong model form?",
+    ),
     "jcac_anchored": SystemSpec(
         "jcac", params={"anchor_moves": True},
         description="PolyForge with per-interval move clamps enforced across "

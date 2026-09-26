@@ -1,0 +1,22 @@
+# PREREG_STRUCTURAL_MISMATCH.md (audit 2026-09-26, Phase 3). Frozen and pushed
+# before any run. The planner of jcac_converged_blind believes the PUBLISHED
+# model forms; the plant runs the form below. jcac_converged (the oracle) sees
+# the plant. jcac_calibrated_blind adds the B1' online calibration to the blind
+# planner. Comparators observe the plant as every reactive arm does.
+#
+# Plant: measured tier work units 1 : 1.475 : 1.518 (the corrected two-GPU ratio; the 1 : 1.516 : 16.64 of RESULTS_TIER_WU is the CPU-offload artifact)
+name: matrix_sm_tierwu
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_converged_blind, jcac_calibrated_blind, jcac_converged, keda_fair, jcac_nojoint_v2_tuned, hpa_fair]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_matrix_sm_tierwu.duckdb
+retries: 2
+timeseries_reps: 0
+model_form:
+  wu_tier_mid: 1.475
+  wu_tier_large: 1.518
