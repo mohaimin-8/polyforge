@@ -69,4 +69,8 @@ such — never as prospective.
 | `PREREG_TRACE.md` | 050ff63 |
 | `PREREG_TRACE2.md` | 825c349 |
 
-Reproduce the anchors: `git log --format="%h %cI" -1 -- research/analysis/<file>`.
+Reproduce the anchors: `git log --diff-filter=A --format="%h %cI" -- research/analysis/<file>`
+(the commit that ADDED the file; `git log -1` returns the latest commit touching it, which
+for a protocol with post-result amendments is the results commit -- audit 2026-09-26).
+This table covers 29 protocols; 51 exist as of 2026-09-26, and
+`scripts/check_prereg_timing.py` judges every campaign against its protocol in CI.
