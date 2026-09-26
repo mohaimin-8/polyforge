@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from stats import holm_bonferroni  # noqa: E402
+from stats import holm_bonferroni, load_campaign_runs  # noqa: E402
 
 
 def test_holm_thresholds_step_down():
@@ -76,3 +76,42 @@ def test_holm_preserves_every_input_key():
     assert set(out) == set(pvals)
     for k in pvals:
         assert out[k]["p"] == pvals[k]
+
+
+def _campaign_db(path, rows):
+    import duckdb
+
+    con = duckdb.connect(str(path))
+    con.execute("create table runs (run_id text, system text, workload text, tenant_mix text, "
+                "cluster_size text, rep integer, status text)")
+    con.execute("create table metrics (run_id text, total_cost_usd double, mean_violation double, "
+                "mean_jain double, steps integer)")
+    for i, (system, workload, rep, cost) in enumerate(rows):
+        con.execute("insert into runs values (?,?,?,?,?,?,?)",
+                    [f"r{i}", system, workload, "uniform", "small", rep, "valid"])
+        con.execute("insert into metrics values (?,?,?,?,?)", [f"r{i}", cost, 0.0, 1.0, 30])
+    con.close()
+
+
+def test_duckdb_rows_come_back_in_the_committed_export_order(tmp_path):
+    """Audit 2026-09-26: bootstraps resample rows by POSITION, and a DuckDB join
+    promises no row order, so the archive tier could print different CI bounds
+    than the clean clone. The committed export is the canonical order."""
+    import pandas as pd
+
+    rows = [("jcac", "a", 0, 1.0), ("hpa", "a", 0, 2.0), ("jcac", "b", 0, 3.0), ("hpa", "b", 0, 4.0)]
+    _campaign_db(tmp_path / "c.duckdb", list(reversed(rows)))       # scrambled insertion
+    export = pd.DataFrame([{"system": s, "workload": w, "tenant_mix": "uniform",
+                            "cluster_size": "small", "rep": r, "total_cost_usd": c,
+                            "mean_violation": 0.0, "mean_jain": 1.0, "steps": 30}
+                           for s, w, r, c in [rows[2], rows[0], rows[3], rows[1]]])
+    export.to_csv(tmp_path / "c.csv.gz", index=False)
+    got = load_campaign_runs(tmp_path / "c.duckdb", tmp_path / "c.csv.gz")
+    assert list(got.total_cost_usd) == [3.0, 1.0, 4.0, 2.0]
+
+
+def test_duckdb_without_an_export_is_sorted_by_run_key(tmp_path):
+    rows = [("jcac", "b", 0, 3.0), ("hpa", "a", 0, 2.0), ("jcac", "a", 0, 1.0)]
+    _campaign_db(tmp_path / "c.duckdb", rows)
+    got = load_campaign_runs(tmp_path / "c.duckdb", tmp_path / "absent.csv.gz")
+    assert list(got.total_cost_usd) == [2.0, 1.0, 3.0]

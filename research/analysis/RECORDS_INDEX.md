@@ -10,9 +10,9 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 75 |
-| regenerated and compared | 57 |
-| outside the gate, reason stated | 18 |
+| records | 77 |
+| regenerated and compared | 62 |
+| outside the gate, reason stated | 15 |
 | outside the gate, no entry | 0 |
 
 | record | hypotheses it names | reproduced |
@@ -39,6 +39,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `PLANNER_CELLS_DEALIAS.md` | PF-H1, PF-H2, PS-H1, PS-H2 | yes |
 | `PLANNER_SCALING.md` | - | no, reason stated |
 | `PSEUDO_TENANT.md` | PT-H1, PT-H2, PT-H3 | no, reason stated |
+| `REANALYSIS_MATRIX.md` | - | yes |
+| `REANALYSIS_NONINFERIORITY.md` | BP-H2, BP-H2a, BP-H2b, EP-H3, MM-H2, TP-H3, TP-H3a, TP-H3b | yes |
 | `RESULTS.md` | - | yes |
 | `RESULTS_BUDGET_PARITY.md` | BP-H1, BP-H1a, BP-H1b, BP-H2, BP-H2a, BP-H2b, BP-H3 | yes |
 | `RESULTS_CACHE_CEILING.md` | - | no, reason stated |
@@ -75,9 +77,9 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_TIER_RATIO.md` | TR-H1, TR-H2 | yes |
 | `RESULTS_TIER_RATIO_V2.md` | TR2-H1, TR2-H2 | yes |
 | `RESULTS_TIER_WU.md` | TW-H1, TW-H2 | yes |
-| `RESULTS_TRACE.md` | - | no, reason stated |
-| `RESULTS_TRACE2.md` | - | no, reason stated |
-| `RESULTS_TRACE_AZURE.md` | - | no, reason stated |
+| `RESULTS_TRACE.md` | - | yes |
+| `RESULTS_TRACE2.md` | - | yes |
+| `RESULTS_TRACE_AZURE.md` | - | yes |
 | `RESULTS_TRACE_LIVE.md` | TL-H1, TL-H2, TL-H3, TL-H4 | yes |
 | `RESULTS_TRACE_PARITY.md` | TP-H1, TP-H1a, TP-H1b, TP-H2, TP-H3a, TP-H3b | yes |
 | `RESULTS_V2.md` | - | yes |

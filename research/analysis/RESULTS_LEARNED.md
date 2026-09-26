@@ -15,10 +15,10 @@ Valid runs: 1200 hpa=300, jcac_anchored=300, learned_online=300, learned_trained
 
 ## LR-H1 (confirmatory, non-inferiority) — MPC vs offline-trained learned policy
 
-| reading | n | mean J (MPC) | mean J (learned) | diff (MPC−learned) | margin δ | p (one-sided) | verdict |
+| reading | n | mean J (MPC) | mean J (learned) | diff (MPC−learned) | margin δ | p | verdict |
 |---|---|---|---|---|---|---|---|
-| LR-H1: J non-inferiority | 300 | 0.4002 | 0.7761 | -0.376 | 0.03881 | 3.896e-33 | PASS |
-| two-sided superiority (reported alongside) | 300 | 0.4002 | 0.7761 | -0.376 | nan | 2.944e-28 | d_z=-0.708 |
+| LR-H1: J non-inferiority (one-sided p) | 300 | 0.4002 | 0.7761 | -0.376 | 0.03881 | 3.896e-33 | PASS |
+| superiority, reported alongside (two-sided p) | 300 | 0.4002 | 0.7761 | -0.376 | nan | 2.944e-28 | d_z=-0.708 |
 
 95% bootstrap CI of the paired J difference (MPC − learned): [-0.4373, -0.318] — the citable unit at this n.
 

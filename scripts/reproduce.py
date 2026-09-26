@@ -90,6 +90,22 @@ CAMPAIGN_RECORDS = [
     # plant constants, so it rebuilds on a clean clone unconditionally.
     ("analysis_separation.py", [], "RESULTS_SEPARATION.md"),
     ("analysis_trace_parity.py", [], "RESULTS_TRACE_PARITY.md"),
+    # The three real-trace replays. Every statistic comes from the committed
+    # run CSVs; their only raw-trace inputs (k, the BurstGPT segments, the
+    # Azure per-window stream share) are frozen in trace_replay_meta.json and
+    # re-verified by trace_meta.py wherever the raw traces exist. They were
+    # UNGATED until 2026-09-26 for that reason alone.
+    ("trace_matrix.py", ["--analyze"], "RESULTS_TRACE.md"),
+    ("trace_matrix2.py", ["--analyze"], "RESULTS_TRACE2.md"),
+    ("trace_matrix_azure.py", ["--analyze"], "RESULTS_TRACE_AZURE.md"),
+    # Audit 2026-09-26, EXPLORATORY: the composite J at the design-point level
+    # (the independent unit; reps averaged) and against the fair comparators,
+    # including both real-trace parity campaigns (Azure: day-block bootstrap).
+    ("reanalysis_matrix.py", [], "REANALYSIS_MATRIX.md"),
+    # Audit 2026-09-26, EXPLORATORY: every registered non-inferiority
+    # hypothesis (EP-H3, TP-H3, BP-H2, MM-H2) under one rule -- the one-sided
+    # 95% bootstrap upper bound of the mean difference below the margin.
+    ("reanalysis_noninferiority.py", [], "REANALYSIS_NONINFERIORITY.md"),
     # Wave 3 live chaos + p99. Scores the committed run-level CSV from the
     # session-23 sitting (eval/results/live_chaos_p99_runs.csv); the per-step
     # series and raw duckdbs are gitignored and travel in the Zenodo bundle.
@@ -496,13 +512,6 @@ UNGATED = {
     "RESULTS_STRUCTREAL.md":
         "exploratory, no registered hypotheses; needs raw_sim_structreal.duckdb, "
         "which is archive tier only",
-    "RESULTS_TRACE.md":
-        "re-runs the BurstGPT replay campaign against the raw trace, which is "
-        "56 MB and deliberately not vendored",
-    "RESULTS_TRACE2.md":
-        "as RESULTS_TRACE.md: 96 windows of the same un-vendored raw trace",
-    "RESULTS_TRACE_AZURE.md":
-        "as RESULTS_TRACE.md: 72 windows of the raw Azure LLM 2024 trace",
     "RESULTS_WIRE_ATTACK.md":
         "a live security campaign against a running gateway, not a desk "
         "re-derivation",

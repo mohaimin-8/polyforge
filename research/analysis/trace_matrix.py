@@ -285,14 +285,20 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=4)
     args = ap.parse_args()
 
+    if args.analyze and OUT_CSV.exists():
+        # The record needs only k and the segment list from the raw trace;
+        # trace_meta freezes them so a clean clone can rebuild it (audit
+        # 2026-09-26), and recomputes them wherever the raw trace exists.
+        import trace_meta
+
+        m = trace_meta.load("burstgpt")
+        analyze(pd.read_csv(OUT_CSV), m["k"], [tuple(s) for s in m["segments"]])
+        return
+
     df = load_events()
     segs = segments_of(df)
     k = scale_factor(df, segs)
     print(f"segments={[(a//3600, b//3600) for a, b in segs]} (hours), k={k:.1f}")
-
-    if args.analyze and OUT_CSV.exists():
-        analyze(pd.read_csv(OUT_CSV), k, segs)
-        return
 
     starts = window_starts(segs)
     print(f"{len(starts)} windows x {WINDOW_H}h; jittering once per window")

@@ -131,7 +131,9 @@ def conv_share(rates: np.ndarray) -> np.ndarray:
     return np.divide(conv, total, out=np.zeros_like(conv), where=total > 0)
 
 
-def analyze(runs: pd.DataFrame, rates: np.ndarray, k: float) -> None:
+def analyze(runs: pd.DataFrame, share: np.ndarray, k: float) -> None:
+    """`share` is the per-window conv share (conv_share(rates)); it is all
+    the record needs from the raw trace besides k (see trace_meta)."""
     lines: list[str] = []
     w = lines.append
     w("# Replay on real Azure LLM 2024 demand — results (pre-registered, second real trace)")
@@ -186,7 +188,6 @@ def analyze(runs: pd.DataFrame, rates: np.ndarray, k: float) -> None:
     w("")
     w("## Declared secondary (estimates, not gates)")
     w("")
-    share = conv_share(rates)
     median = float(np.median(share))
     strata = {"conv-dominant windows": np.where(share > median)[0],
               "code-dominant windows": np.where(share <= median)[0]}
@@ -226,13 +227,19 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=4)
     args = ap.parse_args()
 
+    if args.analyze and OUT_CSV.exists():
+        # k and the per-window conv share are the record's only raw-trace
+        # inputs; trace_meta freezes them so a clean clone can rebuild it
+        # (audit 2026-09-26) and recomputes them wherever the trace exists.
+        import trace_meta
+
+        m = trace_meta.load("azure")
+        analyze(pd.read_csv(OUT_CSV), np.array(m["conv_share"]), m["k"])
+        return
+
     rates, k = load_rates()
     print(f"windows={N_WINDOWS} x {WINDOW_H}h, k={k:.3f}, "
           f"conv share median={float(np.median(conv_share(rates))):.3f}")
-
-    if args.analyze and OUT_CSV.exists():
-        analyze(pd.read_csv(OUT_CSV), rates, k)
-        return
 
     if args.smoke:
         _init_worker(rates)
@@ -257,7 +264,7 @@ def main() -> None:
     OUT_CSV.parent.mkdir(parents=True, exist_ok=True)
     runs.to_csv(OUT_CSV, index=False)
     print(f"wrote {OUT_CSV} ({len(runs)} runs)")
-    analyze(runs, rates, k)
+    analyze(runs, conv_share(rates), k)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import random
+import zlib
 from pathlib import Path
 
 import pandas as pd
@@ -60,7 +61,10 @@ def test_record_builds_and_reports_holds_per_comparison(tmp_path, monkeypatch):
     for cell in aw.CELLS:
         for arm in aw.ARMS:
             for rep in (0, 1):
-                costs = _ar1(31, 0.6, hash((cell, arm, rep)) % 1000, mean=per_bucket[arm], sd=0.0004)
+                # zlib.crc32, not hash(): str hashes are salted per process
+                # (PYTHONHASHSEED), which made this fixture differ run to run.
+                costs = _ar1(31, 0.6, zlib.crc32(f"{cell}|{arm}|{rep}".encode()) % 1000,
+                             mean=per_bucket[arm], sd=0.0004)
                 d = evidence / "runs" / f"{arm}__{cell}__uniform__small__rep{rep}"
                 d.mkdir(parents=True)
                 (d / "eval-export-fine.json").write_text(json.dumps({"buckets": [
