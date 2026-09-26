@@ -193,9 +193,15 @@ jobs:
           ./gitleaks detect --source . --redact --exit-code=1 --log-level=info 2>&1 | tee scan.log
           scanned=$(grep -oE '[0-9]+ commits scanned' scan.log | grep -oE '^[0-9]+' | head -1)
           total=$(git rev-list --count HEAD)
-          echo "gitleaks scanned ${scanned:-0} of $total commits"
-          if [ "${scanned:-0}" -lt "$total" ]; then
-            echo "FAILED: covered ${scanned:-0} commits of $total; a green scan that read one commit is what this replaces."
+          # The floor is every commit that ADDS at least one line of text: a
+          # commit that only deletes or renames has no patch lines for
+          # gitleaks to read, and cannot introduce a secret. Comparing with
+          # the raw commit count failed on 2026-09-21 ("494 of 495") the
+          # moment a delete-only commit (989894e) landed.
+          floor=$(git log --format='format:@%h' --numstat | awk '/^@/{if(seen) n+=(add>0); seen=1; add=0; next} NF>=3 && $1!="-" {add+=$1} END{if(seen) n+=(add>0); print n}')
+          echo "gitleaks scanned ${scanned:-0} commits; $floor of $total add text"
+          if [ "${scanned:-0}" -lt "$floor" ]; then
+            echo "FAILED: covered ${scanned:-0} commits but $floor add text; a green scan that read one commit is what this replaces."
             exit 1
           fi
 

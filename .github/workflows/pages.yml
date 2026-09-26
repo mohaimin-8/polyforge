@@ -68,8 +68,11 @@ jobs:
   deploy:
     needs: build
     # Opt-in: see the note at the top. Without it the build still gates every
-    # push; only publication waits on the owner's decision.
-    if: vars.PAGES_ENABLED == 'true'
+    # push; only publication waits on the owner's decision. Publication is
+    # from main only: the github-pages environment rejects other branches, so
+    # without the ref check every push to a working branch ended red in the
+    # deploy job although its build had passed.
+    if: vars.PAGES_ENABLED == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
