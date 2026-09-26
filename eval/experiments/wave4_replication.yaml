@@ -3,7 +3,8 @@
 # Pre-registration: research/analysis/PREREG_WAVE4_REPLICATION.md -- read it
 # before running; this file is only the matrix.
 #
-# 6 arms x 3 cells x 5 reps = 90 runs, one sitting, the runner resumes.
+# 6 arms x 2 cells x 5 reps = 60 runs, one sitting, the runner resumes
+# (pre-run amendment: ai_cacheable dropped to fit the budget; see the prereg).
 # shared_seeds: every arm in a (cell, rep) sees identical demand; the five
 # reps are five independent seeds (B1' paired arms on different demand and
 # its rep 2 was one more window of the same design).
@@ -19,7 +20,7 @@ steps: 30
 reps: 5
 shared_seeds: true
 systems: [jcac-calibrated, jcac, replica-only-tuned, replica-only, cache-only, tier-only]
-workloads: [joint_stress, agentic, ai_cacheable]
+workloads: [joint_stress, agentic]
 tenant_mixes: [uniform]
 cluster_sizes: [small]
 output: eval/results/wave4_replication.duckdb

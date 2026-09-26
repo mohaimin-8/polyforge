@@ -155,3 +155,19 @@ Hypotheses:
 - The instance is terminated when the matrix completes or the budget
   ($70) is reached, whichever comes first. A budget stop is recorded with
   the runs banked.
+
+## Pre-run amendment 1 (2026-09-26, before any run)
+
+The sitting's budget is $63, not the $70 assumed above. The runner executes
+arm by arm, so a budget stop partway through would leave the last arms
+missing in every cell and make WL-R1 and WL-R2 NOT EVALUABLE. Two changes
+follow, both made before any run and with no data seen:
+
+- **The descriptive in-sample cell `ai_cacheable` is dropped.** The design
+  is 6 arms × 2 cells (`joint_stress`, `agentic`) × 5 reps = **60 runs**:
+  about 14.3 h, about $32 plus setup (≈ $36). Both registered hypotheses,
+  the guard and the listwise rule are unchanged. The scorer and the
+  experiment file drop the cell and change nothing else.
+- **The budget cap is $55**, replacing $70. The instance is terminated at
+  $55 of accrued cost, or when the matrix completes, whichever comes first.
+
