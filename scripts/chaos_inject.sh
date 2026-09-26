@@ -30,31 +30,40 @@ EVIDENCE_DIR=${EVIDENCE_DIR:-"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/e
 mkdir -p "$EVIDENCE_DIR" 2>/dev/null || true
 exec > >(tee -a "$EVIDENCE_DIR/inject_${PLANNER_OFFSET_S}.log") 2>&1
 
-# k6 detection has to work on both hosts this repo runs on. `pgrep` sees only
-# the POSIX process table, so under Git Bash on Windows it cannot see a native
-# k6.exe -- WP14's first soak attempt (session 38) lost all eight faults to
-# exactly that: k6 ran for hours while four injectors sat waiting for it and
-# then aborted. B2 ran on a Linux Codespace, where pgrep works, so this never
-# surfaced. `tasklist` covers the Windows case; the `//FI` doubles the slash
-# so MSYS does not rewrite the flag into a path.
-k6_running() {
-  pgrep -x k6 >/dev/null 2>&1 && return 0
-  command -v tasklist >/dev/null 2>&1 &&
-    tasklist //FI "IMAGENAME eq k6.exe" 2>/dev/null | grep -qi "k6.exe" && return 0
-  return 1
+# T0 is the opening of the SCORED load window. The harness marks that instant
+# by writing .soak-running with `started=<epoch>` (cluster_backend.execute) and
+# removes the file when the run ends. Detecting k6 -- the old rule, first by
+# pgrep and then, after WP14's first soak lost all eight faults to a native
+# k6.exe that pgrep cannot see under Git Bash, by tasklist -- keyed on the
+# FIRST k6 process, which since the warm-up was added is the discarded
+# warm-up: every fault would have fired at least WARMUP_SECONDS (90 s) early
+# (audit 2026-09-26). The marker names the scored window on every host.
+#
+# A marker older than this injector (beyond a tolerance for launching just
+# after the window opened) is a leftover from an earlier, crashed run and is
+# not taken for this one.
+MARKER=${SOAK_MARKER:-"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.soak-running"}
+MARKER_TOLERANCE_S=${MARKER_TOLERANCE_S:-300}
+LAUNCHED=$(date +%s)
+marker_started() {
+  [ -f "$MARKER" ] && sed -n 's/^started=\([0-9][0-9]*\).*/\1/p' "$MARKER" | head -1
 }
 
-echo "[inject] waiting for the k6 load window to start..."
+echo "[inject] waiting for the scored load window to open ($MARKER)..."
+T0=""
 for _ in $(seq 1 480); do
-  k6_running && break
+  started=$(marker_started)
+  if [ -n "$started" ] && [ "$started" -ge $((LAUNCHED - MARKER_TOLERANCE_S)) ]; then
+    T0=$started
+    break
+  fi
   sleep 5
 done
-if ! k6_running; then
-  echo "[inject] ERROR: k6 never started within 40min; aborting injector"
+if [ -z "$T0" ]; then
+  echo "[inject] ERROR: the scored load window never opened within 40min; aborting injector"
   exit 1
 fi
-T0=$(date +%s)
-echo "[inject] k6 load started at $(ts) (T0=$T0)"
+echo "[inject] scored load window opened at $(date -u -d "@$T0" +%H:%M:%S 2>/dev/null || echo "$T0") (T0=$T0)"
 
 wait_until() {
   local tgt=$((T0 + $1)) now

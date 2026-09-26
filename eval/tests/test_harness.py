@@ -1518,6 +1518,22 @@ class TestPlannerFaultActuallyStopsThePlanner:
         assert "positive control" in body
         assert "planner unavailable" in body
 
+    def test_t0_is_the_scored_window_not_the_first_k6_process(self):
+        """Audit 2026-09-26: T0 was the first k6 process, which since the
+        warm-up was added is the DISCARDED warm-up, so every fault would fire
+        at least WARMUP_SECONDS (90 s) early. T0 must come from the marker the
+        harness writes at the instant the scored window opens, and a leftover
+        marker from an earlier run must not be taken for it."""
+        body = self._script()
+        assert "started=" in body and ".soak-running" in body
+        assert "T0=$(date +%s)" not in body
+        assert "LAUNCHED" in body  # the stale-marker guard
+        # The harness side of the contract: the marker is written when the
+        # scored window opens and carries its start time.
+        backend = (Path(__file__).resolve().parents[1] / "harness"
+                   / "cluster_backend.py").read_text(encoding="utf-8")
+        assert 'f"started={time.time():.0f}\\n"' in backend
+
 
 class TestSoakProtocolGuards:
     """WP14 Phase 5: rules that are enforceable rather than written down.
