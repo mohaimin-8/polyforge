@@ -38,6 +38,43 @@ def md_table(df: pd.DataFrame, floatfmt: str = "{:.4g}") -> str:
     return "\n".join([header, sep] + rows)
 
 
+def undominated(summary: pd.DataFrame, systems: list[str]) -> list[str]:
+    """Systems no other system beats on BOTH mean cost and mean violation
+    (at least as good on both, strictly better on one)."""
+    pts = {s: (summary.loc[s, "total_cost_usd"], summary.loc[s, "mean_violation"]) for s in systems}
+    return [s for s, (c, v) in pts.items()
+            if not any(oc <= c and ov <= v and (oc < c or ov < v)
+                       for o, (oc, ov) in pts.items() if o != s)]
+
+
+def gate_fail_reading(summary: pd.DataFrame, obj: pd.DataFrame, head: pd.DataFrame) -> str:
+    """Why the per-metric gate fails, with every number computed (audit
+    2026-09-26: this paragraph was fixed text the gate could not check --
+    "~12x", "~30x", "all p < 1e-24", "the only Pareto-undominated system")."""
+    cost = summary["total_cost_usd"]
+    static_x = cost["static"] / cost["jcac"]
+    cache_x = cost["gptcache"] / cost["jcac"]
+    cost_rows = head[head.metric == "total_cost_usd"]
+    cost_all = bool(cost_rows.jcac_better.all())
+    dz = cost_rows.cohens_dz.abs()
+    front = undominated(summary, [s for s in figures.SYSTEM_ORDER if s in summary.index])
+    front_txt = ("the only system on the (cost, violation) Pareto front" if front == ["jcac"]
+                 else "on the (cost, violation) Pareto front together with "
+                 + ", ".join(f"`{s}`" for s in front if s != "jcac") if "jcac" in front
+                 else "NOT on the (cost, violation) Pareto front (front: "
+                 + ", ".join(f"`{s}`" for s in front) + ")")
+    return ("Why the raw per-metric gate cannot pass against this baseline set: `static` is "
+            f"over-provisioned to peak, so it wins every SLO-shaped metric by construction while "
+            f"paying {static_x:.1f}× PolyForge's mean cost; `gptcache` maxes the cache, so it wins "
+            f"hit rate while paying {cache_x:.1f}×. A system cannot out-violate a baseline that never "
+            f"violates, only match it at lower cost -- the composite-objective sweep above (largest "
+            f"p = {obj.p.max():.2g}, smallest |d_z| = {obj.cohens_dz.abs().min():.2f}). On cost "
+            f"alone PolyForge is lower than {'every' if cost_all else 'NOT every'} baseline "
+            f"(|d_z| {dz.min():.2f}–{dz.max():.2f}); on mean cost and mean violation it is "
+            f"{front_txt}. These comparators carry the LRU charge and the 128 MB cache pin later "
+            "adjudicated as unfair (RESULTS_EVICTION_PARITY.md). The gate row stays FAIL.")
+
+
 def main() -> None:
     df = stats.load_runs(stats.FULL_DB)
     df_abl = stats.load_runs(stats.ABLATIONS_DB)
@@ -137,18 +174,7 @@ def main() -> None:
       + ("" if gate_ok else " — reported as measured; do not tune post hoc."))
     w("")
     if not gate_ok:
-        w("Why the raw per-metric gate cannot pass against this baseline set, "
-          "and why that is the honest finding rather than a defect: `static` "
-          "is over-provisioned to peak, so it wins every SLO-shaped metric "
-          "*by construction* while paying ~12× the cost; `gptcache` maxes the "
-          "cache, so it wins hit rate while paying ~30×. A system cannot "
-          "out-violate a baseline that never violates — it can only match it "
-          "at radically lower cost, which is exactly what the composite-"
-          "objective sweep above shows (all p < 1e-24, all effects large). "
-          "PolyForge also wins cost against *every* baseline "
-          "(|d_z| 0.66–1.12) and is the only Pareto-undominated system "
-          "(fig. 3). This framing goes in the paper verbatim; the gate row "
-          "stays FAIL.")
+        w(gate_fail_reading(summary, obj, head))
         w("")
 
     # --- ablations -------------------------------------------------------
