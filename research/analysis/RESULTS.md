@@ -91,7 +91,7 @@ The matrix is a blocked factorial design — every (workload, mix, cluster, rep)
 
 **Gate (FAIL)**: PolyForge beats every baseline on ≥ 3 of 5 metrics at p < 0.01 with |d_z| ≥ 0.5 (paired-by-cell). — reported as measured; do not tune post hoc.
 
-Why the raw per-metric gate cannot pass against this baseline set, and why that is the honest finding rather than a defect: `static` is over-provisioned to peak, so it wins every SLO-shaped metric *by construction* while paying ~12× the cost; `gptcache` maxes the cache, so it wins hit rate while paying ~30×. A system cannot out-violate a baseline that never violates — it can only match it at radically lower cost, which is exactly what the composite-objective sweep above shows (all p < 1e-24, all effects large). PolyForge also wins cost against *every* baseline (|d_z| 0.66–1.12) and is the only Pareto-undominated system (fig. 3). This framing goes in the paper verbatim; the gate row stays FAIL.
+Why the raw per-metric gate cannot pass against this baseline set: `static` is over-provisioned to peak, so it wins every SLO-shaped metric by construction while paying 12.1× PolyForge's mean cost; `gptcache` maxes the cache, so it wins hit rate while paying 29.9×. A system cannot out-violate a baseline that never violates, only match it at lower cost -- the composite-objective sweep above (largest p = 4.6e-25, smallest |d_z| = 0.66). On cost alone PolyForge is lower than every baseline (|d_z| 0.66–1.12); on mean cost and mean violation it is on the (cost, violation) Pareto front together with `keda`, `static`. These comparators carry the LRU charge and the 128 MB cache pin later adjudicated as unfair (RESULTS_EVICTION_PARITY.md). The gate row stays FAIL.
 
 ## Ablations (full PolyForge vs minus-one-component)
 
