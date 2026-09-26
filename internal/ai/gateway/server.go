@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -49,10 +50,14 @@ type Server struct {
 	// rates fills Event.RPSWindow, the planner's demand signal. Without it
 	// the operator plans every tenant against zero AI demand.
 	rates *telemetry.RateTracker
-	// limiter is per-tenant admission control in front of every AI route.
-	// nil disables it (tests). See ratelimit.go for why the gateway needs
-	// its own — it previously had none at all.
+	// limiter is per-tenant admission control in front of every AI route,
+	// spent only by authenticated calls. nil disables it (tests). See
+	// ratelimit.go for why the gateway needs its own — it previously had
+	// none at all.
 	limiter *tenantLimiter
+	// authFailures is the per-source failed-authentication budget checked
+	// before any key lookup (Server.authorize). nil when limiting is off.
+	authFailures *tenantLimiter
 }
 
 type Config struct {
@@ -120,6 +125,7 @@ func NewServer(log *slog.Logger, cfg Config) *Server {
 		mux:           http.NewServeMux(),
 		rates:         telemetry.NewRateTracker(telemetry.RateWindow),
 		limiter:       newTenantLimiter(cfg.RateLimit),
+		authFailures:  newTenantLimiter(cfg.RateLimit),
 	}
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("GET /metrics", s.metrics)
@@ -163,39 +169,86 @@ func (s *Server) metrics(w http.ResponseWriter, _ *http.Request) {
 
 // authorize authenticates the tenant API key exactly like the control
 // plane: 401 for a bad credential, 403 for missing scope. It is also the
-// admission choke point for every AI route — the per-tenant rate limit runs
-// here, keyed on the path tenant, before any authentication or model work,
-// so a flood is bounded even when it carries no valid key. (The check lives
-// here rather than in mux middleware because r.PathValue is only populated
-// after the mux routes the request.)
+// admission choke point for every AI route, in two stages (audit 2026-09-26:
+// one per-tenant limiter keyed on the URL used to run before authentication,
+// so anyone who knew a tenant's slug could hold it in sustained 429s):
+//
+//   - before authentication, one token is RESERVED from the SOURCE's
+//     failed-authentication budget and refunded unless the credential fails
+//     (401) -- a source that keeps presenting bad or missing keys is refused
+//     with 429 before any key lookup, a concurrent bad-key burst reaches the
+//     key store at most the budget's capacity times, and failures spend
+//     from that source's budget, never from a tenant's;
+//   - after authentication, the tenant's own budget is spent, so only a
+//     caller holding the tenant's key can exhaust it, and authenticated
+//     traffic is never throttled by its source address (a load generator
+//     driving many tenants from one host is limited per tenant, as before).
+//
+// The checks live here rather than in mux middleware because r.PathValue is
+// only populated after the mux routes the request.
 func (s *Server) authorize(w http.ResponseWriter, r *http.Request, tenantID, requiredScope string) bool {
-	if s.limiter != nil {
-		if ok, retryAfter := s.limiter.allow(tenantID); !ok {
-			w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(retryAfter.Seconds())))))
-			writeError(w, http.StatusTooManyRequests, "rate_limited",
-				"per-tenant request rate exceeded; retry after the indicated delay")
+	source := clientAddress(r)
+	if s.authFailures != nil {
+		if ok, retryAfter := s.authFailures.allow(source); !ok {
+			rateLimited(w, retryAfter, "too many failed authentication attempts from this address; retry after the indicated delay")
 			return false
 		}
 	}
-	secret := strings.TrimSpace(r.Header.Get("X-PolyForge-API-Key"))
-	if secret == "" {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "an API key is required")
+	key, status, message := s.authenticate(r, tenantID)
+	if status != http.StatusUnauthorized && s.authFailures != nil {
+		// Only a failed credential keeps its reservation; a success or a
+		// key-store error (500, not the caller's fault) gives it back.
+		s.authFailures.refund(source)
+	}
+	if status != 0 {
+		writeError(w, status, "unauthorized", message)
 		return false
 	}
-	key, err := s.tenants.AuthenticateAPIKey(r.Context(), tenantID, secret)
-	if err != nil {
-		status := http.StatusUnauthorized
-		if !errors.Is(err, tenant.ErrUnauthorized) {
-			status = http.StatusInternalServerError
+	if s.limiter != nil {
+		if ok, retryAfter := s.limiter.allow(tenantID); !ok {
+			rateLimited(w, retryAfter, "per-tenant request rate exceeded; retry after the indicated delay")
+			return false
 		}
-		writeError(w, status, "unauthorized", "invalid API key")
-		return false
 	}
 	if !tenant.ScopeAllows(key.Scope, requiredScope) {
 		writeError(w, http.StatusForbidden, "forbidden", fmt.Sprintf("this endpoint requires the %q scope", requiredScope))
 		return false
 	}
 	return true
+}
+
+// authenticate resolves the request's API key for tenantID. A zero status
+// means success; otherwise status and message describe the refusal (401 for a
+// missing or wrong key, 500 when the key store itself failed).
+func (s *Server) authenticate(r *http.Request, tenantID string) (tenant.APIKey, int, string) {
+	secret := strings.TrimSpace(r.Header.Get("X-PolyForge-API-Key"))
+	if secret == "" {
+		return tenant.APIKey{}, http.StatusUnauthorized, "an API key is required"
+	}
+	key, err := s.tenants.AuthenticateAPIKey(r.Context(), tenantID, secret)
+	if err != nil {
+		if !errors.Is(err, tenant.ErrUnauthorized) {
+			return tenant.APIKey{}, http.StatusInternalServerError, "invalid API key"
+		}
+		return tenant.APIKey{}, http.StatusUnauthorized, "invalid API key"
+	}
+	return key, 0, ""
+}
+
+func rateLimited(w http.ResponseWriter, retryAfter time.Duration, message string) {
+	w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(retryAfter.Seconds())))))
+	writeError(w, http.StatusTooManyRequests, "rate_limited", message)
+}
+
+// clientAddress is the TCP peer's host. X-Forwarded-For is deliberately not
+// trusted (the control plane's rateLimitKey makes the same choice): a header
+// the caller writes cannot choose whose budget it spends.
+func clientAddress(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil || host == "" {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 type chatInput struct {

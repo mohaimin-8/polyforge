@@ -61,3 +61,24 @@ func TestNewTenantLimiterDisabled(t *testing.T) {
 		t.Error("zero burst should disable the limiter")
 	}
 }
+
+// refund gives back a reserved token, never past capacity: the gateway
+// reserves from a source's failed-auth budget before every key lookup and
+// refunds it on success, so successful calls must never drain the budget.
+func TestTenantLimiterRefundRestoresAReservedToken(t *testing.T) {
+	now := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
+	l := newTenantLimiter(RateLimit{RequestsPerMinute: 60, Burst: 2})
+	l.clock = func() time.Time { return now }
+	for i := 0; i < 10; i++ {
+		if ok, _ := l.allow("10.0.0.5"); !ok {
+			t.Fatalf("reservation %d refused although every earlier one was refunded", i)
+		}
+		l.refund("10.0.0.5")
+	}
+	l.refund("10.0.0.5") // a refund with nothing reserved must not exceed capacity
+	l.allow("10.0.0.5")
+	l.allow("10.0.0.5")
+	if ok, wait := l.allow("10.0.0.5"); ok || wait <= 0 {
+		t.Fatal("a full bucket held more than its capacity after an extra refund")
+	}
+}
