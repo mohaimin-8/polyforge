@@ -450,6 +450,20 @@ jobs:
             echo "FAIL: planner.enabled=false still renders the planner"; exit 1
           fi
 
+          # Audit 2026-09-26: the application chart rendered no
+          # NetworkPolicy at all. The default render must carry the
+          # release-wide default-deny and the control plane's allowlist, and
+          # the gateway render the gateway's.
+          # Each policy name is unique to one NetworkPolicy object.
+          for want in t-default-deny t-allow-dns polyforge-control-plane; do
+            if ! grep -A3 '^kind: NetworkPolicy' app.yaml | grep -q "name: ${want}$"; then
+              echo "FAIL: the default application render has no NetworkPolicy ${want}"; exit 1
+            fi
+          done
+          if ! grep -A3 '^kind: NetworkPolicy' gw.yaml | grep -q 'name: polyforge-ai-gateway$'; then
+            echo "FAIL: gateway.enabled=true renders no gateway NetworkPolicy"; exit 1
+          fi
+
           published="ghcr.io/${GITHUB_REPOSITORY}/(control-plane|ai-gateway|operator|planner)"
           rendered=$(grep -hE '^[[:space:]]+image:' on.yaml off.yaml app.yaml gw.yaml \
             | sed -E 's#^[[:space:]]+image:[[:space:]]*##; s#"##g; s#[:@][^/]*$##' | sort -u)

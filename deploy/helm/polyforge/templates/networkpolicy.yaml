@@ -1,0 +1,134 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+# Default-deny for this release's pods, then the flows the chart's own
+# workloads need and nothing else (audit 2026-09-26: a plain `helm install`
+# rendered no NetworkPolicy, although deploy/k8s/README.md says this chart
+# supersedes deploy/k8s/networkpolicies.yaml). Scoped to the release's pods,
+# so PostgreSQL, Redis or anything else in the namespace keeps its own
+# policies. Requires a CNI that enforces NetworkPolicy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-default-deny
+  labels:
+    {{- include "polyforge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-dns
+  labels:
+    {{- include "polyforge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Control plane: reached by the ingress controller, by the operator (its
+# planner's demand feed reads /v1/tenants/{id}/telemetry/features with the
+# admin key -- internal/operator/planner/demand.go) and by Prometheus, when
+# named; reaches PostgreSQL and Redis only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "polyforge.name" . }}
+  labels:
+    {{- include "polyforge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "polyforge.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.ingressNamespace }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.operatorNamespace }}
+        {{- if $np.metricsNamespace }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.metricsNamespace }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml $np.postgresSelector | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml $np.redisSelector | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 6379
+{{- if .Values.gateway.enabled }}
+---
+# AI gateway: reached by the ingress controller and by the operator, which
+# pushes each Policy's cache/tier knobs to /admin/tenants/{id}/knobs; reaches
+# the shared PostgreSQL store and the model backends in gatewayModelEgress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Chart.Name }}-ai-gateway
+  labels:
+    {{- include "polyforge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}-ai-gateway
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.ingressNamespace }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.operatorNamespace }}
+        {{- if $np.metricsNamespace }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.metricsNamespace }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8081
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml $np.postgresSelector | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 5432
+    {{- with $np.gatewayModelEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
+{{- end }}

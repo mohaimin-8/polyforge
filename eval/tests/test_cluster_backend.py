@@ -339,6 +339,24 @@ def test_live_ai_install_lifts_the_gateway_limiter_like_the_control_planes(monke
         assert "--set=rateLimit.requestsPerMinute=1000000" in c
 
 
+def test_every_eval_install_pins_the_charts_network_policies_off(monkeypatch, tmp_path):
+    """The chart now renders default-deny NetworkPolicies (audit 2026-09-26).
+    The published live sittings ran without them, and the eval cluster's
+    port-forwards and host-side tier backends are outside the chart's
+    allowlist, so every eval install -- default and live-AI -- must pin them
+    off rather than silently change the measured substrate."""
+    for live in (False, True):
+        if live:
+            _live_ai(monkeypatch)
+        plan = cb.command_plan(_run(), tmp_path)
+        installs = [" ".join(c) for c in plan if c[:2] == ["helm", "install"]
+                    and any("deploy/helm/polyforge" in a.replace("\\", "/") and "operator" not in a
+                            for a in c)]
+        assert installs, "no application-chart install in the plan"
+        for c in installs:
+            assert "--set=networkPolicy.enabled=false" in c, c
+
+
 def test_no_thread_subclass_shadows_thread_stop():
     """Thread.join() on Python 3.10 calls self._stop(); a subclass that stores
     an Event under that name breaks join() with "'Event' object is not

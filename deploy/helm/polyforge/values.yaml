@@ -55,6 +55,41 @@ autoscaling:
     maxReplicas: 10
     targetCPUUtilization: 60
 
+# Network segmentation (templates/networkpolicy.yaml). On by default: this
+# release's pods deny all traffic except DNS and the flows below (audit
+# 2026-09-26: a plain `helm install` rendered no NetworkPolicy). Requires a CNI
+# that enforces NetworkPolicy. The eval harness turns it off
+# (HELM_EVAL_BASE_VALUES) so the published live sittings replay on the
+# substrate they ran on.
+networkPolicy:
+  enabled: true
+  # Namespace of the ingress controller that fronts both services.
+  ingressNamespace: ingress-nginx
+  # Namespace of the operator, which pushes cache/tier knobs to the gateway
+  # and reads the control plane's telemetry features for its planner.
+  operatorNamespace: polyforge-system
+  # Namespace of the Prometheus that scrapes /metrics; empty = none.
+  metricsNamespace: ""
+  # Pod labels of the PostgreSQL and Redis the services use (same namespace).
+  postgresSelector:
+    app.kubernetes.io/name: postgres
+  redisSelector:
+    app.kubernetes.io/name: redis
+  # Egress rules for the gateway's model and embedding backends. The default
+  # is Ollama in the polyforge-ai namespace; backends outside the cluster
+  # (e.g. tierBackends on a GPU host) need an ipBlock rule here.
+  gatewayModelEgress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: polyforge-ai
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ollama
+      ports:
+        - protocol: TCP
+          port: 11434
+
 # AI gateway leg of the three-knob live plane (PREREG_WAVE4_LIVE_PLANE.md).
 # Off by default; the eval harness enables it for live-AI cells. With it on,
 # AI traffic gets a real semantic cache (per-tenant budget = the operator's
