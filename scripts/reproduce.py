@@ -106,6 +106,14 @@ CAMPAIGN_RECORDS = [
     # hypothesis (EP-H3, TP-H3, BP-H2, MM-H2) under one rule -- the one-sided
     # 95% bootstrap upper bound of the mean difference below the margin.
     ("reanalysis_noninferiority.py", [], "REANALYSIS_NONINFERIORITY.md"),
+    # Audit 2026-09-26, EXPLORATORY: every scored test parsed from the records,
+    # corrected across the whole programme (Holm; Benjamini-Yekutieli). It
+    # parses the COMMITTED records, which this gate proves identical to their
+    # rebuilds, so its place in this list does not matter.
+    ("hypothesis_ledger.py", [], "HYPOTHESIS_LEDGER.md"),
+    # Audit 2026-09-26: Phase 7 and the live-chaos sitting predate the fix for
+    # the planner that read zero demand (commit 33bd83c); from the run tables.
+    ("erratum_zero_demand_planner.py", [], "ERRATUM_ZERO_DEMAND_PLANNER.md"),
     # Wave 3 live chaos + p99. Scores the committed run-level CSV from the
     # session-23 sitting (eval/results/live_chaos_p99_runs.csv); the per-step
     # series and raw duckdbs are gitignored and travel in the Zenodo bundle.
