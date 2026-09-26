@@ -4,6 +4,7 @@ operator:
   image:
     repository: ghcr.io/mohaimin-8/polyforge/operator
     tag: ""            # defaults to .Chart.appVersion
+    digest: ""         # sha256:...; wins over the tag when set
     pullPolicy: IfNotPresent
   leaderElect: true
   # OTLP endpoint for reconcile spans, e.g. otel-collector.observability:4318.
@@ -42,6 +43,7 @@ planner:
   image:
     repository: ghcr.io/mohaimin-8/polyforge/planner
     tag: ""            # defaults to .Chart.appVersion
+    digest: ""         # sha256:...; wins over the tag when set
     pullPolicy: IfNotPresent
   port: 8090
   # Objective weights (alpha: cost, beta: SLO, gamma: fairness) — the

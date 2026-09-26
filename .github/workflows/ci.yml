@@ -464,6 +464,13 @@ jobs:
             echo "FAIL: gateway.enabled=true renders no gateway NetworkPolicy"; exit 1
           fi
 
+          # Audit 2026-09-26: the charts could render only repository:tag,
+          # although release.yml signs digests. A set digest must win.
+          helm template t deploy/helm/polyforge --set image.digest=sha256:0a1b > dg.yaml
+          helm template t deploy/helm/polyforge-operator --set operator.image.digest=sha256:2c3d > dgo.yaml
+          grep -q 'control-plane@sha256:0a1b' dg.yaml || { echo "FAIL: image.digest is not rendered"; exit 1; }
+          grep -q 'operator@sha256:2c3d' dgo.yaml || { echo "FAIL: operator.image.digest is not rendered"; exit 1; }
+
           published="ghcr.io/${GITHUB_REPOSITORY}/(control-plane|ai-gateway|operator|planner)"
           rendered=$(grep -hE '^[[:space:]]+image:' on.yaml off.yaml app.yaml gw.yaml \
             | sed -E 's#^[[:space:]]+image:[[:space:]]*##; s#"##g; s#[:@][^/]*$##' | sort -u)

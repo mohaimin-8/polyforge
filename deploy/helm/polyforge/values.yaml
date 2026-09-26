@@ -12,6 +12,9 @@
 image:
   repository: ghcr.io/mohaimin-8/polyforge/control-plane
   tag: ""            # defaults to .Chart.appVersion
+  # sha256:... pins the image by the digest release.yml signs; when set it
+  # wins over the tag (audit 2026-09-26: the chart could only render tags).
+  digest: ""
   pullPolicy: IfNotPresent
 
 replicaCount: 2
@@ -99,6 +102,7 @@ gateway:
   image:
     repository: ghcr.io/mohaimin-8/polyforge/ai-gateway
     tag: ""          # defaults to .Chart.appVersion
+    digest: ""       # sha256:...; wins over the tag when set
     pullPolicy: IfNotPresent
   replicaCount: 1
   # JSON map tier -> backend, e.g.
