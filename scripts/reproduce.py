@@ -262,6 +262,10 @@ CAMPAIGN_RECORDS = [
     # infra cost: the corrected controller oscillates (8-24 replicas in
     # tier_mixed, changes at most steps) -- printed beside its cost win.
     ("churn_wave4_calibrated.py", [], "CHURN_WAVE4_CALIBRATED.md"),
+    # Audit 2026-09-26: B1/B1' replica-only ran t00 on the largest tier with no
+    # cache (the WL-H2 probe's leftover; fixed in prepare_live_ai_knobs). Derived
+    # from the per-run exports; says which verdict readings it invalidates.
+    ("erratum_wave4_replica_only.py", [], "ERRATUM_WAVE4_REPLICA_ONLY.md"),
     # WL-H3' (PREREG_WAVE4_SIM_TRANSFER): the simulator with its plant fitted
     # from the B1' evidence under a frozen rule, five arms x four cells x 3
     # reps, against a five-arm published-plant control. Rebuilds from the

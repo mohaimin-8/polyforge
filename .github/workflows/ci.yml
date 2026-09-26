@@ -286,11 +286,21 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install test dependencies
-        run: pip install pytest
+        run: pip install pytest pyyaml duckdb
       - name: No frozen rule was touched after its result existed
         run: python scripts/check_preregs.py
       - name: The gate itself can fail
         run: python -m pytest scripts/test_check_preregs.py -q
+      # Audit 2026-09-26: the rule above never compared a protocol with when
+      # its campaign RAN. On a clean clone only committed run exports carry
+      # run times (the DuckDBs are on Zenodo), so CI judges the live
+      # campaigns and the archive tier judges the rest.
+      - name: Every campaign ran after its protocol existed
+        if: always()
+        run: python scripts/check_prereg_timing.py
+      - name: The timing gate itself can fail
+        if: always()
+        run: python -m pytest scripts/test_check_prereg_timing.py -q
       # Same full history: the thesis-drift report dates every record and
       # document from git, and must be the list a fresh build produces.
       - name: The thesis-drift report is current

@@ -612,3 +612,28 @@ class HeadroomCalibrationServiceTests(unittest.TestCase):
         d = {"rps": {"crud_read": 20.0}, "crud_base_ms": 50.0, "realized_p95_ms": {}}
         core.plan({"tenants": [tenant("a", demand=d)]})
         self.assertEqual(core._controller.capacity_scale["a"], 1.0)
+
+
+class SolverModePlumbingTests(unittest.TestCase):
+    """Audit 2026-09-26: the live planner never set anchor_moves, so every live
+    campaign ran the unanchored controller (the +/-4-replica clamp defect the
+    simulator's quotable arm fixed). Both modes are opt-in; default = published."""
+
+    def _controller(self, core):
+        core.plan({"tenants": [tenant("a"), tenant("b")]})
+        return core._controller
+
+    def test_default_is_the_published_solver(self):
+        ctl = self._controller(PlannerCore())
+        self.assertFalse(ctl.anchor_moves)
+        self.assertFalse(ctl.converge_sweeps)
+
+    def test_anchored_convergent_solver_is_selectable(self):
+        ctl = self._controller(PlannerCore(anchor_moves=True, converge_sweeps=True))
+        self.assertTrue(ctl.anchor_moves)
+        self.assertTrue(ctl.converge_sweeps)
+        self.assertTrue(ctl.last_converged)
+
+    def test_convergence_without_anchoring_fails_at_boot(self):
+        with self.assertRaises(ValueError):
+            PlannerCore(converge_sweeps=True)

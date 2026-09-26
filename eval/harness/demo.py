@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 import simulate  # research/jcac_sim via harness sys.path
 
 from . import workloads
-from .systems import SYSTEMS, global_mix_transform, lru_miss_cost_factor, tuned_params
+from .systems import SYSTEMS, base_params, global_mix_transform, lru_miss_cost_factor
 
 #: The default cast: the no-ops floor, the industry norm, and PolyForge.
 DEFAULT_SYSTEMS = ("static", "hpa", "jcac")
@@ -88,8 +88,7 @@ class Comparison:
 
 def _run_system(name: str, tenant_ids, buckets, configs, limits, seed: int) -> SystemOutcome:
     spec = SYSTEMS[name]
-    params = dict(tuned_params().get(spec.controller, {}))
-    params.update(spec.params)
+    params = base_params(spec)
     if spec.seeded:
         params["seed"] = seed
     started = time.time()

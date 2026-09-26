@@ -188,7 +188,10 @@ def record(con: duckdb.DuckDBPyConnection, run: RunSpec, status: str, attempts: 
                 run.run_id, run.experiment, run.backend, run.system, run.workload,
                 run.tenant_mix, run.cluster_size, run.rep, run.seed, run.steps,
                 status, attempts, outcome.get("wall_s"), outcome.get("tenants"),
-                error, HARNESS_VERSION, datetime.now(timezone.utc),
+                # Naive UTC on purpose: DuckDB converts an AWARE datetime to
+                # the session's local time before storing it in a TIMESTAMP
+                # column, which is how 1.0.0 rows came to hold host-local time.
+                error, HARNESS_VERSION, datetime.now(timezone.utc).replace(tzinfo=None),
             ],
         )
         con.execute("DELETE FROM metrics WHERE run_id = ?", [run.run_id])

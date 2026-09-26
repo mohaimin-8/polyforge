@@ -469,3 +469,92 @@ def test_replica_sampler_keeps_its_cadence_when_kubectl_is_slow(monkeypatch):
     # the wall-clock schedule gives close to 10 (back-to-back calls while overrunning)
     assert len(s.samples) >= 8, len(s.samples)
     assert s.failures == 0
+
+
+# --- knob posture after the WL-H2 preflight (audit 2026-09-26, CRITICAL-1) ---
+#
+# The preflight's last write pins its probe tenant to the LARGEST tier with the
+# cache at 0 MB. For non-operator arms nothing restored it: B1/B1' replica-only
+# ran one tenant of eight on the large tier with no cache (2,988 large-tier
+# requests in joint_stress where every other arm sent the probe's 12). The
+# defaults must therefore be pushed AFTER the probe, and read back.
+
+def _recorder():
+    calls = []
+
+    class _Paused:
+        def __init__(self, run):
+            self.run = run
+
+        def __enter__(self):
+            calls.append("pause")
+
+        def __exit__(self, *exc):
+            calls.append("resume")
+            return False
+
+    fakes = dict(
+        preflight=lambda gw, tid, key, wd: calls.append(("preflight", tid)),
+        push_defaults=lambda gw, tids: calls.append(("push", tuple(tids))),
+        verify=lambda gw, tids: calls.append(("verify", tuple(tids))),
+        paused=_Paused,
+    )
+    return calls, fakes
+
+
+def test_non_operator_arm_gets_defaults_after_the_preflight(tmp_path):
+    calls, fakes = _recorder()
+    run = _run(system="replica-only")
+    cb.prepare_live_ai_knobs(run, "http://gw", ["t00", "t01"],
+                             {"t00": "k0", "t01": "k1"}, tmp_path, **fakes)
+    assert calls == ["pause", ("preflight", "t00"), "resume",
+                     ("push", ("t00", "t01")), ("verify", ("t00", "t01"))]
+
+
+def test_operator_arm_is_not_given_the_fixed_defaults(tmp_path):
+    # Operator arms take their knobs from Policy CRs; the reconciler re-pushes
+    # them when it resumes, so a fixed-default push would be wrong here.
+    calls, fakes = _recorder()
+    run = _run(system="tier-only")
+    cb.prepare_live_ai_knobs(run, "http://gw", ["t00"], {"t00": "k0"},
+                             tmp_path, **fakes)
+    assert calls == ["pause", ("preflight", "t00"), "resume"]
+
+
+def test_verify_default_knobs_rejects_the_probe_leftover():
+    leftover = {"t00": {"model_tier": "large", "cache_size_mb": 0},
+                "t01": {"model_tier": "small", "cache_size_mb": 128}}
+    with pytest.raises(RuntimeError, match="t00"):
+        cb.verify_default_knobs("http://gw", ["t00", "t01"],
+                                fetch=lambda gw, tid: leftover[tid])
+
+
+def test_verify_default_knobs_accepts_the_initial_world():
+    ok = {"model_tier": "small", "cache_size_mb": 128}
+    cb.verify_default_knobs("http://gw", ["t00", "t01"],
+                            fetch=lambda gw, tid: ok)
+
+
+# --- per-run evidence holds only that run's files (audit 2026-09-26, HIGH-4) ---
+#
+# A failed run that never produced eval-export.json inherited the previous
+# run's copy from the shared evidence directory: B1' replica-only crud_bursty
+# rep1 carried files byte-identical to jcac tier_mixed rep0, and
+# CHURN_WAVE4_CALIBRATED printed jcac's trajectory under replica-only's name.
+
+def test_failed_run_does_not_inherit_the_previous_runs_export(tmp_path, monkeypatch):
+    monkeypatch.setattr(cb, "host_facts", lambda: {"host": "test"})
+    workdir, shared, per_run = tmp_path / "wd", tmp_path / "shared", tmp_path / "run"
+    workdir.mkdir()
+    shared.mkdir()
+    (workdir / "k6-summary.json").write_text('{"this": "run"}', encoding="utf-8")
+    (shared / "eval-export.json").write_text('{"previous": "run"}', encoding="utf-8")
+
+    cb._preserve_evidence(workdir, shared, None, per_run=per_run)
+
+    assert (per_run / "k6-summary.json").read_text(encoding="utf-8") == '{"this": "run"}'
+    assert (per_run / "host_facts.json").exists()
+    assert not (per_run / "eval-export.json").exists(), \
+        "a file this run never produced must not be filed under its name"
+    assert not (shared / "eval-export.json").exists(), \
+        "the shared 'latest run' view must not mix two runs either"
