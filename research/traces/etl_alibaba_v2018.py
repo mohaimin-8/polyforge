@@ -85,6 +85,11 @@ def _diurnal_probabilities() -> np.ndarray:
     return density / density.sum()
 
 
+# Above this share of jobs matching no deployment unit, the output would be
+# mostly one catch-all tenant, so normalize refuses rather than emits it.
+MAX_UNMAPPED_SHARE = 0.5
+
+
 def normalize(tasks: pd.DataFrame, containers: pd.DataFrame) -> pd.DataFrame:
     tasks = tasks.copy()
     known = set(containers["app_du"].unique())
@@ -101,6 +106,15 @@ def normalize(tasks: pd.DataFrame, containers: pd.DataFrame) -> pd.DataFrame:
         return f"unmapped_{parts[0] if parts else 'job'}"
 
     tasks["tenant_id"] = tasks["job_name"].map(tenant_for)
+    # Real v2018 job names (`j_<id>`) match no unit in this synthetic-shape
+    # rule, and every job used to fall into ONE `unmapped_j` tenant: a
+    # single-tenant trace under a multi-tenant name (audit 2026-09-26).
+    unmapped = float(tasks["tenant_id"].str.startswith("unmapped_").mean()) if len(tasks) else 0.0
+    if unmapped > MAX_UNMAPPED_SHARE:
+        raise ValueError(
+            f"{unmapped:.0%} of jobs are unmapped (ceiling {MAX_UNMAPPED_SHARE:.0%}); this "
+            "job-name rule fits only the synthetic shape -- the real trace needs the "
+            "DAG-prefix join documented in the README")
     tasks = tasks[(tasks["end_time"] > tasks["start_time"]) & (tasks["start_time"] > 0)]
     frame = pd.DataFrame({
         "timestamp_ms": tasks["start_time"].astype("int64") * 1000,
