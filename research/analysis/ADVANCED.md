@@ -26,7 +26,7 @@ A shared semantic cache leaks tenant prompt membership at AUC 0.88 from response
 
 - **Attack**: a shared semantic cache leaks tenant prompt membership at AUC **0.88** from response time alone.
 - **Defense**: PolyForge's per-tenant cache returns the attacker to chance (AUC **0.50**), eliminating essentially all (100%) of the exploitable signal above chance. The Go invariant behind this is `TestCacheGivesNoCrossTenantHit` (internal/ai/gateway).
-- **Cost of isolation**: naive equal splitting loses 29% of the aggregate hit rate; the joint planner's demand-proportional sizing cuts that to 24% (recovering 18% of the penalty). Security and efficiency are not in opposition when the controller sizes caches by demand.
+- **Cost of isolation**: naive equal splitting loses 29% of the aggregate hit rate; the joint planner's demand-proportional sizing cuts that to 24% (recovering 18% of the penalty), so isolation still costs 24% of the hit rate. The proportional split gives the largest tenant 1,725 MB, above the model's 1,024 MB top cache level; capped there and re-split, it recovers 19%, so the figure is not flattered by the infeasible allocation (audit 2026-09-26).
 
 This is a novel framing: prior semantic-cache work optimizes hit rate; treating the shared cache as a **cross-tenant covert channel** and quantifying the isolation/efficiency trade-off is, to our knowledge, new — and PolyForge's W28 per-tenant design already implements the defense.
 

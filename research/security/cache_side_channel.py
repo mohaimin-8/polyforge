@@ -170,11 +170,38 @@ def run_attack(scenario: str, warm_fraction: float, probes: int, seed: int,
     )
 
 
+# The isolation-cost scenario: a whale and seven minnows sharing 4 GB.
+ISOLATION_DEMAND = [8.0, 4.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+ISOLATION_TOTAL_MB = 4096.0
+# The model's largest cache level (research/jcac_sim/model.py CACHE_LEVELS_MB).
+TOP_CACHE_MB = 1024.0
+
+
 def _agg_hit_rate(mb: float) -> float:
     return CACHE_HIT_MAX * mb / (mb + CACHE_HALF_MB)
 
 
-def isolation_cost(total_mb: float, n_tenants: int, demand_shares: list[float]) -> dict:
+def capped_split(total_mb: float, shares: list[float], cap_mb: float) -> list[float]:
+    """`total_mb` split in proportion to `shares`, no pool above `cap_mb`:
+    a capped tenant's excess is re-split among the uncapped ones."""
+    alloc = [0.0] * len(shares)
+    free, left = set(range(len(shares))), total_mb
+    while free and left > 1e-9:
+        weight = sum(shares[i] for i in free)
+        over = [i for i in free if shares[i] / weight * left > cap_mb - alloc[i]]
+        if not over:
+            for i in free:
+                alloc[i] += shares[i] / weight * left
+            break
+        for i in over:
+            left -= cap_mb - alloc[i]
+            alloc[i] = cap_mb
+            free.discard(i)
+    return alloc
+
+
+def isolation_cost(total_mb: float, n_tenants: int, demand_shares: list[float],
+                   cap_mb: float | None = None) -> dict:
     """Cost of isolation, and PolyForge's recovery of it.
 
     - shared:   one pool of `total_mb`, hit rate on the full pool.
@@ -182,12 +209,18 @@ def isolation_cost(total_mb: float, n_tenants: int, demand_shares: list[float]) 
     - polyforge: total_mb split in proportion to each tenant's demand, the
       joint planner's cache-sizing behavior — big talkers get big pools,
       so the weighted hit rate stays close to shared.
+
+    `cap_mb` bounds each pool (audit 2026-09-26: the uncapped split gives the
+    largest tenant 1,725 MB, above the model's 1,024 MB top cache level, an
+    allocation the controller cannot make). None keeps the published split.
     """
     shared = _agg_hit_rate(total_mb)
     equal_each = total_mb / n_tenants
     equal = _agg_hit_rate(equal_each)
     shares = [s / sum(demand_shares) for s in demand_shares]
-    poly = sum(w * _agg_hit_rate(max(1.0, w * total_mb)) for w in shares)
+    pools = ([w * total_mb for w in shares] if cap_mb is None
+             else capped_split(total_mb, shares, cap_mb))
+    poly = sum(w * _agg_hit_rate(max(1.0, mb)) for w, mb in zip(shares, pools))
     return {
         "total_mb": total_mb, "n_tenants": n_tenants,
         "shared_hit_rate": round(shared, 4),
@@ -242,8 +275,8 @@ def defense_frontier(probes: int, seed: int, worst_wf: float = 0.9) -> list[dict
             "latency_benefit_cost": latency_benefit_cost(d, probes, seed),
             "hits_retained": round(1.0 - q, 4),
         })
-    demand = [8.0, 4.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-    cost = isolation_cost(total_mb=4096.0, n_tenants=len(demand), demand_shares=demand)
+    demand = ISOLATION_DEMAND
+    cost = isolation_cost(total_mb=ISOLATION_TOTAL_MB, n_tenants=len(demand), demand_shares=demand)
     iso_auc = run_attack("per_tenant", worst_wf, probes, seed).auc
     for name, penalty in (("partition_equal", cost["naive_isolation_penalty"]),
                           ("partition_polyforge", cost["polyforge_penalty"])):
@@ -278,8 +311,8 @@ def main() -> None:
     shared_auc = max(row["auc"] for row in attack_rows if row["scenario"] == "shared")
     iso_auc = max(row["auc"] for row in attack_rows if row["scenario"] == "per_tenant")
 
-    demand = [8.0, 4.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0]  # a whale + minnows
-    cost = isolation_cost(total_mb=4096.0, n_tenants=len(demand), demand_shares=demand)
+    demand = ISOLATION_DEMAND  # a whale + minnows
+    cost = isolation_cost(total_mb=ISOLATION_TOTAL_MB, n_tenants=len(demand), demand_shares=demand)
 
     frontier_rows = defense_frontier(args.probes, args.seed)
 
