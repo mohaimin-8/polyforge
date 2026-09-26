@@ -120,6 +120,9 @@ class TestSystems:
             # replica layer at the tuned target_rho (the published ones ran
             # the 0.6 default; see systems.AS_RUN_UNTUNED).
             "jcac_nojoint_tuned", "jcac_nojoint_v2_tuned",
+            # 2026-09-26 audit, PREREG_RETUNED: the layered stack with its
+            # replica layer re-tuned per cluster size (tuned_arms.yaml).
+            "jcac_nojoint_v2_retuned",
         }
 
     def test_lru_factor_comes_from_w28_data(self):
@@ -1601,6 +1604,93 @@ class TestTunedParameterResolution:
         assert not silent, f"arms with no tuned grid and no declaration: {silent}"
         for name, reason in AS_RUN_UNTUNED.items():
             assert name in SYSTEMS and reason.strip(), name
+
+
+class TestPerSizeRetunedArms:
+    """Audit 2026-09-26, Phase 3: the FAIR_J comparators re-tuned as arms at
+    every cluster size (baselines/tune_arms.py -> tuned_arms.yaml)."""
+
+    RETUNED = {"hpa_fair_retuned": "hpa_fair", "keda_fair_retuned": "keda_fair",
+               "jcac_nojoint_v2_retuned": "jcac_nojoint_v2_tuned"}
+    SAME = ("controller", "params", "gamma", "lru_eviction", "blind_classifier", "seeded",
+            "knob_freeze", "static_cache_mb", "beta", "tuned_from")
+
+    def test_a_retuned_arm_is_its_source_arm_but_for_the_parameters(self):
+        for arm, source in self.RETUNED.items():
+            for attr in self.SAME:
+                assert getattr(SYSTEMS[arm], attr) == getattr(SYSTEMS[source], attr), (arm, attr)
+            assert SYSTEMS[arm].tuned_arm == source
+
+    def test_each_size_reads_its_own_tuned_values(self):
+        from harness.systems import tuned_arms
+
+        table = tuned_arms()
+        for arm, source in self.RETUNED.items():
+            for size in ("small", "medium", "large"):
+                expected = {**sim_backend.base_params(SYSTEMS[source]), **table[source][size]}
+                assert sim_backend.base_params(SYSTEMS[arm], size) == expected, (arm, size)
+
+    def test_a_retuned_arm_without_a_cluster_size_fails_loudly(self):
+        with pytest.raises(ValueError, match="needs the cluster size"):
+            sim_backend.base_params(SYSTEMS["hpa_fair_retuned"])
+        with pytest.raises(ValueError, match="no hpa_fair entry"):
+            sim_backend.base_params(SYSTEMS["hpa_fair_retuned"], "gigantic")
+
+    def test_published_arms_ignore_the_per_size_table(self):
+        for source in self.RETUNED.values():
+            assert (sim_backend.base_params(SYSTEMS[source], "small")
+                    == sim_backend.base_params(SYSTEMS[source]))
+
+    def test_tune_arms_hands_the_engine_what_execute_hands_it(self, monkeypatch):
+        """tune_arms.py claims to tune each arm AS THE HARNESS RUNS IT: for
+        every tuned arm, the engine call it makes must carry the same
+        controller and the same non-default settings as sim_backend.execute's."""
+        import inspect
+
+        monkeypatch.syspath_prepend(str(EVAL_DIR / "baselines"))
+        import tune_arms
+
+        defaults = {k: p.default for k, p in inspect.signature(sim_backend.simulate.run).parameters.items()
+                    if p.default is not inspect.Parameter.empty}
+        per_run = {"configs", "limits", "collect_rows", "jitter_seed"}
+        calls = []
+
+        def fake_run(controller, tenant_ids, buckets, **kwargs):
+            calls.append((controller, {k: v for k, v in kwargs.items()
+                                       if k not in per_run and v != defaults.get(k)}))
+            raise RuntimeError("stop")
+
+        monkeypatch.setattr(sim_backend.simulate, "run", fake_run)
+        assert tune_arms.tune.simulate.run is fake_run
+        for arm in tune_arms.ARMS:
+            spec = ExperimentSpec(name="t", backend="sim", systems=[arm], workloads=["crud_bursty"],
+                                  tenant_mixes=["uniform"], cluster_sizes=["medium"], reps=1, steps=4)
+            with pytest.raises(RuntimeError, match="stop"):
+                sim_backend.execute(expand(spec)[0])
+            with pytest.raises(RuntimeError, match="stop"):
+                tune_arms.score_arm(arm, {}, "medium")
+            assert calls[-2] == calls[-1], arm
+        assert any(kw.get("initial_cache_mb") == 512 for _, kw in calls)
+
+    def test_the_sim_backend_passes_the_runs_cluster_size(self, monkeypatch):
+        from harness.config import RunSpec
+        from harness.systems import tuned_arms
+
+        seen = {}
+
+        def fake_run(controller, *args, controller_params=None, **kwargs):
+            seen["params"] = controller_params
+            raise RuntimeError("stop")
+
+        monkeypatch.setattr(sim_backend.simulate, "run", fake_run)
+        spec = ExperimentSpec(name="t", backend="sim", systems=["hpa_fair_retuned"],
+                              workloads=["crud_bursty"], tenant_mixes=["uniform"],
+                              cluster_sizes=["large"], reps=1, steps=4)
+        run = expand(spec)[0]
+        assert isinstance(run, RunSpec)
+        with pytest.raises(RuntimeError, match="stop"):
+            sim_backend.execute(run)
+        assert seen["params"]["target_rho"] == tuned_arms()["hpa_fair"]["large"]["target_rho"]
 
 
 def test_firm_hold_is_firm_at_its_tuned_grid_with_the_hold_tie_break():

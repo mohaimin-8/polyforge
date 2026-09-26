@@ -86,9 +86,10 @@ class Comparison:
         }
 
 
-def _run_system(name: str, tenant_ids, buckets, configs, limits, seed: int) -> SystemOutcome:
+def _run_system(name: str, tenant_ids, buckets, configs, limits, seed: int,
+                cluster_size: str) -> SystemOutcome:
     spec = SYSTEMS[name]
-    params = base_params(spec)
+    params = base_params(spec, cluster_size)
     if spec.seeded:
         params["seed"] = seed
     started = time.time()
@@ -128,7 +129,8 @@ def compare(systems: tuple[str, ...] = DEFAULT_SYSTEMS, baseline: str = "hpa",
 
     comparison = Comparison(scenario=spec, tenants=len(tenant_ids), baseline=baseline)
     for name in systems:
-        outcome = _run_system(name, tenant_ids, buckets, configs, limits, spec["seed"])
+        outcome = _run_system(name, tenant_ids, buckets, configs, limits, spec["seed"],
+                              spec["cluster_size"])
         comparison.outcomes.append(outcome)
         if on_progress:
             on_progress(outcome)

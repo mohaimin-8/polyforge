@@ -73,6 +73,7 @@ def eviction_sensitivity_band() -> dict[str, float]:
 
 
 TUNED_PATH = Path(__file__).resolve().parents[1] / "baselines" / "tuned.yaml"
+TUNED_ARMS_PATH = Path(__file__).resolve().parents[1] / "baselines" / "tuned_arms.yaml"
 
 
 def tuned_params() -> dict:
@@ -86,13 +87,31 @@ def tuned_params() -> dict:
     return yaml.safe_load(TUNED_PATH.read_text(encoding="utf-8")) or {}
 
 
-def base_params(spec: "SystemSpec") -> dict:
+def tuned_arms() -> dict:
+    """Per-arm, per-cluster-size best-of-grid parameters (tune_arms.py writes
+    tuned_arms.yaml). Read only by arms that declare `tuned_arm`."""
+    if not TUNED_ARMS_PATH.exists():
+        return {}
+    import yaml
+
+    return yaml.safe_load(TUNED_ARMS_PATH.read_text(encoding="utf-8")) or {}
+
+
+def base_params(spec: "SystemSpec", cluster_size: str | None = None) -> dict:
     """The arm's controller parameters: its best-of-grid values from
-    tuned.yaml, then the arm's own overrides. The grid entry is found by
-    `spec.tuned_from` when set, else by the controller name -- the published
+    tuned.yaml, then (for an arm declaring `tuned_arm`) the per-size values
+    from tuned_arms.yaml, then the arm's own overrides. The grid entry is found
+    by `spec.tuned_from` when set, else by the controller name -- the published
     lookup, under which wrapper and subclass controllers find no entry and run
     their constructor defaults (declared per arm in AS_RUN_UNTUNED)."""
     params = dict(tuned_params().get(spec.tuned_from or spec.controller, {}))
+    if spec.tuned_arm is not None:
+        if cluster_size is None:
+            raise ValueError(f"arm tuned per size ({spec.tuned_arm}) needs the cluster size")
+        per_size = tuned_arms().get(spec.tuned_arm, {}).get(cluster_size)
+        if per_size is None:
+            raise ValueError(f"tuned_arms.yaml has no {spec.tuned_arm} entry for {cluster_size!r}")
+        params.update(per_size)
     params.update(spec.params)
     return params
 
@@ -137,6 +156,7 @@ class SystemSpec:
         beta: float | None = None,
         description: str = "",
         tuned_from: str | None = None,
+        tuned_arm: str | None = None,
     ):
         self.controller = controller
         self.params = params or {}
@@ -174,6 +194,10 @@ class SystemSpec:
         # without this it silently runs the constructor default -- audit
         # 2026-09-26, HIGH-3. `sim_backend.base_params` resolves it.
         self.tuned_from = tuned_from
+        # Which tuned_arms.yaml entry supplies per-cluster-size parameters
+        # (tune_arms.py tunes an ARM as the harness runs it, at every size).
+        # None, as for every published arm, reads tuned.yaml alone.
+        self.tuned_arm = tuned_arm
 
 
 # Controllers with no tuning grid by design: JCAC's weights are the published
@@ -591,6 +615,26 @@ SYSTEMS: dict[str, SystemSpec] = {
         "layered_v2", tuned_from="hpa",
         description="jcac_nojoint_v2 with its HPA replica layer at the tuned "
                     "target_rho (audit 2026-09-26)",
+    ),
+    # Audit 2026-09-26, Phase 3 (TUNING_EXTENDED.md): the published optima
+    # were grid edges and depend on the cluster size. These are the FAIR_J
+    # comparators re-tuned AS ARMS at every size, over grids whose optima are
+    # interior (baselines/tune_arms.py -> tuned_arms.yaml). Controller, cache
+    # and miss-cost are the `tuned_arm` arm's; only the parameters differ.
+    "hpa_fair_retuned": SystemSpec(
+        "hpa", static_cache_mb=512, tuned_arm="hpa_fair",
+        description="hpa_fair with target_rho re-tuned per cluster size over an "
+                    "interior-optimum grid (audit 2026-09-26)",
+    ),
+    "keda_fair_retuned": SystemSpec(
+        "keda", static_cache_mb=512, tuned_arm="keda_fair",
+        description="keda_fair with rps_per_replica re-tuned per cluster size over "
+                    "an interior-optimum grid (audit 2026-09-26)",
+    ),
+    "jcac_nojoint_v2_retuned": SystemSpec(
+        "layered_v2", tuned_from="hpa", tuned_arm="jcac_nojoint_v2_tuned",
+        description="jcac_nojoint_v2_tuned with its replica layer's target_rho "
+                    "re-tuned per cluster size (audit 2026-09-26)",
     ),
     "gptcache_v2_tuned": SystemSpec(
         "gptcache_v2", lru_eviction=True, tuned_from="gptcache",
