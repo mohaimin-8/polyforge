@@ -112,6 +112,10 @@ CAMPAIGN_RECORDS = [
     # while the plant runs five altered ones. Rebuilds from the committed
     # exports metrics_matrix_sm_<plant>.csv.gz.
     ("analysis_structural_mismatch.py", [], "RESULTS_STRUCTURAL_MISMATCH.md"),
+    # PREREG_RETUNED (audit Phase 3, confirmatory): composite J against the
+    # FAIR_J comparators re-tuned per cluster size (tuned_arms.yaml). Rebuilds
+    # from the committed export metrics_matrix_retuned.csv.gz.
+    ("analysis_retuned.py", [], "RESULTS_RETUNED.md"),
     # Audit 2026-09-26, EXPLORATORY: the published tuning optima were grid
     # edges; rebuilds from the committed sweeps in eval/baselines.
     ("analysis_tuning_extended.py", [], "TUNING_EXTENDED.md"),
