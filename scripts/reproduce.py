@@ -151,6 +151,10 @@ CAMPAIGN_RECORDS = [
     ("effect_sizes.py", [], "EFFECT_SIZES.md"),
     ("objective_form.py", [], "OBJECTIVE_FORM.md"),
     ("planner_cells_dealias.py", [], "PLANNER_CELLS_DEALIAS.md"),
+    # Audit 2026-09-26, EXPLORATORY: planning-cell fairness paired on the same
+    # portfolio; rebuilds from the committed eval/results/planner_cells_paired.csv
+    # (`--measure` re-plans, minutes -- never run by the gate).
+    ("planner_cells_paired.py", [], "PLANNER_CELLS_PAIRED.md"),
     ("analysis_vtc.py", [], "VTC_FAIRNESS.md"),
     ("coordination_gap.py", ["--anchored"], "COORD_GAP_ANCHORED.md"),
     ("sensitivity_j.py", [], "SENSITIVITY_J.md"),

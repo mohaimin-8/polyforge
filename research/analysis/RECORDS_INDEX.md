@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 83 |
-| regenerated and compared | 68 |
+| records | 84 |
+| regenerated and compared | 69 |
 | outside the gate, reason stated | 15 |
 | outside the gate, no entry | 0 |
 
@@ -39,6 +39,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `PHASE7_ORDINAL.md` | - | yes |
 | `PLANNER_CELLS.md` | PS-H1, PS-H2, PS-H3 | no, reason stated |
 | `PLANNER_CELLS_DEALIAS.md` | PF-H1, PF-H2, PS-H1, PS-H2 | yes |
+| `PLANNER_CELLS_PAIRED.md` | - | yes |
 | `PLANNER_SCALING.md` | - | no, reason stated |
 | `PSEUDO_TENANT.md` | PT-H1, PT-H2, PT-H3 | no, reason stated |
 | `REANALYSIS_MATRIX.md` | - | yes |
