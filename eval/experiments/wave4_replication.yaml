@@ -1,0 +1,27 @@
+# Phase 4 of the 2026-09-26 audit: the live three-knob comparison replicated
+# on independent seeds, with a held-out cell and a tuned live HPA.
+# Pre-registration: research/analysis/PREREG_WAVE4_REPLICATION.md -- read it
+# before running; this file is only the matrix.
+#
+# 6 arms x 3 cells x 5 reps = 90 runs, one sitting, the runner resumes.
+# shared_seeds: every arm in a (cell, rep) sees identical demand; the five
+# reps are five independent seeds (B1' paired arms on different demand and
+# its rep 2 was one more window of the same design).
+#
+# RUN REQUIREMENTS -- live-AI plane (as B1'):
+#   POLYFORGE_EVAL_LIVE_AI=1  POLYFORGE_EVAL_SHARED_PG=1
+#   POLYFORGE_EVAL_TIER_BACKENDS='<the line b1_tier_host.sh printed>'
+#   POLYFORGE_EVAL_FINE_BUCKET_SECONDS=10
+# Evidence per run under eval/results/wave4_replication_evidence/runs/.
+name: wave4_replication
+backend: cluster
+steps: 30
+reps: 5
+shared_seeds: true
+systems: [jcac-calibrated, jcac, replica-only-tuned, replica-only, cache-only, tier-only]
+workloads: [joint_stress, agentic, ai_cacheable]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/wave4_replication.duckdb
+retries: 0
+timeseries_reps: 0
