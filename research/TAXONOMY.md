@@ -48,7 +48,16 @@ held-out seeded synthetic set (500 windows, balanced, contaminated):
 
 Reproduce: `go run ./cmd/classifier-train -out .` (artifacts:
 `artifacts/classifier-model.json`, `research/results/model_selection.csv`;
-same seeds → identical bytes).
+same seeds → identical bytes, except the inference-latency column, which is
+wall-clock timing).
+
+The rule-baseline row is scored by `predictWithRules` in
+`cmd/classifier-train`, an adapter over the feature vector that cannot see the
+raw RPS spread and substitutes a coefficient-of-variation rule. It is not the
+live fallback (`classifier.Classify`, on raw telemetry windows). On the same
+500 held-out windows the live fallback scores **0.830**, not 0.888, and agrees
+with the adapter on 94.2% of them (pinned in
+`cmd/classifier-train/main_test.go`; audit 2026-09-26).
 
 Read the numbers honestly: window-majority labels over aggregate features
 remain nearly linearly separable, so a perfect synthetic score says the
