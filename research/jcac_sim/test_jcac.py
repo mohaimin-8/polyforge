@@ -754,9 +754,6 @@ class SimulateTests(unittest.TestCase):
         self.assertIn("cache_hit_rate", r.rows[0])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class VTCReplicaTests(unittest.TestCase):
     """VTC-replica (session 15): least-weighted-service-first pool division
@@ -1960,3 +1957,10 @@ class BeliefFormTests(unittest.TestCase):
     def test_an_unknown_belief_form_is_refused(self):
         with self.assertRaises(ValueError):
             JCACController({"t": TenantConfig(tenant_id="t")}, belief_form="measured")
+
+
+# At the END: placed mid-file (it used to sit after the first 68 tests), a
+# direct `python test_jcac.py` ran only the classes defined above it and
+# skipped the rest (audit 2026-09-26). Discovery was never affected.
+if __name__ == "__main__":
+    unittest.main()
