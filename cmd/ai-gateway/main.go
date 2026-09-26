@@ -28,6 +28,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"polyforge/internal/ai/agent"
+	"polyforge/internal/ai/egress"
 	"polyforge/internal/ai/embed"
 	"polyforge/internal/ai/gateway"
 	"polyforge/internal/redisopt"
@@ -252,15 +253,9 @@ func duckDuckGoSearch(ctx context.Context, query string) ([]agent.SearchResult, 
 	}
 	req.Header.Set("User-Agent", "polyforge-ai-gateway/0.1")
 	// Refuse redirects: the search host is fixed, and a 3xx to another host
-	// (an internal service, cloud metadata) must not be followed. Mirrors the
-	// gateway providers' egress guard.
-	client := &http.Client{
-		Timeout: 15 * time.Second,
-		CheckRedirect: func(r *http.Request, _ []*http.Request) error {
-			return fmt.Errorf("search egress guard: refusing redirect to %s", r.URL.Host)
-		},
-	}
-	resp, err := client.Do(req)
+	// (an internal service, cloud metadata) must not be followed. The shared
+	// egress guard, so any hardening added there reaches this call too.
+	resp, err := egress.Client(15 * time.Second).Do(req)
 	if err != nil {
 		return nil, err
 	}

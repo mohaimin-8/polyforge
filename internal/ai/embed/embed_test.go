@@ -98,3 +98,28 @@ func TestOpenAIEmbedderSurfacesAPIErrors(t *testing.T) {
 		t.Fatal("expected an error from a 429 response")
 	}
 }
+
+// Audit 2026-09-26 (HIGH): the embeddings client was a plain http.Client, so
+// an embeddings endpoint answering 302 to an internal host (cloud metadata, a
+// sibling service) had the gateway fetch it. It must refuse the redirect like
+// every other outbound client, and never reach the redirect target.
+func TestOpenAIEmbedderRefusesRedirect(t *testing.T) {
+	reached := false
+	internal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		reached = true
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{{"embedding": []float32{1}}}})
+	}))
+	defer internal.Close()
+	hostile := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, internal.URL+"/embeddings", http.StatusTemporaryRedirect)
+	}))
+	defer hostile.Close()
+
+	_, err := embed.NewOpenAI(hostile.URL, "", "m", 1).Embed(t.Context(), []string{"x"})
+	if err == nil {
+		t.Fatal("embedder followed a redirect; egress guard not active")
+	}
+	if reached {
+		t.Fatal("the redirect target was fetched")
+	}
+}
