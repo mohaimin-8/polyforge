@@ -231,3 +231,30 @@ func verifyViaJWKS(t *testing.T, keys []map[string]string, token string) {
 	}
 	t.Fatalf("kid %s not present in JWKS", kid)
 }
+
+// Audit 2026-09-26 (MEDIUM): Issue inserted refresh tokens and never pruned;
+// only Refresh did. A process that issues tokens but rarely refreshes them
+// kept every expired record for its whole life. Issue prunes too now, so the
+// map is bounded by the tokens still inside their TTL.
+func TestIssuePrunesExpiredRefreshTokens(t *testing.T) {
+	issuer := newTestIssuer(t)
+	start := time.Now()
+	issuer.now = func() time.Time { return start }
+	for i := 0; i < 50; i++ {
+		if _, err := issuer.Issue("acme", "read"); err != nil {
+			t.Fatalf("Issue: %v", err)
+		}
+	}
+	// Past every token's TTL and the prune interval, one more Issue must
+	// reclaim the 50 expired records.
+	issuer.now = func() time.Time { return start.Add(DefaultRefreshTTL + 11*time.Minute) }
+	if _, err := issuer.Issue("acme", "read"); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	issuer.mu.Lock()
+	live := len(issuer.refresh)
+	issuer.mu.Unlock()
+	if live != 1 {
+		t.Fatalf("refresh map holds %d records after the others expired, want 1", live)
+	}
+}

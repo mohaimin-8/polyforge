@@ -127,6 +127,10 @@ func (i *Issuer) Issue(tenantID, scope string) (TokenPair, error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
+	// Prune here as well as in Refresh: a process that issues tokens but
+	// rarely refreshes them otherwise keeps every expired record for its
+	// whole life (audit 2026-09-26).
+	i.pruneRefreshLocked(now)
 	access, err := i.signAccessTokenLocked(tenantID, scope, now)
 	if err != nil {
 		return TokenPair{}, err
