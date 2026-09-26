@@ -182,6 +182,41 @@ class TestResults:
         assert con.execute("SELECT count(*) FROM runs").fetchone()[0] == 1
         assert con.execute("SELECT count(*) FROM metrics").fetchone()[0] == 1
 
+    def test_every_attempt_is_kept_even_when_the_run_is_replaced(self, tmp_path):
+        """Audit 2026-09-26: INSERT OR REPLACE overwrote a failed attempt with
+        its retry, and `attempts` reset each invocation, so failure causes
+        were lost. The runs row still upserts; run_attempts only grows."""
+        con = self._db(tmp_path)
+        run = expand(tiny_spec())[0]
+        results.record(con, run, "failed", 2, None, error="boom",
+                       history=[(1, "failed", "boom-1"), (2, "failed", "boom")])
+        results.record(con, run, "valid", 1, sim_backend.execute(run),
+                       history=[(1, "valid", None)])
+        assert con.execute("SELECT count(*) FROM runs").fetchone()[0] == 1
+        rows = con.execute("SELECT attempt, outcome, error FROM run_attempts "
+                           "WHERE run_id = ? ORDER BY recorded_at, attempt", [run.run_id]).fetchall()
+        assert [(a, o) for a, o, _ in rows] == [(1, "failed"), (2, "failed"), (1, "valid")]
+        assert rows[0][2] == "boom-1"
+
+    def test_the_runner_reports_each_attempts_outcome(self, monkeypatch):
+        from harness import runner
+
+        calls = iter([RuntimeError("transient"), None])
+        run = expand(tiny_spec())[0]
+        real = sim_backend.execute
+
+        def flaky(r):
+            exc = next(calls)
+            if exc is not None:
+                raise exc
+            return real(r)
+
+        monkeypatch.setattr(runner, "execute_backend", flaky)
+        status, attempts, outcome, error, history = runner._attempt(run, retries=2)
+        assert (status, attempts, error) == ("valid", 2, None)
+        assert [(a, o) for a, o, _ in history] == [(1, "failed"), (2, "valid")]
+        assert "transient" in history[0][2]
+
     def test_failed_run_is_recorded_without_metrics(self, tmp_path):
         con = self._db(tmp_path)
         run = expand(tiny_spec())[0]

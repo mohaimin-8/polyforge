@@ -193,6 +193,20 @@ def test_malformed_backends_json_is_rejected(monkeypatch, tmp_path, capsys):
     assert "malformed" in capsys.readouterr().err
 
 
+def test_three_tiers_are_refused_with_the_pairwise_instruction(monkeypatch, tmp_path, capsys):
+    # Audit 2026-09-26: `--tiers small,mid,large` crashed with a bare
+    # ValueError from tuple unpacking. The probe contrasts exactly two tiers;
+    # a three-tier sitting runs it once per adjacent pair.
+    backends = json.dumps({t: {"kind": "openai", "base_url": "http://x/v1", "model": t}
+                           for t in ("small", "mid", "large")})
+    monkeypatch.setattr(sys, "argv", ["tunnel_preflight.py", "--backends", backends,
+                                      "--tiers", "small,mid,large",
+                                      "--report", str(tmp_path / "r.json")])
+    assert tp.main() == 1
+    err = capsys.readouterr().err
+    assert "exactly two tiers" in err and "mid,large" in err
+
+
 def test_slo_headroom_is_reported_and_warns_when_over_target(monkeypatch, tmp_path, stub, capsys):
     """The binding constraint on the free route is usually the premium AI SLO
     (2500 ms), not WL-H2's tier gap -- a path can keep the tiers separable
