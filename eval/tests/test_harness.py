@@ -1647,3 +1647,41 @@ def test_recorded_at_is_utc_whatever_the_session_timezone(tmp_path):
         [run.run_id]).fetchone()
     assert abs((got - before).total_seconds()) < 60
     assert version == HARNESS_VERSION and version >= "1.1.0"
+
+
+EVICTION_PARITY_ROW0_SEED = 1768606423  # the committed export's seed column, row 0
+
+
+class TestSharedSeeds:
+    """Audit 2026-09-26: run_identity hashed the SYSTEM into the seed, so arms in
+    the same cell saw different demand phases and arrival jitter, although
+    the paper says every system sees identical demand realisations.
+    `shared_seeds: true` derives the demand seed without the system."""
+
+    def test_existing_experiments_keep_their_run_ids_and_seeds(self):
+        # A committed row of matrix_eviction_parity (metrics_...csv.gz).
+        spec = load(EVAL_DIR / "experiments" / "matrix_eviction_parity.yaml")
+        assert not spec.shared_seeds
+        assert run_identity(spec, "jcac", "crud_bursty", "uniform", "small", 0) == \
+            ("32e4e6dd5a77bfd0", EVICTION_PARITY_ROW0_SEED)
+
+    def test_shared_seeds_give_every_arm_the_same_seed_and_distinct_ids(self):
+        spec = tiny_spec(systems=["jcac", "hpa_fair", "keda_fair"], shared_seeds=True)
+        runs = expand(spec)
+        by_cell = {}
+        for r in runs:
+            by_cell.setdefault((r.workload, r.tenant_mix, r.cluster_size, r.rep), set()).add(r.seed)
+        assert all(len(seeds) == 1 for seeds in by_cell.values())
+        assert len({r.run_id for r in runs}) == len(runs)
+
+    def test_shared_seeds_change_the_seed_of_an_otherwise_identical_spec(self):
+        a = run_identity(tiny_spec(), "jcac", "crud_bursty", "uniform", "small", 0)
+        b = run_identity(tiny_spec(shared_seeds=True), "jcac", "crud_bursty", "uniform", "small", 0)
+        assert a != b
+
+    def test_shared_seeds_give_arms_identical_demand(self):
+        spec = tiny_spec(systems=["hpa_fair", "keda_fair"], shared_seeds=True)
+        r1, r2 = [r for r in expand(spec) if r.rep == 0 and r.workload == spec.workloads[0]][:2]
+        b1 = workloads.build(r1.workload, r1.tenant_mix, r1.cluster_size, r1.seed, r1.steps)[1]
+        b2 = workloads.build(r2.workload, r2.tenant_mix, r2.cluster_size, r2.seed, r2.steps)[1]
+        assert b1 == b2
