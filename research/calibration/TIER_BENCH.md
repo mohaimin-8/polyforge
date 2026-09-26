@@ -538,14 +538,24 @@ hardware. It was not, and the reason is specific.
 
 | tier | engine | p95 ms | clause 3 (<2500) | rps | vs 64 rps base |
 |---|---|---|---|---|---|
-| mid | transformers | 2310.2 | PASS | 26.54 | 41.5% |
+| mid | transformers | 2363.8 | PASS | 13.74 | 21.5% |
 | **mid** | **vLLM 0.11.0** | **1901.9** | **PASS** | **6.84** | **10.7%** |
-| large | transformers | 3081.5 | FAIL | — | — |
+| large | transformers | 3193.3 | FAIL | — | — |
 | **large** | **vLLM 0.11.0** | **2068.7** | **PASS** | **4.85** | **7.6%** |
 
+*Corrected 2026-09-26 (audit). The transformers rows first published here
+were not like-for-like: `mid` showed the single-card MEAN (2310.2) as its p95
+(`tier_bench_1gpu.csv`: p95 2363.8) and the TWO-GPU throughput at batch 64
+(26.54 rps) against single-GPU vLLM (one GPU: 13.74 rps,
+`tier_bench_2gpu.csv`); `large` showed `mid`'s T4 ×2 mean (3081.5) as its p95
+(`tier_bench_t4.csv`: `large` p95 3193.3). Every clause-3 verdict is
+unchanged. The throughput gap is 2.0×, not 3.9× (transformers batch 64 vs
+vLLM's one 256-request batch).*
+
 **vLLM improves latency and destroys throughput.** It clears clause 3 on both
-tiers — including `large`, which transformers could not — and is **3.9x worse
-than transformers on throughput** for `mid`. That is not a configuration
+tiers — including `large`, which transformers could not — and is **2.0x worse
+than transformers on throughput** for `mid`, one GPU against one GPU (3.9x as
+first published, against a two-GPU transformers figure; corrected 2026-09-26). That is not a configuration
 accident; KV cache was ample (10.02 GiB, 875,296 tokens, *maximum concurrency
 427x*), so concurrency was never the limit.
 
