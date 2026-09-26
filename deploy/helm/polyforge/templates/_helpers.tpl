@@ -14,3 +14,14 @@ app.kubernetes.io/part-of: polyforge
 app.kubernetes.io/name: {{ include "polyforge.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/* An image reference: repository@digest when a digest is set (the digest
+release.yml signs), else repository:tag with the tag defaulting to the chart's
+appVersion. Pass (dict "image" <values.image> "appVersion" .Chart.AppVersion). */}}
+{{- define "polyforge.image" -}}
+{{- if .image.digest -}}
+{{- printf "%s@%s" .image.repository .image.digest -}}
+{{- else -}}
+{{- printf "%s:%s" .image.repository (default .appVersion .image.tag) -}}
+{{- end -}}
+{{- end }}

@@ -19,11 +19,19 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- end -}}
 
 {{- define "polyforge-operator.operatorImage" -}}
+{{- if .Values.operator.image.digest -}}
+{{- printf "%s@%s" .Values.operator.image.repository .Values.operator.image.digest -}}
+{{- else -}}
 {{- printf "%s:%s" .Values.operator.image.repository (default .Chart.AppVersion .Values.operator.image.tag) -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "polyforge-operator.plannerImage" -}}
+{{- if .Values.planner.image.digest -}}
+{{- printf "%s@%s" .Values.planner.image.repository .Values.planner.image.digest -}}
+{{- else -}}
 {{- printf "%s:%s" .Values.planner.image.repository (default .Chart.AppVersion .Values.planner.image.tag) -}}
+{{- end -}}
 {{- end -}}
 
 {{/* Name and key of the Secret holding the planner's shared bearer token —
