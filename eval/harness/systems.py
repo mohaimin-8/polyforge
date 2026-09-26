@@ -419,6 +419,15 @@ SYSTEMS: dict[str, SystemSpec] = {
                     "and tier fixed at the initial default (the prereg's "
                     "strongest single-knob reactive baseline)",
     ),
+    # Audit 2026-09-26: the live replica-only arm ran the chart's HPA
+    # defaults. Its tuned twin targets tuned.yaml's hpa utilization and holds
+    # JCAC's replica floor (cluster_backend.tuned_live_hpa_values). In the
+    # sim it is the tuned HPA, as `replica-only` already is.
+    "replica-only-tuned": SystemSpec(
+        "hpa", lru_eviction=True,
+        description="replica-only with the live HPA at the tuned target and "
+                    "JCAC's replica floor (audit 2026-09-26)",
+    ),
     "cache-only": SystemSpec(
         "jcac", knob_freeze=frozenset({"replicas", "tier"}),
         description="Wave 4 cache-only ablation: the joint MPC with replicas "

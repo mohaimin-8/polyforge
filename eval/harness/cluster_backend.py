@@ -39,7 +39,7 @@ import threading
 import time
 from pathlib import Path
 
-from model import TenantState, TIERS as MODEL_TIERS  # research/jcac_sim via harness sys.path
+from model import TenantConfig, TenantState, TIERS as MODEL_TIERS  # research/jcac_sim via harness sys.path
 
 from .config import RunSpec
 from . import histogram, workloads
@@ -241,6 +241,10 @@ HELM_VALUES_BY_SYSTEM = {
     "jcac-calibrated": {"planner.enabled": "true", "classifier.enabled": "true"},
     "jcac-calibrated-dwell": {"planner.enabled": "true", "classifier.enabled": "true"},
     "replica-only": {"planner.enabled": "false", "autoscaling.hpa.enabled": "true"},
+    # Audit 2026-09-26 (HIGH): `replica-only` runs the chart's HPA defaults
+    # (60% CPU, minReplicas 1). The tuned twin's target and floor depend on
+    # the run, so they are set in helm_values (tuned_live_hpa_values).
+    "replica-only-tuned": {"planner.enabled": "false", "autoscaling.hpa.enabled": "true"},
     "hpa": {"planner.enabled": "false", "autoscaling.hpa.enabled": "true"},
     "keda": {"planner.enabled": "false", "autoscaling.keda.enabled": "true"},
     "firm": {"planner.enabled": "false", "autoscaling.firm.enabled": "true"},
@@ -679,6 +683,22 @@ HELM_EVAL_BASE_VALUES = {
 }
 
 
+def tuned_live_hpa_values(n_tenants: int) -> dict[str, str]:
+    """The live HPA at the published tuned target and at JCAC's floor.
+
+    Target: the sim-tuned HPA utilization (tuned.yaml `hpa.target_rho`, 0.3)
+    as a CPU-utilization percentage -- a mapping, not a live tune; the sim's
+    rho is replica work-unit utilization, the live metric is pod CPU against
+    its request. Floor: one replica per tenant, the sum JCAC's Policies'
+    replicaMin reach, so neither arm can go lower than the other."""
+    from .systems import tuned_params
+
+    return {
+        "autoscaling.hpa.targetCPUUtilization": str(round(100 * tuned_params()["hpa"]["target_rho"])),
+        "autoscaling.hpa.minReplicas": str(n_tenants * TenantConfig(tenant_id="floor").replica_min),
+    }
+
+
 def _arm_knob_bounds(system: str, initial: "TenantState", size) -> tuple:
     """Per-arm Policy-CRD knob bounds for the Wave 4 live plane
     (PREREG_WAVE4_LIVE_PLANE.md §Arms). Returns
@@ -709,7 +729,7 @@ def _arm_knob_bounds(system: str, initial: "TenantState", size) -> tuple:
     frozen_c = (initial.cache_mb, initial.cache_mb)
     free_t = ("none", "large")
     frozen_t = (initial.tier, initial.tier)
-    if system == "replica-only":
+    if system in ("replica-only", "replica-only-tuned"):
         return free_r, frozen_c, frozen_t
     if system == "cache-only":
         return frozen_r, free_c, frozen_t
@@ -856,6 +876,7 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
         "replicaCount": str(n_tenants * TenantState().replicas),
         "autoscaling.hpa.maxReplicas": str(size.limits_replicas),
         **HELM_VALUES_BY_SYSTEM[run.system],
+        **(tuned_live_hpa_values(n_tenants) if run.system == "replica-only-tuned" else {}),
     }
     if EVAL_LIVE_AI:
         # The tierBackends JSON travels via the gw-values.yaml file (-f):
