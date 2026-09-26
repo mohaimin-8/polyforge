@@ -365,6 +365,7 @@ class JCACController:
     self-calibration may make the model humbler, never optimistic.
     """
 
+    MAX_SWEEPS = 50   # convergent solver's safety cap; `last_converged` reports hitting it
     CAP_LEARN = 0.15  # multiplicative step when projection was optimistic
     CAP_RECOVER = 0.02  # additive drift back toward trusting the model
     CAP_TOLERANCE = 0.02  # |realized - projected| below this is agreement
@@ -396,6 +397,7 @@ class JCACController:
         headroom_cap: float = 4.0,
         switch_penalty: float | None = None,
         replica_dwell_steps: int = 0,
+        converge_sweeps: bool = False,
     ):
         self.configs = configs
         # B1' follow-up (session 48): the corrected controller oscillated its
@@ -570,6 +572,26 @@ class JCACController:
         # N-tenant sweep recomputes the same (tenant, state) projection up to
         # N-1 times.
         self._project_memo: dict = {}
+        # Audit 2026-09-26 (THEORY_V2 Proposition 1): two FIXED sweeps do not
+        # end at a block-coordinate minimum -- a tenant visited before the last
+        # mover best-responded to that mover's OLD value. Measured on the
+        # published unanchored solver: 23 of 1,830 control cycles left a
+        # tenant a strictly better unilateral move. `converge_sweeps=True`
+        # sweeps until a full sweep changes no tenant and keeps the incumbent
+        # on ties, so each accepted move strictly lowers the shared potential
+        # (the objective is an exact potential when fairness weights are
+        # uniform, as in every campaign). A converged plan is then a best
+        # response for every tenant by construction: in the last sweep each
+        # tenant was re-optimised against others that did not move after it.
+        # It requires anchored moves: unanchored, each extra sweep re-centres
+        # the +/-2 clamp and convergence would compound the clamp defect
+        # (PREREG_MOVE_CLAMP) without bound. False = the published two sweeps.
+        if converge_sweeps and not anchor_moves:
+            raise ValueError("converge_sweeps requires anchor_moves=True")
+        self.converge_sweeps = converge_sweeps
+        self.last_sweeps = 0
+        self.last_converged: bool | None = None
+        self._last_plan_ctx: tuple | None = None
 
     def snapshot(self) -> dict:
         """Serializable planner state for failover (W31): per-tenant forecast
@@ -765,10 +787,19 @@ class JCACController:
         # both sweeps draw candidates from the interval-start lattice so
         # coordination cannot compound the per-interval actuation clamps.
         origin = dict(states) if self.anchor_moves else None
-        for _ in range(2):
+        sweeps, changed = 0, True
+        while changed if self.converge_sweeps else sweeps < 2:
+            changed = False
             for tid in self._sweep_order():
-                chosen[tid] = self._best_for_tenant(tid, chosen, horizons, origin,
-                                                    cost_horizons)
+                new = self._best_for_tenant(tid, chosen, horizons, origin, cost_horizons)
+                changed = changed or new != chosen[tid]
+                chosen[tid] = new
+            sweeps += 1
+            if sweeps >= self.MAX_SWEEPS:
+                break
+        self.last_sweeps = sweeps
+        self.last_converged = (not changed) if self.converge_sweeps else None
+        self._last_plan_ctx = (dict(chosen), horizons, origin, cost_horizons)
 
         if self.replica_dwell_steps:
             for tid, state in chosen.items():
@@ -924,93 +955,27 @@ class JCACController:
         # choice otherwise (published behavior, kept bit-identical).
         base = current if origin is None else origin[tid]
         budget_per_step = config.hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
-
         # Others' contributions are fixed during this tenant's move.
-        other_cost = other_obj = other_carbon = 0.0
-        other_satisfaction = []
-        others_cache = others_replicas = 0
-        for oid, ostate in chosen.items():
-            if oid == tid:
-                continue
-            cost, viol, obj = self._project(oid, ostate, horizons[oid])
-            if self.carbon_weight:
-                other_carbon += self._project_carbon(oid, ostate, horizons[oid])
-            if cost_horizons is not None:
-                cost = self._project(oid, ostate, cost_horizons[oid], 1)[0]
-            other_cost += cost
-            other_obj += obj
-            other_satisfaction.append(1.0 - viol)
-            others_cache += ostate.cache_mb
-            others_replicas += ostate.replicas
+        others = self._others(tid, chosen, horizons, cost_horizons)
+        others_replicas = others[5]
 
         best_state, best_score = current, float("inf")
-        for delta in DELTA_REPLICAS:
-            if delta and self._dwell_blocks(tid, delta):
+        incumbent_score = None
+        for candidate in self._lattice(tid, base):
+            score = self._candidate_score(tid, candidate, base, others, horizons,
+                                          cost_horizons, budget_per_step)
+            if score is None:
                 continue
-            for cache_mb in neighbor_cache_levels(base.cache_mb):
-                for tier in TIERS:
-                    # Per-tenant knob bounds: a pinned (min==max) cache or tier
-                    # removes every off-value candidate, so a cache-only /
-                    # tier-only ablation truly re-optimizes over the free knob
-                    # alone instead of planning jointly and being clamped at
-                    # actuation. Full-envelope bounds admit everything, so the
-                    # published campaigns enumerate the identical lattice (R4).
-                    if not config.knob_admits(cache_mb, tier):
-                        continue
-                    candidate = apply_action(config, base, delta, cache_mb, tier)
-                    if others_cache + candidate.cache_mb > self.limits.cache_mb:
-                        continue
-                    if others_replicas + candidate.replicas > self.limits.replicas:
-                        continue
-                    cost, viol, obj = self._project(tid, candidate, horizons[tid])
-                    if cost_horizons is not None:
-                        # Budget is a *money* guardrail: test it against the
-                        # spend the arriving demand will bill, not against the
-                        # headroom we provisioned for.
-                        cost = self._project(tid, candidate, cost_horizons[tid], 1)[0]
-                    # PREREG_BUDGET_PARITY: the per-tenant Budget CRD is a hard
-                    # filter applied BEFORE the objective, and no baseline in
-                    # baselines.py has an equivalent -- so the proposal is the
-                    # only arm solving "best SLO within budget". `jcac_nobudget`
-                    # lifts it to measure how much of the WP1 severity gap the
-                    # constraint accounts for. True (the default) is the
-                    # published behaviour, so every committed arm replays
-                    # bit-identically (R4).
-                    if self.enforce_budget and cost > budget_per_step:
-                        continue
-                    switches = (
-                        (candidate.replicas != base.replicas)
-                        + (candidate.cache_mb != base.cache_mb)
-                        + (candidate.tier != base.tier)
-                    )
-                    fairness = 1.0 - jain_index(other_satisfaction + [1.0 - viol])
-                    # W32: a tenant flagged noisy pays for expansion in
-                    # proportion to its interference score — the planner
-                    # shrinks it back toward its floor instead of scaling
-                    # the interference up.
-                    noise = self._interference.get(tid, 0.0)
-                    resource_share = 0.0
-                    if noise > 0.0:
-                        resource_share = 0.5 * (
-                            candidate.replicas / max(1, config.replica_max)
-                            + candidate.cache_mb / 1024.0
-                        )
-                    score = (
-                        self.weights.alpha * (other_cost + cost) / COST_SCALE_USD
-                        + self.weights.beta * (other_obj + obj)
-                        + self.weights.gamma * (0.5 + config.fairness_weight) * fairness
-                        + self.weights.gamma * noise * resource_share
-                        + self.switch_penalty * switches
-                    )
-                    # M4 / T18: guarded rather than multiplied by zero, so with
-                    # the knob off the score is the published expression to the
-                    # last bit.
-                    if self.carbon_weight:
-                        score += self.carbon_weight * (
-                            other_carbon + self._project_carbon(tid, candidate, horizons[tid])
-                        ) / CARBON_SCALE_G
-                    if score < best_score:
-                        best_score, best_state = score, candidate
+            if candidate == current:
+                incumbent_score = score
+            if score < best_score:
+                best_score, best_state = score, candidate
+        # Convergent solver only: a move must STRICTLY improve on the
+        # incumbent, or sweeping could cycle between equal-score plans. The
+        # published path keeps its enumeration-order tie-break (R4).
+        if (self.converge_sweeps and incumbent_score is not None
+                and not best_score < incumbent_score):
+            return current
         # An entirely infeasible lattice (tight budget + tight cluster)
         # falls back to shedding cost: floor replicas, no cache, no model.
         if best_score == float("inf"):
@@ -1028,3 +993,138 @@ class JCACController:
                         return cand
             return shed
         return best_state
+
+    def _others(self, tid: str, chosen: dict[str, TenantState],
+                horizons: dict[str, list[Demand]],
+                cost_horizons: dict[str, list[Demand]] | None) -> tuple:
+        """Every other tenant's fixed contribution to `tid`'s objective:
+        (cost, obj, carbon, satisfaction list, cache MB, replicas)."""
+        other_cost = other_obj = other_carbon = 0.0
+        other_satisfaction = []
+        others_cache = others_replicas = 0
+        for oid, ostate in chosen.items():
+            if oid == tid:
+                continue
+            cost, viol, obj = self._project(oid, ostate, horizons[oid])
+            if self.carbon_weight:
+                other_carbon += self._project_carbon(oid, ostate, horizons[oid])
+            if cost_horizons is not None:
+                cost = self._project(oid, ostate, cost_horizons[oid], 1)[0]
+            other_cost += cost
+            other_obj += obj
+            other_satisfaction.append(1.0 - viol)
+            others_cache += ostate.cache_mb
+            others_replicas += ostate.replicas
+        return (other_cost, other_obj, other_carbon, other_satisfaction,
+                others_cache, others_replicas)
+
+    def _lattice(self, tid: str, base: TenantState):
+        """`tid`'s move-blocked candidates around `base`, in the published
+        enumeration order (replica delta, cache level, tier)."""
+        config = self.configs[tid]
+        for delta in DELTA_REPLICAS:
+            if delta and self._dwell_blocks(tid, delta):
+                continue
+            for cache_mb in neighbor_cache_levels(base.cache_mb):
+                for tier in TIERS:
+                    # Per-tenant knob bounds: a pinned (min==max) cache or tier
+                    # removes every off-value candidate, so a cache-only /
+                    # tier-only ablation truly re-optimizes over the free knob
+                    # alone instead of planning jointly and being clamped at
+                    # actuation. Full-envelope bounds admit everything, so the
+                    # published campaigns enumerate the identical lattice (R4).
+                    if not config.knob_admits(cache_mb, tier):
+                        continue
+                    yield apply_action(config, base, delta, cache_mb, tier)
+
+    def _candidate_score(self, tid: str, candidate: TenantState, base: TenantState,
+                         others: tuple, horizons: dict[str, list[Demand]],
+                         cost_horizons: dict[str, list[Demand]] | None,
+                         budget_per_step: float) -> float | None:
+        """The objective `tid` minimises for one candidate, others fixed; None
+        when the candidate breaks a cluster cap or the tenant's budget."""
+        config = self.configs[tid]
+        (other_cost, other_obj, other_carbon, other_satisfaction,
+         others_cache, others_replicas) = others
+        if others_cache + candidate.cache_mb > self.limits.cache_mb:
+            return None
+        if others_replicas + candidate.replicas > self.limits.replicas:
+            return None
+        cost, viol, obj = self._project(tid, candidate, horizons[tid])
+        if cost_horizons is not None:
+            # Budget is a *money* guardrail: test it against the
+            # spend the arriving demand will bill, not against the
+            # headroom we provisioned for.
+            cost = self._project(tid, candidate, cost_horizons[tid], 1)[0]
+        # PREREG_BUDGET_PARITY: the per-tenant Budget CRD is a hard
+        # filter applied BEFORE the objective, and no baseline in
+        # baselines.py has an equivalent -- so the proposal is the
+        # only arm solving "best SLO within budget". `jcac_nobudget`
+        # lifts it to measure how much of the WP1 severity gap the
+        # constraint accounts for. True (the default) is the
+        # published behaviour, so every committed arm replays
+        # bit-identically (R4).
+        if self.enforce_budget and cost > budget_per_step:
+            return None
+        switches = (
+            (candidate.replicas != base.replicas)
+            + (candidate.cache_mb != base.cache_mb)
+            + (candidate.tier != base.tier)
+        )
+        fairness = 1.0 - jain_index(other_satisfaction + [1.0 - viol])
+        # W32: a tenant flagged noisy pays for expansion in
+        # proportion to its interference score — the planner
+        # shrinks it back toward its floor instead of scaling
+        # the interference up.
+        noise = self._interference.get(tid, 0.0)
+        resource_share = 0.0
+        if noise > 0.0:
+            resource_share = 0.5 * (
+                candidate.replicas / max(1, config.replica_max)
+                + candidate.cache_mb / 1024.0
+            )
+        score = (
+            self.weights.alpha * (other_cost + cost) / COST_SCALE_USD
+            + self.weights.beta * (other_obj + obj)
+            + self.weights.gamma * (0.5 + config.fairness_weight) * fairness
+            + self.weights.gamma * noise * resource_share
+            + self.switch_penalty * switches
+        )
+        # M4 / T18: guarded rather than multiplied by zero, so with
+        # the knob off the score is the published expression to the
+        # last bit.
+        if self.carbon_weight:
+            score += self.carbon_weight * (
+                other_carbon + self._project_carbon(tid, candidate, horizons[tid])
+            ) / CARBON_SCALE_G
+        return score
+
+    def best_response_gaps(self) -> dict[str, float]:
+        """For the last `plan()`: how much each tenant could lower its own
+        objective by a unilateral move with every other tenant held at its
+        plan. 0.0 = a best response (Proposition 1's claim); inf = the planned
+        state is infeasible while a feasible candidate exists. Uses the same
+        lattice and score as the solver. With `replica_dwell_steps` on, the
+        dwell state has already advanced past the plan, so read it with care."""
+        if self._last_plan_ctx is None:
+            return {}
+        chosen, horizons, origin, cost_horizons = self._last_plan_ctx
+        gaps = {}
+        for tid in chosen:
+            config = self.configs[tid]
+            current = chosen[tid]
+            base = current if origin is None else origin[tid]
+            budget = config.hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
+            others = self._others(tid, chosen, horizons, cost_horizons)
+            planned = self._candidate_score(tid, current, base, others, horizons,
+                                            cost_horizons, budget)
+            scores = [s for s in (self._candidate_score(tid, c, base, others, horizons,
+                                                        cost_horizons, budget)
+                                  for c in self._lattice(tid, base)) if s is not None]
+            if not scores:
+                gaps[tid] = 0.0
+            elif planned is None:
+                gaps[tid] = float("inf")
+            else:
+                gaps[tid] = max(0.0, planned - min(scores))
+        return gaps

@@ -1352,6 +1352,38 @@ def push_default_knobs(gateway_base: str, tenant_ids) -> None:
                 raise RuntimeError(f"default knob push for {tid} -> {resp.status}")
 
 
+def _get_knobs(gateway_base: str, tenant_id: str) -> dict:
+    """The gateway's current knobs for one tenant (GET /admin/.../knobs)."""
+    import urllib.request
+
+    req = urllib.request.Request(
+        f"{gateway_base}/admin/tenants/{tenant_id}/knobs",
+        headers={"X-PolyForge-Admin-Key": ADMIN_KEY})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def verify_default_knobs(gateway_base: str, tenant_ids, fetch=_get_knobs) -> None:
+    """Read every tenant's knobs back and refuse the run unless each one holds
+    the initial world a non-operator arm is registered to start from.
+
+    A push that returned 200 is not proof of posture: the WL-H2 probe writes
+    to the same endpoint, and when it ran after the push its last write
+    (largest tier, cache 0 MB) survived into the scored window on B1/B1'
+    replica-only. Reading back is what makes the posture evidence."""
+    initial = TenantState()
+    wrong = []
+    for tid in tenant_ids:
+        got = fetch(gateway_base, tid)
+        if (got.get("model_tier") != initial.tier
+                or got.get("cache_size_mb") != initial.cache_mb):
+            wrong.append(f"{tid}={got.get('model_tier')}/{got.get('cache_size_mb')}MB")
+    if wrong:
+        raise RuntimeError(
+            f"non-operator arm must start every tenant at tier {initial.tier}, "
+            f"cache {initial.cache_mb} MB; read back: {', '.join(wrong)}")
+
+
 def provision_tenants(base: str, tenant_ids, slo_classes=None) -> dict[str, str]:
     """Create each tenant and mint it a full-scope API key via the admin
     key the chart's Secret carries. Returns tenant -> key secret, exported
@@ -1787,6 +1819,30 @@ def _operator_paused(run: RunSpec):
                        capture_output=True, timeout=240)
 
 
+def prepare_live_ai_knobs(run: RunSpec, gateway_base: str, tenant_ids, tokens: dict,
+                          workdir: Path, *, preflight=run_knob_preflight,
+                          push_defaults=push_default_knobs,
+                          verify=verify_default_knobs,
+                          paused=_operator_paused) -> None:
+    """WL-H2 knob preflight, then the arm's starting knob posture -- in that
+    order, because the preflight drives the same admin endpoint and its last
+    write pins the probe tenant to the largest tier with the cache at 0 MB.
+
+    Before 2026-09-26 the defaults were pushed FIRST, so on non-operator arms
+    the probe's leftover survived into the scored window: B1 and B1'
+    replica-only ran t00 on the large tier with no cache (2,988 large-tier
+    requests in joint_stress where every other arm sent the probe's 12). The
+    committed records stand as run; this ordering is what later sittings use.
+
+    Operator arms are not given the fixed defaults: their Policy reconciler
+    re-pushes each Policy's knobs when `paused` resumes it."""
+    with paused(run):
+        preflight(gateway_base, tenant_ids[0], tokens[tenant_ids[0]], workdir)
+    if run.system not in OPERATOR_SYSTEMS:
+        push_defaults(gateway_base, tenant_ids)
+        verify(gateway_base, tenant_ids)
+
+
 def _cmd_line(cmd: list[str]) -> str | None:
     """First line of a command's stdout, or None if it is absent or fails.
     Never raises: host facts are evidence, not a gate."""
@@ -1859,20 +1915,30 @@ def _preserve_evidence(workdir: Path, evidence_dir: Path | None,
         # evidence self-deleted with the workdir -- the same loss that took
         # attempt 2's k6 summary. The verdict that VOIDS a run is exactly the
         # evidence a reader will want to check.
+        # Only files THIS run produced are evidence of it. The shared directory
+        # is a "latest run" view: a name this run did not produce is removed
+        # there, never left over from the run before -- and the per-run folder
+        # is filled from this run's own list, not from the shared view. It
+        # used to copy the shared view, so a run that failed before writing
+        # eval-export.json was filed with the PREVIOUS run's export (B1'
+        # replica-only crud_bursty rep1 = jcac tier_mixed rep0; audit
+        # 2026-09-26, HIGH-4).
+        produced = []
         for name in ("k6-summary.json", "eval-export.json", "eval-export-fine.json",
                      "knob_preflight.json", "metrics_histogram.json"):
             src = workdir / name
             if src.exists():
                 shutil.copy2(src, evidence_dir / name)
+                produced.append(name)
+            else:
+                (evidence_dir / name).unlink(missing_ok=True)
         (evidence_dir / "host_facts.json").write_text(
             json.dumps(host_facts(), indent=2), encoding="utf-8")
+        produced.append("host_facts.json")
         if per_run is not None:
             per_run.mkdir(parents=True, exist_ok=True)
-            for name in ("k6-summary.json", "eval-export.json", "eval-export-fine.json",
-                         "knob_preflight.json", "metrics_histogram.json", "host_facts.json"):
-                src = evidence_dir / name
-                if src.exists():
-                    shutil.copy2(src, per_run / name)
+            for name in produced:
+                shutil.copy2(evidence_dir / name, per_run / name)
         if supervisor is not None:
             (evidence_dir / "port_forward_summary.json").write_text(
                 json.dumps(supervisor.summary(), indent=2), encoding="utf-8")
@@ -2139,8 +2205,6 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                         # NodePort, never a port-forward -- see GATEWAY_NODE_PORT.
                         gw_base = f"http://127.0.0.1:{GATEWAY_NODE_PORT}"
                         _wait_http(gw_base + "/healthz")
-                        if run.system not in OPERATOR_SYSTEMS:
-                            push_default_knobs(gw_base, tenant_ids)
                         env["POLYFORGE_GATEWAY_URL"] = gw_base
                         # WL-H2 liveness gate, executed rather than described.
                         # An inert cache or tier knob VOIDS WL-H1, so this runs
@@ -2148,10 +2212,11 @@ def execute(run: RunSpec, timeout_s: int = 3600) -> dict:
                         # previously existed only as a script referenced from
                         # prose, callable from no code path, which meant a
                         # four-arm campaign could complete with both knobs dead
-                        # and every row looking valid.
-                        with _operator_paused(run):
-                            run_knob_preflight(gw_base, tenant_ids[0],
-                                               tokens[tenant_ids[0]], workdir)
+                        # and every row looking valid. The fixed default knobs
+                        # of non-operator arms are pushed AFTER it and read
+                        # back -- see prepare_live_ai_knobs for why the order
+                        # is load-bearing.
+                        prepare_live_ai_knobs(run, gw_base, tenant_ids, tokens, workdir)
                     sampler = ReplicaSampler()
                     sampler.start()
                     loadspread = LoadDistributionSampler()

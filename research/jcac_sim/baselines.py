@@ -198,7 +198,10 @@ class FIRMReplicaController:
         w_util: float = 0.5,
         target_rho: float = 0.6,
         seed: int = 0,
+        tie_break: str = "first",
     ):
+        if tie_break not in ("first", "hold"):
+            raise ValueError(f"tie_break must be 'first' or 'hold', not {tie_break!r}")
         self.configs = configs
         self.lr = learning_rate
         self.discount = discount
@@ -206,12 +209,28 @@ class FIRMReplicaController:
         self.w_slo = w_slo
         self.w_util = w_util
         self.target_rho = target_rho
+        # How a greedy argmax tie is broken. "first" is the published arm: an
+        # unseen state's Q-row is all zeros, so it takes index 0 = -2 replicas,
+        # even in overload (audit 2026-09-26; kept so every committed FIRM row
+        # replays bit-identically). "hold" prefers the smallest move and breaks
+        # a +/- tie toward the SLO -- FIRM's own "meet the SLO first".
+        self.tie_break = tie_break
         self.rng = random.Random(seed)
         # q[tenant][(rho_bucket, violating)][action_index]
         self.q: dict[str, dict[tuple[int, bool], list[float]]] = {
             tid: {} for tid in configs
         }
         self._last: dict[str, tuple[tuple[int, bool], int]] = {}
+
+    @classmethod
+    def _greedy_hold(cls, row: list[float], violating: bool) -> int:
+        """Greedy action under the "hold" tie-break: the highest Q-value; among
+        ties the smallest |move|; among an equal +/- pair, scale up when the
+        state violates its SLO and down when it does not."""
+        best = max(row)
+        tied = [i for i, q in enumerate(row) if q == best]
+        return min(tied, key=lambda i: (abs(cls._actions[i]),
+                                        -cls._actions[i] if violating else cls._actions[i]))
 
     def _observe(self, config: TenantConfig, state: TenantState, demand: Demand):
         rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * model.REPLICA_CAPACITY_WU)
@@ -241,6 +260,8 @@ class FIRMReplicaController:
 
             if self.rng.random() < self.epsilon:
                 a = self.rng.randrange(len(self._actions))
+            elif self.tie_break == "hold":
+                a = self._greedy_hold(row, violating=s[1])
             else:
                 best = max(row)
                 a = row.index(best)

@@ -15,7 +15,7 @@ import simulate
 from controller import Weights
 
 from .config import RunSpec
-from .systems import SYSTEMS, global_mix_transform, lru_miss_cost_factor, tuned_params
+from .systems import SYSTEMS, base_params, global_mix_transform, lru_miss_cost_factor
 from . import workloads
 
 # The jitter stream must not correlate with the phase-offset stream drawn
@@ -104,8 +104,7 @@ def execute(run: RunSpec) -> dict:
     if spec.knob_freeze:
         configs = _freeze_knobs(configs, spec.knob_freeze)
 
-    params = dict(tuned_params().get(spec.controller, {}))
-    params.update(spec.params)
+    params = base_params(spec)
     # Chaos settings are engine-level, not controller knobs: the controller
     # must not know (PREREG_CHAOS_SIM.md).
     chaos_outage = params.pop("chaos_planner_outage", None)

@@ -296,6 +296,62 @@ class BaselineTests(unittest.TestCase):
         self.assertEqual(states["a"].cache_mb, 128)  # replica-only controller
         self.assertEqual(states["a"].tier, "small")
 
+    def test_firm_published_tie_break_scales_down_an_unseen_overloaded_state(self):
+        # Pins the published behaviour (R4) AND documents the defect the audit
+        # of 2026-09-26 found: an unseen state's Q-row is all zeros, so the
+        # greedy argmax is index 0, i.e. -2 replicas, even while violating.
+        configs = {"a": TenantConfig(tenant_id="a", slo_class="premium")}
+        ctl = baselines.FIRMReplicaController(configs, seed=7, epsilon=0.0)
+        out = ctl.plan({"a": TenantState(replicas=4)}, {"a": demand({"crud_read": 400.0})})
+        self.assertEqual(out["a"].replicas, 2)
+
+    def test_firm_hold_tie_break_never_sheds_on_an_unseen_violating_state(self):
+        configs = {"a": TenantConfig(tenant_id="a", slo_class="premium")}
+        ctl = baselines.FIRMReplicaController(configs, seed=7, epsilon=0.0,
+                                              tie_break="hold")
+        out = ctl.plan({"a": TenantState(replicas=4)}, {"a": demand({"crud_read": 400.0})})
+        self.assertEqual(out["a"].replicas, 4)  # all-zero row: hold is the tie winner
+
+    def test_firm_hold_tie_break_prefers_the_smallest_move_then_the_slo(self):
+        pick = baselines.FIRMReplicaController._greedy_hold
+        # actions (-2,-1,0,+1,+2): hold wins any tie it is part of.
+        self.assertEqual(pick([0.0, 0.0, 0.0, 0.0, 0.0], violating=True), 2)
+        # -1 and +1 tie without hold: up when violating, down when not.
+        self.assertEqual(pick([-1.0, 0.5, -1.0, 0.5, -1.0], violating=True), 3)
+        self.assertEqual(pick([-1.0, 0.5, -1.0, 0.5, -1.0], violating=False), 1)
+        # A strict maximum is taken as-is.
+        self.assertEqual(pick([0.9, 0.1, 0.0, 0.1, 0.2], violating=True), 0)
+
+    def test_firm_rejects_an_unknown_tie_break(self):
+        with self.assertRaises(ValueError):
+            baselines.FIRMReplicaController({"a": TenantConfig(tenant_id="a")},
+                                            tie_break="random")
+
+    def test_convergent_solver_requires_anchored_moves(self):
+        # Unanchored, every extra sweep re-centres the +/-2 clamp: convergence
+        # would compound the disclosed clamp defect without bound.
+        configs = {"a": TenantConfig(tenant_id="a")}
+        with self.assertRaises(ValueError):
+            JCACController(configs, converge_sweeps=True)
+
+    def test_default_solver_runs_exactly_two_sweeps(self):
+        configs = {t: TenantConfig(tenant_id=t) for t in ("a", "b")}
+        ctl = JCACController(configs)
+        ctl.plan({t: TenantState() for t in configs}, {t: demand({"chat": 5.0}) for t in configs})
+        self.assertEqual((ctl.last_sweeps, ctl.last_converged), (2, None))
+
+    def test_convergent_solver_stops_at_a_best_response(self):
+        configs = {t: TenantConfig(tenant_id=t) for t in ("a", "b", "c")}
+        ctl = JCACController(configs, limits=ClusterLimits(cache_mb=512, replicas=9),
+                             anchor_moves=True, converge_sweeps=True)
+        states = {t: TenantState() for t in configs}
+        for step in range(8):
+            load = {t: demand({"chat": 4.0 + 3 * step, "crud_read": 30.0}) for t in configs}
+            states = {t: p.state for t, p in ctl.plan(states, load).items()}
+            self.assertTrue(ctl.last_converged)
+            self.assertGreaterEqual(ctl.last_sweeps, 1)
+            self.assertTrue(all(g <= 1e-12 for g in ctl.best_response_gaps().values()))
+
     def test_firm_is_deterministic_under_a_seed(self):
         def run_once():
             configs = {"a": TenantConfig(tenant_id="a")}

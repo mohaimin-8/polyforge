@@ -8,7 +8,7 @@ The corrected joint controller wins on cost at iso-fairness. The same evidence s
 
 ## Every run
 
-`changes` counts replica-count changes between consecutive 10-s samples inside the load window; `largest` is the biggest single change; `pods` is how many distinct control-plane pods `kubectl top` saw during the window and `short` how many of them appeared in fewer than 3 of its 30-s samples (created and shed inside a minute).
+`changes` counts replica-count changes between consecutive 10-s samples inside the load window; `largest` is the biggest single change; `pods` is how many distinct control-plane pods `kubectl top` saw during the window and `short` how many of them appeared in fewer than 3 of its 30-s samples (created and shed inside a minute). Only runs the scored table marks valid are listed: the folder of a failed run can hold another run's files (a harness defect fixed on 2026-09-26), so it is not evidence of that run.
 
 | cell | arm | rep | samples | replicas min..max (mean) | changes (up / down) | largest | replica-seconds | pods | short-lived |
 |---|---|---|---|---|---|---|---|---|---|
@@ -37,7 +37,6 @@ The corrected joint controller wins on cost at iso-fairness. The same evidence s
 | crud_bursty | jcac | 0 | 30 | 16..16 (16.0) | 0 (0 / 0) | 0 | 4800 | 16 | 0 |
 | crud_bursty | jcac | 1 | 31 | 16..16 (16.0) | 0 (0 / 0) | 0 | 4960 | 16 | 0 |
 | crud_bursty | replica-only | 0 | 31 | 1..24 (19.6) | 5 (5 / 0) | 8 | 6080 | 24 | 1 |
-| crud_bursty | replica-only | 1 | 31 | 16..24 (23.5) | 1 (1 / 0) | 8 | 7280 | 20 | 0 |
 | crud_bursty | cache-only | 0 | 31 | 16..16 (16.0) | 0 (0 / 0) | 0 | 4960 | 16 | 0 |
 | crud_bursty | cache-only | 1 | 30 | 16..16 (16.0) | 0 (0 / 0) | 0 | 4800 | 16 | 0 |
 | crud_bursty | tier-only | 0 | 28 | 16..16 (16.0) | 0 (0 / 0) | 0 | 4480 | 16 | 0 |
@@ -58,5 +57,5 @@ The corrected joint controller wins on cost at iso-fairness. The same evidence s
 * The single-knob arms without the replica knob (`cache-only`, `tier-only`) hold the chart's initial replica count for the whole window; their infra cost is the ceiling every replica-aware arm is measured against.
 * The published controller (`jcac`) moves replicas rarely and upward: its plant model is pessimistic and its switching penalty exceeds the saving of shedding a replica (the ratchet the correction removed).
 * The corrected controller (`jcac-calibrated`) changes its replica count at most steps, and in the two AI-heavy cells by large jumps: in `tier_mixed` it swings between 8 and 24 replicas with single-step changes of 9–11, in `joint_stress` between 9 and 16 with changes of 3–4. That is a limit cycle, not a dither. A plausible mechanism, not measured here: the realized AI p95 moves from step to step (tier latency under load), the additive tier-latency offset learns UP fast (0.5) and DOWN slowly (0.1), the projection flips between predicting a violation (add replicas) and predicting headroom (shed them), and the half-replica switching penalty is too small to hold the plan still. Whether the replica count moves the AI p95 at all on this plant is not established by this record. Its mean replica-seconds are still below the static arms' (the cost the record scores), and its Jain index and violation are unchanged, so the win stands as registered; what the cycle costs in pod creations is visible here and not in the objective. A dwell time or a rate limit on the replica knob is the obvious damping; neither is in this sitting, and adding one needs a new pre-registration and a sitting to score it.
-* `replica-only` (HPA) scales on CPU alone and, in the AI-heavy cells, cannot reduce tier spend at all; its replica trajectory is printed for completeness.
+* `replica-only` (HPA) scales on CPU alone and, in the AI-heavy cells, cannot reduce tier spend at all; its replica trajectory is printed for completeness. In this sitting its tenant `t00` also ran on the `large` tier with the cache at 0 MB: that is the WL-H2 preflight's last probe posture, which the harness did not restore for non-operator arms (found 2026-09-26; fixed in `prepare_live_ai_knobs`). Its cost here is therefore not a measurement of a replica-only controller.
 

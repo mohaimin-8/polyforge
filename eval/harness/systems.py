@@ -86,6 +86,17 @@ def tuned_params() -> dict:
     return yaml.safe_load(TUNED_PATH.read_text(encoding="utf-8")) or {}
 
 
+def base_params(spec: "SystemSpec") -> dict:
+    """The arm's controller parameters: its best-of-grid values from
+    tuned.yaml, then the arm's own overrides. The grid entry is found by
+    `spec.tuned_from` when set, else by the controller name -- the published
+    lookup, under which wrapper and subclass controllers find no entry and run
+    their constructor defaults (declared per arm in AS_RUN_UNTUNED)."""
+    params = dict(tuned_params().get(spec.tuned_from or spec.controller, {}))
+    params.update(spec.params)
+    return params
+
+
 def global_mix_transform(demands):
     """The `-classifier` ablation: the controller keeps each tenant's
     request *volume* but sees the cluster-wide average request *mix*
@@ -125,6 +136,7 @@ class SystemSpec:
         static_cache_mb: int | None = None,
         beta: float | None = None,
         description: str = "",
+        tuned_from: str | None = None,
     ):
         self.controller = controller
         self.params = params or {}
@@ -155,6 +167,38 @@ class SystemSpec:
         # committed arm replays bit-identically (R4).
         self.beta = beta
         self.description = description
+        # Which tuned.yaml entry supplies this arm's best-of-grid parameters.
+        # None looks up the controller's own name, which is what every
+        # published arm did. A wrapper or subclass of a tuned controller
+        # (hpa_budget, gptcache_v2, layered) has no entry of its own, so
+        # without this it silently runs the constructor default -- audit
+        # 2026-09-26, HIGH-3. `sim_backend.base_params` resolves it.
+        self.tuned_from = tuned_from
+
+
+# Controllers with no tuning grid by design: JCAC's weights are the published
+# objective, static has no knob, and the learned controller is trained
+# (baselines/train_learned.py), not grid-searched.
+NO_GRID_CONTROLLERS = frozenset({"jcac", "static", "learned"})
+
+# Arms that ran WITHOUT their base's tuned parameters in committed campaigns.
+# They stay exactly as run so those campaigns replay bit-identically; each has
+# a `*_tuned` twin below for new registrations. Adding an arm whose tuned grid
+# cannot be found fails `test_every_arm_is_tuned_or_declared_untuned` unless it
+# is declared here with a reason.
+AS_RUN_UNTUNED: dict[str, str] = {
+    "hpa_budget": "PREREG_BUDGET_PARITY ran it at target_rho 0.6 (constructor "
+                  "default), not HPA's tuned 0.3; twin: hpa_budget_tuned",
+    "keda_budget": "PREREG_BUDGET_PARITY ran it at 8 rps/replica (constructor "
+                   "default), not KEDA's tuned 2.0; twin: keda_budget_tuned",
+    "gptcache_v2": "PREREG_LAYERED_FIX LF-H2 ran it at target_rho 0.6, not "
+                   "GPTCache's tuned 0.3; twin: gptcache_v2_tuned",
+    "jcac_nojoint": "the published ablation comparator ran its HPA replica "
+                    "layer at target_rho 0.6, not the tuned 0.3; twin: "
+                    "jcac_nojoint_tuned",
+    "jcac_nojoint_v2": "PREREG_LAYERED_FIX LF-H1 ran its HPA replica layer at "
+                       "target_rho 0.6; twin: jcac_nojoint_v2_tuned",
+}
 
 
 SYSTEMS: dict[str, SystemSpec] = {
@@ -162,6 +206,12 @@ SYSTEMS: dict[str, SystemSpec] = {
     "jcac": SystemSpec(
         "jcac",
         description="PolyForge: joint MPC over replicas, cache, tier (W30-32)",
+    ),
+    "jcac_converged": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True},
+        description="jcac_anchored whose coordination sweeps run to a fixed "
+                    "point, so every plan is a best response for every tenant "
+                    "(audit 2026-09-26: two fixed sweeps are not, Proposition 1)",
     ),
     "jcac_anchored": SystemSpec(
         "jcac", params={"anchor_moves": True},
@@ -290,6 +340,16 @@ SYSTEMS: dict[str, SystemSpec] = {
         "keda_budget", lru_eviction=False, static_cache_mb=512,
         description="Event-driven KEDA under the same budget filter and fair "
                     "cache posture (PREREG_BUDGET_PARITY BP-H1b)"),
+    # Tuned twins of the two arms above (see AS_RUN_UNTUNED): identical except
+    # that the replica rule runs at its base's best-of-grid parameters.
+    "hpa_budget_tuned": SystemSpec(
+        "hpa_budget", lru_eviction=False, static_cache_mb=512, tuned_from="hpa",
+        description="hpa_budget at HPA's tuned target_rho (audit 2026-09-26: "
+                    "the published arm ran the 0.6 default)"),
+    "keda_budget_tuned": SystemSpec(
+        "keda_budget", lru_eviction=False, static_cache_mb=512, tuned_from="keda",
+        description="keda_budget at KEDA's tuned rps_per_replica (audit "
+                    "2026-09-26: the published arm ran the 8.0 default)"),
     "jcac_nobudget": SystemSpec(
         "jcac", params={"enforce_budget": False},
         description="PolyForge with the per-tenant budget filter LIFTED — what "
@@ -362,6 +422,12 @@ SYSTEMS: dict[str, SystemSpec] = {
     "keda": SystemSpec(
         "keda", lru_eviction=True,
         description="KEDA event-driven scaler on RPS; cache and tier fixed",
+    ),
+    "firm_hold": SystemSpec(
+        "firm", lru_eviction=True, seeded=True, params={"tie_break": "hold"},
+        description="FIRM-replica with greedy ties broken toward holding "
+                    "(audit 2026-09-26: the published arm takes -2 replicas on "
+                    "every unseen state, even in overload)",
     ),
     "firm": SystemSpec(
         "firm", lru_eviction=True, seeded=True,
@@ -494,6 +560,24 @@ SYSTEMS: dict[str, SystemSpec] = {
         "gptcache_v2", lru_eviction=True,
         description="GPTCache posture with the latency-ranked tier rule: cache "
                     "everything with LRU, HPA replicas, no absorbing tier",
+    ),
+    # Tuned twins (see AS_RUN_UNTUNED). The layered stack's replica layer IS
+    # the HPA rule, so HPA's grid is its local tuning -- which is what "a
+    # stack of locally tuned single-knob controllers" means.
+    "jcac_nojoint_tuned": SystemSpec(
+        "layered", tuned_from="hpa",
+        description="jcac_nojoint with its HPA replica layer at the tuned "
+                    "target_rho (audit 2026-09-26)",
+    ),
+    "jcac_nojoint_v2_tuned": SystemSpec(
+        "layered_v2", tuned_from="hpa",
+        description="jcac_nojoint_v2 with its HPA replica layer at the tuned "
+                    "target_rho (audit 2026-09-26)",
+    ),
+    "gptcache_v2_tuned": SystemSpec(
+        "gptcache_v2", lru_eviction=True, tuned_from="gptcache",
+        description="gptcache_v2 at GPTCache's tuned target_rho (audit "
+                    "2026-09-26: the published arm ran the 0.6 default)",
     ),
     "jcac_noeviction": SystemSpec(
         "jcac", lru_eviction=True,

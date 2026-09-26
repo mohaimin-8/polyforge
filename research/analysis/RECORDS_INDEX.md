@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 74 |
-| regenerated and compared | 56 |
+| records | 75 |
+| regenerated and compared | 57 |
 | outside the gate, reason stated | 18 |
 | outside the gate, no entry | 0 |
 
@@ -22,11 +22,12 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `BREAKEVEN_TIER_V2.md` | - | no, reason stated |
 | `CACHE_PRECISION.md` | - | no, reason stated |
 | `CELLS_SHIPPED.md` | PF-H1, PS-H1 | yes |
-| `CHURN_WAVE4_CALIBRATED.md` | - | yes |
+| `CHURN_WAVE4_CALIBRATED.md` | WL-H2 | yes |
 | `COORD_GAP.md` | CG-H1 | no, reason stated |
 | `COORD_GAP_ANCHORED.md` | CG-H1 | yes |
 | `DEGRADE_PROBE.md` | DG-H1, DG-H2 | yes |
 | `EFFECT_SIZES.md` | - | yes |
+| `ERRATUM_WAVE4_REPLICA_ONLY.md` | WL-H1, WL-H2 | yes |
 | `FAIRNESS_V2.md` | - | yes |
 | `FORECAST_AZURE.md` | - | no, reason stated |
 | `FORECAST_MR.md` | - | no, reason stated |

@@ -18,7 +18,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-HARNESS_VERSION = "1.0.0"
+# 1.1.0 (2026-09-26): runs.recorded_at is UTC on every host. Rows written by
+# 1.0.0 hold the RECORDING HOST's local time, unmarked (laptop UTC+6, cloud
+# UTC); scripts/check_prereg_timing.py reads them with that caveat.
+HARNESS_VERSION = "1.1.0"
 # Bump when the result schema or run-identity inputs change; it is part of
 # every run_id, so old rows can never be silently mixed with new ones.
 SCHEMA_VERSION = "1"

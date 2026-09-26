@@ -102,7 +102,19 @@ class PlannerCore:
                  headroom_cap: float = 4.0,
                  switch_penalty: float | None = None,
                  replica_dwell_steps: int = 0,
-                 state_file: str | None = None) -> None:
+                 state_file: str | None = None,
+                 anchor_moves: bool = False,
+                 converge_sweeps: bool = False) -> None:
+        # Audit 2026-09-26: the service never set anchor_moves, so every live
+        # campaign ran the unanchored solver (up to +/-4 replicas per interval
+        # through its second sweep; PREREG_MOVE_CLAMP) rather than the
+        # anchored arm the simulator quotes. Both are opt-in; off = the
+        # published jcac arm. Convergence without anchoring is refused here,
+        # at boot, rather than on the first plan request.
+        if converge_sweeps and not anchor_moves:
+            raise ValueError("converge_sweeps requires anchor_moves")
+        self._anchor_moves = bool(anchor_moves)
+        self._converge_sweeps = bool(converge_sweeps)
         # The live planner always runs the published physics; a stray
         # sensitivity override in a module global would silently corrupt
         # every plan, so pin it explicitly at construction.
@@ -281,6 +293,8 @@ class PlannerCore:
                 headroom_cap=self._headroom_cap,
                 switch_penalty=self._switch_penalty,
                 replica_dwell_steps=self._replica_dwell_steps,
+                anchor_moves=self._anchor_moves,
+                converge_sweeps=self._converge_sweeps,
             )
             self._signature = signature
             if old is not None:
@@ -490,6 +504,14 @@ def main() -> None:
                          "reversed within (B1' follow-up: damping for the "
                          "corrected arm's replica oscillation); 0 = off = "
                          "every registered arm")
+    ap.add_argument("--anchor-moves", action="store_true",
+                    help="anchor every coordination sweep's move clamps at the "
+                         "interval-start state (PREREG_MOVE_CLAMP); off = the "
+                         "published jcac arm, which can move +/-4 replicas")
+    ap.add_argument("--converge-sweeps", action="store_true",
+                    help="sweep until no tenant moves, so each plan is a best "
+                         "response for every tenant (audit 2026-09-26, "
+                         "Proposition 1); requires --anchor-moves")
     ap.add_argument("--auth-token-file", default=None,
                     help="path to a file holding the shared bearer token that "
                          "guards /v1/plan and /v1/state; overrides the "
@@ -506,6 +528,8 @@ def main() -> None:
         headroom_cap=args.headroom_cap,
         switch_penalty=args.switch_penalty,
         replica_dwell_steps=args.replica_dwell_steps,
+        anchor_moves=args.anchor_moves,
+        converge_sweeps=args.converge_sweeps,
     )
     server = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(core, auth_token))
     print(f"jcac planner ({SOLVER_NAME}) listening on :{args.port}")

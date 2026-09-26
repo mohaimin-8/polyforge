@@ -116,6 +116,10 @@ class TestSystems:
             # Session 38, PREREG_LAYERED_FIX: the −joint-control ablation
             # against a tier rule that is not absorbing.
             "jcac_nojoint_v2",
+            # 2026-09-26 audit, HIGH-3: the same two ablations with their HPA
+            # replica layer at the tuned target_rho (the published ones ran
+            # the 0.6 default; see systems.AS_RUN_UNTUNED).
+            "jcac_nojoint_tuned", "jcac_nojoint_v2_tuned",
         }
 
     def test_lru_factor_comes_from_w28_data(self):
@@ -518,8 +522,13 @@ class TestClusterBackend:
         # campaign could complete with both knobs inert and every row valid.
         src = inspect.getsource(cluster_backend)
         assert "run_knob_preflight(" in src
-        assert src.count("run_knob_preflight(") >= 2, \
-            "preflight must be defined AND invoked, not just defined"
+        # Invoked through prepare_live_ai_knobs, which also owns the ordering
+        # against the default-knob push (audit 2026-09-26, CRITICAL-1).
+        assert src.count("prepare_live_ai_knobs(") >= 2, \
+            "prepare_live_ai_knobs must be defined AND invoked, not just defined"
+        default = inspect.signature(
+            cluster_backend.prepare_live_ai_knobs).parameters["preflight"].default
+        assert default is cluster_backend.run_knob_preflight
         assert hasattr(cluster_backend, "run_knob_preflight")
 
         # It must fail loudly rather than skip when tiers are unconfigured.
@@ -1537,3 +1546,104 @@ class TestSoakProtocolGuards:
         # hand at hour 17, capturing only 5 of 8 faults.
         assert "live_soak_evidence" in body
         assert "EVIDENCE_DIR" in body
+
+
+class TestTunedParameterResolution:
+    """Audit 2026-09-26, HIGH-3: tuned parameters were looked up by CONTROLLER
+    name, so arms whose controller is a wrapper or subclass of a tuned one
+    (hpa_budget, keda_budget, gptcache_v2, layered, layered_v2) silently ran
+    the constructor default (target_rho 0.6 / 8 rps per replica) instead of the
+    best-of-grid value their base was tuned to."""
+
+    TUNED_ARMS = {
+        "hpa_budget_tuned": "hpa",
+        "keda_budget_tuned": "keda",
+        "gptcache_v2_tuned": "gptcache",
+        "jcac_nojoint_tuned": "hpa",
+        "jcac_nojoint_v2_tuned": "hpa",
+    }
+
+    def test_tuned_arms_inherit_their_base_grid(self):
+        from harness.systems import tuned_params
+
+        grid = tuned_params()
+        for arm, base in self.TUNED_ARMS.items():
+            assert arm in SYSTEMS, arm
+            assert sim_backend.base_params(SYSTEMS[arm]) == grid[base], arm
+
+    def test_tuned_values_reach_the_controller(self):
+        import baselines as bl
+
+        configs = workloads.build("crud_bursty", "uniform", "small", 1, 2)[2]
+        hpa = bl.make_baseline(
+            "hpa_budget", configs, **sim_backend.base_params(SYSTEMS["hpa_budget_tuned"]))
+        assert hpa.inner.target_rho == 0.3
+        keda = bl.make_baseline(
+            "keda_budget", configs, **sim_backend.base_params(SYSTEMS["keda_budget_tuned"]))
+        assert keda.inner.rps_per_replica == 2.0
+
+    def test_historical_arms_resolve_exactly_as_they_ran(self):
+        # The committed BUDGET_PARITY / LAYERED_FIX / ablation campaigns ran
+        # these arms untuned; they must keep resolving to nothing so the
+        # published arms replay bit-identically.
+        for arm in ("hpa_budget", "keda_budget", "gptcache_v2",
+                    "jcac_nojoint", "jcac_nojoint_v2"):
+            assert sim_backend.base_params(SYSTEMS[arm]) == {}, arm
+
+    def test_every_arm_is_tuned_or_declared_untuned(self):
+        from harness.systems import AS_RUN_UNTUNED, NO_GRID_CONTROLLERS, tuned_params
+
+        grid = tuned_params()
+        silent = [name for name, spec in SYSTEMS.items()
+                  if (spec.tuned_from or spec.controller) not in grid
+                  and spec.controller not in NO_GRID_CONTROLLERS
+                  and name not in AS_RUN_UNTUNED]
+        assert not silent, f"arms with no tuned grid and no declaration: {silent}"
+        for name, reason in AS_RUN_UNTUNED.items():
+            assert name in SYSTEMS and reason.strip(), name
+
+
+def test_firm_hold_is_firm_at_its_tuned_grid_with_the_hold_tie_break():
+    # Audit 2026-09-26: the corrected FIRM arm differs from the published one
+    # in the tie-break alone, and still runs at FIRM's best-of-grid values.
+    from harness.systems import base_params, tuned_params
+
+    firm, hold = SYSTEMS["firm"], SYSTEMS["firm_hold"]
+    assert hold.controller == firm.controller == "firm"
+    assert (hold.lru_eviction, hold.seeded) == (firm.lru_eviction, firm.seeded)
+    assert base_params(hold) == {**tuned_params()["firm"], "tie_break": "hold"}
+    assert "tie_break" not in base_params(firm)  # the published arm is untouched
+
+
+def test_jcac_converged_arm_runs_the_convergent_anchored_solver():
+    # Audit 2026-09-26: the arm for new registrations whose plans satisfy
+    # Proposition 1 by construction.
+    from harness.systems import base_params
+
+    assert base_params(SYSTEMS["jcac_converged"]) == {"anchor_moves": True,
+                                                      "converge_sweeps": True}
+    run = expand(tiny_spec(systems=["jcac_converged"]))[0]
+    out = sim_backend.execute(run)
+    assert out["metrics"]["total_cost_usd"] > 0
+
+
+def test_recorded_at_is_utc_whatever_the_session_timezone(tmp_path):
+    """Audit 2026-09-26, MEDIUM-7: a timezone-aware UTC datetime inserted into
+    a DuckDB TIMESTAMP column is converted to the SESSION's local time, so
+    laptop databases held UTC+6 and cloud ones UTC, unmarked -- which broke
+    every prereg-before-run timing audit by six hours. From harness 1.1.0 the
+    column holds UTC on every host."""
+    from datetime import datetime, timezone
+
+    from harness import HARNESS_VERSION
+
+    con = results.connect(tmp_path / "tz.duckdb")
+    con.execute("SET TimeZone='Asia/Dhaka'")
+    run = expand(tiny_spec())[0]
+    before = datetime.now(timezone.utc).replace(tzinfo=None)
+    results.record(con, run, "failed", 1, error="probe")
+    got, version = con.execute(
+        "SELECT recorded_at, harness_version FROM runs WHERE run_id = ?",
+        [run.run_id]).fetchone()
+    assert abs((got - before).total_seconds()) < 60
+    assert version == HARNESS_VERSION and version >= "1.1.0"
