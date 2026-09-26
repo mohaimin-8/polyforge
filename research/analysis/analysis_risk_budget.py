@@ -24,6 +24,64 @@ import stats
 
 import figures as F
 
+PROBE_ARMS = {"point": "jcac_anchored", "q90c": "jcac_q90c", "q95c": "jcac_q95c"}
+PROBE_CLASSES = ("ai_uncacheable", "ai_cacheable", "agentic", "crud_bursty")
+PROBE_MIXES = ("uniform", "premium_heavy")
+
+
+def diagnosis_probe() -> tuple[dict, float]:
+    """The POST-RUN DIAGNOSIS's 24-cell probe, executed rather than quoted
+    (audit 2026-09-26: every number in the diagnosis was fixed text): the
+    campaign's own rep-0 seeds at `medium`, timeseries on. Returns per
+    (class, arm) the shed share, mean replicas, mean cache and small/mid tier
+    shares over tenant-steps, and the medium cluster's per-tenant replica
+    ceiling."""
+    import sys
+    from dataclasses import replace
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "eval"))
+    from harness import sim_backend, workloads
+    from harness.config import expand, load
+
+    spec = load(str(Path(__file__).resolve().parents[2] / "eval" / "experiments"
+                    / "matrix_risk_budget.yaml"))
+    cells = [r for r in expand(spec)
+             if r.cluster_size == "medium" and r.rep == 0 and r.tenant_mix in PROBE_MIXES
+             and r.system in PROBE_ARMS.values() and r.workload in PROBE_CLASSES]
+    tally: dict = {}
+    ceiling = None
+    for r in cells:
+        rows = sim_backend.execute(replace(r, store_timeseries=True))["timeseries"]
+        t = tally.setdefault((r.workload, r.system), dict.fromkeys(
+            ("n", "none", "replicas", "cache", "small", "mid"), 0))
+        t["n"] += len(rows)
+        t["none"] += sum(x["tier"] == "none" for x in rows)
+        t["small"] += sum(x["tier"] == "small" for x in rows)
+        t["mid"] += sum(x["tier"] == "mid" for x in rows)
+        t["replicas"] += sum(x["replicas"] for x in rows)
+        t["cache"] += sum(x["cache_mb"] for x in rows)
+        if ceiling is None:
+            ids, _, _, limits = workloads.build(r.workload, r.tenant_mix, r.cluster_size, r.seed, 1)
+            ceiling = (limits.replicas, len(ids))
+    out = {k: {"shed": t["none"] / t["n"], "replicas": t["replicas"] / t["n"],
+               "cache": t["cache"] / t["n"], "small": t["small"] / t["n"], "mid": t["mid"] / t["n"]}
+           for k, t in tally.items()}
+    return out, ceiling
+
+
+def ai_cacheable_share(workload: str) -> float:
+    """Demand-weighted cacheable fraction of a class's AI traffic."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "eval"))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "jcac_sim"))
+    import model
+    from harness import workloads
+
+    rps = {k: v for k, v in workloads.WORKLOAD_CLASSES[workload].base_rps.items()
+           if k in model.CACHEABLE_FRACTION}
+    return sum(v * model.CACHEABLE_FRACTION[k] for k, v in rps.items()) / sum(rps.values())
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DB = REPO_ROOT / "eval" / "results" / "raw_sim_risk_budget.duckdb"
 # Committed run-level export: the DuckDB is Zenodo-archived, so this is what
@@ -472,35 +530,56 @@ def main() -> None:
       "internal state directly: shed events (`tier=\"none\"`), the tier mix, "
       "mean replicas against the cluster ceiling, and mean cache.")
     w("")
+    probe, (cap, n_tenants) = diagnosis_probe()
+
+    def p(cls: str, arm: str) -> dict:
+        return probe[(cls, PROBE_ARMS[arm])]
+
+    def reps(cls: str) -> str:
+        return " → ".join(f"{p(cls, a)['replicas']:.2f}" for a in PROBE_ARMS)
+
+    def pct_ceiling(cls: str) -> str:
+        lo, hi = (min(p(cls, a)["replicas"] for a in PROBE_ARMS) / (cap / n_tenants),
+                  max(p(cls, a)["replicas"] for a in PROBE_ARMS) / (cap / n_tenants))
+        return f"{lo:.0%}" if round(lo * 100) == round(hi * 100) else f"{lo:.0%}–{hi:.0%}"
+
+    crud_shed = max(p("crud_bursty", a)["shed"] for a in PROBE_ARMS)
     w("**Finding 1 — the correction works, but does not abolish the budget "
-      "interaction.** On `ai_uncacheable` the shed rate *falls* from 0.89% at "
-      "the point forecast to **0.31%** at q90c — the correction doing exactly "
-      "what it was designed to do — and then rises to **2.08%** at q95c, "
+      f"interaction.** On `ai_uncacheable` the shed rate *falls* from "
+      f"{p('ai_uncacheable', 'point')['shed']:.2%} at "
+      f"the point forecast to **{p('ai_uncacheable', 'q90c')['shed']:.2%}** at q90c — the "
+      "correction doing exactly what it was designed to do — and then rises to "
+      f"**{p('ai_uncacheable', 'q95c')['shed']:.2%}** at q95c, "
       "above even the uncorrected starting point. Capacity still costs money "
       "at *any* forecast, so at an extreme quantile the per-tenant budget "
       "filter binds again and the designed shed fallback returns. The "
-      "`crud_bursty` control shows **0.00% shed at every arm**, confirming "
+      f"`crud_bursty` control shows **{crud_shed:.2%} shed at every arm**, confirming "
       "the channel is tier spend — the same signature the null's diagnosis "
-      "identified.")
+      "identified. (Every number in this diagnosis is computed by this script's "
+      "probe; audit 2026-09-26.)")
     w("")
     w("**Finding 2 — the knob buys attainment only where a capacity lever "
-      "still has headroom.** The `medium` cluster caps replicas at 48 across "
-      "8 tenants, i.e. a mean of 6.00 per tenant when saturated:")
+      f"still has headroom.** The `medium` cluster caps replicas at {cap} across "
+      f"{n_tenants} tenants, i.e. a mean of {cap / n_tenants:.2f} per tenant when saturated:")
     w("")
+    agentic, uncache = (p("agentic", "point"), p("agentic", "q95c")), \
+        (p("ai_uncacheable", "point"), p("ai_uncacheable", "q95c"))
     w(md_table(pd.DataFrame([
-        {"class": "ai_cacheable", "mean replicas (point→q90c→q95c)": "3.04 → 3.28 → 3.53",
-         "% of cluster ceiling": "51–59% (headroom)",
+        {"class": "ai_cacheable", "mean replicas (point→q90c→q95c)": reps("ai_cacheable"),
+         "% of cluster ceiling": f"{pct_ceiling('ai_cacheable')} (headroom)",
          "what the knob buys": "real replicas; violation falls"},
-        {"class": "agentic", "mean replicas (point→q90c→q95c)": "5.95 → 5.94 → 5.95",
-         "% of cluster ceiling": "99% (saturated)",
-         "what the knob buys": "tier upgrades (small 76%→56%, mid 12%→28%); "
+        {"class": "agentic", "mean replicas (point→q90c→q95c)": reps("agentic"),
+         "% of cluster ceiling": f"{pct_ceiling('agentic')} (saturated)",
+         "what the knob buys": f"tier upgrades (small {agentic[0]['small']:.0%}→{agentic[1]['small']:.0%}, "
+                               f"mid {agentic[0]['mid']:.0%}→{agentic[1]['mid']:.0%}); "
                                "violation falls, cost rises sharply"},
-        {"class": "ai_uncacheable", "mean replicas (point→q90c→q95c)": "5.91 → 5.94 → 5.93",
-         "% of cluster ceiling": "99% (saturated)",
-         "what the knob buys": "cache (377→481 MB) on a class only ~29% "
+        {"class": "ai_uncacheable", "mean replicas (point→q90c→q95c)": reps("ai_uncacheable"),
+         "% of cluster ceiling": f"{pct_ceiling('ai_uncacheable')} (saturated)",
+         "what the knob buys": f"cache ({uncache[0]['cache']:.0f}→{uncache[1]['cache']:.0f} MB) on a "
+                               f"class only {ai_cacheable_share('ai_uncacheable'):.0%} "
                                "cacheable and past half-saturation; spend, not service"},
-        {"class": "crud_bursty", "mean replicas (point→q90c→q95c)": "5.65 → 5.63 → 5.62",
-         "% of cluster ceiling": "94%",
+        {"class": "crud_bursty", "mean replicas (point→q90c→q95c)": reps("crud_bursty"),
+         "% of cluster ceiling": pct_ceiling("crud_bursty"),
          "what the knob buys": "nothing — no tier spend, violation already ~0"},
     ])))
     w("")

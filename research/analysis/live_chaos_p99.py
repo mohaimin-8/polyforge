@@ -150,10 +150,19 @@ def main() -> None:
             "- Violation verdicts must be compared per percentile before the"
             " P99-H1 sentence may be used; at least one row is nonzero."
         )
+    # Computed from the table above (audit 2026-09-26: this sentence was
+    # fixed text, "p99/p95 ≈ 2.68 in crud_bursty ... AI nearly flat ≈ 1.00").
+    spreads = [(float(r[f"{fam}_p99_ms"]) / float(r[f"{fam}_p95_ms"]), fam, r["cell"])
+               for r in rows for fam in ("crud", "ai") if float(r[f"{fam}_p95_ms"]) > 0.0]
+    top, top_fam, top_cell = max(spreads)
+    ai = [s for s, fam, _ in spreads if fam == "ai"]
+    ai_txt = ("no cell carries AI traffic" if not ai
+              else f"the AI family under the mock backend is flat at p99/p95 = {ai[0]:.2f}"
+              if f"{min(ai):.2f}" == f"{max(ai):.2f}"
+              else f"the AI family under the mock backend spans p99/p95 {min(ai):.2f}–{max(ai):.2f}")
     w(
-        "- The largest tail spread is the bursty CRUD family"
-        " (p99/p95 ≈ 2.68 in `crud_bursty`); the AI family under the mock"
-        " backend is nearly flat (≈ 1.00). Per ground rule 5 these are"
+        f"- The largest tail spread is the {top_fam.upper() if top_fam == 'ai' else 'CRUD'} family"
+        f" (p99/p95 = {top:.2f} in `{top_cell}`); {ai_txt}. Per ground rule 5 these are"
         " **live-only** readings — no sim table is revisited with them."
     )
     w("")

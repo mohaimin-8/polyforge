@@ -81,15 +81,15 @@ Prose only — no datum above is changed and every verdict stands as scored. Two
 
 **Method.** An exploratory probe (fixes no number, outside the frozen protocol) replays 24 cells — {point, q90c, q95c} × {ai_uncacheable, ai_cacheable, agentic, crud_bursty} × {uniform, premium_heavy} at `medium`, rep 0 — with timeseries on, and counts the controller's internal state directly: shed events (`tier="none"`), the tier mix, mean replicas against the cluster ceiling, and mean cache.
 
-**Finding 1 — the correction works, but does not abolish the budget interaction.** On `ai_uncacheable` the shed rate *falls* from 0.89% at the point forecast to **0.31%** at q90c — the correction doing exactly what it was designed to do — and then rises to **2.08%** at q95c, above even the uncorrected starting point. Capacity still costs money at *any* forecast, so at an extreme quantile the per-tenant budget filter binds again and the designed shed fallback returns. The `crud_bursty` control shows **0.00% shed at every arm**, confirming the channel is tier spend — the same signature the null's diagnosis identified.
+**Finding 1 — the correction works, but does not abolish the budget interaction.** On `ai_uncacheable` the shed rate *falls* from 0.89% at the point forecast to **0.31%** at q90c — the correction doing exactly what it was designed to do — and then rises to **2.08%** at q95c, above even the uncorrected starting point. Capacity still costs money at *any* forecast, so at an extreme quantile the per-tenant budget filter binds again and the designed shed fallback returns. The `crud_bursty` control shows **0.00% shed at every arm**, confirming the channel is tier spend — the same signature the null's diagnosis identified. (Every number in this diagnosis is computed by this script's probe; audit 2026-09-26.)
 
 **Finding 2 — the knob buys attainment only where a capacity lever still has headroom.** The `medium` cluster caps replicas at 48 across 8 tenants, i.e. a mean of 6.00 per tenant when saturated:
 
 | class | mean replicas (point→q90c→q95c) | % of cluster ceiling | what the knob buys |
 |---|---|---|---|
-| ai_cacheable | 3.04 → 3.28 → 3.53 | 51–59% (headroom) | real replicas; violation falls |
-| agentic | 5.95 → 5.94 → 5.95 | 99% (saturated) | tier upgrades (small 76%→56%, mid 12%→28%); violation falls, cost rises sharply |
-| ai_uncacheable | 5.91 → 5.94 → 5.93 | 99% (saturated) | cache (377→481 MB) on a class only ~29% cacheable and past half-saturation; spend, not service |
+| ai_cacheable | 3.04 → 3.28 → 3.53 | 51%–59% (headroom) | real replicas; violation falls |
+| agentic | 5.94 → 5.94 → 5.95 | 99% (saturated) | tier upgrades (small 76%→56%, mid 12%→28%); violation falls, cost rises sharply |
+| ai_uncacheable | 5.91 → 5.94 → 5.93 | 99% (saturated) | cache (377→481 MB) on a class only 29% cacheable and past half-saturation; spend, not service |
 | crud_bursty | 5.65 → 5.63 → 5.62 | 94% | nothing — no tier spend, violation already ~0 |
 
 This is one mechanism for both anomalies. Where the replica budget has headroom (`ai_cacheable`), risk headroom converts into capacity and attainment improves cheaply. Where replicas are pinned at the cluster ceiling, the controller can only chase the inflated target through the levers that remain: tier upgrades, which work but cost real money and eventually re-trip the budget filter (`agentic`), or cache, which on a low-cacheable class past its half-saturation point returns almost nothing (`ai_uncacheable`). **The risk knob converts forecast headroom into attainment only insofar as some capacity lever still has headroom with a real return; where the levers are saturated or low-return, the inflated target is converted into spend instead of service.** That is why the aggregate frontier has an interior optimum rather than a monotone one.
