@@ -204,3 +204,13 @@ def test_spot_is_one_time_and_terminates_on_interruption():
         "SpotOptions": {"SpotInstanceType": "one-time",
                         "InstanceInterruptionBehavior": "terminate"}}
     assert "InstanceMarketOptions" not in ab.run_instances_params("ami", "g6e.4xlarge", "sg", 120)
+
+
+def test_the_ssh_rule_description_is_one_aws_accepts():
+    # AWS rejects a rule description outside its charset; "operator's" (an
+    # apostrophe) failed the first live launch after the /32 change.
+    import re
+
+    desc = ab.ssh_ingress("203.0.113.9/32")[0]["IpRanges"][0]["Description"]
+    assert len(desc) < 256
+    assert re.fullmatch(r"[a-zA-Z0-9. _\-:/()#,@\[\]+=&;{}!$*]*", desc), desc

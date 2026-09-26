@@ -115,7 +115,7 @@ def ssh_ingress(cidr: str) -> list[dict]:
     """SSH from `cidr` only. It was 0.0.0.0/0 -- key auth, but a GPU box's
     sshd open to every scanner on the internet (audit 2026-09-26)."""
     return [{"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22,
-             "IpRanges": [{"CidrIp": cidr, "Description": "ssh from the operator's address"}]}]
+             "IpRanges": [{"CidrIp": cidr, "Description": "ssh from the operator address"}]}]
 
 
 CHECKIP_URL = "https://checkip.amazonaws.com"
