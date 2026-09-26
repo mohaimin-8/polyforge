@@ -1,0 +1,514 @@
+openapi: 3.1.0
+info:
+  title: PolyForge AI Gateway API
+  version: 0.9.0
+  description: >-
+    The AI data plane: per-tenant chat with a semantic cache and model-tier
+    routing, document indexing and search, the agent loop, and the admin knob
+    surface the operator's Policy reconciler pushes the cache budget and model
+    tier to (PREREG_WAVE4_LIVE_PLANE.md). A separate service from the control
+    plane (api/openapi.yaml); internal/ai/gateway/server_openapi_test.go keeps
+    this document and the served routes identical.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: /
+    description: Current deployment origin (the gateway listens on :8081)
+paths:
+  /healthz:
+    get:
+      operationId: gatewayHealth
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: The gateway is serving.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  service:
+                    type: string
+                    const: polyforge-ai-gateway
+        "400":
+          $ref: "#/components/responses/Malformed"
+  /metrics:
+    get:
+      operationId: gatewayMetrics
+      summary: Prometheus counters (requests, cache hits and misses)
+      security: []
+      responses:
+        "200":
+          description: Prometheus text exposition format.
+          content:
+            text/plain:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/Malformed"
+  /v1/tenants/{tenant_id}/ai/chat:
+    post:
+      operationId: chat
+      summary: Chat completion through the tenant's semantic cache and model tier
+      description: >-
+        A near-duplicate prompt is answered from the tenant's semantic cache
+        without calling a model (X-PolyForge-Cache hit). On a miss the request
+        is served by the tenant's pinned tier (PUT /admin/tenants/{tenant_id}/knobs),
+        else the default tier, else the budget router. With stream true the
+        response is Server-Sent Events: data lines carrying {"delta": ...}
+        and a final data: [DONE].
+      security:
+        - TenantAPIKey: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatInput"
+      responses:
+        "200":
+          description: The completion (JSON), or its SSE stream when stream is true.
+          headers:
+            X-PolyForge-Cache:
+              description: hit or miss.
+              schema:
+                type: string
+                enum: [hit, miss]
+            X-PolyForge-Cache-Score:
+              description: Similarity of the cached prompt (hits only).
+              schema:
+                type: string
+            X-PolyForge-Tier:
+              description: The model tier that served a miss, when tier routing applied.
+              schema:
+                type: string
+            X-PolyForge-Backend:
+              description: The backend that served a miss.
+              schema:
+                type: string
+            X-PolyForge-Route-Reason:
+              description: Why that backend (policy-tier, default-tier, or a router reason).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+  /v1/tenants/{tenant_id}/ai/index:
+    post:
+      operationId: indexDocument
+      summary: Embed and index one document in the tenant's search index
+      security:
+        - TenantAPIKey: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, text]
+              properties:
+                id:
+                  type: string
+                  minLength: 1
+                text:
+                  type: string
+                  minLength: 1
+                meta:
+                  type: object
+                  additionalProperties:
+                    type: string
+      responses:
+        "201":
+          description: Indexed (an existing id is replaced).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, indexed, count]
+                properties:
+                  id:
+                    type: string
+                  indexed:
+                    type: boolean
+                  count:
+                    type: integer
+                    description: Documents now in the tenant's index.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          description: The admission budget is spent, or the tenant's index is at its 10,000-document limit (code quota_exceeded).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+  /v1/tenants/{tenant_id}/ai/search:
+    post:
+      operationId: searchDocuments
+      summary: Semantic search over the tenant's indexed documents
+      security:
+        - TenantAPIKey: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  minLength: 1
+                k:
+                  type: integer
+                  minimum: 0
+                  description: Maximum matches; 0 or absent uses the index default.
+      responses:
+        "200":
+          description: Matches, best first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [matches]
+                properties:
+                  matches:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Match"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+  /v1/tenants/{tenant_id}/ai/agent:
+    post:
+      operationId: runAgent
+      summary: Run the multi-step LLM and tool agent loop for one prompt
+      security:
+        - TenantAPIKey: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: The agent's final output and its step trace.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "501":
+          description: No agent runner is configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/UpstreamError"
+  /admin/tenants/{tenant_id}/knobs:
+    put:
+      operationId: putTenantKnobs
+      summary: Set the tenant's data-plane knobs (model tier and semantic-cache budget)
+      description: >-
+        The push target of the operator's Policy reconciler. model_tier pins the
+        tenant's cache misses to one configured tier backend; empty or none
+        releases the pin. cache_size_mb is the tenant's semantic-cache budget;
+        0 disables the tenant's cache. Knobs are process state and are re-pushed
+        by the next reconcile after a gateway restart.
+      security:
+        - AdminKey: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TenantKnobs"
+      responses:
+        "200":
+          description: The knobs now in force.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tenant_id, model_tier, cache_size_mb]
+                properties:
+                  tenant_id:
+                    type: string
+                  model_tier:
+                    type: string
+                  cache_size_mb:
+                    type: integer
+        "400":
+          description: A negative cache budget, or a model_tier with no configured backend.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "501":
+          $ref: "#/components/responses/KnobsDisabled"
+    get:
+      operationId: getTenantKnobs
+      summary: Read the tenant's data-plane knobs and cache usage
+      security:
+        - AdminKey: []
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: The knobs in force and the tenant's current cache usage.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tenant_id, model_tier, cache_size_mb, cache_used_bytes, cache_budget_set]
+                properties:
+                  tenant_id:
+                    type: string
+                  model_tier:
+                    type: string
+                  cache_size_mb:
+                    type: integer
+                  cache_used_bytes:
+                    type: integer
+                  cache_budget_set:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No knobs have been set for this tenant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          $ref: "#/components/responses/KnobsDisabled"
+components:
+  securitySchemes:
+    AdminKey:
+      type: apiKey
+      in: header
+      name: X-PolyForge-Admin-Key
+      description: The same POLYFORGE_ADMIN_KEY the control plane reads. With none configured the knob surface answers 501.
+    TenantAPIKey:
+      type: apiKey
+      in: header
+      name: X-PolyForge-API-Key
+      description: A tenant API key minted by the control plane. chat, index and agent need the full scope; search accepts read.
+  parameters:
+    TenantID:
+      name: tenant_id
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Malformed:
+      description: The HTTP server rejected a malformed request line or headers before routing.
+    BadRequest:
+      description: The body is not valid JSON or misses a required field.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: A missing or invalid credential.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: The API key lacks the scope this endpoint requires.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: >-
+        Admission refused. Before authentication a source address that keeps
+        failing authentication is throttled; after authentication the tenant's
+        own request budget applies. Retry after the Retry-After delay.
+      headers:
+        Retry-After:
+          description: Seconds until a request may be admitted.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UpstreamError:
+      description: The model, embedding or agent backend failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    KnobsDisabled:
+      description: No admin key is configured, so the knob surface does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+    Message:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+        content:
+          type: string
+        tool_calls:
+          type: array
+          items:
+            type: object
+            required: [id, name, arguments]
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              arguments: {}
+        tool_call_id:
+          type: string
+        name:
+          type: string
+    ChatInput:
+      type: object
+      required: [messages]
+      properties:
+        model:
+          type: string
+        messages:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Message"
+        stream:
+          type: boolean
+    ChatResponse:
+      type: object
+      required: [model, message, finish_reason, prompt_tokens, completion_tokens]
+      properties:
+        model:
+          type: string
+          description: The serving model, or semantic-cache for a cache hit.
+        message:
+          $ref: "#/components/schemas/Message"
+        finish_reason:
+          type: string
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+    TenantKnobs:
+      type: object
+      properties:
+        model_tier:
+          type: string
+          description: small, mid or large (a configured tier backend); empty or none releases the pin.
+        cache_size_mb:
+          type: integer
+          minimum: 0
+    Match:
+      type: object
+      required: [doc, score]
+      properties:
+        doc:
+          type: object
+          required: [id, tenant_id, text]
+          properties:
+            id:
+              type: string
+            tenant_id:
+              type: string
+            text:
+              type: string
+            meta:
+              type: object
+              additionalProperties:
+                type: string
+        score:
+          type: number
+    AgentResult:
+      type: object
+      required: [output, steps, llm_calls, tool_calls]
+      properties:
+        output:
+          type: string
+        steps:
+          type: array
+          items:
+            type: object
+        llm_calls:
+          type: integer
+        tool_calls:
+          type: integer

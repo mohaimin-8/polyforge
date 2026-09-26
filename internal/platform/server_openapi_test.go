@@ -3,13 +3,11 @@ package platform
 import (
 	"io"
 	"log/slog"
-	"os"
 	"path/filepath"
-	"regexp"
-	"sort"
 	"strings"
 	"testing"
 
+	"polyforge/internal/apicontract"
 	"polyforge/internal/tenant"
 )
 
@@ -32,83 +30,18 @@ func registeredPatterns(t *testing.T) []string {
 	return srv.RoutePatterns()
 }
 
-// parseOpenAPIOperations reads the "METHOD /path" operations from the spec.
-// A tiny structural scan (not a full YAML parse) keeps the test
-// dependency-free: paths live under a top-level "paths:" map as "  /x:"
-// keys, each followed by method keys ("    get:", "    post:", …).
-func parseOpenAPIOperations(t *testing.T) []string {
-	t.Helper()
-	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+func TestOpenAPIContractMatchesRoutes(t *testing.T) {
+	specOps, err := apicontract.Operations(filepath.Join("..", "..", "api", "openapi.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(repoRoot, "api", "openapi.yaml"))
-	if err != nil {
-		t.Fatalf("read openapi.yaml: %v", err)
-	}
-	lines := strings.Split(string(data), "\n")
-
-	pathRE := regexp.MustCompile(`^ {2}(/\S*):\s*$`)
-	methodRE := regexp.MustCompile(`^ {4}(get|post|put|patch|delete):\s*$`)
-
-	var ops []string
-	inPaths := false
-	curPath := ""
-	for _, line := range lines {
-		if strings.HasPrefix(line, "paths:") {
-			inPaths = true
-			continue
-		}
-		if !inPaths {
-			continue
-		}
-		// A new top-level key ends the paths section.
-		if len(line) > 0 && line[0] != ' ' && strings.TrimSpace(line) != "" {
-			break
-		}
-		if m := pathRE.FindStringSubmatch(line); m != nil {
-			curPath = m[1]
-			continue
-		}
-		if m := methodRE.FindStringSubmatch(line); m != nil && curPath != "" {
-			ops = append(ops, strings.ToUpper(m[1])+" "+curPath)
-		}
-	}
-	return ops
-}
-
-func TestOpenAPIContractMatchesRoutes(t *testing.T) {
-	specOps := parseOpenAPIOperations(t)
-	if len(specOps) == 0 {
-		t.Fatal("parsed zero operations from openapi.yaml — the scanner or the spec changed shape")
-	}
-
-	spec := map[string]bool{}
-	for _, op := range specOps {
-		spec[op] = true
-	}
-	served := map[string]bool{}
+	var served []string
 	for _, p := range registeredPatterns(t) {
-		if _, skip := nonAPIRoutes[p]; skip {
-			continue
-		}
-		served[p] = true
-	}
-
-	var undocumented, unimplemented []string
-	for op := range served {
-		if !spec[op] {
-			undocumented = append(undocumented, op)
+		if _, skip := nonAPIRoutes[p]; !skip {
+			served = append(served, p)
 		}
 	}
-	for op := range spec {
-		if !served[op] {
-			unimplemented = append(unimplemented, op)
-		}
-	}
-	sort.Strings(undocumented)
-	sort.Strings(unimplemented)
-
+	undocumented, unimplemented := apicontract.Diff(served, specOps)
 	if len(undocumented) > 0 {
 		t.Errorf("routes served but NOT in api/openapi.yaml (add them to the spec, "+
 			"or to nonAPIRoutes with a reason):\n  %s", strings.Join(undocumented, "\n  "))

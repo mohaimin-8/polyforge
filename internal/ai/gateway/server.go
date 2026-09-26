@@ -58,6 +58,8 @@ type Server struct {
 	// authFailures is the per-source failed-authentication budget checked
 	// before any key lookup (Server.authorize). nil when limiting is off.
 	authFailures *tenantLimiter
+	// patterns records every registered route for the OpenAPI-drift gate.
+	patterns []string
 }
 
 type Config struct {
@@ -127,15 +129,30 @@ func NewServer(log *slog.Logger, cfg Config) *Server {
 		limiter:       newTenantLimiter(cfg.RateLimit),
 		authFailures:  newTenantLimiter(cfg.RateLimit),
 	}
-	s.mux.HandleFunc("GET /healthz", s.health)
-	s.mux.HandleFunc("GET /metrics", s.metrics)
-	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/ai/chat", s.chat)
-	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/ai/index", s.indexDoc)
-	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/ai/search", s.searchDocs)
-	s.mux.HandleFunc("POST /v1/tenants/{tenant_id}/ai/agent", s.runAgent)
-	s.mux.HandleFunc("PUT /admin/tenants/{tenant_id}/knobs", s.putKnobs)
-	s.mux.HandleFunc("GET /admin/tenants/{tenant_id}/knobs", s.getKnobs)
+	s.handle("GET /healthz", s.health)
+	s.handle("GET /metrics", s.metrics)
+	s.handle("POST /v1/tenants/{tenant_id}/ai/chat", s.chat)
+	s.handle("POST /v1/tenants/{tenant_id}/ai/index", s.indexDoc)
+	s.handle("POST /v1/tenants/{tenant_id}/ai/search", s.searchDocs)
+	s.handle("POST /v1/tenants/{tenant_id}/ai/agent", s.runAgent)
+	s.handle("PUT /admin/tenants/{tenant_id}/knobs", s.putKnobs)
+	s.handle("GET /admin/tenants/{tenant_id}/knobs", s.getKnobs)
 	return s
+}
+
+// handle registers a route and records its "METHOD /path" pattern, so the
+// served surface is the single source of truth the OpenAPI-drift test
+// (server_openapi_test.go) checks api/ai-gateway.openapi.yaml against -- the
+// control plane's arrangement (internal/platform/server.go).
+func (s *Server) handle(pattern string, h http.HandlerFunc) {
+	s.patterns = append(s.patterns, pattern)
+	s.mux.HandleFunc(pattern, h)
+}
+
+// RoutePatterns returns the registered "METHOD /path" patterns in
+// registration order. Used by the OpenAPI-drift gate.
+func (s *Server) RoutePatterns() []string {
+	return append([]string(nil), s.patterns...)
 }
 
 func (s *Server) Handler() http.Handler { return securityHeaders(s.mux) }
