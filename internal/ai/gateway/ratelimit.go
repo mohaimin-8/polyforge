@@ -56,13 +56,35 @@ func newTenantLimiter(cfg RateLimit) *tenantLimiter {
 // allow consumes one token for key, returning whether the request may proceed
 // and, if not, how long until the next token.
 func (l *tenantLimiter) allow(key string) (bool, time.Duration) {
-	now := l.clock()
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	b := l.refilled(key, l.clock())
+	if b.tokens < 1 {
+		return false, l.waitFor(b)
+	}
+	b.tokens--
+	return true, 0
+}
 
-	// Reclaim idle tenants' buckets so the map does not grow for the process
-	// lifetime; keys are authenticated tenant ids, but a churny fleet still
-	// accumulates them.
+// refund returns one token to key's bucket, never past capacity. The
+// gateway's failed-authentication budget is RESERVED with allow before a key
+// lookup and refunded when the lookup did not fail on the caller's
+// credential: reserving first caps a concurrent bad-key burst at the
+// bucket's capacity the moment it arrives, where checking without reserving
+// let every concurrent request through to the key store (security review
+// 2026-09-26).
+func (l *tenantLimiter) refund(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	b := l.refilled(key, l.clock())
+	b.tokens = math.Min(l.capacity, b.tokens+1)
+}
+
+// refilled returns key's bucket topped up to now. Callers hold l.mu.
+func (l *tenantLimiter) refilled(key string, now time.Time) *tokenBucket {
+	// Reclaim idle buckets so the map does not grow for the process
+	// lifetime; keys are tenant ids or client addresses, and a churny fleet
+	// (or a scanner rotating addresses) still accumulates them.
 	if l.lastPrune.IsZero() {
 		l.lastPrune = now
 	} else if now.Sub(l.lastPrune) > 10*time.Minute {
@@ -73,7 +95,6 @@ func (l *tenantLimiter) allow(key string) (bool, time.Duration) {
 		}
 		l.lastPrune = now
 	}
-
 	b := l.buckets[key]
 	if b == nil {
 		b = &tokenBucket{tokens: l.capacity, updated: now}
@@ -82,19 +103,19 @@ func (l *tenantLimiter) allow(key string) (bool, time.Duration) {
 	b.tokens = math.Min(l.capacity, b.tokens+now.Sub(b.updated).Seconds()*l.refillPerSecond)
 	b.updated = now
 	b.lastSeen = now
-	if b.tokens < 1 {
-		wait := time.Duration((1 - b.tokens) / l.refillPerSecond * float64(time.Second))
-		return false, wait
-	}
-	b.tokens--
-	return true, 0
+	return b
 }
 
-// forget drops a tenant's bucket, called when the tenant is deleted. The
-// admission check itself lives in Server.authorize (server.go), the shared
-// choke point for every AI route, because r.PathValue — the tenant key — is
-// only populated after the mux routes the request, so wrapping the mux would
-// see an empty tenant.
+func (l *tenantLimiter) waitFor(b *tokenBucket) time.Duration {
+	return time.Duration((1 - b.tokens) / l.refillPerSecond * float64(time.Second))
+}
+
+// forget drops a key's bucket. Nothing outside the tests calls it today: a
+// deleted tenant's bucket is reclaimed by the idle prune in refilled. The
+// admission checks themselves live in Server.authorize (server.go), the
+// shared choke point for every AI route, because r.PathValue -- the tenant
+// key -- is only populated after the mux routes the request, so wrapping the
+// mux would see an empty tenant.
 func (l *tenantLimiter) forget(key string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()

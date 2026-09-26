@@ -81,11 +81,26 @@ func (s *Server) authorizeAdmin(w http.ResponseWriter, r *http.Request) bool {
 	// also unlocks the control-plane admin surface (tenant CRUD, key
 	// minting) — platform-root. A plain != short-circuits on the first
 	// differing byte and leaks that.
+	//
+	// Guessing is also bounded: each attempt reserves from the source's
+	// failed-authentication budget (the one Server.authorize uses), refunded
+	// on success, so a wrong key keeps its token and a source that keeps
+	// guessing is refused with 429 (security review 2026-09-26).
+	source := clientAddress(r)
+	if s.authFailures != nil {
+		if ok, retryAfter := s.authFailures.allow(source); !ok {
+			rateLimited(w, retryAfter, "too many failed authentication attempts from this address; retry after the indicated delay")
+			return false
+		}
+	}
 	provided := strings.TrimSpace(r.Header.Get("X-PolyForge-Admin-Key"))
 	if len(provided) != len(s.adminKey) ||
 		subtle.ConstantTimeCompare([]byte(provided), []byte(s.adminKey)) != 1 {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "a valid admin key is required")
 		return false
+	}
+	if s.authFailures != nil {
+		s.authFailures.refund(source)
 	}
 	return true
 }
