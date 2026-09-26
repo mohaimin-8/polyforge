@@ -704,6 +704,54 @@ class IncrementalAllocationTests(unittest.TestCase):
         self.assertFalse(real["invariant"])
 
 
+class FloorBoundTests(unittest.TestCase):
+    """Audit 2026-09-26: positions sharing a need level were charged the
+    WORST of their achievable violations, which makes the walk's expectation
+    an upper bound, not the floor its comment claimed. `bound="min"` is the
+    valid lower bound; the published "worst" stays the default."""
+
+    @staticmethod
+    def _cell():
+        cfg = TenantConfig(tenant_id="t", slo_class="standard", replica_max=6)
+        # Positions at the same need level carry DIFFERENT demand, so the two
+        # bounds can differ (the batched-walk fixture has two shapes only).
+        factors = [6.0, 5.4, 4.9, 4.4, 2.2, 1.9, 0.5, 0.45, 0.4, 0.3]
+        orbit = [Demand(rps={"crud_read": 60.0 * f, "crud_write": 10.0 * f},
+                        crud_base_ms=40.0) for f in factors]
+        return cfg, orbit
+
+    def test_min_is_never_above_worst_and_differs_somewhere(self):
+        cfg, orbit = self._cell()
+        needs = guarantee.orbit_replica_needs(cfg, orbit)
+        worst = guarantee._violation_table(cfg, orbit, needs, cfg.replica_max)
+        low = guarantee._violation_table(cfg, orbit, needs, cfg.replica_max, bound="min")
+        self.assertEqual(worst.keys(), low.keys())
+        self.assertTrue(all(low[k] <= worst[k] for k in worst))
+        self.assertTrue(any(low[k] < worst[k] for k in worst),
+                        "fixture does not separate the bounds; the test would be vacuous")
+
+    def test_the_default_is_the_published_worst_bound(self):
+        cfg, orbit = self._cell()
+        needs = guarantee.orbit_replica_needs(cfg, orbit)
+        self.assertEqual(guarantee._violation_table(cfg, orbit, needs, cfg.replica_max),
+                         guarantee._violation_table(cfg, orbit, needs, cfg.replica_max,
+                                                    bound="worst"))
+
+    def test_the_min_floor_is_at_most_the_worst_under_contention(self):
+        cfg, orbit = self._cell()
+        for tenants, cap in ((2, 8), (3, 12)):
+            hi = guarantee.coupled_floor_incremental_batched(cfg, orbit, tenants, cap)
+            lo = guarantee.coupled_floor_incremental_batched(cfg, orbit, tenants, cap, bound="min")
+            self.assertLessEqual(lo["coupled_violation"], hi["coupled_violation"] + 1e-12)
+            self.assertEqual((lo["bound"], hi["bound"]), ("min", "worst"))
+
+    def test_an_unknown_bound_is_refused(self):
+        cfg, orbit = self._cell()
+        needs = guarantee.orbit_replica_needs(cfg, orbit)
+        with self.assertRaises(ValueError):
+            guarantee._violation_table(cfg, orbit, needs, cfg.replica_max, bound="mean")
+
+
 class BatchedOrderedWalkTests(unittest.TestCase):
     """WP13 step 3 — the vectorised ordered walk.
 

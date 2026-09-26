@@ -970,19 +970,33 @@ def incremental_allocation(needs: list[int], cap: int, held: list[int],
 
 
 def _violation_table(config: TenantConfig, demands: list[Demand],
-                     needs: tuple[int, ...], replica_max: int
-                     ) -> dict[tuple[int, int], float]:
+                     needs: tuple[int, ...], replica_max: int,
+                     bound: str = "worst") -> dict[tuple[int, int], float]:
     """(need level, replicas held) -> best achievable violation.
 
     Same construction as `coupled_floor`'s inner cache: positions sharing a
-    need level share a demand shape only up to that level, so the worst of
-    them is taken, which keeps this a floor rather than an average wearing a
-    floor's name.
+    need level share a demand shape only up to that level, so one value
+    stands for all of them. The published construction (`bound="worst"`)
+    takes the WORST, and its comment called that "a floor". It is not: each
+    position is charged at least its own achievable violation, so the walk's
+    expectation is an UPPER bound on the per-position quantity, and a
+    measured arm can land below it (audit 2026-09-26; that fits S3's "keda
+    67x below the floor"). `bound="min"` charges each position at most its
+    own value, so the expectation is a valid LOWER bound -- a floor. The
+    per-position quantity lies between the two. "worst" stays the default so
+    every committed series replays bit for bit.
+    On the published flash cell every need level carries one demand shape,
+    so the bounds coincide and its published series is exact
+    (research/analysis/test_separation_floor_bound.py); S3's gap does not
+    come from this fold.
     """
+    if bound not in ("worst", "min"):
+        raise ValueError(f"bound must be 'worst' or 'min', not {bound!r}")
+    pick = max if bound == "worst" else min
     table: dict[tuple[int, int], float] = {}
     for level in sorted(set(needs)):
         for held in range(1, replica_max + 1):
-            worst = 0.0
+            chosen = None
             for demand, need in zip(demands, needs):
                 if need != level:
                     continue
@@ -994,8 +1008,10 @@ def _violation_table(config: TenantConfig, demands: list[Demand],
                     for tier in TIERS
                     if config.knob_admits(cache_mb, tier)
                 )
-                worst = max(worst, local)
-            table[(level, held)] = worst
+                chosen = local if chosen is None else pick(chosen, local)
+            # max(0.0, ...) is the published fold's starting value; a level
+            # always has at least one position, so `chosen` is set.
+            table[(level, held)] = max(0.0, chosen) if bound == "worst" else chosen
     return table
 
 
@@ -1316,7 +1332,7 @@ def coupled_floor_incremental_batched(config: TenantConfig,
                                       demands: list[Demand], tenants: int,
                                       cap: int, *, periods: int = 4,
                                       chunk: int = 1 << 20,
-                                      progress=None) -> dict:
+                                      progress=None, bound: str = "worst") -> dict:
     """`coupled_floor_incremental(mode="ordered")` over the vectorised walk.
 
     Same enumeration, same arithmetic, no `max_states` ceiling. The aggregate
@@ -1328,7 +1344,7 @@ def coupled_floor_incremental_batched(config: TenantConfig,
     if any(n is None for n in needs):
         raise ValueError("orbit has an unservable position")
     length = len(needs)
-    table = _violation_table(config, demands, needs, config.replica_max)
+    table = _violation_table(config, demands, needs, config.replica_max, bound)
     lead = ramp_lead(config.replica_max)
 
     walked = length ** (tenants - 1) if tenants > 1 else 1
@@ -1352,6 +1368,7 @@ def coupled_floor_incremental_batched(config: TenantConfig,
         "uncoupled_violation": uncoupled,
         "gap": coupled - uncoupled,
         "mode": "ordered-batched",
+        "bound": bound,
         "states_walked": walked,
         "needs": needs,
         "cap": cap,
