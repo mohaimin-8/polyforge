@@ -1,0 +1,26 @@
+# PREREG_RETUNED.md (audit 2026-09-26, Phase 3) -- the composite objective
+# against the FAIR_J comparators RE-TUNED per cluster size over grids whose
+# optima are interior (TUNING_EXTENDED.md; baselines/tune_arms.py ->
+# tuned_arms.yaml), on FRESH shared seeds. Frozen and pushed before any run.
+#
+#   jcac_converged           treatment (as in PREREG_FAIR_J)
+#   hpa_fair_retuned         RT-H1: hpa_fair at its per-size re-tuned target_rho
+#   keda_fair_retuned        RT-H2: keda_fair at its per-size re-tuned rps/replica
+#   jcac_nojoint_v2_retuned  RT-H3: the layered stack, replica layer re-tuned
+#   hpa_fair, keda_fair      the as-published comparators, reported beside
+#
+# Cells mirror the headline matrix. The new experiment name gives fresh
+# seeds; shared_seeds gives every arm in a cell identical demand.
+name: matrix_retuned
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_converged, hpa_fair_retuned, keda_fair_retuned, jcac_nojoint_v2_retuned,
+          hpa_fair, keda_fair]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_retuned.duckdb
+retries: 2
+timeseries_reps: 0
