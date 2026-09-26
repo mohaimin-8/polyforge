@@ -567,9 +567,6 @@ class PublishedSeparationNumbers(unittest.TestCase):
                                clear["predictive_cycle_cost"], places=12)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class CouplingBracketTests(unittest.TestCase):
     """WP13 step 1: the coupling bracket the M3 prose asserts, pinned.
@@ -872,3 +869,9 @@ class BatchedOrderedWalkTests(unittest.TestCase):
         self.assertEqual(default["coupled_violation"],
                          scalar["coupled_violation"],
                          "the default engine must be the scalar one, bit for bit")
+
+
+# At the END: mid-file, a direct `python test_guarantee.py` ran only the 31
+# tests above it (audit 2026-09-26, same defect as test_jcac.py).
+if __name__ == "__main__":
+    unittest.main()
