@@ -37,8 +37,9 @@ COMPARATORS = ["jcac", "replica-only-tuned", "replica-only", "cache-only", "tier
 ARMS = [TREATMENT, *COMPARATORS]
 PRIMARY_CELL = "joint_stress"      # WL-R1 (the B1' WL-H1' cell)
 HELD_OUT_CELL = "agentic"          # WL-R2 (never used to design the controller)
-IN_SAMPLE_CELL = "ai_cacheable"    # descriptive replication of a B1' cell
-CELLS = [PRIMARY_CELL, HELD_OUT_CELL, IN_SAMPLE_CELL]
+# Pre-run amendment: the descriptive in-sample cell (ai_cacheable) was dropped
+# to fit the budget before any run (PREREG_WAVE4_REPLICATION.md).
+CELLS = [PRIMARY_CELL, HELD_OUT_CELL]
 REPS = 5
 ALPHA = 0.05
 JAIN_MARGIN = 0.01                 # iso-fairness, as WL-H1'
@@ -174,7 +175,6 @@ def build(df: pd.DataFrame) -> str:
     L += table(f"## Guard: WL-R1 with control overhead charged (${overhead:.4f} per run to each "
                "operator-driven arm: operator + planner pods as control-plane replica-equivalents)",
                PRIMARY_CELL, overhead)
-    L += table(f"## Descriptive: in-sample replication, `{IN_SAMPLE_CELL}`", IN_SAMPLE_CELL)
     L += ["", "## Descriptive: the two replica-only arms", "",
           "| cell | `replica-only` (chart HPA) | `replica-only-tuned` | difference |",
           "|---|---:|---:|---:|"]
