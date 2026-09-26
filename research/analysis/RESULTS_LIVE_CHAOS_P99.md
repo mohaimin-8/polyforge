@@ -42,7 +42,7 @@ any live number existed. This file adds no new measurement.
 | crud_bursty | ai | — | — | (no ai traffic in cell) |
 
 - Violation is zero in every committed row, so the **p99 violation verdict matches the p95 verdict** in both cells: on the live cluster the SLO story is unchanged when read at p99 — exactly the narrow claim P99-H1 permits.
-- The largest tail spread is the bursty CRUD family (p99/p95 ≈ 2.68 in `crud_bursty`); the AI family under the mock backend is nearly flat (≈ 1.00). Per ground rule 5 these are **live-only** readings — no sim table is revisited with them.
+- The largest tail spread is the CRUD family (p99/p95 = 2.68 in `crud_bursty`); the AI family under the mock backend is flat at p99/p95 = 1.00. Per ground rule 5 these are **live-only** readings — no sim table is revisited with them.
 
 ## Status
 

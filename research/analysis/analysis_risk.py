@@ -20,6 +20,32 @@ import stats
 
 import figures as F  # shared 600-DPI / colour-blind-safe conventions
 
+PROBE_SEED = 4242
+PROBE_ARMS = ("jcac_anchored", "jcac_q90", "jcac_q95")
+
+
+def shed_probe() -> dict[str, tuple[int, float]]:
+    """The POST-RUN DIAGNOSIS's targeted probe, executed rather than quoted
+    (audit 2026-09-26: its counts were fixed text; this reproduces them):
+    ai_cacheable/uniform/medium at seed 4242, 120 steps. Per arm, the
+    tenant-steps served at tier "none" and the mean replicas."""
+    import sys
+    from dataclasses import replace
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "eval"))
+    from harness import sim_backend
+    from harness.config import ExperimentSpec, expand
+
+    out = {}
+    for arm in PROBE_ARMS:
+        spec = ExperimentSpec(name="probe", backend="sim", steps=120, reps=1, systems=[arm],
+                              workloads=["ai_cacheable"], tenant_mixes=["uniform"],
+                              cluster_sizes=["medium"], timeseries_reps=1)
+        rows = sim_backend.execute(replace(expand(spec)[0], seed=PROBE_SEED))["timeseries"]
+        out[arm] = (sum(r["tier"] == "none" for r in rows),
+                    sum(r["replicas"] for r in rows) / len(rows))
+    return out
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DB = REPO_ROOT / "eval" / "results" / "raw_sim_risk.duckdb"
 # Committed run-level export: the DuckDB is Zenodo-archived, so this is what
@@ -311,13 +337,18 @@ def main() -> None:
       "**violation rises**. The knob was fighting the Budget CRD, not the "
       "demand.")
     w("")
+    crud_p = {r["class"]: r["p"] for r in rows if r["class"].startswith("crud_")}
+    probe = shed_probe()
+    (n0, r0), (n90, _), (n95, r95) = (probe[a] for a in PROBE_ARMS)
     w("**Evidence.** (a) The class breakdown above: `crud_bursty` and "
-      "`crud_steady` show *no* effect (p = 0.27, 0.92) — CRUD carries no tier "
+      f"`crud_steady` show *no* effect (p = {crud_p['crud_bursty']:.2g}, "
+      f"{crud_p['crud_steady']:.2g}) — CRUD carries no tier "
       "spend, so its budget headroom is untouched — while all three AI classes "
       "move sharply. (b) A targeted probe (`ai_cacheable/uniform/medium`, seed "
-      "4242) counts the shed state directly: `tier=\"none\"` occurs **0** times "
-      "at the point forecast, **2** at q=0.90 and **4** at q=0.95, while mean "
-      "replicas *rise* 2.64 → 2.93 — the capacity half of the mechanism worked "
+      f"{PROBE_SEED}, executed by this script) counts the shed state directly: "
+      f"`tier=\"none\"` occurs **{n0}** times "
+      f"at the point forecast, **{n90}** at q=0.90 and **{n95}** at q=0.95, while mean "
+      f"replicas *rise* {r0:.2f} → {r95:.2f} — the capacity half of the mechanism worked "
       "exactly as designed; the budget interaction defeated it.")
     w("")
     w("**What this does and does not license.** It does *not* rescue the "
