@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"polyforge/internal/ai/egress"
 )
 
 // OpenAI calls any OpenAI-compatible /v1/embeddings endpoint (OpenAI
@@ -31,7 +33,9 @@ func NewOpenAI(baseURL, apiKey, model string, dims int) *OpenAI {
 		apiKey:  apiKey,
 		model:   model,
 		dims:    dims,
-		client:  &http.Client{Timeout: 30 * time.Second},
+		// The shared egress guard: never follow a redirect the embeddings
+		// endpoint returns (SSRF into internal hosts; audit 2026-09-26).
+		client: egress.Client(30 * time.Second),
 	}
 }
 
