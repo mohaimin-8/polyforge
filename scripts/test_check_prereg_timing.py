@@ -66,3 +66,24 @@ def test_a_disclosure_that_no_longer_applies_is_reported():
 
 def test_the_gate_passes_on_the_real_history():
     assert ct.main() == 0
+
+
+def test_mixed_laptop_and_cloud_evidence_takes_the_conservative_reading(tmp_path):
+    # Review of fe23712: one cloud host_facts among laptop sittings must not
+    # make a laptop-recorded first run read as UTC -- that would place it six
+    # hours LATER and could hide a run that preceded its protocol.
+    _host_facts(tmp_path / "ev", "Linux 6.8.0-1063-aws")
+    other = tmp_path / "ev" / "runs" / "arm__cell__rep1"
+    other.mkdir(parents=True)
+    (other / "host_facts.json").write_text(json.dumps({"os": "Windows 11"}), encoding="utf-8")
+    assert ct.host_offset_hours("1.0.0", tmp_path / "ev")[0] == 6
+
+
+def test_a_shallow_clone_is_refused_not_misjudged(monkeypatch, capsys):
+    # Review of fe23712: on a depth-1 clone every prereg's "first commit" is
+    # the checkout commit, so every campaign would look like it ran first.
+    real = ct.git
+    monkeypatch.setattr(ct, "git", lambda *a: "true" if a == ("rev-parse", "--is-shallow-repository")
+                        else real(*a))
+    assert ct.main() == 2
+    assert "shallow" in capsys.readouterr().out

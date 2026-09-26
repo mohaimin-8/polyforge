@@ -79,13 +79,19 @@ def host_offset_hours(harness_version: str | None, evidence_dir: Path) -> tuple[
     """Hours to SUBTRACT from a stored `recorded_at` to get UTC, and why."""
     if _version(harness_version) >= (1, 1, 0):
         return 0, "UTC (harness >= 1.1.0)"
+    # Read as UTC only when EVERY host this campaign's evidence names is a
+    # cloud host. One cloud sitting among laptop ones must not make a
+    # laptop-recorded first run read six hours late -- that would hide a run
+    # that preceded its protocol (review of fe23712). Unreadable facts count
+    # as unknown, which keeps the conservative reading.
+    oses = []
     for facts in sorted(evidence_dir.glob("**/host_facts.json")) if evidence_dir.exists() else []:
         try:
-            os_name = json.loads(facts.read_text(encoding="utf-8")).get("os", "")
+            oses.append(json.loads(facts.read_text(encoding="utf-8")).get("os", ""))
         except (OSError, ValueError):
-            continue
-        if "-aws" in os_name:
-            return 0, "UTC (cloud host per host_facts)"
+            oses.append("")
+    if oses and all("-aws" in o for o in oses):
+        return 0, "UTC (every host_facts is a cloud host)"
     return LAPTOP_OFFSET_H, "UTC+6 assumed (laptop; conservative)"
 
 
@@ -187,6 +193,13 @@ def audit() -> list[dict]:
 
 
 def main() -> int:
+    # A depth-1 clone has one commit, so every prereg's "first commit" would
+    # be the checkout and every campaign would look like it ran first. Refuse
+    # loudly, as check_preregs.py does, rather than report a false storm.
+    if git("rev-parse", "--is-shallow-repository") == "true":
+        print("REFUSED: shallow clone -- fetch full history (fetch-depth: 0) "
+              "before judging prereg timing")
+        return 2
     rows = audit()
     print(f"{'campaign':34s} {'protocol':32s} {'run - prereg':>14s}  verdict")
     for r in sorted(rows, key=lambda r: (r["gap_s"] is None, r["gap_s"] or 0.0)):
