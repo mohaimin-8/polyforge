@@ -24,14 +24,14 @@ A further **51** scored tests in 12 records carry a verdict but no p-value (conf
 
 | record | section | test | registered verdict | registered p | programme Holm | programme BY |
 |---|---|---|---|---:|---|---|
-| `RESULTS_BUDGET_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | BP-H1a | FAIL | 0.112 | — | — |
-| `RESULTS_BUDGET_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | BP-H1b | FAIL | 0.191 | — | — |
-| `RESULTS_BUDGET_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | BP-H2a | PASS | 0.000517 | reject | reject |
-| `RESULTS_BUDGET_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | BP-H2b | PASS | 0.000517 | reject | reject |
-| `RESULTS_BUDGET_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | BP-H1a | FAIL | 0.379 | — | — |
-| `RESULTS_BUDGET_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | BP-H1b | FAIL | 0.91 | — | — |
-| `RESULTS_BUDGET_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | BP-H2a | PASS | 2.5e-13 | reject | reject |
-| `RESULTS_BUDGET_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | BP-H2b | PASS | 2.5e-13 | reject | reject |
+| `RESULTS_BUDGET_PARITY.md` | BurstGPT v2.0 (96 x 6 h) / Hypotheses (Holm-corrected within this trace's family of 4) | BP-H1a | FAIL | 0.112 | — | — |
+| `RESULTS_BUDGET_PARITY.md` | BurstGPT v2.0 (96 x 6 h) / Hypotheses (Holm-corrected within this trace's family of 4) | BP-H1b | FAIL | 0.191 | — | — |
+| `RESULTS_BUDGET_PARITY.md` | BurstGPT v2.0 (96 x 6 h) / Hypotheses (Holm-corrected within this trace's family of 4) | BP-H2a | PASS | 0.000517 | reject | reject |
+| `RESULTS_BUDGET_PARITY.md` | BurstGPT v2.0 (96 x 6 h) / Hypotheses (Holm-corrected within this trace's family of 4) | BP-H2b | PASS | 0.000517 | reject | reject |
+| `RESULTS_BUDGET_PARITY.md` | Azure LLM 2024 (72 x 3 h) / Hypotheses (Holm-corrected within this trace's family of 4) | BP-H1a | FAIL | 0.379 | — | — |
+| `RESULTS_BUDGET_PARITY.md` | Azure LLM 2024 (72 x 3 h) / Hypotheses (Holm-corrected within this trace's family of 4) | BP-H1b | FAIL | 0.91 | — | — |
+| `RESULTS_BUDGET_PARITY.md` | Azure LLM 2024 (72 x 3 h) / Hypotheses (Holm-corrected within this trace's family of 4) | BP-H2a | PASS | 2.5e-13 | reject | reject |
+| `RESULTS_BUDGET_PARITY.md` | Azure LLM 2024 (72 x 3 h) / Hypotheses (Holm-corrected within this trace's family of 4) | BP-H2b | PASS | 2.5e-13 | reject | reject |
 | `RESULTS_CONCURRENCY.md` | CQ-H1 / CQ-H2 (confirmatory) — jcac_anchored vs tuned concurrency | CQ-H1: composite J | PASS | 1.26e-44 | reject | reject |
 | `RESULTS_CONCURRENCY.md` | CQ-H1 / CQ-H2 (confirmatory) — jcac_anchored vs tuned concurrency | CQ-H2: cost (USD) | PASS | 7.67e-31 | reject | reject |
 | `RESULTS_EVICTION_PARITY.md` | Hypotheses (Holm-corrected within this family) | EP-H1a | FAIL | 0.995 | — | — |
@@ -40,7 +40,7 @@ A further **51** scored tests in 12 records carry a verdict but no p-value (conf
 | `RESULTS_EVICTION_PARITY.md` | Hypotheses (Holm-corrected within this family) | EP-H3 | PASS | 6.38e-12 | reject | reject |
 | `RESULTS_LAYERED_FIX.md` | Hypotheses (Holm-corrected within the family of 2) | LF-H1 | PASS | 1.17e-11 | reject | reject |
 | `RESULTS_LAYERED_FIX.md` | Hypotheses (Holm-corrected within the family of 2) | LF-H2 | PASS | 8.39e-16 | reject | reject |
-| `RESULTS_LEARNED.md` | LR-H1 (confirmatory, non-inferiority) — MPC vs offline-trained learned | LR-H1: J non-inferiority (one-sided p) | PASS | 3.9e-33 | reject | reject |
+| `RESULTS_LEARNED.md` | LR-H1 (confirmatory, non-inferiority) — MPC vs offline-trained learned policy | LR-H1: J non-inferiority (one-sided p) | PASS | 3.9e-33 | reject | reject |
 | `RESULTS_LEARNED.md` | LR-H2 (confirmatory, data-efficiency) — trained vs online learned | LR-H2: J (trained − online) | PASS | 4.61e-43 | reject | reject |
 | `RESULTS_MODEL_MISMATCH.md` | MM-H1 and MM-H2 (one Holm family of 12, α = 0.05) | MM-H1[cap0.75] | PASS | 2.74e-10 | reject | reject |
 | `RESULTS_MODEL_MISMATCH.md` | MM-H1 and MM-H2 (one Holm family of 12, α = 0.05) | MM-H2[cap0.75] | PASS | 4.71e-09 | reject | reject |
@@ -59,12 +59,12 @@ A further **51** scored tests in 12 records carry a verdict but no p-value (conf
 | `RESULTS_RISK.md` | RQ-H2 (confirmatory) — dominance at the pre-declared q = 0.90 | cost vs tuned keda (want < 0) | PASS | 6.52e-51 | reject | reject |
 | `RESULTS_RISK.md` | RQ-H2 (confirmatory) — dominance at the pre-declared q = 0.90 | cost vs tuned concurrency (want < 0) | PASS | 7.31e-36 | reject | reject |
 | `RESULTS_RISK_BUDGET.md` | RB-H1 (confirmatory) — does the corrected knob buy attainment? | violation, q90c − point (want < 0) | PASS | 0.00733 | — | reject |
-| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive  | violation, q90c − hpa (want < 0) | FAIL | 0.0256 | — | — |
-| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive  | cost, q90c − hpa (want < 0) | PASS | 1.77e-24 | reject | reject |
-| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive  | violation, q90c − keda (want < 0) | FAIL | 0.585 | — | — |
-| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive  | cost, q90c − keda (want < 0) | PASS | 3.41e-39 | reject | reject |
-| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive  | violation, q90c − concurrency (want < 0) | FAIL | 0.376 | — | — |
-| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive  | cost, q90c − concurrency (want < 0) | PASS | 2.14e-26 | reject | reject |
+| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive stack | violation, q90c − hpa (want < 0) | FAIL | 0.0256 | — | — |
+| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive stack | cost, q90c − hpa (want < 0) | PASS | 1.77e-24 | reject | reject |
+| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive stack | violation, q90c − keda (want < 0) | FAIL | 0.585 | — | — |
+| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive stack | cost, q90c − keda (want < 0) | PASS | 3.41e-39 | reject | reject |
+| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive stack | violation, q90c − concurrency (want < 0) | FAIL | 0.376 | — | — |
+| `RESULTS_RISK_BUDGET.md` | RB-H3 (confirmatory) — strict Pareto domination of the tuned reactive stack | cost, q90c − concurrency (want < 0) | PASS | 2.14e-26 | reject | reject |
 | `RESULTS_TENANT_SCALE.md` | TS-H1a (confirmatory) — 32 tenants | HPA | PASS | 4.06e-05 | reject | reject |
 | `RESULTS_TENANT_SCALE.md` | TS-H1a (confirmatory) — 32 tenants | KEDA | PASS | 0.000222 | reject | reject |
 | `RESULTS_TENANT_SCALE.md` | TS-H1a (confirmatory) — 32 tenants | Concurrency (KPA shape) | PASS | 3.05e-05 | reject | reject |
@@ -77,21 +77,29 @@ A further **51** scored tests in 12 records carry a verdict but no p-value (conf
 | `RESULTS_TRACE2.md` | HT2 (confirmatory, PREREG_TRACE2 §3) — composite J, paired by window | HPA | PASS | 4.91e-05 | reject | reject |
 | `RESULTS_TRACE2.md` | HT2 (confirmatory, PREREG_TRACE2 §3) — composite J, paired by window | KEDA | PASS | 5.54e-05 | reject | reject |
 | `RESULTS_TRACE2.md` | HT2 (confirmatory, PREREG_TRACE2 §3) — composite J, paired by window | FIRM | PASS | 1.06e-05 | reject | reject |
-| `RESULTS_TRACE_AZURE.md` | HT-AZ (confirmatory, PREREG_TRACE_AZURE §3) — composite J, paired by w | HPA | PASS | 5.3e-22 | reject | reject |
-| `RESULTS_TRACE_AZURE.md` | HT-AZ (confirmatory, PREREG_TRACE_AZURE §3) — composite J, paired by w | KEDA | PASS | 5.29e-22 | reject | reject |
-| `RESULTS_TRACE_AZURE.md` | HT-AZ (confirmatory, PREREG_TRACE_AZURE §3) — composite J, paired by w | FIRM | PASS | 1.03e-24 | reject | reject |
-| `RESULTS_TRACE_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | TP-H1a | FAIL | 0.0133 | — | — |
-| `RESULTS_TRACE_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | TP-H1b | FAIL | 0.0146 | — | — |
-| `RESULTS_TRACE_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | TP-H3a | FAIL | 0.989 | — | — |
-| `RESULTS_TRACE_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | TP-H3b | FAIL | 0.989 | — | — |
-| `RESULTS_TRACE_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | TP-H1a | PASS | 3.01e-05 | reject | reject |
-| `RESULTS_TRACE_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | TP-H1b | PASS | 9.51e-05 | reject | reject |
-| `RESULTS_TRACE_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | TP-H3a | PASS | 0.002 | reject | reject |
-| `RESULTS_TRACE_PARITY.md` | Hypotheses (Holm-corrected within this trace's family of 4) | TP-H3b | PASS | 0.002 | reject | reject |
+| `RESULTS_TRACE_AZURE.md` | HT-AZ (confirmatory, PREREG_TRACE_AZURE §3) — composite J, paired by window | HPA | PASS | 5.3e-22 | reject | reject |
+| `RESULTS_TRACE_AZURE.md` | HT-AZ (confirmatory, PREREG_TRACE_AZURE §3) — composite J, paired by window | KEDA | PASS | 5.29e-22 | reject | reject |
+| `RESULTS_TRACE_AZURE.md` | HT-AZ (confirmatory, PREREG_TRACE_AZURE §3) — composite J, paired by window | FIRM | PASS | 1.03e-24 | reject | reject |
+| `RESULTS_TRACE_PARITY.md` | BurstGPT v2.0 (96 x 6 h, `PREREG_TRACE2.md` protocol) / Hypotheses (Holm-corrected within  | TP-H1a | FAIL | 0.0133 | — | — |
+| `RESULTS_TRACE_PARITY.md` | BurstGPT v2.0 (96 x 6 h, `PREREG_TRACE2.md` protocol) / Hypotheses (Holm-corrected within  | TP-H1b | FAIL | 0.0146 | — | — |
+| `RESULTS_TRACE_PARITY.md` | BurstGPT v2.0 (96 x 6 h, `PREREG_TRACE2.md` protocol) / Hypotheses (Holm-corrected within  | TP-H3a | FAIL | 0.989 | — | — |
+| `RESULTS_TRACE_PARITY.md` | BurstGPT v2.0 (96 x 6 h, `PREREG_TRACE2.md` protocol) / Hypotheses (Holm-corrected within  | TP-H3b | FAIL | 0.989 | — | — |
+| `RESULTS_TRACE_PARITY.md` | Azure LLM 2024 (72 x 3 h, `PREREG_TRACE_AZURE.md` protocol) / Hypotheses (Holm-corrected w | TP-H1a | PASS | 3.01e-05 | reject | reject |
+| `RESULTS_TRACE_PARITY.md` | Azure LLM 2024 (72 x 3 h, `PREREG_TRACE_AZURE.md` protocol) / Hypotheses (Holm-corrected w | TP-H1b | PASS | 9.51e-05 | reject | reject |
+| `RESULTS_TRACE_PARITY.md` | Azure LLM 2024 (72 x 3 h, `PREREG_TRACE_AZURE.md` protocol) / Hypotheses (Holm-corrected w | TP-H3a | PASS | 0.002 | reject | reject |
+| `RESULTS_TRACE_PARITY.md` | Azure LLM 2024 (72 x 3 h, `PREREG_TRACE_AZURE.md` protocol) / Hypotheses (Holm-corrected w | TP-H3b | PASS | 0.002 | reject | reject |
 | `RESULTS_V2.md` | H1 (confirmatory, PREREG_V2 §4) — the SLO segment | HPA | FAIL | 0.648 | — | — |
 | `RESULTS_V2.md` | H1 (confirmatory, PREREG_V2 §4) — the SLO segment | KEDA | FAIL | 0.264 | — | — |
-| `RESULTS_V3.md` | H1′ (confirmatory, PREREG_V3 §4) — the SLO segment in the overload reg | HPA | FAIL | 2.83e-08 | reject | reject |
-| `RESULTS_V3.md` | H1′ (confirmatory, PREREG_V3 §4) — the SLO segment in the overload reg | KEDA | FAIL | 3.25e-24 | reject | reject |
+| `RESULTS_V3.md` | H1′ (confirmatory, PREREG_V3 §4) — the SLO segment in the overload regime | HPA | FAIL | 2.83e-08 | reject | reject |
+| `RESULTS_V3.md` | H1′ (confirmatory, PREREG_V3 §4) — the SLO segment in the overload regime | KEDA | FAIL | 3.25e-24 | reject | reject |
+
+## Tables with verdicts that are not counted
+
+These tables carry PASS/FAIL cells but no `verdict` column, so they are listed here rather than parsed. They are not in the counts above; each should be checked against its record to see whether it is a registered test or a sub-reading of one.
+
+| record | section | rows with PASS/FAIL |
+|---|---|---:|
+| `RESULTS_LIVE_SOAK_V8.md` | SK-H1 — recovery | 1 |
 
 ## Reading
 

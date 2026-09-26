@@ -56,3 +56,19 @@ def test_record_builds_and_names_every_registered_hypothesis(monkeypatch, tmp_pa
     for hid in ("EP-H3", "TP-H3a", "TP-H3b", "BP-H2a", "BP-H2b", "MM-H2[cap0.75]", "MM-H2[cache1.25]"):
         assert hid in text, hid
     assert "exploratory" in text.lower()
+
+
+def test_registered_refuses_an_ambiguous_or_missing_row(monkeypatch, tmp_path):
+    # Review of bca5acd: a hypothesis id found in two places, or in none, must
+    # raise rather than return whichever row a regex reached first.
+    mod = _mod(monkeypatch, tmp_path)
+    twice = ("## A\n| id | p | verdict |\n|---|---:|---|\n| X-H1 | 0.01 | PASS |\n"
+             "## B\n| id | p | verdict |\n|---|---:|---|\n| X-H1 | 0.5 | FAIL |\n")
+    import pytest
+    with pytest.raises(LookupError):
+        mod.registered_in(twice, "X-H1", None)
+    assert mod.registered_in(twice, "X-H1", "B") == "FAIL"
+    with pytest.raises(LookupError):
+        mod.registered_in(twice, "X-H9", None)
+    with pytest.raises(LookupError):
+        mod.registered_in(twice, "X-H1", "C")
