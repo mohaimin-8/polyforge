@@ -1143,6 +1143,45 @@ class GracefulDegradationTests(unittest.TestCase):
         self.assertEqual(graceful.tier, "none")
 
 
+class ClampedFallbackTests(unittest.TestCase):
+    """Audit 2026-09-26 (MEDIUM): an entirely infeasible lattice shed to
+    (replica_min, 0 MB, none) in ONE step -- confirmed by execution, a tenant
+    at 9 replicas became 1 -- ignoring the move clamps the lattice itself
+    obeys (±2 replicas, one cache level) and any pinned knob. The opt-in
+    `clamped_fallback` sheds inside those guardrails; the default is the
+    published shed, bit for bit. It composes with `anchor_moves`, as every
+    audit-era arm runs: unanchored, each of the two coordination sweeps moves
+    from the previous sweep's choice, so any move -- this one included --
+    compounds to the disclosed ±4 per interval."""
+
+    DEMAND = {"chat": 500.0, "agent": 50.0}
+
+    def _shed(self, cfg: TenantConfig, state: TenantState, **kw) -> TenantState:
+        ctl = JCACController({"a": cfg}, **kw)
+        return ctl.plan({"a": state}, {"a": demand(self.DEMAND)})["a"].state
+
+    def test_the_published_shed_jumps_to_the_floor(self):
+        cfg = TenantConfig(tenant_id="a", hourly_budget_usd=1e-6, replica_min=1, replica_max=10)
+        s = self._shed(cfg, TenantState(replicas=9, cache_mb=512, tier="mid"))
+        self.assertEqual((s.replicas, s.cache_mb, s.tier), (1, 0, "none"))
+
+    def test_the_clamped_shed_moves_one_step(self):
+        cfg = TenantConfig(tenant_id="a", hourly_budget_usd=1e-6, replica_min=1, replica_max=10)
+        s = self._shed(cfg, TenantState(replicas=9, cache_mb=512, tier="mid"), clamped_fallback=True, anchor_moves=True)
+        self.assertEqual((s.replicas, s.cache_mb, s.tier), (7, 256, "none"))
+
+    def test_the_clamped_shed_keeps_a_pinned_tier_and_cache(self):
+        cfg = TenantConfig(tenant_id="a", hourly_budget_usd=1e-6, replica_min=1, replica_max=10,
+                           cache_min=512, cache_max=512, tier_min="mid", tier_max="mid")
+        s = self._shed(cfg, TenantState(replicas=9, cache_mb=512, tier="mid"), clamped_fallback=True, anchor_moves=True)
+        self.assertEqual((s.replicas, s.cache_mb, s.tier), (7, 512, "mid"))
+
+    def test_the_clamped_shed_never_goes_below_the_floor(self):
+        cfg = TenantConfig(tenant_id="a", hourly_budget_usd=1e-6, replica_min=2, replica_max=10)
+        s = self._shed(cfg, TenantState(replicas=3, cache_mb=0, tier="small"), clamped_fallback=True, anchor_moves=True)
+        self.assertEqual((s.replicas, s.cache_mb, s.tier), (2, 0, "none"))
+
+
 class RiskAwareForecastTests(unittest.TestCase):
     """PREREG_RISK_MPC: plan against a demand quantile instead of the point
     forecast. The default path must stay bit-identical."""

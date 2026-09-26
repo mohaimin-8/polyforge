@@ -388,6 +388,7 @@ class JCACController:
         adaptive_capacity: bool = False,
         anchor_moves: bool = False,
         degrade_gracefully: bool = False,
+        clamped_fallback: bool = False,
         risk_quantile: float | None = None,
         risk_cost_at_point: bool = False,
         carbon_weight: float = 0.0,
@@ -549,6 +550,12 @@ class JCACController:
         # a documented, budget-safe option (committed campaigns replay
         # bit-identically); DG-H2 (never serves outside budget) holds.
         self.degrade_gracefully = degrade_gracefully
+        # Audit 2026-09-26: the infeasible-lattice shed jumps to (replica_min,
+        # 0 MB, none) in one step, outside the move clamps the lattice obeys
+        # and through any pinned knob (a tenant at 9 replicas became 1).
+        # `clamped_fallback=True` sheds inside those guardrails instead
+        # (_clamped_shed). Default False = the published shed (R4).
+        self.clamped_fallback = clamped_fallback
         # PREREG_ORDER_PERMUTATION: the coordinate-descent sweep order is
         # first-come-first-served on the shared cluster caps, and the default
         # sorted() order is confounded with priority class because tenant ids
@@ -1008,7 +1015,8 @@ class JCACController:
         # An entirely infeasible lattice (tight budget + tight cluster)
         # falls back to shedding cost: floor replicas, no cache, no model.
         if best_score == float("inf"):
-            shed = TenantState(replicas=config.replica_min, cache_mb=0, tier="none")
+            shed = (self._clamped_shed(tid, base) if self.clamped_fallback
+                    else TenantState(replicas=config.replica_min, cache_mb=0, tier="none"))
             if not self.degrade_gracefully:
                 return shed
             # Graceful degradation (PREREG_DEGRADE): prefer serving on the
@@ -1022,6 +1030,20 @@ class JCACController:
                         return cand
             return shed
         return best_state
+
+    def _clamped_shed(self, tid: str, base: TenantState) -> TenantState:
+        """The shed move inside the lattice's own guardrails: the largest
+        replica step down (floored by apply_action), the lowest neighbouring
+        cache level the tenant's bounds admit, and tier none unless the tier
+        is pinned -- then the cheapest admitted tier (TIERS is cheapest
+        first)."""
+        config = self.configs[tid]
+        caches = [c for c in neighbor_cache_levels(base.cache_mb)
+                  if any(config.knob_admits(c, t) for t in TIERS)]
+        cache_mb = min(caches) if caches else base.cache_mb
+        tiers = [t for t in TIERS if config.knob_admits(cache_mb, t)]
+        tier = tiers[0] if tiers else base.tier
+        return apply_action(config, base, min(DELTA_REPLICAS), cache_mb, tier)
 
     def _others(self, tid: str, chosen: dict[str, TenantState],
                 horizons: dict[str, list[Demand]],
