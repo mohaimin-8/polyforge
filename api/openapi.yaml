@@ -792,8 +792,10 @@ components:
         Idempotency-Replayed: true response header) instead of executing the
         write again; the same key with a different body executes as a
         distinct operation. Honored on every mutating endpoint; cached for
-        24 hours; a concurrent duplicate returns 409. 5xx responses are not
-        cached, so failures can be retried with the same key.
+        24 hours; a concurrent duplicate returns 409. The key is scoped to
+        every credential the request carries (API key, bearer token, admin
+        key). 5xx responses and admission refusals (401, 403, 408, 429) are
+        not cached, so they can be retried with the same key.
       schema:
         type: string
         minLength: 1

@@ -165,7 +165,7 @@ jobs:
           # that can change underneath a gate without anything in the tree
           # changing -- the shape that broke setup-envtest in R5. 2.51.2
           # is the version this spec was verified against.
-          npx --yes @redocly/cli@2.51.2 lint api/openapi.yaml
+          npx --yes @redocly/cli@2.51.2 lint api/openapi.yaml api/ai-gateway.openapi.yaml
 
   # W23: no secrets in the repo or its history. gitleaks scans every push
   # over the full history (fetch-depth: 0 is what makes that true).
