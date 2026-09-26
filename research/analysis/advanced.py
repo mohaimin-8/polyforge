@@ -34,6 +34,15 @@ REALISM_LABELS = {**F.SYSTEM_LABELS, "jcac_adaptive": "PolyForge+adaptive"}
 REALISM_COLORS = {**F.SYSTEM_COLORS, "jcac_adaptive": "#1baf7a"}
 
 
+def _side_channel_module():
+    """research/security/cache_side_channel.py, the source of the isolation
+    scenario's constants and its cost function."""
+    sys.path.insert(0, str(stats.REPO_ROOT / "research" / "security"))
+    import cache_side_channel
+
+    return cache_side_channel
+
+
 def fig_forecast_ablation():
     df = stats.load_runs(stats.FORECASTERS_DB)
     fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.5))
@@ -305,11 +314,19 @@ def main() -> None:
       f"(AUC **{atk['per_tenant_max_auc']:.2f}**), eliminating essentially all "
       f"({reduction:.0%}) of the exploitable signal above chance. The Go invariant "
       "behind this is `TestCacheGivesNoCrossTenantHit` (internal/ai/gateway).")
+    csc = _side_channel_module()
+    shares = [d / sum(csc.ISOLATION_DEMAND) for d in csc.ISOLATION_DEMAND]
+    largest = max(shares) * csc.ISOLATION_TOTAL_MB
+    capped = csc.isolation_cost(csc.ISOLATION_TOTAL_MB, len(shares), csc.ISOLATION_DEMAND,
+                                cap_mb=csc.TOP_CACHE_MB)
     w(f"- **Cost of isolation**: naive equal splitting loses "
       f"{cost['naive_isolation_penalty']:.0%} of the aggregate hit rate; the joint "
       f"planner's demand-proportional sizing cuts that to {cost['polyforge_penalty']:.0%} "
-      f"(recovering {cost['penalty_recovered']:.0%} of the penalty). Security and "
-      "efficiency are not in opposition when the controller sizes caches by demand.")
+      f"(recovering {cost['penalty_recovered']:.0%} of the penalty), so isolation still "
+      f"costs {cost['polyforge_penalty']:.0%} of the hit rate. The proportional split gives the "
+      f"largest tenant {largest:,.0f} MB, above the model's {csc.TOP_CACHE_MB:,.0f} MB top cache "
+      f"level; capped there and re-split, it recovers {capped['penalty_recovered']:.0%}, so the "
+      "figure is not flattered by the infeasible allocation (audit 2026-09-26).")
     w("")
     w("This is a novel framing: prior semantic-cache work optimizes hit rate; treating "
       "the shared cache as a **cross-tenant covert channel** and quantifying the "
