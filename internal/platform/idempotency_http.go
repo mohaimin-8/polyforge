@@ -67,8 +67,9 @@ func (s *Server) idempotency(next http.Handler) http.Handler {
 		if recorder.status == 0 {
 			recorder.status = http.StatusOK
 		}
-		if recorder.status >= http.StatusInternalServerError {
-			// Do not cache failures the client should retry.
+		if !cacheableStatus(recorder.status) {
+			// Do not cache failures the client should retry, nor refusals
+			// that say nothing about the write (see cacheableStatus).
 			if err := s.idempotencyStore.Abandon(r.Context(), digest); err != nil {
 				s.log.Warn("release idempotency key", "request_id", requestID(r.Context()), "error", err)
 			}
@@ -93,14 +94,37 @@ func mutatingMethod(method string) bool {
 	return false
 }
 
+// cacheableStatus reports whether a response is the write's own outcome and
+// may be replayed. Server errors stay retryable. Admission refusals -- 401,
+// 403, 408, 429 -- are about the request's credential or timing, not its
+// effect: caching one let an unauthenticated caller plant a 401 that the real
+// admin, reusing the key and body, was replayed for 24 hours (audit
+// 2026-09-26).
+func cacheableStatus(status int) bool {
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return false
+	}
+	return status < http.StatusInternalServerError
+}
+
+// idempotencyDigest scopes a key to every credential the request carries --
+// tenant API key, bearer token and admin key -- so a caller holding none, or a
+// different one, can never claim the key another caller will use.
 func idempotencyDigest(r *http.Request, key string, body []byte) string {
-	credential := strings.TrimSpace(r.Header.Get("X-PolyForge-API-Key"))
-	if credential == "" {
-		credential = bearerToken(r)
+	var credentials []string
+	for _, c := range []struct{ kind, secret string }{
+		{"api", strings.TrimSpace(r.Header.Get("X-PolyForge-API-Key"))},
+		{"bearer", bearerToken(r)},
+		{"admin", strings.TrimSpace(r.Header.Get("X-PolyForge-Admin-Key"))},
+	} {
+		if c.secret != "" {
+			credentials = append(credentials, c.kind+":"+secretFingerprint(c.secret))
+		}
 	}
 	scope := "anon"
-	if credential != "" {
-		scope = secretFingerprint(credential)
+	if len(credentials) > 0 {
+		scope = strings.Join(credentials, ",")
 	}
 	bodySum := sha256.Sum256(body)
 	sum := sha256.Sum256([]byte(strings.Join([]string{

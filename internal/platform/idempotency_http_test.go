@@ -104,3 +104,63 @@ func TestIdempotencyKeyMakesWritesRepeatSafe(t *testing.T) {
 		t.Fatalf("expected 409 without idempotency header, got %d", fourth.StatusCode)
 	}
 }
+
+// Audit 2026-09-26 (HIGH): admin requests were scoped to the "anon"
+// idempotency bucket (only the tenant API key and bearer token were in the
+// scope), and every status below 500 was cached. An unauthenticated caller
+// could send POST /v1/tenants with a chosen Idempotency-Key, get a 401
+// cached, and the real admin reusing that key and body was replayed the
+// stale 401 for up to 24 hours.
+func TestAnUnauthenticatedCallCannotPlantAReplayForTheAdmin(t *testing.T) {
+	server := httptest.NewServer(NewServer(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		tenant.NewStore(), telemetry.NewStore(100), Config{AdminKey: "admin-test"},
+	).Handler())
+	defer server.Close()
+
+	create := func(adminKey string) *http.Response {
+		req, _ := http.NewRequest(http.MethodPost, server.URL+"/v1/tenants",
+			bytes.NewBufferString(`{"id":"victim","name":"Victim"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Idempotency-Key", "planted-key")
+		if adminKey != "" {
+			req.Header.Set("X-PolyForge-Admin-Key", adminKey)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		return resp
+	}
+
+	if planted := create(""); planted.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated create: got %d, want 401", planted.StatusCode)
+	}
+	if wrong := create("not-the-admin-key"); wrong.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong admin key: got %d, want 401", wrong.StatusCode)
+	}
+	admin := create("admin-test")
+	if admin.StatusCode != http.StatusCreated || admin.Header.Get("Idempotency-Replayed") != "" {
+		t.Fatalf("the admin was replayed a planted response: status %d, replayed %q",
+			admin.StatusCode, admin.Header.Get("Idempotency-Replayed"))
+	}
+}
+
+func TestAdmissionRefusalsAreNeverReplayed(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden,
+		http.StatusRequestTimeout, http.StatusTooManyRequests} {
+		if cacheableStatus(status) {
+			t.Errorf("status %d would be cached and replayed", status)
+		}
+	}
+	for _, status := range []int{http.StatusOK, http.StatusCreated, http.StatusBadRequest,
+		http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity} {
+		if !cacheableStatus(status) {
+			t.Errorf("status %d is the write's own outcome and must be replayed", status)
+		}
+	}
+	if cacheableStatus(http.StatusInternalServerError) || cacheableStatus(http.StatusServiceUnavailable) {
+		t.Error("server errors must stay retryable")
+	}
+}
