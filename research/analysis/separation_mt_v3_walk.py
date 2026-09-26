@@ -43,6 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "eval"))
 from harness import workloads  # noqa: E402
 
 DEFAULT_OUT = Path(__file__).resolve().parent / "separation_mt_v3_walk.json"
+MIN_OUT = Path(__file__).resolve().parent / "separation_mt_v3_walk_min.json"
 
 
 def cell():
@@ -63,8 +64,16 @@ def main() -> int:
                     help="stop early (development); default is the cell's own "
                          "tenant count")
     ap.add_argument("--chunk", type=int, default=1 << 20)
-    ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    ap.add_argument("--out", type=Path, default=None,
+                    help="default: separation_mt_v3_walk.json for the published "
+                         "bound, separation_mt_v3_walk_min.json for --bound min")
+    ap.add_argument("--bound", choices=("worst", "min"), default="worst",
+                    help="need-level table bound: 'worst' is the published "
+                         "construction (an upper bound); 'min' is a valid floor "
+                         "(guarantee._violation_table, audit 2026-09-26)")
     args = ap.parse_args()
+    if args.out is None:
+        args.out = DEFAULT_OUT if args.bound == "worst" else MIN_OUT
 
     c = cell()
     cfg, orbit, cap = c["config"], c["orbit"], c["cap"]
@@ -77,7 +86,7 @@ def main() -> int:
     for n in range(1, upto + 1):
         started = time.time()
         r = guarantee.coupled_floor_incremental_batched(
-            cfg, orbit, n, cap, chunk=args.chunk)
+            cfg, orbit, n, cap, chunk=args.chunk, bound=args.bound)
         elapsed = time.time() - started
         rows.append({
             "tenants": n,
@@ -95,6 +104,7 @@ def main() -> int:
     payload = {
         "generated_by": Path(__file__).name,
         "mode": "ordered-batched",
+        **({"bound": args.bound} if args.bound != "worst" else {}),
         "cell": mt.CELL,
         "cap": cap,
         "replica_max": cfg.replica_max,
