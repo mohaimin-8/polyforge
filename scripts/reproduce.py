@@ -107,6 +107,7 @@ CAMPAIGN_RECORDS = [
     # shared seeds, design-point unit. Rebuilds from the committed export
     # metrics_matrix_fair_j.csv.gz (the scorer is order-independent).
     ("analysis_fair_j.py", [], "RESULTS_FAIR_J.md"),
+    ("analysis_tuning_extended.py", [], "TUNING_EXTENDED.md"),
     # Audit 2026-09-26, EXPLORATORY: every registered non-inferiority
     # hypothesis (EP-H3, TP-H3, BP-H2, MM-H2) under one rule -- the one-sided
     # 95% bootstrap upper bound of the mean difference below the margin.

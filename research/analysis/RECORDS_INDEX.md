@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 80 |
-| regenerated and compared | 65 |
+| records | 81 |
+| regenerated and compared | 66 |
 | outside the gate, reason stated | 15 |
 | outside the gate, no entry | 0 |
 
@@ -95,6 +95,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `SEMANTIC_CACHE.md` | - | no, reason stated |
 | `SENSITIVITY_J.md` | - | yes |
 | `SENSITIVITY_WAVE4_CALIBRATED.md` | WL-H1, WL-H4, WL-H5 | yes |
+| `TUNING_EXTENDED.md` | - | yes |
 | `VTC_FAIRNESS.md` | - | yes |
 | `RESULTS_WIRE_ATTACK.md` | WA-H1, WA-H2, WA-H3 | no, reason stated |
 
