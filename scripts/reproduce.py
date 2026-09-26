@@ -107,6 +107,13 @@ CAMPAIGN_RECORDS = [
     # shared seeds, design-point unit. Rebuilds from the committed export
     # metrics_matrix_fair_j.csv.gz (the scorer is order-independent).
     ("analysis_fair_j.py", [], "RESULTS_FAIR_J.md"),
+    # PREREG_STRUCTURAL_MISMATCH (audit Phase 3, confirmatory): the FAIR_J
+    # comparisons with a planner that believes the published model forms
+    # while the plant runs five altered ones. Rebuilds from the committed
+    # exports metrics_matrix_sm_<plant>.csv.gz.
+    ("analysis_structural_mismatch.py", [], "RESULTS_STRUCTURAL_MISMATCH.md"),
+    # Audit 2026-09-26, EXPLORATORY: the published tuning optima were grid
+    # edges; rebuilds from the committed sweeps in eval/baselines.
     ("analysis_tuning_extended.py", [], "TUNING_EXTENDED.md"),
     # Audit 2026-09-26, EXPLORATORY: every registered non-inferiority
     # hypothesis (EP-H3, TP-H3, BP-H2, MM-H2) under one rule -- the one-sided

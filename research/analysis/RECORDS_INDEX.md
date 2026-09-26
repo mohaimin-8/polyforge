@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 81 |
-| regenerated and compared | 66 |
+| records | 82 |
+| regenerated and compared | 67 |
 | outside the gate, reason stated | 15 |
 | outside the gate, no entry | 0 |
 
@@ -34,7 +34,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `FORECAST_MR.md` | - | no, reason stated |
 | `FORECAST_TRACE.md` | - | no, reason stated |
 | `FORECAST_TRACE_REAL.md` | - | no, reason stated |
-| `HYPOTHESIS_LEDGER.md` | BP-H1a, BP-H1b, BP-H2a, BP-H2b, CQ-H1, CQ-H2, EP-H1a, EP-H1b, EP-H3, EP-H4, FJ-H1, FJ-H2, FJ-H3, LF-H1, LF-H2, LR-H1, LR-H2, MM-H1, MM-H2, RB-H1, RB-H3, RQ-H2, SK-H1, TP-H1a, TP-H1b, TP-H3a, TP-H3b, TS-H1a, TS-H1b | yes |
+| `HYPOTHESIS_LEDGER.md` | BP-H1a, BP-H1b, BP-H2a, BP-H2b, CQ-H1, CQ-H2, EP-H1a, EP-H1b, EP-H3, EP-H4, FJ-H1, FJ-H2, FJ-H3, LF-H1, LF-H2, LR-H1, LR-H2, MM-H1, MM-H2, RB-H1, RB-H3, RQ-H2, SK-H1, SM-H1, SM-H2, TP-H1a, TP-H1b, TP-H3a, TP-H3b, TS-H1a, TS-H1b | yes |
 | `OBJECTIVE_FORM.md` | - | yes |
 | `PHASE7_ORDINAL.md` | - | yes |
 | `PLANNER_CELLS.md` | PS-H1, PS-H2, PS-H3 | no, reason stated |
@@ -76,6 +76,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_SEPARATION_MT_V3.md` | - | yes |
 | `RESULTS_SKH1_DISCRIMINABILITY.md` | SK-H1 | yes |
 | `RESULTS_STRUCTREAL.md` | - | no, reason stated |
+| `RESULTS_STRUCTURAL_MISMATCH.md` | SM-H1, SM-H2 | yes |
 | `RESULTS_TENANT_SCALE.md` | TS-H1a, TS-H1b | yes |
 | `RESULTS_TIER_RATIO.md` | TR-H1, TR-H2 | yes |
 | `RESULTS_TIER_RATIO_V2.md` | TR2-H1, TR2-H2 | yes |
