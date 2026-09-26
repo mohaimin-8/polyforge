@@ -56,8 +56,16 @@ python -m unittest                                  # invariants
 python simulate.py --trace ../traces/out/azure_synth.csv.gz \
     --controller jcac --max-steps 120               # one run
 python sweep.py --trace ../traces/out/azure_synth.csv.gz \
-    --max-steps 120 --out ../results/jcac           # paper figure
+    --max-steps 120 --out ../results/jcac           # W30 exploratory sweep
 ```
+
+The W30 sweep (`pareto.png`) is exploratory and no longer cited by the paper: one
+trace, one seed, no arrival jitter, 20 minutes, and the published unanchored
+controller. On it, no JCAC weight setting dominates `hpa` ($0.348, violation 0.102)
+or `keda` ($0.348, 0.102); the nearest settings are cheaper-but-worse or
+better-but-dearer, so it does not
+support a "Pareto-dominates the baselines" reading (audit 2026-09-26). The
+paper's weight-sweep evidence is `research/analysis/analysis_dominance.py`.
 
 Results on `azure_synth` (seed 42, first 20 min, defaults α=1 β=2 γ=0.5):
 JCAC roughly halves mean SLO violation vs HPA/KEDA with the best Jain
