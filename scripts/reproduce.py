@@ -102,6 +102,11 @@ CAMPAIGN_RECORDS = [
     # (the independent unit; reps averaged) and against the fair comparators,
     # including both real-trace parity campaigns (Azure: day-block bootstrap).
     ("reanalysis_matrix.py", [], "REANALYSIS_MATRIX.md"),
+    # PREREG_FAIR_J (audit Phase 3, confirmatory): composite J of the converged
+    # solver vs hpa_fair, keda_fair and the tier-capable layered stack, fresh
+    # shared seeds, design-point unit. Rebuilds from the committed export
+    # metrics_matrix_fair_j.csv.gz (the scorer is order-independent).
+    ("analysis_fair_j.py", [], "RESULTS_FAIR_J.md"),
     # Audit 2026-09-26, EXPLORATORY: every registered non-inferiority
     # hypothesis (EP-H3, TP-H3, BP-H2, MM-H2) under one rule -- the one-sided
     # 95% bootstrap upper bound of the mean difference below the margin.
