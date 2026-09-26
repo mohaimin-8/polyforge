@@ -102,6 +102,12 @@ class ExperimentSpec:
     # Structural model-form override, sim backend only. Known keys:
     # MODEL_FORM_KEYS above. Empty mapping = the published forms.
     model_form: dict = field(default_factory=dict)
+    # Common random numbers across arms (audit 2026-09-26). The published
+    # seed hashes the SYSTEM, so arms in one cell saw different demand phases
+    # and arrival jitter. True derives the demand seed without the system, so
+    # every arm in a cell sees identical demand; run ids stay unique. False
+    # (the default) leaves every pre-existing run id and seed unchanged.
+    shared_seeds: bool = False
 
     def total_runs(self) -> int:
         return (
@@ -171,6 +177,20 @@ def load(path: str | Path) -> ExperimentSpec:
 
 def run_identity(spec: ExperimentSpec, system: str, workload: str, mix: str,
                  cluster: str, rep: int) -> tuple[str, int]:
+    material = _identity_material(spec, system, workload, mix, cluster, rep)
+    digest = hashlib.sha256(material.encode()).hexdigest()
+    run_id = digest[:16]
+    if spec.shared_seeds:
+        # The seed ignores the system so every arm in a cell draws identical
+        # demand; the run id above still names the system.
+        shared = _identity_material(spec, "*", workload, mix, cluster, rep)
+        digest = hashlib.sha256(shared.encode()).hexdigest()
+    seed = int(digest[16:28], 16) % (2**31 - 1)
+    return run_id, seed
+
+
+def _identity_material(spec: ExperimentSpec, system: str, workload: str, mix: str,
+                       cluster: str, rep: int) -> str:
     material = "|".join(
         [SCHEMA_VERSION, spec.name, system, workload, mix, cluster, str(rep), str(spec.steps)]
     )
@@ -187,10 +207,9 @@ def run_identity(spec: ExperimentSpec, system: str, workload: str, mix: str,
         material += "|form:" + ",".join(
             f"{k}={spec.model_form[k]:g}" for k in sorted(spec.model_form)
         )
-    digest = hashlib.sha256(material.encode()).hexdigest()
-    run_id = digest[:16]
-    seed = int(digest[16:28], 16) % (2**31 - 1)
-    return run_id, seed
+    if spec.shared_seeds:
+        material += "|shared"
+    return material
 
 
 def expand(spec: ExperimentSpec) -> list[RunSpec]:
