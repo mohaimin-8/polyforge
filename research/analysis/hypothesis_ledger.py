@@ -51,43 +51,75 @@ def _clean(cell: str) -> str:
     return cell.replace("**", "").replace("`", "").strip()
 
 
-def parse(name: str, text: str) -> list[dict]:
-    """One dict per PASS/FAIL row of every table that has a verdict and a p."""
+def _verdict(cell: str) -> str | None:
+    words = _clean(cell).split()
+    return words[0] if words and words[0] in VERDICTS else None
+
+
+def tables(text: str):
+    """Yield (section, heading, header, rows) for every markdown table.
+    `section` is the nearest `## ` heading, `heading` the nearest heading of
+    any level. A row whose cell count differs from its header's is refused:
+    a `|` inside a cell would otherwise shift every column silently."""
     lines = text.splitlines()
-    heading, out, i = "", [], 0
+    section = heading = ""
+    i = 0
     while i < len(lines):
         line = lines[i]
         if line.startswith("#"):
             heading = line.lstrip("#").strip()
+            if re.match(r"##(?!#)", line):
+                section = heading
         if (line.startswith("|") and i + 1 < len(lines)
                 and re.fullmatch(r"\|[\s:|-]+\|", lines[i + 1].strip())):
             header = [c.lower() for c in _cells(line)]
             j, rows = i + 2, []
             while j < len(lines) and lines[j].startswith("|"):
-                rows.append(_cells(lines[j]))
+                row = _cells(lines[j])
+                if len(row) != len(header) and any(_verdict(c) for c in row):
+                    raise ValueError(f"row with {len(row)} cells under a {len(header)}-column header "
+                                     f"in section {section!r}: {lines[j][:80]}")
+                rows.append(row)
                 j += 1
-            pcol = next((header.index(c) for c in P_COLUMNS if c in header), None)
-            if "verdict" in header and pcol is None:
-                vcol = header.index("verdict")
-                for r in rows:
-                    words = _clean(r[vcol]).split() if len(r) == len(header) else []
-                    if words and words[0] in VERDICTS:
-                        out.append({"record": name, "heading": heading, "label": _clean(r[0]),
-                                    "verdict": words[0], "p": None})
-            if "verdict" in header and pcol is not None:
-                vcol = header.index("verdict")
-                for r in rows:
-                    if len(r) != len(header):
-                        continue
-                    words = _clean(r[vcol]).split()
-                    m = _NUM.search(_clean(r[pcol]))
-                    if not words or words[0] not in VERDICTS or m is None:
-                        continue
-                    out.append({"record": name, "heading": heading, "label": _clean(r[0]),
-                                "verdict": words[0], "p": float(m.group(0))})
+            yield section, heading, header, rows
             i = j
             continue
         i += 1
+
+
+def parse(name: str, text: str) -> list[dict]:
+    """One dict per PASS/FAIL row of every table with a `verdict` column; `p`
+    is the registered p-value where the table carries one, else None."""
+    out = []
+    for section, heading, header, rows in tables(text):
+        if "verdict" not in header:
+            continue
+        vcol = header.index("verdict")
+        pcol = next((header.index(c) for c in P_COLUMNS if c in header), None)
+        for r in rows:
+            verdict = _verdict(r[vcol]) if len(r) == len(header) else None
+            if verdict is None:
+                continue
+            m = _NUM.search(_clean(r[pcol])) if pcol is not None else None
+            if pcol is not None and m is None:
+                continue
+            out.append({"record": name, "section": section, "heading": heading,
+                        "label": _clean(r[0]), "verdict": verdict,
+                        "p": float(m.group(0)) if m else None})
+    return out
+
+
+def uncounted(name: str, text: str) -> list[dict]:
+    """Tables that carry PASS/FAIL cells but no `verdict` column -- reported,
+    never silently skipped (review of bca5acd: RESULTS_LIVE_SOAK_V8's
+    per-injection table was dropped without a word)."""
+    out = []
+    for section, _heading, header, rows in tables(text):
+        if "verdict" in header:
+            continue
+        n = sum(1 for r in rows if any(_verdict(c) for c in r))
+        if n:
+            out.append({"record": name, "section": section, "rows": n})
     return out
 
 
@@ -102,15 +134,25 @@ def benjamini_yekutieli(pvals: dict[str, float], q: float) -> dict[str, bool]:
     return {name: rank <= cutoff for rank, (name, _) in enumerate(ordered, 1)}
 
 
-def ledger() -> list[dict]:
+def _record_names() -> list[str]:
     names = sorted(p.name for p in HERE.glob("RESULTS_*.md") if p.name not in SKIP)
-    names += [n for n in EXTRA if (HERE / n).exists()]
+    return names + [n for n in EXTRA if (HERE / n).exists()]
+
+
+def ledger() -> list[dict]:
     rows = []
-    for n in names:
+    for n in _record_names():
         rows += parse(n, (HERE / n).read_text(encoding="utf-8"))
     for k, r in enumerate(rows):
-        r["key"] = k
+        r["key"] = f"t{k:04d}"
     return rows
+
+
+def not_counted() -> list[dict]:
+    out = []
+    for n in _record_names():
+        out += uncounted(n, (HERE / n).read_text(encoding="utf-8"))
+    return out
 
 
 def split(rows: list[dict]) -> tuple[list[dict], list[dict]]:
@@ -148,7 +190,7 @@ def build() -> str:
         L += ["| record | section | test | registered p | Holm threshold | survives BY? |",
               "|---|---|---|---:|---:|---|"]
         for r in sorted(lost_holm, key=lambda r: -r["p"]):
-            L.append(f"| `{r['record']}` | {r['heading'][:70]} | {r['label']} | {r['p']:.3g} | "
+            L.append(f"| `{r['record']}` | {_where(r)} | {r['label']} | {r['p']:.3g} | "
                      f"{holm[r['key']]['threshold']:.2g} | {'yes' if by[r['key']] else 'no'} |")
     else:
         L.append("None.")
@@ -156,12 +198,28 @@ def build() -> str:
           "| record | section | test | registered verdict | registered p | programme Holm | programme BY |",
           "|---|---|---|---|---:|---|---|"]
     for r in rows:
-        L.append(f"| `{r['record']}` | {r['heading'][:70]} | {r['label']} | {r['verdict']} | {r['p']:.3g} | "
+        L.append(f"| `{r['record']}` | {_where(r)} | {r['label']} | {r['verdict']} | {r['p']:.3g} | "
                  f"{'reject' if holm[r['key']]['reject'] else '—'} | {'reject' if by[r['key']] else '—'} |")
+    skipped = not_counted()
+    L += ["", "## Tables with verdicts that are not counted", ""]
+    if skipped:
+        L += ["These tables carry PASS/FAIL cells but no `verdict` column, so they are listed here rather than "
+              "parsed. They are not in the counts above; each should be checked against its record to see "
+              "whether it is a registered test or a sub-reading of one.", "",
+              "| record | section | rows with PASS/FAIL |", "|---|---|---:|"]
+        L += [f"| `{t['record']}` | {t['section'][:70]} | {t['rows']} |" for t in skipped]
+    else:
+        L.append("None.")
     L += ["", "## Reading", "",
           "A PASS that does not survive is not withdrawn by this record: its registration fixed its own family, "
           "and the record stands as committed. It should be quoted as surviving its registered family only.", ""]
     return "\n".join(L) + "\n"
+
+
+def _where(r: dict) -> str:
+    """`section / subheading`, or the section alone when they coincide."""
+    where = r["section"] if r["heading"] in ("", r["section"]) else f"{r['section']} / {r['heading']}"
+    return where[:90]
 
 
 def main() -> int:

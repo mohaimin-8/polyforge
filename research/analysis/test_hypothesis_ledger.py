@@ -59,3 +59,21 @@ def test_record_builds_and_names_the_marginal_passes(monkeypatch, tmp_path):
     text = (tmp_path / mod.RECORD).read_text(encoding="utf-8")
     assert "programme-wide" in text.lower()
     assert "TP-H1a" in text                    # the ledger carries the registered tests
+
+
+def test_a_table_with_verdicts_but_no_verdict_column_is_reported_not_dropped(monkeypatch, tmp_path):
+    # Review of bca5acd: RESULTS_LIVE_SOAK_V8's per-injection table carries
+    # PASS/FAIL in a blank-headed column and was silently skipped.
+    mod = _mod(monkeypatch, tmp_path)
+    text = "## SK\n| fault | deviation | |\n|---|---:|---|\n| cpu #1 | +66% | **FAIL** |\n"
+    assert mod.parse("R.md", text) == []
+    skipped = mod.uncounted("R.md", text)
+    assert skipped == [{"record": "R.md", "section": "SK", "rows": 1}]
+
+
+def test_rows_keep_their_section_and_subheading(monkeypatch, tmp_path):
+    mod = _mod(monkeypatch, tmp_path)
+    text = ("## BurstGPT\n### Hypotheses\n| id | p | verdict |\n|---|---:|---|\n"
+            "| **TP-H1a** | 0.0133 | FAIL |\n")
+    (row,) = mod.parse("R.md", text)
+    assert row["section"] == "BurstGPT" and row["heading"] == "Hypotheses"

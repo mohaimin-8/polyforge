@@ -25,7 +25,6 @@ day-long moving blocks for Azure, whose windows are back-to-back.
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -34,6 +33,7 @@ import pandas as pd
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+from hypothesis_ledger import parse  # noqa: E402
 from reanalysis_matrix import AZURE_BLOCK, DESIGN  # noqa: E402
 from stats import record_path  # noqa: E402
 
@@ -96,17 +96,21 @@ def differences(df: pd.DataFrame, unit: str, treat: str, comp: str) -> np.ndarra
     return (m[f"{METRIC}_t"] - m[f"{METRIC}_c"]).to_numpy()
 
 
+def registered_in(text: str, hid: str, section: str | None) -> str:
+    """The verdict `text` gives `hid`: read from its table's `verdict` column
+    by the same table-aware parser the ledger uses, within the `## ` section
+    whose title STARTS with `section` (anywhere when None). Exactly one row
+    must match -- none, or two, raises instead of returning whichever row a
+    regex reached first (review of bca5acd)."""
+    rows = [r for r in parse("record", text)
+            if r["label"] == hid and (section is None or r["section"].startswith(section))]
+    if len(rows) != 1:
+        raise LookupError(f"{hid} in section {section!r}: {len(rows)} matching rows, expected 1")
+    return rows[0]["verdict"]
+
+
 def registered(record: str, hid: str, section: str | None) -> str:
-    """The verdict the committed record gives `hid` (first word of the last
-    table cell), within the `## ` section whose title contains `section`."""
-    text = (HERE / record).read_text(encoding="utf-8")
-    if section is not None:
-        parts = re.split(r"(?m)^## ", text)
-        text = next(p for p in parts if p.startswith(section) or p.split("\n", 1)[0].find(section) >= 0)
-    row = re.search(r"(?m)^\| (?:\*\*)?" + re.escape(hid) + r"(?:\*\*)? \|.*\| ([^|]+) \|$", text)
-    if row is None:
-        raise KeyError(f"{hid} not found in {record} section {section}")
-    return row.group(1).strip().split()[0]
+    return registered_in((HERE / record).read_text(encoding="utf-8"), hid, section)
 
 
 def build() -> str:

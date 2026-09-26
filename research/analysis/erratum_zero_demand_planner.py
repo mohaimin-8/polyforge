@@ -43,11 +43,21 @@ FIRST_COMMIT = {
 }
 
 
+def offset_hours(harness_version: str) -> int:
+    """Hours to subtract from a stored `recorded_at` for UTC: harness 1.0.0
+    stored the laptop's local time (UTC+6); >= 1.1.0 stores UTC."""
+    try:
+        version = tuple(int(p) for p in str(harness_version).split("."))
+    except ValueError:
+        version = (0,)
+    return 0 if version >= (1, 1, 0) else LAPTOP_OFFSET_H
+
+
 def phase7() -> dict:
     df = pd.read_csv(PHASE7_RUNS)
     local = pd.to_datetime(df.recorded_at)
-    utc = [t.to_pydatetime().replace(tzinfo=timezone.utc) - timedelta(hours=LAPTOP_OFFSET_H)
-           for t in local]
+    utc = [t.to_pydatetime().replace(tzinfo=timezone.utc) - timedelta(hours=offset_hours(v))
+           for t, v in zip(local, df.harness_version)]
     cells = []
     for (system, workload), sub in df.groupby(["system", "workload"], sort=True):
         cells.append({"system": system, "workload": workload,

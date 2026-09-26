@@ -46,3 +46,11 @@ def test_phase7_validity_is_counted_from_the_run_table(monkeypatch, tmp_path):
     assert mod.main() == 0
     text = (tmp_path / mod.RECORD).read_text(encoding="utf-8")
     assert "**10 of 12**" in text and "all before the fix" in text
+
+
+def test_utc_rows_are_not_shifted(monkeypatch, tmp_path):
+    # Review of bca5acd: the +6 h laptop reading applies to harness 1.0.0 rows
+    # only; rows from >= 1.1.0 are already UTC.
+    mod = _mod(monkeypatch, tmp_path)
+    assert mod.offset_hours("1.0.0") == 6
+    assert mod.offset_hours("1.1.0") == 0 and mod.offset_hours("1.10.0") == 0
