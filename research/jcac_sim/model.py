@@ -19,6 +19,7 @@ production numbers (those come from the W33 harness on a live cluster).
 
 from __future__ import annotations
 
+import contextlib
 import math
 from dataclasses import dataclass, field, replace
 
@@ -294,6 +295,50 @@ def set_model_form(
         if any(float(v) <= 0.0 for v in wu_tier_factor.values()):
             raise ValueError("wu_tier_factor values must be positive")
         WU_TIER_FACTOR.update({k: float(v) for k, v in wu_tier_factor.items()})
+
+
+# Every global set_model_form controls. A snapshot of these is a complete
+# description of the structural form evaluate_step computes with.
+_FORM_GLOBALS = ("CONGESTION_EXPONENT", "P95_TAIL", "MIXTURE_P95", "REPLICA_CAPACITY_WU",
+                 "WU_AI_SCALE", "CRUD_BASE_SCALE", "CACHEABLE_UNIFORM", "TIER_LATENCY_FLAT")
+
+
+def form_snapshot() -> tuple:
+    """The active structural form: the scalar globals plus a copy of the
+    tier work-unit table."""
+    return tuple(globals()[n] for n in _FORM_GLOBALS), dict(WU_TIER_FACTOR)
+
+
+def _restore_form(snapshot: tuple) -> None:
+    values, wu = snapshot
+    for name, value in zip(_FORM_GLOBALS, values):
+        globals()[name] = value
+    WU_TIER_FACTOR.clear()
+    WU_TIER_FACTOR.update(wu)
+
+
+def published_form() -> tuple:
+    """The published forms' snapshot, without disturbing the active form."""
+    active = form_snapshot()
+    set_model_form()
+    published = form_snapshot()
+    _restore_form(active)
+    return published
+
+
+@contextlib.contextmanager
+def use_form(snapshot: tuple):
+    """Evaluate under `snapshot`'s form, then restore the active one, even on
+    an exception. Lets a planner BELIEVE one form while the plant it is
+    scored on runs another (audit 2026-09-26: the planner otherwise plans
+    with the very function that scores it). The engine is single-threaded
+    per process, so swapping module globals around a projection is safe."""
+    active = form_snapshot()
+    _restore_form(snapshot)
+    try:
+        yield
+    finally:
+        _restore_form(active)
 
 
 def p95_factor(rho: float) -> float:

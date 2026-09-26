@@ -1852,3 +1852,72 @@ class LivePlantOverrideTests(unittest.TestCase):
             model.set_model_form(tier_latency_ms={"small": 1.0})
         model.set_model_form()
         self.assertIsNone(model.TIER_LATENCY_FLAT)
+
+
+class BeliefFormTests(unittest.TestCase):
+    """Audit 2026-09-26 (simulator CRITICAL): the controller plans with the very
+    function the simulator scores it with. `belief_form="published"` makes
+    the planner believe the published model FORMS while the plant runs
+    whatever form the experiment set -- a structural mismatch, not just the
+    +/-25% constant scaling belief_scale offers."""
+
+    def tearDown(self):
+        model.set_model_form()
+
+    def test_use_form_swaps_the_forms_and_always_restores_them(self):
+        model.set_model_form(congestion_exponent=0.86, wu_ai_scale=0.0)
+        published = model.published_form()
+        with model.use_form(published):
+            self.assertEqual((model.CONGESTION_EXPONENT, model.WU_AI_SCALE), (1.0, 1.0))
+        self.assertEqual((model.CONGESTION_EXPONENT, model.WU_AI_SCALE), (0.86, 0.0))
+        with self.assertRaises(RuntimeError):
+            with model.use_form(published):
+                raise RuntimeError("boom")
+        self.assertEqual(model.CONGESTION_EXPONENT, 0.86)
+
+    def _projection(self, **kw):
+        configs = {"t": TenantConfig(tenant_id="t")}
+        ctl = JCACController(configs, limits=ClusterLimits(cache_mb=1 << 20, replicas=1000), **kw)
+        state = TenantState(replicas=3, cache_mb=128, tier="small")
+        horizon = [demand({"chat": 8.0, "agent": 2.0, "crud_read": 20.0})] * 3
+        return ctl._project("t", state, horizon)
+
+    def test_a_published_belief_projects_the_published_model_whatever_the_plant(self):
+        want = self._projection()                                   # published world
+        model.set_model_form(tier_latency_ms={"small": 1300.0, "mid": 1900.0, "large": 1950.0},
+                             wu_ai_scale=0.0)
+        sees_plant = self._projection()
+        configs = {"t": TenantConfig(tenant_id="t")}
+        ctl = JCACController(configs, limits=ClusterLimits(cache_mb=1 << 20, replicas=1000),
+                             belief_form="published")
+        state = TenantState(replicas=3, cache_mb=128, tier="small")
+        horizon = [demand({"chat": 8.0, "agent": 2.0, "crud_read": 20.0})] * 3
+        with model.use_form(ctl._belief_form):
+            blind = ctl._project("t", state, horizon)
+        self.assertEqual(blind, want)
+        self.assertNotEqual(sees_plant, want)
+
+    def test_plan_runs_under_the_belief_and_leaves_the_plant_form_in_place(self):
+        model.set_model_form(congestion_exponent=0.86)
+        configs = {t: TenantConfig(tenant_id=t) for t in ("a", "b")}
+        ctl = JCACController(configs, belief_form="published")
+        seen = []
+        real = model.evaluate_step
+
+        def spy(*a, **k):
+            seen.append(model.CONGESTION_EXPONENT)
+            return real(*a, **k)
+
+        import controller as ctlmod
+        orig = ctlmod.evaluate_step
+        ctlmod.evaluate_step = spy
+        try:
+            ctl.plan({t: TenantState() for t in configs}, {t: demand({"chat": 5.0}) for t in configs})
+        finally:
+            ctlmod.evaluate_step = orig
+        self.assertTrue(seen and set(seen) == {1.0})
+        self.assertEqual(model.CONGESTION_EXPONENT, 0.86)
+
+    def test_an_unknown_belief_form_is_refused(self):
+        with self.assertRaises(ValueError):
+            JCACController({"t": TenantConfig(tenant_id="t")}, belief_form="measured")

@@ -29,6 +29,7 @@ this is what prevents oscillation between adjacent plans.
 
 from __future__ import annotations
 
+import contextlib
 import math
 import random
 from dataclasses import dataclass, field, replace
@@ -398,8 +399,19 @@ class JCACController:
         switch_penalty: float | None = None,
         replica_dwell_steps: int = 0,
         converge_sweeps: bool = False,
+        belief_form: str | None = None,
     ):
         self.configs = configs
+        # Audit 2026-09-26 (simulator CRITICAL): `_project` calls the very
+        # evaluate_step the engine scores with, so the planner sees 100% of
+        # the plant's structural form -- a model-match advantage no reactive
+        # baseline has. belief_form="published" makes the planner believe
+        # the published FORMS while the plant runs whatever form the
+        # experiment set (model.use_form around every projection). None =
+        # the planner sees the plant: every registered arm, bit-identical.
+        if belief_form not in (None, "published"):
+            raise ValueError(f"belief_form must be None or 'published', not {belief_form!r}")
+        self._belief_form = model.published_form() if belief_form == "published" else None
         # B1' follow-up (session 48): the corrected controller oscillated its
         # replica count on the live plane -- 8 to 24 replicas in tier_mixed
         # with single-step jumps of 9-11, changes at 21-24 of 30 steps
@@ -646,6 +658,12 @@ class JCACController:
             self.capacity_scale[tid] = scale
 
     def observe_realized(self, realized: dict[str, "RealizedStep"]) -> None:
+        """Headroom calibration, projected under the believed form (see
+        `belief_form`); the realized values come from the plant."""
+        with self._believed():
+            self._observe_realized(realized)
+
+    def _observe_realized(self, realized: dict[str, "RealizedStep"]) -> None:
         """Headroom calibration hook: what each tenant's plant actually served
         last interval, at which state, under which demand. No-op unless
         `headroom_calibration`; see __init__ for the mechanism."""
@@ -751,7 +769,18 @@ class JCACController:
             crud_base_ms=demand.crud_base_ms,
         )
 
-    def plan(
+    def _believed(self):
+        """The context every projection runs in: the believed structural
+        form when `belief_form` is set, else the plant's own (a no-op)."""
+        return model.use_form(self._belief_form) if self._belief_form else contextlib.nullcontext()
+
+    def plan(self, states: dict[str, TenantState], demands: dict[str, Demand],
+             interference: dict[str, float] | None = None) -> dict[str, PlanEntry]:
+        """One control cycle (see `_plan_cycle`), under the believed form."""
+        with self._believed():
+            return self._plan_cycle(states, demands, interference)
+
+    def _plan_cycle(
         self,
         states: dict[str, TenantState],
         demands: dict[str, Demand],
@@ -1100,6 +1129,12 @@ class JCACController:
         return score
 
     def best_response_gaps(self) -> dict[str, float]:
+        """See `_best_response_gaps`; scored under the believed form, as the
+        plan it checks was."""
+        with self._believed():
+            return self._best_response_gaps()
+
+    def _best_response_gaps(self) -> dict[str, float]:
         """For the last `plan()`: how much each tenant could lower its own
         objective by a unilateral move with every other tenant held at its
         plan. 0.0 = a best response (Proposition 1's claim); inf = the planned
