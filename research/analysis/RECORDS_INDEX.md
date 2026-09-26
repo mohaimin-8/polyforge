@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 77 |
-| regenerated and compared | 62 |
+| records | 79 |
+| regenerated and compared | 64 |
 | outside the gate, reason stated | 15 |
 | outside the gate, no entry | 0 |
 
@@ -28,11 +28,13 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `DEGRADE_PROBE.md` | DG-H1, DG-H2 | yes |
 | `EFFECT_SIZES.md` | - | yes |
 | `ERRATUM_WAVE4_REPLICA_ONLY.md` | WL-H1, WL-H2 | yes |
+| `ERRATUM_ZERO_DEMAND_PLANNER.md` | LC-H1 | yes |
 | `FAIRNESS_V2.md` | - | yes |
 | `FORECAST_AZURE.md` | - | no, reason stated |
 | `FORECAST_MR.md` | - | no, reason stated |
 | `FORECAST_TRACE.md` | - | no, reason stated |
 | `FORECAST_TRACE_REAL.md` | - | no, reason stated |
+| `HYPOTHESIS_LEDGER.md` | BP-H1a, BP-H1b, BP-H2a, BP-H2b, CQ-H1, CQ-H2, EP-H1a, EP-H1b, EP-H3, EP-H4, LF-H1, LF-H2, LR-H1, LR-H2, MM-H1, MM-H2, RB-H1, RB-H3, RQ-H2, TP-H1a, TP-H1b, TP-H3a, TP-H3b, TS-H1a, TS-H1b | yes |
 | `OBJECTIVE_FORM.md` | - | yes |
 | `PHASE7_ORDINAL.md` | - | yes |
 | `PLANNER_CELLS.md` | PS-H1, PS-H2, PS-H3 | no, reason stated |
