@@ -668,6 +668,12 @@ HELM_EVAL_BASE_VALUES = {
     # Empty disables Redis, as the chart's own comment says.
     "redis.url": "",
     "ingress.enabled": "false",
+    # The chart now renders default-deny NetworkPolicies (audit 2026-09-26).
+    # Every published live sitting ran without them, and the eval cluster's
+    # port-forwards and host-side tier backends are not in the chart's
+    # allowlist, so the eval profile pins them off: the substrate stays the
+    # one the sittings were measured on.
+    "networkPolicy.enabled": "false",
     "rateLimit.requestsPerMinute": "1000000",
     "rateLimit.burst": "100000",
 }
