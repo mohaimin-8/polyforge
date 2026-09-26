@@ -1685,3 +1685,35 @@ class TestSharedSeeds:
         b1 = workloads.build(r1.workload, r1.tenant_mix, r1.cluster_size, r1.seed, r1.steps)[1]
         b2 = workloads.build(r2.workload, r2.tenant_mix, r2.cluster_size, r2.seed, r2.steps)[1]
         assert b1 == b2
+
+
+def test_the_blind_arm_plans_with_the_published_form_whatever_the_plant():
+    """Audit 2026-09-26: jcac_converged_blind believes the published model
+    forms while the plant runs the experiment's model_form. On the published
+    plant it must equal jcac_converged; on an altered plant it must not."""
+    from harness.systems import base_params
+
+    assert base_params(SYSTEMS["jcac_converged_blind"]) == {
+        "anchor_moves": True, "converge_sweeps": True, "belief_form": "published"}
+
+    def metrics(system, form):
+        spec = tiny_spec(systems=[system], workloads=["agentic"], shared_seeds=True,
+                         model_form=form)
+        return sim_backend.execute(expand(spec)[0])["metrics"]["total_cost_usd"]
+
+    assert metrics("jcac_converged_blind", {}) == metrics("jcac_converged", {})
+    altered = {"tier_latency_small": 261.7, "tier_latency_mid": 751.2,
+               "tier_latency_large": 2156.0, "wu_ai_scale": 0}
+    assert metrics("jcac_converged_blind", altered) != metrics("jcac_converged", altered)
+
+
+def test_the_calibrated_blind_arm_is_the_calibrated_controller_believing_published_forms():
+    from harness.systems import base_params
+
+    blind = base_params(SYSTEMS["jcac_calibrated_blind"])
+    calibrated = base_params(SYSTEMS["jcac-calibrated"])
+    assert {k: blind[k] for k in calibrated} == calibrated
+    assert (blind["belief_form"], blind["anchor_moves"], blind["converge_sweeps"]) == ("published", True, True)
+    spec = tiny_spec(systems=["jcac_calibrated_blind"], workloads=["agentic"], shared_seeds=True,
+                     model_form={"wu_ai_scale": 0})
+    assert sim_backend.execute(expand(spec)[0])["metrics"]["total_cost_usd"] > 0
