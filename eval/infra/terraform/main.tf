@@ -32,16 +32,20 @@ resource "hcloud_ssh_key" "eval" {
   public_key = file(var.ssh_public_key_path)
 }
 
+# 10.0.0.0/16, not 10.42.0.0/16: k3s allocates pod addresses from
+# 10.42.0.0/16 (its default cluster-cidr) and services from 10.43.0.0/16, so
+# a node network there overlaps the pod network (audit 2026-09-26; this file
+# had never been applied, so no cluster was built on the overlap).
 resource "hcloud_network" "eval" {
   name     = var.cluster_name
-  ip_range = "10.42.0.0/16"
+  ip_range = "10.0.0.0/16"
 }
 
 resource "hcloud_network_subnet" "eval" {
   network_id   = hcloud_network.eval.id
   type         = "cloud"
   network_zone = var.network_zone
-  ip_range     = "10.42.1.0/24"
+  ip_range     = "10.0.1.0/24"
 }
 
 resource "hcloud_firewall" "eval" {
@@ -73,7 +77,7 @@ resource "hcloud_server" "control" {
 
   network {
     network_id = hcloud_network.eval.id
-    ip         = "10.42.1.10"
+    ip         = "10.0.1.10"
   }
 
   user_data = templatefile("${path.module}/cloud-init-control.yaml.tftpl", {
@@ -94,12 +98,12 @@ resource "hcloud_server" "worker" {
 
   network {
     network_id = hcloud_network.eval.id
-    ip         = "10.42.1.2${count.index}"
+    ip         = "10.0.1.2${count.index}"
   }
 
   user_data = templatefile("${path.module}/cloud-init-worker.yaml.tftpl", {
     k3s_token  = random_password.k3s_token.result
-    control_ip = "10.42.1.10"
+    control_ip = "10.0.1.10"
   })
 
   depends_on = [hcloud_server.control]

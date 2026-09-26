@@ -38,7 +38,8 @@ is forgetting `terraform destroy`, not node count.
 - The k3s join token is generated per cluster by Terraform and is part of
   the state — treat `terraform.tfstate` as a secret (it is gitignored).
 - Firewall admits SSH/6443 only from `admin_cidrs`; node-to-node traffic
-  stays on the 10.42.0.0/16 private network.
+  stays on the 10.0.0.0/16 private network (clear of k3s's 10.42/16 pod and
+  10.43/16 service ranges).
 - Status: written and validated syntactically; **not yet applied** — the
   first `apply` happens when the paid cloud runs are approved (memory:
   cloud spend is a user decision).
