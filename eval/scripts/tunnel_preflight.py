@@ -265,7 +265,15 @@ def main() -> int:
         print(f"tier backends JSON is malformed: {err}", file=sys.stderr)
         return 1
 
-    tier_a, tier_b = [t.strip() for t in args.tiers.split(",")]
+    tiers = [t.strip() for t in args.tiers.split(",") if t.strip()]
+    if len(tiers) != 2:
+        # It used to crash here with a bare ValueError (audit 2026-09-26).
+        pairs = " then ".join(f"--tiers {a},{b}" for a, b in zip(tiers, tiers[1:]))
+        print(f"--tiers takes exactly two tiers (got {len(tiers)}: {args.tiers!r}); "
+              "the probe contrasts one adjacent pair per run"
+              + (f" -- run it as {pairs}" if len(tiers) > 2 else ""), file=sys.stderr)
+        return 1
+    tier_a, tier_b = tiers
     for tier in (tier_a, tier_b):
         if tier not in backends:
             print(f"tier {tier!r} missing from the backends JSON "

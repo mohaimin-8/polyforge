@@ -65,6 +65,16 @@ CREATE TABLE IF NOT EXISTS metrics (
     ai_p99_ms            DOUBLE,
     steps                INTEGER NOT NULL
 );
+-- Append-only: one row per execution attempt, never replaced or deleted.
+-- `runs` keeps the latest outcome per run_id (INSERT OR REPLACE), which lost
+-- every failed attempt's cause to its retry (audit 2026-09-26).
+CREATE TABLE IF NOT EXISTS run_attempts (
+    run_id      TEXT NOT NULL,
+    attempt     INTEGER NOT NULL,
+    outcome     TEXT NOT NULL,
+    error       TEXT,
+    recorded_at TIMESTAMP NOT NULL
+);
 CREATE TABLE IF NOT EXISTS timeseries (
     run_id         TEXT NOT NULL,
     step           INTEGER NOT NULL,
@@ -175,13 +185,22 @@ def check_metrics(metrics: dict, expected_steps: int,
 
 
 def record(con: duckdb.DuckDBPyConnection, run: RunSpec, status: str, attempts: int,
-           outcome: dict | None = None, error: str | None = None) -> None:
+           outcome: dict | None = None, error: str | None = None,
+           history: list[tuple[int, str, str | None]] | None = None) -> None:
     """Upsert one run's row(s) atomically. Replays overwrite their own
-    run_id; they can never touch another run's rows."""
+    run_id; they can never touch another run's rows. `history` -- one
+    (attempt, outcome, error) per execution attempt -- is APPENDED to
+    run_attempts, so a replaced run keeps the record of how it failed."""
     outcome = outcome or {}
     metrics = outcome.get("metrics")
     con.execute("BEGIN")
     try:
+        if history:
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            con.executemany(
+                "INSERT INTO run_attempts VALUES (?,?,?,?,?)",
+                [[run.run_id, attempt, result, err, now] for attempt, result, err in history],
+            )
         con.execute(
             "INSERT OR REPLACE INTO runs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             [

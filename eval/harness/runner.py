@@ -41,15 +41,19 @@ def execute_backend(run: RunSpec) -> dict:
     raise ValueError(f"unknown backend {run.backend!r}")
 
 
-def _attempt(run: RunSpec, retries: int) -> tuple[str, int, dict | None, str | None]:
-    """Execute with retry. Returns (status, attempts, outcome, error) and
-    never raises — the caller records whatever happened."""
+def _attempt(run: RunSpec, retries: int) -> tuple[str, int, dict | None, str | None, list]:
+    """Execute with retry. Returns (status, attempts, outcome, error, history)
+    and never raises — the caller records whatever happened. `history` holds
+    one (attempt, outcome, error) per try; it is returned rather than filled
+    in place because the attempt may run in a worker process."""
     error = None
+    history: list[tuple[int, str, str | None]] = []
     for attempt in range(1, retries + 2):
         try:
             outcome = execute_backend(run)
         except Exception:
             error = traceback.format_exc(limit=8)
+            history.append((attempt, "failed", error))
             continue
         # A trace-driven cell replays BurstGPT, which records LLM arrivals and
         # nothing else, so its demand is chat-only (PREREG_TRACE_LIVE.md) and a
@@ -65,10 +69,12 @@ def _attempt(run: RunSpec, retries: int) -> tuple[str, int, dict | None, str | N
                                expects_ai=workload_has_ai(run.workload) or trace_driven,
                                expects_crud=not trace_driven)
         if reason is None:
-            return "valid", attempt, outcome, None
+            history.append((attempt, "valid", None))
+            return "valid", attempt, outcome, None, history
         error = reason  # completed but broke the contract: retry, then mark
+        history.append((attempt, "invalid", reason))
     status = "invalid" if error and "\n" not in error else "failed"
-    return status, retries + 1, None, error
+    return status, retries + 1, None, error, history
 
 
 def _log_progress(experiment: str, done: int, total: int, failed: int, started: float) -> None:
@@ -125,9 +131,9 @@ def run_experiment(spec: ExperimentSpec, workers: int = 1, limit: int | None = N
     started = time.time()
     done = failed = 0
 
-    def _record(run: RunSpec, status: str, attempts: int, outcome, error) -> None:
+    def _record(run: RunSpec, status: str, attempts: int, outcome, error, history) -> None:
         nonlocal done, failed
-        record(con, run, status, attempts, outcome, error)
+        record(con, run, status, attempts, outcome, error, history)
         done += 1
         failed += status != "valid"
         if done % progress_every == 0 or done == len(pending):
@@ -139,8 +145,7 @@ def run_experiment(spec: ExperimentSpec, workers: int = 1, limit: int | None = N
 
     if workers <= 1:
         for run in pending:
-            status, attempts, outcome, error = _attempt(run, spec.retries)
-            _record(run, status, attempts, outcome, error)
+            _record(run, *_attempt(run, spec.retries))
     else:
         # Workers compute; only this process writes. Bounded in-flight set
         # keeps memory flat even with timeseries-bearing outcomes.
@@ -154,8 +159,7 @@ def run_experiment(spec: ExperimentSpec, workers: int = 1, limit: int | None = N
                 finished, _ = wait(in_flight, return_when=FIRST_COMPLETED)
                 for fut in finished:
                     run = in_flight.pop(fut)
-                    status, attempts, outcome, error = fut.result()
-                    _record(run, status, attempts, outcome, error)
+                    _record(run, *fut.result())
 
     report = validate(con, spec.name, len(all_runs))
     con.close()
