@@ -32,7 +32,7 @@ helm install polyforge-operator polyforge/polyforge-operator \
 | `networkPolicy.enabled` | `true` | restrict planner ingress to the operator's pods (the planner's HTTP API is unauthenticated by design, ADR 0014); inert on non-enforcing CNIs such as kind's kindnet |
 | `operator.otlpEndpoint` | `""` | OTLP endpoint for reconcile spans; empty disables export |
 | `operator.leaderElect` | `true` | leader election for multi-replica safety |
-| `*.image.repository/tag` | ghcr.io/polyforge/…, `appVersion` | container images |
+| `*.image.repository/tag` | ghcr.io/mohaimin-8/polyforge/…, `appVersion` | container images (the names release.yml publishes) |
 
 ## Planner forecast state
 

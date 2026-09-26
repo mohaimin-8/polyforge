@@ -30,6 +30,10 @@ spec:
     spec:
       securityContext:
         fsGroup: 65532
+        # The operator chart's pod hardening (audit 2026-09-26: this chart
+        # omitted it): the runtime's default syscall filter.
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: ai-gateway
           image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag | default .Chart.AppVersion }}"
@@ -87,6 +91,9 @@ spec:
             runAsNonRoot: true
             runAsUser: 65532
             runAsGroup: 65532
+            # A static Go binary on an unprivileged port needs no capability.
+            capabilities:
+              drop: ["ALL"]
           {{- if not .Values.postgres.adminURL }}
           volumeMounts:
             - name: data
