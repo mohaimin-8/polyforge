@@ -353,10 +353,19 @@ def fig_ablation(df_abl):
     axes[0].set_yticks(ys, [SYSTEM_LABELS[a] for a in ABLATION_ORDER])
     fig.suptitle("change vs full PolyForge when one component is removed (%)",
                  fontsize=9, y=1.06)
+    # Derived from the same table the dots are drawn from. The caption used to
+    # say "each of the four components carries ... significant weight", while
+    # removing the fairness term degrades no metric at p < 0.01 (RESULTS.md) --
+    # audit 2026-09-26.
+    hurt = set(table[table.removal_hurts & table.significant].ablation)
+    carrying = [a for a in ABLATION_ORDER if a in hurt]
+    idle = [SYSTEM_LABELS[a].lstrip("− ") for a in ABLATION_ORDER if a not in hurt]
     save(fig, "fig08_ablation_deltas",
-         "Removing any one contribution measurably hurts (red = worse than full "
-         "PolyForge; * = p < 0.01): each of the four components carries "
-         "independent, statistically significant weight.")
+         "Removing one component at a time (red = worse than full PolyForge; "
+         f"* = p < 0.01): {len(carrying)} of the {len(ABLATION_ORDER)} components "
+         "carry statistically significant weight"
+         + (f"; removing the {', '.join(idle)} component degrades no metric at "
+            "p < 0.01." if idle else "."))
 
 
 def fig_adaptation(ts_jcac, ts_hpa):

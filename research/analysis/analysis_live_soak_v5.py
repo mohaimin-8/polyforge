@@ -3,8 +3,9 @@
 
 **The run is INVALID — and it is the sitting that settles the question.**
 
-Attempt 7 ran 11 h 47 m, delivered 12,645,794 requests at 0.0005% failed with
-zero pod restarts, and was ended by a **51.4-second stall**. Not 7 seconds, not
+Attempt 7 ran 11 h 47 m, delivered 12,645,794 requests at 0.0005% failed, with
+13 pod restarts all in one sample coincident with the stall, and was ended by a
+**51.4-second stall**. Not 7 seconds, not
 19 -- fifty-one, with `fsync=off`, `full_page_writes=off`,
 `synchronous_commit=off`, and a 9,600-VU pool that was only 23% utilised.
 
@@ -17,10 +18,10 @@ V5 registered the reading before the run:
 So the central finding of this record is NOT the SK-H4 failure. It is that
 **the stall is not storage durability**, and that no configuration available on
 this host addresses it. Across sittings the worst stall has grown 6.2 s ->
-19.5 s -> 51.4 s while the cluster itself stayed healthy throughout -- zero
-restarts, node memory under 20%, server-side p95 of 25 ms right up to the
-event. That is a discrete pathology in the host I/O stack, not a trend that
-tuning improves.
+19.5 s -> 51.4 s while the cluster itself stayed healthy up to the event --
+no restart before it, node memory under 20%, server-side p95 of 25 ms. That
+is a discrete pathology of the host, not a trend that tuning improves; with
+storage durability ruled out, its cause is unknown.
 
 Beside that, the run produced the strongest scored evidence in the work
 package: SK-H3 passes with 37% headroom (max hourly crud_p95 5.076 ms against
@@ -204,7 +205,7 @@ def build() -> str:
       "`PREREG_LIVE_SOAK_V5.md`, committed and pushed before the run.")
     w("")
     w("")
-    w("## Headline — SK-H4 FAILS, and the cause is now isolated")
+    w("## Headline — SK-H4 FAILS; storage durability is ruled out and the cause is unknown")
     w("")
     w(f"The sitting delivered **{reqs:,} requests** over **{load_s // 3600} h "
       f"{load_s % 3600 // 60} m** at **{failed:.4%} failed** with **{restarts} "
@@ -252,7 +253,7 @@ def build() -> str:
     w("")
     w("For contrast, attempt 4 lost **4.567%** of its requests to a pinned "
       f"load path and recorded no metrics at all. This run lost {failed:.4%} "
-      "and recorded eleven and a half million events.")
+      f"and recorded {coarse['n_events']:,} events.")
     w("")
     w("**The rebuilt exporter proved itself here.** It reduced "
       f"{coarse['n_events']:,} events in 78 seconds. The in-memory path it "
@@ -291,13 +292,17 @@ def build() -> str:
           f"{r['recovery']:.3f} ms | {r['dev'] * 100:+.1f}% | "
           f"{'PASS' if r['ok'] else '**FAIL**'} |")
     w("")
-    w("The rule passes only if every occurrence passes, so **SK-H1 FAILS**. "
-      "The interesting detail is *where*: on `planner #2` the worst minute "
-      "during the outage was barely above baseline, and the excursion arrived "
-      "AFTER the planner returned. That is consistent with the planner "
-      "re-planning every tenant at once on recovery rather than with the "
-      "outage itself hurting, and it is a controller behaviour worth naming "
-      "rather than an instrument artefact.")
+    scored = [r for r in h1_rows if r["scoreable"]]
+    after = [r["name"] for r in scored if r["recovery"] > r["during"]]
+    verdict_word = ("PASSES" if h1 else "FAILS") if h1 is not None else "is UNSCOREABLE"
+    w(f"The rule passes only if every occurrence passes, so **SK-H1 {verdict_word}**.")
+    if after:
+        w(f" The worst minute came in the recovery window rather than under the "
+          f"fault, i.e. the excursion arrived AFTER the fault ended on: "
+          f"{', '.join(f'`{n}`' for n in after)}. For a planner outage that is "
+          "consistent with the planner re-planning every tenant at once on "
+          "recovery; this record does not establish it.")
+        L[-2:] = [L[-2] + L[-1]]
     w("")
 
     w("### SK-H2 — audit continuity")
@@ -329,14 +334,12 @@ def build() -> str:
     for i, v in enumerate(hourly):
         w(f"| {i} | {v:.3f} |")
     w("")
-    w(f"**The margin is 0.003 ms and that is not a rounding detail.** The "
-      f"largest hour-bucket is {max(hourly):.3f} ms against a threshold of "
-      f"{SKH3_THRESHOLD}. Across the 60 s buckets, more than a hundred land "
-      "inside 8.001–8.009 ms: `latency_ms` is a `burnCPU` duration quantised "
-      "by work units, so p95 settles ON a discrete tier rather than near one — "
-      "and the threshold, inherited from the committed B2 `crud_p99`, sits in "
-      "the same tier. SK-H3 passes as written. A reader should not take that "
-      "pass as evidence of comfortable headroom, because there is none.")
+    margin = SKH3_THRESHOLD - max(hourly)
+    w(f"The largest hour-bucket is {max(hourly):.3f} ms against a threshold of "
+      f"{SKH3_THRESHOLD} ms: a margin of {margin:+.3f} ms "
+      f"({margin / SKH3_THRESHOLD:+.0%} of the threshold). `latency_ms` is a "
+      "`burnCPU` service time quantised by work units, not end-to-end request "
+      "latency, so the margin is read on that measurand.")
     w("")
     w("")
     w("## What is established, and what is not")
@@ -360,18 +363,24 @@ def build() -> str:
           "server-side service time never saw, this is the signature of the "
           "HOST freezing, not of the system under test degrading.")
         w("")
+    clean = (f", with no restart for the first {first_restart_min / 60:.1f} hours"
+             if first_restart_min is not None else "")
     w(f"**Established.** This system ran **{load_s / 3600:.2f} hours** of "
-      f"continuous fault-injected load at {failed:.4%} failure, with zero "
-      f"restarts for the first {first_restart_min / 60:.1f} hours, and "
+      f"continuous fault-injected load at {failed:.4%} failure{clean}, and "
       "produced scored results against pre-registered hypotheses. It is the "
-      "longest and largest live run in this work package: attempt 6 reached "
-      "10 h 44 m and 11.5M requests, this one 11 h 47 m and 12.6M.")
+      "longest and largest live run in this work package so far: attempt 6 "
+      f"reached 10 h 44 m and 11.5M requests, this one {load_s // 3600} h "
+      f"{load_s % 3600 // 60} m and {reqs / 1e6:.1f}M.")
     w("")
-    w("**Established.** The failure causes have moved every attempt and are "
-      "now exhausted one by one: not the load path (NodePort, gated), not the "
-      "exporter (11.5M events in 78 s), not the instruments (three of four "
-      "scored), not the generator (4,876 VUs used of 9,601), not memory (zero "
-      "restarts), and not the controller.")
+    scoreable_h = sum(v is not None for v in (h1, h2, h3_ok))
+    w("**Established.** Several candidate causes are excluded by this run's own "
+      f"evidence: not the load path (NodePort, gated), not the exporter "
+      f"({coarse['n_events']:,} events reduced), not the generator "
+      f"({k6['vus']['max']:,} VUs used of {k6['vus_max']['max']:,}), and not "
+      f"node memory (peak {node_mem}%). {scoreable_h} of the four instruments "
+      f"scored. The {restarts} pod restarts all landed in one sample, "
+      "coincident with the stall, which is read above as a host freeze rather "
+      "than a cause.")
     w("")
     w("### Independent corroboration from outside the harness")
     w("")
@@ -402,9 +411,9 @@ def build() -> str:
       f"minimum — this reached {load_s / 3600:.2f} h and missed it by "
       f"{(12 * 3600 - load_s) / 60:.0f} minutes.")
     w("")
-    w("**NOT established.** That SK-H1 holds. It failed on one of three "
-      "scoreable occurrences, and the failure is on the recovery side rather "
-      "than under the fault.")
+    n_fail = sum(1 for r in scored if not r["ok"])
+    w(f"**NOT established.** That SK-H1 holds. It failed on {n_fail} of "
+      f"{len(scored)} scoreable occurrences.")
     w("")
     w("")
     w("## Disposition")
@@ -415,9 +424,9 @@ def build() -> str:
     w("")
     w("What a completed sitting needs:")
     w("")
-    w("1. **Storage that does not stall for 19 seconds** — a real block device "
-      "rather than an `emptyDir` over a VHDX. A modest cloud VM would settle "
-      "it in one day.")
+    w("1. **A different host.** Storage durability is ruled out above and the "
+      "cause is otherwise unknown, so the remedy is a machine without this "
+      "stall, not a storage change on this one.")
     w("2. **Or a telemetry write path that does not block the handler.** That "
       "is a product change and needs its own pre-registration, because it "
       "alters what the live plane measures.")

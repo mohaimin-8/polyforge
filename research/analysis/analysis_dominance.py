@@ -9,10 +9,11 @@ author chose the weights.
 
 This analysis removes weights from the question entirely. An arm is
 **dominated** in a cell when some other arm is no worse on **every** raw
-objective and strictly better on at least one. A non-dominated arm cannot be
-beaten by ANY weighting of those objectives, including weightings nobody has
-thought of. So where jcac is non-dominated, the choice of alpha/beta/gamma is
-not load-bearing at all.
+objective and strictly better on at least one. A non-dominated arm is one no
+other arm matches or beats on every objective at once. That is NOT immunity
+to weighting -- a baseline that is better on violation and worse on cost still
+wins under a violation-heavy weighting (audit 2026-09-26 corrected this
+claim) -- but it does mean no baseline beats it without a trade-off.
 
 Objectives, all minimised, taken raw from the committed matrix export:
   * `total_cost_usd`
@@ -50,6 +51,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -71,6 +73,40 @@ def dominates(a: dict, b: dict) -> bool:
     """`a` dominates `b`: no worse on every objective, better on at least one."""
     return (all(a[o] <= b[o] + EPS for o in OBJ)
             and any(a[o] < b[o] - EPS for o in OBJ))
+
+
+BOOT_N = 2000
+BOOT_SEED = 20260926
+STABLE = 0.95
+
+
+def rep_bootstrap(raw: pd.DataFrame, arm: str, n: int = BOOT_N,
+                  seed: int = BOOT_SEED) -> dict[tuple, float]:
+    """Per cell: the share of rep resamples in which `arm` is non-dominated.
+
+    Each arm's reps are resampled with replacement, independently -- the
+    matrix seeds each (arm, cell, rep) separately, so reps are not paired
+    across arms. Cells and arms are visited in sorted order from one seeded
+    generator, so the result is deterministic."""
+    rng = np.random.default_rng(seed)
+    out = {}
+    for key, sub in sorted(raw.groupby(CELL), key=lambda kv: kv[0]):
+        means = {}
+        for name, rows in sorted(sub.groupby("system"), key=lambda kv: kv[0]):
+            vals = rows[OBJ].to_numpy(dtype=float)
+            idx = rng.integers(0, len(vals), size=(n, len(vals)))
+            means[name] = vals[idx].mean(axis=1)                  # (n, objectives)
+        if arm not in means:
+            continue
+        target = means[arm]
+        dominated = np.zeros(n, dtype=bool)
+        for name, other in means.items():
+            if name == arm:
+                continue
+            dominated |= (np.all(other <= target + EPS, axis=1)
+                          & np.any(other < target - EPS, axis=1))
+        out[key] = float(1.0 - dominated.mean())
+    return out
 
 
 def ai_rps(workload: str) -> float:
@@ -117,9 +153,11 @@ def main() -> int:
     w("An arm is **dominated** in a cell when another arm is no worse on "
       "**every** raw objective (`total_cost_usd`, `mean_violation`, "
       "`1 - mean_jain`) and strictly better on at least one. A non-dominated "
-      "arm cannot be beaten by **any** weighting of those objectives. So this "
-      "says what `SENSITIVITY_J.md` cannot: where jcac is non-dominated, the "
-      "choice of weights is not load-bearing at all.\n")
+      "arm is one that no other arm matches or beats on every objective at "
+      "once. It is not the winner under every weighting: a baseline that is "
+      "better on one objective and worse on another still wins when that "
+      "objective is weighted heavily. What non-dominance does say is that no "
+      "baseline beats it without a trade-off.\n")
     w("> Descriptive, not a hypothesis test — but note that dominance has **no "
       "free parameters**: no weights, no thresholds, no feature selection. "
       "There is nothing here to tune toward a preferred answer.\n")
@@ -148,9 +186,9 @@ def main() -> int:
           f"| {bold}{count / n_cells * 100:.1f}%{bold} |")
     w("")
     w(f"jcac is non-dominated in **{front['jcac']} of {n_cells}** cells, the "
-      "highest of any arm. In those cells no weighting of cost, violation and "
-      "fairness — the published one or any other — can put a baseline ahead "
-      "of it.\n")
+      "highest of any arm. In those cells every baseline that is better on one "
+      "objective is worse on another. These counts are taken on 5-rep cell "
+      "means; D5 below says how many of them survive resampling the reps.\n")
 
     w("\n## D3 — where jcac IS dominated\n")
     if not exceptions:
@@ -199,6 +237,32 @@ def main() -> int:
     elif hot:
         w(f"The exceptions span {len(hot)} workloads "
           f"({', '.join(hot)}), so they are not explained by one regime.\n")
+
+    # D5 (audit 2026-09-26): D2 counts dominance on 5-rep means with a 1e-12
+    # tolerance, i.e. with no uncertainty at all.
+    share = rep_bootstrap(raw, "jcac")
+    stable_nd = sum(1 for v in share.values() if v >= STABLE)
+    stable_d = sum(1 for v in share.values() if v <= 1.0 - STABLE)
+    unstable = len(share) - stable_nd - stable_d
+    w("\n## D5 — how stable is the count? (rep bootstrap)\n")
+    w(f"Each arm's 5 reps are resampled with replacement {BOOT_N:,} times per "
+      f"cell (seed {BOOT_SEED}) and dominance is re-judged on each resample. "
+      f"A cell is **stably non-dominated** when jcac is non-dominated in at least "
+      f"{STABLE:.0%} of resamples, **stably dominated** when in at most "
+      f"{1 - STABLE:.0%}, and **unstable** otherwise.\n")
+    w("| reading | cells |")
+    w("|---|---:|")
+    w(f"| stably non-dominated | {stable_nd} |")
+    w(f"| unstable | {unstable} |")
+    w(f"| stably dominated | {stable_d} |")
+    w("")
+    w(f"Of the {front['jcac']} cells D2 counts as non-dominated, the rep noise "
+      f"supports {stable_nd} as stable"
+      + (f"; in {unstable} the arms sit close enough that five reps cannot "
+         "order them on every objective.\n" if unstable else
+         ", and no cell's dominance status depends on which reps were drawn. "
+         "This bounds rep noise only: the cells are still simulator cells, "
+         "scored against the originally tuned baselines.\n"))
 
     out = record_path(RECORD)
     out.write_text("\n".join(L) + "\n", encoding="utf-8")

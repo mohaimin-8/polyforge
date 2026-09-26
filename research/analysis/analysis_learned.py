@@ -150,14 +150,14 @@ def main() -> None:
     # Pre-committed falsifier: the learned policy genuinely beats the MPC.
     falsified = (sup["mean_diff"] > 0 and sup["p"] < 0.01 and abs(sup["dz"]) >= 0.5)
     w(md_table(pd.DataFrame([
-        {"reading": "LR-H1: J non-inferiority", "n": ni["n"],
+        {"reading": "LR-H1: J non-inferiority (one-sided p)", "n": ni["n"],
          "mean J (MPC)": ni["mean_a"], "mean J (learned)": ni["mean_b"],
          "diff (MPC−learned)": ni["mean_diff"], "margin δ": ni["delta"],
-         "p (one-sided)": ni["p"], "verdict": "PASS" if h1 else "FAIL"},
-        {"reading": "two-sided superiority (reported alongside)", "n": sup["n"],
+         "p": ni["p"], "verdict": "PASS" if h1 else "FAIL"},
+        {"reading": "superiority, reported alongside (two-sided p)", "n": sup["n"],
          "mean J (MPC)": sup["mean_a"], "mean J (learned)": sup["mean_b"],
          "diff (MPC−learned)": sup["mean_diff"], "margin δ": float("nan"),
-         "p (one-sided)": sup["p"], "verdict": f"d_z={sup['dz']:.3g}"},
+         "p": sup["p"], "verdict": f"d_z={sup['dz']:.3g}"},
     ])))
     w("")
     w(f"95% bootstrap CI of the paired J difference (MPC − learned): "

@@ -149,6 +149,29 @@ CAMPAIGN_RUN_COLUMNS = [
 ]
 
 
+def _canonical_order(df: pd.DataFrame, csv_path: Path) -> pd.DataFrame:
+    """Put DuckDB rows in the committed export's row order.
+
+    A DuckDB join promises no row order, and the bootstraps downstream
+    resample rows by POSITION: eight random orders of the learned-control
+    campaign give eight different CI bounds, differing in the printed fourth
+    digit (audit 2026-09-26). The committed export is what a clean clone
+    reads and what the records were built from, so it defines the order;
+    rows it does not carry (a campaign re-run after its export) follow it,
+    sorted by run key, and a campaign with no export yet is sorted by run key.
+    """
+    keys = ["system", "workload", "tenant_mix", "cluster_size", "rep"]
+    if csv_path.exists():
+        order = pd.read_csv(csv_path, usecols=keys, dtype={"rep": "int64"})
+        df = df.astype({"rep": "int64"})
+        order["_pos"] = range(len(order))
+        placed = df.merge(order, on=keys, how="left", validate="one_to_one")
+        placed["_pos"] = placed["_pos"].fillna(len(order))
+        return (placed.sort_values(["_pos", *keys], kind="mergesort")
+                .drop(columns="_pos").reset_index(drop=True))
+    return df.sort_values(keys, kind="mergesort").reset_index(drop=True)
+
+
 def load_campaign_runs(db_path: Path, csv_path: Path) -> pd.DataFrame:
     """Run-level rows for one campaign matrix: from its DuckDB when that is
     present, else from its committed csv.gz export.
@@ -174,7 +197,7 @@ def load_campaign_runs(db_path: Path, csv_path: Path) -> pd.DataFrame:
             "where r.status = 'valid'"
         ).fetchdf()
         con.close()
-        return df
+        return _canonical_order(df, csv_path)
     if csv_path.exists():
         # Exports carry only valid rows, so there is no status filter here.
         df = pd.read_csv(csv_path, float_precision="round_trip")[CAMPAIGN_RUN_COLUMNS]

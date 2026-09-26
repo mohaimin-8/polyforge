@@ -169,14 +169,18 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=4)
     args = ap.parse_args()
 
+    if args.analyze and OUT_CSV.exists():
+        # Same trace, same k and segments as RESULTS_TRACE; see trace_meta.
+        import trace_meta
+
+        m = trace_meta.load("burstgpt")
+        analyze(pd.read_csv(OUT_CSV), m["k"], [tuple(s) for s in m["segments"]])
+        return
+
     df = load_events()
     segs = segments_of(df)
     k = scale_factor(df, segs)
     print(f"segments={[(a//3600, b//3600) for a, b in segs]} (hours), k={k:.1f}")
-
-    if args.analyze and OUT_CSV.exists():
-        analyze(pd.read_csv(OUT_CSV), k, segs)
-        return
 
     starts = window_starts(segs)
     jobs = [(system, widx, start_s)
