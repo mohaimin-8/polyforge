@@ -140,6 +140,13 @@ func main() {
 		// infrastructure: it reads every managed tenant's features, which
 		// a tenant-scoped bearer token cannot (Phase 7 jcac live arm).
 		demands.AdminKey = os.Getenv("POLYFORGE_FEATURES_ADMIN_KEY")
+		fromCount, err := planner.ParseDemandRate(os.Getenv("POLYFORGE_PLANNER_DEMAND_RATE"))
+		if err != nil {
+			log.Error("planner demand rate", "error", err)
+			os.Exit(1)
+		}
+		demands.RateFromCount = fromCount
+		log.Info("planner demand rate", "from_event_count", fromCount)
 		runner := &controllers.PlanRunner{
 			Client: mgr.GetClient(),
 			// The planner's /v1/* routes steer every tenant's capacity and

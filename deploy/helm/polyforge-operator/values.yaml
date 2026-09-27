@@ -35,6 +35,14 @@ features:
   adminKeySecret:
     name: ""           # Secret in the release namespace carrying the admin key
     key: admin-key
+  # Demand = event_count / window instead of the mean of per-pod rate stamps.
+  # Each control-plane pod stamps events with its OWN rate, so behind N
+  # load-balanced pods the mean reads about 1/N of a tenant's demand (a 16-pod
+  # kind run, 2026-09-28: 0.36 rps reported for 4.1 sent). REQUIRES the control
+  # plane on one shared PostgreSQL: on per-pod SQLite each pod counts only its
+  # own events and the count reads ~1/N again. Off keeps the signal the
+  # registered campaigns ran on.
+  rateFromCount: false
 
 # JCAC planner (W31): jointly plans replicas, cache and tier every 10 s.
 # Disabled = operator enforces static Policy guardrails only.
