@@ -23,6 +23,7 @@ detail — every record, the hypotheses it names, and whether the gate rebuilds 
 | [../README.md](../README.md) | Project overview, quick start |
 | [../ARCHITECTURE.md](../ARCHITECTURE.md) | System design: control plane, operator, simulator |
 | [REPRODUCE.md](REPRODUCE.md) | **How to verify every published number** — run this first |
+| [DEMO.md](DEMO.md) | **How to demonstrate PolyForge live**: the platform, the controller comparison, a kind cluster, the evidence gate; what each result means |
 
 ## 2. Live status — what is being worked on
 
