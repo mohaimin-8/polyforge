@@ -4,7 +4,51 @@ PolyForge is a thesis-grade platform engineering research project for adaptive m
 
 The target research contribution is a workload-aware controller that observes tenant traffic, classifies workload behavior, and recommends joint control actions across replicas, cache budget, and model routing.
 
-**Start here**: [docs/INDEX.md](docs/INDEX.md) (documentation map) · [ARCHITECTURE.md](ARCHITECTURE.md) (system tour) · [research/analysis/RESULTS_MASTER.md](research/analysis/RESULTS_MASTER.md) (every measured result, one page) · [eval/README.md](eval/README.md) (evaluation + results) · [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/adr/](docs/adr/) (design decisions)
+**Start here**: [docs/INDEX.md](docs/INDEX.md) (documentation map) · [ARCHITECTURE.md](ARCHITECTURE.md) (system tour) · [research/analysis/RECORDS_INDEX.md](research/analysis/RECORDS_INDEX.md) (every record, generated) · [research/analysis/RESULTS_MASTER.md](research/analysis/RESULTS_MASTER.md) (reconciled summary of the contested results) · [eval/README.md](eval/README.md) (evaluation + results) · [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/adr/](docs/adr/) (design decisions)
+
+## Where the research stands (after the 2026-09-26 audit)
+
+A full audit of the project on 2026-09-26 found that several headline comparisons
+had been made against comparators that were handicapped: an LRU inference charge
+and a pinned cache that no joint arm paid, a budget filter that only the joint
+controller obeyed, and tuning grids whose optima all sat on the grid edge. It also
+found a harness artifact in one live arm and a planner that read zero demand in the
+first live check. Every defect was fixed as an opt-in change (published arms still
+replay bit for bit), and the comparisons were re-run under new pre-registrations on
+fresh, shared seeds. What the evidence now supports:
+
+- **Composite objective J against fairly tuned reactive autoscaling: a tie.**
+  Against a fair HPA (competently sized cache, no LRU charge) the joint controller
+  ties (`RESULTS_FAIR_J.md`, FJ-H1 FAIL, ΔJ −0.4%). With HPA and KEDA re-tuned per
+  cluster size over grids whose optima are interior, it ties HPA exactly and no
+  longer beats KEDA (`RESULTS_RETUNED.md`, RT-H1/RT-H2 FAIL); the re-tuned
+  reactive arms halve SLO overshoot at about 24% more cost.
+- **Jointness beats a layered design.** Against a layered stack that holds all
+  three knobs but controls each separately, the joint controller wins by 53–60%
+  on J (FJ-H3, RT-H3 PASS). This survives a planner that believes the wrong model
+  on all four measured model forms (`RESULTS_STRUCTURAL_MISMATCH.md`, SM-H2), but
+  not on a plant fitted to the live evidence, where the layered stack is better.
+- **On live hardware the controller must calibrate its model online.** The
+  published controller lost to its own tier-only ablation live (B1, WL-H1 FAIL);
+  its plant model was about 1,000× too pessimistic. With online calibration it won
+  its cell (B1′, WL-H1′ PASS), but on one host × one seed, in-sample, and with a
+  replica-only comparator later shown to be a harness artifact
+  (`ERRATUM_WAVE4_REPLICA_ONLY.md`). A five-seed replication with a held-out cell
+  and a tuned live HPA is pre-registered (`PREREG_WAVE4_REPLICATION.md`) and waits
+  on cloud access.
+- **Withdrawn:** every comparative cost claim (−70% on BurstGPT, −42% and −7.1% on
+  Azure, the matrix cost wins), the claim that joint control "wins J in every
+  campaign", and the claim that it is the only Pareto-undominated system. The cost
+  result that stands is a feasibility statement: only a controller holding the
+  tier knob can meet a per-tenant budget under AI load.
+- **Unaffected:** the cache timing side channel and its per-tenant defence, the
+  real-trace forecasting results, the semantic-cache measurements, and the
+  planning-cell scaling result.
+
+Across the programme, 96 registered tests carry a p-value; 60 passed as registered,
+and 51 of those survive a programme-wide Holm correction
+(`research/analysis/HYPOTHESIS_LEDGER.md`). The audit report is outside the
+repository; the fixes and re-runs are commits `fe23712` onward on this branch.
 
 ## Install the operator (Helm)
 
@@ -37,7 +81,7 @@ The current implementation provides a persistent control-plane backend:
 - tenant isolation ladder (pool → bridge → silo) with an admin promotion API, audited via the outbox (ADR 0008)
 - canary releases at two layers: Linkerd TrafficSplit manifests and an in-process weighted split with automatic error-spike rollback (ADR 0009)
 - secrets via a Vault Agent file → Vault KV (K8s auth) → env chain; OIDC code+PKCE relying party for human login (ADR 0010)
-- security hardening: default-deny NetworkPolicies, OWASP API Top 10 compliance doc (`docs/SECURITY.md`), gitleaks + SBOM in CI, cosign-signed release images
+- security hardening: default-deny NetworkPolicies (plain manifests and, since the audit, the application Helm chart), OWASP API Top 10 compliance doc (`docs/SECURITY.md`), gitleaks + SBOM in CI, cosign-signed release images; audit fixes (2026-09-26): redirect-refusing egress for every outbound client (SSRF), two-stage gateway admission (per-source failed-auth budget before authentication, per-tenant budget after), idempotency keys scoped to every credential, digest-pinned base images, seccomp and dropped capabilities in the chart
 - inference benchmark harness (`cmd/llmbench`) producing the TTFT/throughput/cost CSV behind `docs/INFERENCE_BENCH.md`
 - analytical telemetry pipeline: ClickHouse schema + OTel collector config (`deploy/clickhouse/`), best-effort in-process mirror behind `POLYFORGE_CLICKHOUSE_URL` (ADR 0011, `docs/CLICKHOUSE_DESIGN.md`)
 - trace research infrastructure: Azure/Alibaba/LMSYS ETL to a normalized schema (`research/traces/`), deterministic replay driver (`cmd/replay`) with cross-language stream-hash proof
@@ -48,17 +92,17 @@ The current implementation provides a persistent control-plane backend:
 - JCAC joint controller: MPC formulation + offline simulator with Pareto sweep (`research/jcac_sim`, `research/paper/sec-jcac.tex`, W30); live planner service (`services/planner`) called by the operator every 10s with last-good-plan fallback and NATS action audit (ADR 0014, W31)
 - multi-tenant fairness: peer-relative noisy-neighbor detector on eBPF-shaped signals feeding an interference penalty into the planner, Jain's index exported per plan cycle (ADR 0015, W32; Pixie adapter + soak deferred to the harness environment)
 - evaluation harness (`eval/`): YAML-driven experiment matrix with deterministic run IDs, resume, retry-on-flake, and a standardized DuckDB result schema; sim backend verified, cluster backend (kind + Helm + k6) code-complete for the cloud box (W33)
-- five tuned baselines — HPA, KEDA, FIRM-replica (OSDI '20 re-implementation), static over-provisioned, GPTCache+LRU — each grid-searched with committed sweep evidence (`eval/baselines/TUNING.md`, W34)
+- five tuned baselines — HPA, KEDA, FIRM-replica (OSDI '20 re-implementation), static over-provisioned, GPTCache+LRU — each grid-searched with committed sweep evidence (`eval/baselines/TUNING.md`, W34); the audit found every published optimum on a grid edge, and the extended sweeps and per-size re-tuning are in `research/analysis/TUNING_EXTENDED.md` and `eval/baselines/tuned_arms.yaml`
 - 1,800-run full matrix + 500-run ablation matrix executed and validated: exact row counts, zero duplicate/NULL rows, 10/10 bit-identical spot-check replays, Holm-corrected KS reproducibility gate (`eval/SMOKE_BUGS.md`, W35)
 - statistical analysis: two-way ANOVA, Cohen's d vs every baseline, 95% CIs, per-component ablation significance, 12 publication figures (600-DPI PNG + vector PDF, color-blind-safe) — `research/analysis/RESULTS.md` (W36)
 - open-source packaging: `polyforge-operator` Helm chart (`deploy/helm/polyforge-operator`), architecture guide, contributor guide + templates, Zenodo artifact bundler, release checklist (`docs/RELEASE_CHECKLIST.md`, W39)
 - advanced controller work: pluggable demand forecasters (persistence / trend / damped Holt / online-seasonal) with a forecast ablation showing Holt beats the W30 trend default by ~16% on SLO violation at equal cost; self-calibrating JCAC that learns effective capacity from realized-vs-projected feedback; a reconfiguration-realism scoring mode (replica startup lag + cache warm-up) where hysteresis and self-calibration earn their keep (`research/analysis/ADVANCED.md`, figs 13–15)
-- **security contribution — cross-tenant cache timing side channel:** a shared semantic cache leaks tenant prompt membership at AUC 0.88 from response time alone; PolyForge's per-tenant bounded cache (W28) returns the attacker to chance, and the joint planner's demand-proportional sizing makes the isolation cheaper than a naive equal split (`research/security/`, `TestCacheGivesNoCrossTenantHit`, fig 16)
+- **security contribution — cross-tenant cache timing side channel:** a shared semantic cache leaks tenant prompt membership at AUC 0.88 from response time alone; PolyForge's per-tenant bounded cache (W28) returns the attacker to chance, and demand-proportional sizing recovers 18% of a naive equal split's hit-rate penalty, so isolation still costs 24% of the hit rate (`research/security/`, `TestCacheGivesNoCrossTenantHit`, fig 16)
 - **v2/v3 pre-registered evaluation campaign** (every hypothesis pushed to GitHub before its data existed; nulls published): iso-cost gate quantifying that static/cache-max postures buy their metric wins with 12–36× spend (`RESULTS_V2.md`); overload matrix proving the forecast mechanism (seasonal < trend on violation, p=6e-4) and the honest boundary — tuned reactive scalers buy attainment at 3.2–3.4× spend (`RESULTS_V3.md`); security defense frontier where per-tenant partitioning dominates padding/TTL-jitter (fig 17, `ADVANCED.md`); fairness γ-term honestly nulled under injected interference (`FAIRNESS_V2.md`)
-- **real-trace evaluation (BurstGPT v2.0, 10,632,194 real Azure OpenAI/ChatGPT requests):** reproducible fetch+ETL (`research/traces/fetch_burstgpt.py`); forecast ablation on real periodicity — damped Holt −26.9% one-step RMSE vs the trend default, and the synthetic stand-in's seasonal prediction published as *not transferring* (`FORECAST_TRACE_REAL.md`); pre-registered headline replay on real demand shape — first sample (n=16) underpowered but directionally consistent (`RESULTS_TRACE.md`); **powered second sample (n=96) confirmatory: PolyForge beats tuned HPA/KEDA/FIRM on the composite objective at p ≤ 5.5e-05 with cost −70% (p ≤ 4.3e-06), disclosed violation trade +0.07** (`RESULTS_TRACE2.md`)
-- **VTC-replica baseline (OSDI '24 fair-scheduler re-implementation) beaten on its own turf:** tuned least-weighted-service-first pool division loses the joint objective to PolyForge (d_z=−1.12, p=3e-19) *and* is less fair on Jain (0.9599 vs 0.9705, p=1.5e-6) at 55% higher cost with 57% higher worst-tenant p95 — fairness emerges from joint optimization more cheaply than from a fairness-only rule (`VTC_FAIRNESS.md`, pre-registered)
+- **real-trace evaluation (BurstGPT v2.0, 10,632,194 real Azure OpenAI/ChatGPT requests):** reproducible fetch+ETL (`research/traces/fetch_burstgpt.py`); forecast ablation on real periodicity — damped Holt −26.9% one-step RMSE vs the trend default, and the synthetic stand-in's seasonal prediction published as *not transferring* (`FORECAST_TRACE_REAL.md`); pre-registered headline replay on real demand shape — first sample (n=16) underpowered but directionally consistent (`RESULTS_TRACE.md`); powered second sample (n=96): PolyForge beat the published HPA/KEDA/FIRM on the composite objective at p ≤ 5.5e-05 with cost −70% (`RESULTS_TRACE2.md`) — **against comparators later found handicapped; after fair accounting and budget parity the comparative cost claim was withdrawn** (`RESULTS_TRACE_PARITY.md`, `RESULTS_BUDGET_PARITY.md`)
+- **VTC-replica baseline (OSDI '24 fair-scheduler re-implementation) beaten on its own turf:** tuned least-weighted-service-first pool division loses the joint objective to PolyForge (d_z=−1.12, p=3e-19) *and* is less fair on Jain (0.9599 vs 0.9705, p=1.5e-6) at 55% higher cost with 57% higher worst-tenant p95 — fairness emerges from joint optimization more cheaply than from a fairness-only rule (`VTC_FAIRNESS.md`, pre-registered). Caveat from the audit: within VTC's published tuning grid its fair-division rule never engaged, so the tuned VTC arm behaved as HPA (`TUNING_EXTENDED.md`)
 - **related-work position:** capability + performance matrix vs SageServe (POMACS '25), Chiron, Aladdin, VTC/Equinox/D²LPM, GPTCache/SCALM/InstCache/MeanCache — no surveyed system co-optimizes replicas, semantic cache, and model tier against one multi-tenant objective, and none publishes pre-registered nulls (`docs/RELATED_WORK.md`)
-- **Wave 5 structural-form program (session 24):** the sensitivity axis the economy reruns never touched — the simulator's *functional forms*. Three pre-registered full-matrix reruns (measured latency model, mixture-percentile p95, tier-scaled work units) all PASS with narrowed margins and SLO non-inferiority held; a solver audit measured the coordination gap **zero on 120/120 frozen instances** and en route caught the second CD sweep exceeding the per-interval actuation clamps — adjudicated by a pre-registered clamp-fixed rerun that wins slightly *more* (MC 5/5, 5/5, 2/2), making `anchor_moves` the quotable controller; plus churn-safe/thread-safe planner state, deployment-selectable forecasters, and a multi-resolution seasonal forecaster that lets the *live* planner see daily cycles (`FORECAST_MR.md`, DEFENSE_QA #24–25)
+- **Wave 5 structural-form program (session 24):** the sensitivity axis the economy reruns never touched — the simulator's *functional forms*. Three pre-registered full-matrix reruns (measured latency model, mixture-percentile p95, tier-scaled work units) all PASS with narrowed margins and SLO non-inferiority held; a solver audit measured the coordination gap **zero on every scored instance** (83 of 120; the 37 where coordinate descent fell back were not scored — the anchored rerun is exact on 120/120) and en route caught the second CD sweep exceeding the per-interval actuation clamps — adjudicated by a pre-registered clamp-fixed rerun that wins slightly *more* (MC 5/5, 5/5, 2/2), making `anchor_moves` the quotable controller; plus churn-safe/thread-safe planner state, deployment-selectable forecasters, and a multi-resolution seasonal forecaster that lets the *live* planner see daily cycles (`FORECAST_MR.md`, DEFENSE_QA #24–25)
 
 SQLite remains the zero-infrastructure development path. PostgreSQL is the production path and requires separate admin and application roles so row-level security is testable rather than bypassed accidentally.
 
@@ -89,7 +133,7 @@ The response contains a one-time `bootstrap_api_key.secret`. Use it as `X-PolyFo
 .\scripts\smoke.ps1
 ```
 
-The API contract is at `api/openapi.yaml`.
+The API contracts are `api/openapi.yaml` (control plane) and `api/ai-gateway.openapi.yaml` (AI gateway, including the admin knob surface); a test holds each equal to the routes its service registers.
 
 ## Observability
 
@@ -238,12 +282,14 @@ are the committed artifacts.
 
 **Evidence site:** every pre-registration, record and figure, with the gate
 status of each, is published at https://mohaimin-8.github.io/polyforge/
-(rebuilt from `main` on every push).
+(rebuilt from `main` on every push; it shows the audit's results once this branch
+is merged).
 
 **Archived evaluation artifact (DOI):** the raw run databases, every
 pre-registration and record, the live-campaign evidence and the IaC are
 deposited at [https://doi.org/10.5281/zenodo.22801195](https://doi.org/10.5281/zenodo.22801195)
-(Islam, 2026, CC BY 4.0; 1,023 files, SHA-256 manifest). Restoring its
+(Islam, 2026, CC BY 4.0; 1,023 files, SHA-256 manifest). The deposit predates the
+2026-09-26 audit; the audit's campaigns are in this repository until it is refreshed. Restoring its
 DuckDB files into `eval/results/` enables the archive tier of
 `docs/REPRODUCE.md`. Cite the dataset as:
 
@@ -251,10 +297,13 @@ DuckDB files into `eval/results/` enables the archive tier of
 > controller-comparison campaigns (harness, baselines, raw results,
 > live-run data, IaC)* [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.22801195
 
-**Pre-registrations on OSF:** all 48 protocols are mirrored, frozen and
+**Pre-registrations on OSF:** the first 48 protocols are mirrored, frozen and
 public at [https://doi.org/10.17605/OSF.IO/DYZKV](https://doi.org/10.17605/OSF.IO/DYZKV) (registered after the
 campaigns ran; the git push timestamps remain the pre-run anchor, and
-`scripts/check_preregs.py` proves no protocol changed after its result).
+`scripts/check_preregs.py` proves no protocol changed after its result). The four
+protocols of the audit programme (`PREREG_FAIR_J`, `PREREG_STRUCTURAL_MISMATCH`,
+`PREREG_RETUNED`, `PREREG_WAVE4_REPLICATION`) are git-anchored; 52 protocols in all,
+and `scripts/check_prereg_timing.py` checks each campaign ran after its protocol.
 
 ## Limitations (honest boundaries)
 
@@ -271,7 +320,9 @@ campaigns ran; the git push timestamps remain the pre-run anchor, and
   non-inferiority margin (`RESULTS_LM_ADOPTION.md`,
   `RESULTS_MIXTURE_P95.md`, `RESULTS_TIER_WU.md`, DEFENSE_QA #24).
   Still unvaried: intra-interval demand is deterministic, and p95 is
-  the finest latency statistic the sim reports.
+  the finest latency statistic the sim reports. The planner plans with the
+  simulator's own model; `RESULTS_STRUCTURAL_MISMATCH.md` measures what a wrong
+  belief costs (about nothing on the measured forms, a lot on the live-fitted plant).
 - **Actuation clamps.** The project's own coordination-gap audit caught
   the published controller exceeding its declared per-interval move
   clamps through its second coordination sweep (±4 replicas / two cache
@@ -281,10 +332,12 @@ campaigns ran; the git push timestamps remain the pre-run anchor, and
   the quotable configuration; the published matrices remain the
   bit-reproducible record (`COORD_GAP.md`, `RESULTS_MOVE_CLAMP.md`,
   DEFENSE_QA #25).
-- **SLO.** Two pre-registered attempts to beat tuned reactive scalers on
-  raw violation failed and are published (v2 H1, v3 H1'). The earned
-  claim is violation parity at −43…−48% cost, plus the confirmed
-  forecast mechanism.
+- **SLO and cost.** Two pre-registered attempts to beat tuned reactive scalers on
+  raw violation failed and are published (v2 H1, v3 H1'). The earlier "violation
+  parity at −43…−48% cost" rested on the handicapped comparators and is
+  withdrawn with the other comparative cost claims. Against re-tuned HPA and KEDA
+  the joint controller's SLO overshoot is about twice theirs (`RESULTS_RETUNED.md`);
+  the forecast mechanism result stands.
 - **Latency percentile.** p95, not p99 — deliberate, documented deviation
   (`eval/README.md`); measured live percentiles can report both.
 - **Cache.** The live control plane exercises per-tenant partitioning
@@ -297,13 +350,14 @@ campaigns ran; the git push timestamps remain the pre-run anchor, and
   (near-duplicate prompts agree only 33.8%, so response stochasticity
   dominates the absolute level; the relative readings are the claim).
   Staleness/TTL is out of scope.
-- **Live cluster.** The cluster backend is verified end-to-end for the
-  HPA arm on kind; the PolyForge (operator/planner) arm is fully wired in
-  code behind an executable actuation gate (`kubectl wait
-  --for=condition=Applied` fails the run before any load if the operator
-  never scaled the target) but has not yet run live. The eventual ordinal
-  figure exercises the replica-control projection only — the replay data
-  plane's cache/tier knobs are inert live, and the figure caption says so.
+- **Live cluster.** The full three-knob loop has run live on a rented L40S host:
+  B1 (WL-H1 FAIL), B1′ with online calibration (WL-H1′ PASS, but one seed,
+  in-sample, and a replica-only arm the audit found to be a harness artifact) and
+  B1″ (WL-H6/H7 FAIL). The cache and tier knobs are shown to actuate live
+  (WL-H2 PASS in every run). A 24 h CRUD-plane soak completed with 25,806,353
+  requests, zero dropped and zero restarts. The first live check (Phase 7) ran
+  with a planner that read zero demand (`ERRATUM_ZERO_DEMAND_PLANNER.md`). A
+  five-seed live replication is pre-registered and pending.
 - **Latency granularity.** Request-level p95, not token-level TTFT/TPOT:
   continuous-batching dynamics belong to the llm-d/AIBrix-class actuation
   layer beneath PolyForge's portfolio decisions (`docs/RELATED_WORK.md`

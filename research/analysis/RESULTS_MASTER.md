@@ -53,6 +53,16 @@ offline-trained **learned (RL) joint controller** over the identical action spac
 (p = 2.9e-28, d_z = −0.708, at zero training cost) —
 and is the only Pareto-undominated system in the matrix.
 
+*Correction (audit 2026-09-26).* Every campaign in that list scored J against the
+published comparators, which carried the LRU charge, the pinned cache and
+edge-of-grid tuning. Against fair comparators on fresh shared seeds, J **ties**
+HPA (`RESULTS_FAIR_J.md`, FJ-H1 FAIL). Against HPA and KEDA re-tuned per cluster
+size it ties HPA and does not beat KEDA (`RESULTS_RETUNED.md`, RT-H1/RT-H2 FAIL).
+It beats the layered three-knob stack by 53–60% (FJ-H3, RT-H3 PASS). The "only
+Pareto-undominated system" claim is false: on mean cost and violation, KEDA and
+static are also on the front (`RESULTS.md`, computed since 2026-09-26). Do not cite
+this paragraph without this correction.
+
 ---
 
 ## Campaign ledger (chronological)
