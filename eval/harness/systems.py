@@ -33,25 +33,31 @@ def miss_cost_factor_for(policy: str = "lru") -> float:
     against the proposal) and ARC gives 1.337. The comparator is therefore a
     reported sensitivity band, not a single constant. `lru` remains the
     default so every published arm reproduces bit-identically (R4).
+
+    Only a MISSING data file falls back to the committed LRU value (a tree
+    shipped without research/results). A malformed file or a policy with no
+    measured rows raises: it used to return the LRU fallback silently, so a
+    typo in a policy name priced that arm as LRU (audit 2026-09-26).
     """
+    by_capacity: dict[str, dict[str, float]] = {}
     try:
-        by_capacity: dict[str, dict[str, float]] = {}
-        with open(EVICTION_CSV, newline="", encoding="utf-8") as f:
-            for row in csv.DictReader(f):
-                if row["policy"] in (policy, "costaware_w28"):
-                    by_capacity.setdefault(row["capacity_entries"], {})[row["policy"]] = float(
-                        row["cost_per_request_usd"]
-                    )
-        ratios = [
-            caps[policy] / caps["costaware_w28"]
-            for caps in by_capacity.values()
-            if policy in caps and "costaware_w28" in caps and caps["costaware_w28"] > 0
-        ]
-        if not ratios:
-            return LRU_MISS_COST_FACTOR_FALLBACK
-        return math.exp(sum(math.log(r) for r in ratios) / len(ratios))
-    except (OSError, KeyError, ValueError):
+        f = open(EVICTION_CSV, newline="", encoding="utf-8")
+    except FileNotFoundError:
         return LRU_MISS_COST_FACTOR_FALLBACK
+    with f:
+        for row in csv.DictReader(f):
+            if row["policy"] in (policy, "costaware_w28"):
+                by_capacity.setdefault(row["capacity_entries"], {})[row["policy"]] = float(
+                    row["cost_per_request_usd"]
+                )
+    ratios = [
+        caps[policy] / caps["costaware_w28"]
+        for caps in by_capacity.values()
+        if policy in caps and "costaware_w28" in caps and caps["costaware_w28"] > 0
+    ]
+    if not ratios:
+        raise ValueError(f"no W28 rows for eviction policy {policy!r} in {EVICTION_CSV.name}")
+    return math.exp(sum(math.log(r) for r in ratios) / len(ratios))
 
 
 def lru_miss_cost_factor() -> float:

@@ -129,6 +129,24 @@ class TestSystems:
         factor = lru_miss_cost_factor()
         assert 1.2 < factor < 1.8  # W28 measured 1.32 and 1.62 at the two capacities
 
+    def test_the_miss_cost_factor_fails_loudly_on_bad_data(self, monkeypatch, tmp_path):
+        """Audit 2026-09-26 (LOW): any error -- a malformed CSV, a misspelled
+        policy -- used to return the LRU fallback silently. Only a MISSING
+        data file may fall back now."""
+        from harness import systems
+
+        monkeypatch.setattr(systems, "EVICTION_CSV", tmp_path / "absent.csv")
+        assert systems.miss_cost_factor_for("lru") == systems.LRU_MISS_COST_FACTOR_FALLBACK
+        bad = tmp_path / "bad.csv"
+        bad.write_text("policy,capacity_entries,cost_per_request_usd\nlru,100,not-a-number\n",
+                       encoding="utf-8")
+        monkeypatch.setattr(systems, "EVICTION_CSV", bad)
+        with pytest.raises(ValueError):
+            systems.miss_cost_factor_for("lru")
+        monkeypatch.undo()
+        with pytest.raises(ValueError, match="no W28 rows"):
+            systems.miss_cost_factor_for("lruu")
+
     def test_global_mix_transform_preserves_volume_not_mix(self):
         from model import Demand
 
