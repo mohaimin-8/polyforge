@@ -81,3 +81,6 @@ eval/results/live_soak_evidence/
 
 # soak_observer.sh's liveness heartbeat, written where it is launched from.
 .observer.heartbeat
+
+# Presentation runs (docs/DEMO.md): never evidence.
+eval/results/demo_cluster*

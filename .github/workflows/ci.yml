@@ -348,6 +348,10 @@ jobs:
       # 0.3166 in three places for a record that reports 0.3165.
       - name: Numbers the roadmap quotes still match their records
         run: python -m pytest scripts/test_roadmap_claims.py -q
+      # The live demo's decision logic (tier contract, port check, verdicts);
+      # the end-to-end rehearsal binds local ports and runs only on a desk.
+      - name: Platform demo checks its own results
+        run: python -m pytest scripts/test_demo_platform.py -q
 
   # Phase 9: the trace pipelines must stay runnable — synthetic modes are
   # deterministic and dependency-light, so a broken ETL fails CI, not a

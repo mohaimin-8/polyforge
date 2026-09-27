@@ -1,0 +1,18 @@
+# Presentation run, NOT evidence: the live control loop on a local kind
+# cluster for a demonstration (docs/DEMO.md, act C). Same cell as
+# phase7_jcac_smoke -- PolyForge's operator and planner actuating a real
+# Deployment under k6 load -- but its own name and output, so it can never
+# resume into or overwrite a scored campaign. Delete the output file before
+# each rerun: the runner skips run ids already valid in it.
+# 30 steps x 10 s = 5 min of load after a 90 s warm-up.
+name: demo_cluster
+backend: cluster
+steps: 30
+reps: 1
+systems: [jcac]
+workloads: [ai_cacheable]
+tenant_mixes: [uniform]
+cluster_sizes: [small]
+output: eval/results/demo_cluster.duckdb
+retries: 0
+timeseries_reps: 0

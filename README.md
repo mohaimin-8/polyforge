@@ -19,7 +19,8 @@ fresh, shared seeds. What the evidence now supports:
 
 - **Composite objective J against fairly tuned reactive autoscaling: a tie.**
   Against a fair HPA (competently sized cache, no LRU charge) the joint controller
-  ties (`RESULTS_FAIR_J.md`, FJ-H1 FAIL, ΔJ −0.4%). With HPA and KEDA re-tuned per
+  ties (`RESULTS_FAIR_J.md`, FJ-H1 FAIL: ΔJ −0.0037, −0.9% of HPA's J, 95% CI
+  [−0.0234, +0.0166] includes zero). With HPA and KEDA re-tuned per
   cluster size over grids whose optima are interior, it ties HPA exactly and no
   longer beats KEDA (`RESULTS_RETUNED.md`, RT-H1/RT-H2 FAIL); the re-tuned
   reactive arms halve SLO overshoot at about 24% more cost.

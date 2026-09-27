@@ -19,7 +19,7 @@ if str(EVAL_DIR) not in sys.path:
     sys.path.insert(0, str(EVAL_DIR))
 
 from harness import cluster_backend, demo, results, sim_backend, workloads  # noqa: E402
-from harness.config import ExperimentSpec, expand, load, run_identity  # noqa: E402
+from harness.config import ExperimentSpec, RunSpec, expand, load, run_identity  # noqa: E402
 from harness.systems import SYSTEMS, global_mix_transform, lru_miss_cost_factor  # noqa: E402
 
 
@@ -309,25 +309,62 @@ class TestDemo:
     def _comparison(self, **kw):
         return demo.compare(steps=12, **kw)
 
+    def test_default_cast_is_the_fair_j_cast(self):
+        # Audit 2026-09-26: the published hpa/static cast carried the LRU
+        # charge and the pinned cache, so the demo leads with the fair arms.
+        assert demo.DEFAULT_SYSTEMS == (
+            "hpa_fair", "keda_fair", "jcac_nojoint_v2_tuned", "jcac_converged")
+        assert demo.DEFAULT_BASELINE == "hpa_fair"
+        assert demo.PUBLISHED_SYSTEMS == ("static", "hpa", "jcac")
+        assert demo.PUBLISHED_BASELINE == "hpa"
+
     def test_default_cast_runs_and_reports_every_metric(self):
         c = self._comparison()
         assert [o.system for o in c.outcomes] == list(demo.DEFAULT_SYSTEMS)
+        assert c.baseline == demo.DEFAULT_BASELINE
         for o in c.outcomes:
             assert set(o.metrics) == {attr for attr, *_ in demo.METRIC_ROWS}
 
-    def test_deltas_are_relative_to_the_baseline(self):
+    def test_each_arm_runs_the_campaign_code_path(self):
+        # hpa_fair's 512 MB cache lives in SystemSpec.static_cache_mb, which
+        # only sim_backend.execute applies: the demo must match it exactly.
+        c = self._comparison(systems=("hpa_fair", "jcac_converged"),
+                             baseline="hpa_fair")
+        for name in ("hpa_fair", "jcac_converged"):
+            run = RunSpec(experiment="demo", backend="sim", system=name,
+                          workload=demo.DEFAULT_SCENARIO["workload"],
+                          tenant_mix=demo.DEFAULT_SCENARIO["tenant_mix"],
+                          cluster_size=demo.DEFAULT_SCENARIO["cluster_size"],
+                          rep=0, steps=12, run_id=f"demo-{name}",
+                          seed=demo.DEFAULT_SCENARIO["seed"], store_timeseries=False)
+            expected = sim_backend.execute(run)["metrics"]
+            got = c.outcome(name).metrics
+            for attr in ("total_cost_usd", "mean_violation", "mean_jain",
+                         "cache_hit_rate", "tier_none_step_share"):
+                assert got[attr] == expected[attr], (name, attr)
+
+    def test_j_is_the_records_composite_objective(self):
+        # stats.composite_objective: cost/(119*8)/0.01 + 2*viol + 0.5*(1-Jain)
+        metrics = {"total_cost_usd": 9.52, "mean_violation": 0.1, "mean_jain": 0.9}
+        assert demo.composite_j(metrics) == pytest.approx(1.0 + 0.2 + 0.05)
         c = self._comparison()
+        for o in c.outcomes:
+            assert o.metrics["J"] == pytest.approx(demo.composite_j(o.metrics))
+
+    def test_deltas_are_relative_to_the_baseline(self):
+        c = self._comparison(systems=demo.PUBLISHED_SYSTEMS,
+                             baseline=demo.PUBLISHED_BASELINE)
         assert c.delta("hpa", "total_cost_usd") == 0.0
         static_delta = c.delta("static", "total_cost_usd")
         assert static_delta is not None and static_delta > 0  # over-provision costs more
 
     def test_near_zero_baseline_suppresses_percentages(self):
         c = self._comparison(workload="crud_steady")  # no AI traffic -> hit rate ~ 0
-        assert c.delta("jcac", "cache_hit_rate") is None
+        assert c.delta("jcac_converged", "cache_hit_rate") is None
 
     def test_rejects_unknown_system_and_foreign_baseline(self):
         with pytest.raises(ValueError, match="unknown systems"):
-            demo.compare(systems=("hpa", "nope"), steps=12)
+            demo.compare(systems=("hpa", "nope"), baseline="hpa", steps=12)
         with pytest.raises(ValueError, match="baseline"):
             demo.compare(systems=("hpa", "jcac"), baseline="static", steps=12)
 
@@ -336,14 +373,69 @@ class TestDemo:
         table = demo.render_table(c)
         takeaway = demo.render_takeaway(c)
         (table + takeaway).encode("ascii")  # cp1252 terminals must never crash
-        assert "PolyForge" in table and "$" in takeaway
+        assert "PolyForge" in table and "J (" in table
+        # One scenario is an illustration: the sentence names the record that
+        # holds the pre-registered test and never claims a win on its own.
+        assert "RESULTS_FAIR_J.md" in takeaway
+        assert "less than the norm" not in takeaway
+
+    def test_takeaway_is_empty_without_a_polyforge_arm(self):
+        c = self._comparison(systems=("hpa_fair", "keda_fair"), baseline="hpa_fair")
+        assert demo.render_takeaway(c) == ""
 
     def test_to_dict_round_trips_through_json(self):
         import json
 
         payload = json.loads(json.dumps(self._comparison().to_dict()))
-        assert payload["baseline"] == "hpa"
+        assert payload["baseline"] == demo.DEFAULT_BASELINE
         assert set(payload["systems"]) == set(demo.DEFAULT_SYSTEMS)
+
+    def test_takeaway_survives_a_zero_j_comparator(self):
+        c = self._comparison(systems=("hpa_fair", "jcac_converged"), baseline="hpa_fair")
+        zero = demo.SystemOutcome("hpa_fair", "HPA-fair (tuned)", 0.0,
+                                  {**c.outcome("hpa_fair").metrics, "J": 0.0})
+        c.outcomes[0] = zero
+        assert "HPA-fair" in demo.render_takeaway(c)
+
+    def test_cli_refuses_an_empty_systems_list(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "demo_compare", Path(__file__).resolve().parents[1] / "scripts" / "demo_compare.py")
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        args = cli.argparse.Namespace(published=False, systems=" , ", baseline=None)
+        with pytest.raises(SystemExit, match="at least one"):
+            cli._cast(args)
+
+    def test_trace_plot_draws_every_arm(self, tmp_path):
+        c = self._comparison(collect_rows=True)
+        for o in c.outcomes:
+            assert o.rows, o.system  # per-tenant, per-step knob settings
+        out = demo.plot_trace(c, tmp_path / "trace.png")
+        assert out.exists() and out.stat().st_size > 10_000
+
+    def test_trace_plot_refuses_a_comparison_without_rows(self, tmp_path):
+        with pytest.raises(ValueError, match="collect_rows"):
+            demo.plot_trace(self._comparison(), tmp_path / "trace.png")
+
+    def test_sweep_runs_one_comparison_per_headline_workload(self):
+        assert demo.HEADLINE_WORKLOADS == (
+            "crud_steady", "crud_bursty", "ai_cacheable", "ai_uncacheable", "agentic")
+        comparisons = demo.sweep(steps=12)
+        assert [c.scenario["workload"] for c in comparisons] == list(demo.HEADLINE_WORKLOADS)
+        for c in comparisons:
+            assert [o.system for o in c.outcomes] == list(demo.DEFAULT_SYSTEMS)
+
+    def test_sweep_table_marks_the_lowest_j_per_workload(self):
+        comparisons = demo.sweep(workloads=("agentic", "ai_cacheable"), steps=12)
+        table = demo.render_sweep(comparisons)
+        table.encode("ascii")
+        body = table.splitlines()[2:]
+        assert len(body) == 2 and all(line.count("<") == 1 for line in body)
+        for c, line in zip(comparisons, body):
+            best = min(c.outcomes, key=lambda o: o.metrics["J"])
+            assert f"{best.metrics['J']:.3f} <" in line
 
 
 class TestClusterBackend:
