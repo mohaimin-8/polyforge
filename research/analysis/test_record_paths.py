@@ -42,6 +42,13 @@ ALLOWED = {
         "that PRODUCES a committed input artifact rather than a record the "
         "gate regenerates; when it is deliberately re-run, writing beside the "
         "record is the intended destination",
+    ("separation_mt_v3_walk.py", "separation_mt_v3_walk_min.json"):
+        "the same walk's --out default under --bound min (audit 2026-09-26): an "
+        "input artifact the walk produces, never a record the gate regenerates",
+    ("planner_cells_paired.py", "PLANNER_CELLS_DEALIAS.md"):
+        "a READ, not a write: the paired record quotes the published unpaired "
+        "values beside its own, so it must read the committed copy, as "
+        "planner_cells_dealias.py reads PLANNER_CELLS.md",
 }
 
 
