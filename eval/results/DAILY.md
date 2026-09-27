@@ -1911,3 +1911,5 @@ Appended by the runner every progress tick.
 | 2026-09-26 11:28 | matrix_retuned | 1750/1800 | 0 | 17185 runs/h |
 | 2026-09-26 11:28 | matrix_retuned | 1775/1800 | 0 | 17409 runs/h |
 | 2026-09-26 11:28 | matrix_retuned | 1800/1800 | 0 | 17637 runs/h |
+| 2026-09-27 21:09 | demo_cluster | 1/1 | 1 | 15 runs/h |
+| 2026-09-27 21:20 | demo_cluster | 1/1 | 0 | 6 runs/h |
