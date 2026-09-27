@@ -57,6 +57,10 @@ spec:
             - name: POLYFORGE_FEATURES_TOKEN
               value: {{ .Values.features.token | quote }}
             {{- end }}
+            {{- if .Values.features.rateFromCount }}
+            - name: POLYFORGE_PLANNER_DEMAND_RATE
+              value: "count"
+            {{- end }}
             {{- if .Values.features.adminKeySecret.name }}
             - name: POLYFORGE_FEATURES_ADMIN_KEY
               valueFrom:

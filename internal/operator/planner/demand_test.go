@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // featuresServer serves one canned feature payload on the features endpoint.
@@ -136,5 +137,111 @@ func TestRealizedP95IsCarriedPerKindConservatively(t *testing.T) {
 	}
 	if demand.RealizedP95Ms != nil {
 		t.Errorf("realized map should be absent when no row carries a p95, got %v", demand.RealizedP95Ms)
+	}
+}
+
+// Behind N load-balanced control-plane pods, each pod's in-process
+// RateTracker sees about 1/N of a tenant's requests, and the feature API
+// averages those per-pod rates. A 2026-09-28 kind run with 16 pods reported
+// tenant t00's chat demand as 0.36 rps while it sent 4.1 rps. The shared
+// store sees every pod's events, so count / window is the tenant's rate
+// whatever the pod count. Opt-in: the default keeps the registered signal.
+func TestRateFromCountIsIndependentOfPodCount(t *testing.T) {
+	srv := featuresServer(t, []map[string]any{
+		// 41 chat events in a 10 s window = 4.1 rps; each of 16 pods saw ~0.26.
+		{"service": "chat", "event_count": 41, "avg_rps_window": 0.36, "avg_latency_ms": 20.0},
+		{"service": "crud_read", "event_count": 50, "avg_rps_window": 0.42, "avg_latency_ms": 1.0},
+	})
+	defer srv.Close()
+
+	src := NewFeatureDemandSource(srv.URL, "tok")
+	src.RateFromCount = true
+	demand, ok, err := src.TenantDemand(context.Background(), "t00")
+	if err != nil || !ok {
+		t.Fatalf("TenantDemand: ok=%v err=%v", ok, err)
+	}
+	if got := demand.RPS["chat"]; got != 4.1 {
+		t.Errorf("chat rps = %v, want 4.1 (41 events / 10 s)", got)
+	}
+	if got := demand.RPS["crud_read"]; got != 5.0 {
+		t.Errorf("crud_read rps = %v, want 5.0 (50 events / 10 s)", got)
+	}
+	// The latency weights follow the corrected rates: (20*4.1 + 1*5) / 9.1.
+	if want := (20.0*4.1 + 1.0*5.0) / 9.1; diff(demand.CrudBaseMs, want) > 1e-9 {
+		t.Errorf("CrudBaseMs = %v, want %v", demand.CrudBaseMs, want)
+	}
+}
+
+func TestDefaultDemandStillAveragesPerPodRates(t *testing.T) {
+	srv := featuresServer(t, []map[string]any{
+		{"service": "chat", "event_count": 41, "avg_rps_window": 0.36, "avg_latency_ms": 20.0},
+	})
+	defer srv.Close()
+
+	demand, _, err := NewFeatureDemandSource(srv.URL, "tok").TenantDemand(context.Background(), "t00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := demand.RPS["chat"]; got != 0.36 {
+		t.Errorf("default chat rps = %v, want the registered avg_rps_window 0.36", got)
+	}
+}
+
+func diff(a, b float64) float64 {
+	if a > b {
+		return a - b
+	}
+	return b - a
+}
+
+func TestParseDemandRate(t *testing.T) {
+	for mode, want := range map[string]bool{"": false, "mean": false, "count": true} {
+		got, err := ParseDemandRate(mode)
+		if err != nil || got != want {
+			t.Errorf("ParseDemandRate(%q) = %v, %v; want %v, nil", mode, got, err, want)
+		}
+	}
+	// A typo must not silently fall back to the attenuated signal.
+	if _, err := ParseDemandRate("counts"); err == nil {
+		t.Error("ParseDemandRate(\"counts\") accepted an unknown mode")
+	}
+}
+
+// The divisor is the window the server counted over, not the one the operator
+// asked for: a slow feature call widens [since, until] and the count with it.
+func TestRateFromCountDividesByTheServerReportedWindow(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"since": "2026-09-28T00:00:00Z",
+			"until": "2026-09-28T00:00:12.5Z", // 12.5 s, not the requested 10 s
+			"items": []map[string]any{{"service": "chat", "event_count": 50, "avg_rps_window": 0.3}},
+		})
+	}))
+	defer srv.Close()
+
+	src := NewFeatureDemandSource(srv.URL, "tok")
+	src.RateFromCount = true
+	demand, _, err := src.TenantDemand(context.Background(), "t00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := demand.RPS["chat"]; got != 4.0 {
+		t.Errorf("chat rps = %v, want 4.0 (50 events / 12.5 s server window)", got)
+	}
+}
+
+func TestRateFromCountFallsBackToTheConfiguredWindow(t *testing.T) {
+	srv := featuresServer(t, []map[string]any{{"service": "chat", "event_count": 20}})
+	defer srv.Close()
+
+	src := NewFeatureDemandSource(srv.URL, "tok")
+	src.RateFromCount = true
+	src.Window = 5 * time.Second
+	demand, _, err := src.TenantDemand(context.Background(), "t00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := demand.RPS["chat"]; got != 4.0 {
+		t.Errorf("chat rps = %v, want 4.0 (20 events / 5 s configured window)", got)
 	}
 }

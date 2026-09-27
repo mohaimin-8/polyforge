@@ -130,6 +130,11 @@ EVAL_LIVE_AI = os.environ.get("POLYFORGE_EVAL_LIVE_AI") == "1"
 # relationship to have with a teardown race. Default stays delete-on-exit so
 # CI never leaks clusters.
 EVAL_KEEP_CLUSTER = os.environ.get("POLYFORGE_EVAL_KEEP_CLUSTER") == "1"
+# Opt-in replica-independent planner demand (features.rateFromCount). The
+# per-pod rate stamps the planner averages read ~1/N of a tenant's demand
+# behind N control-plane pods (demo_cluster run, 2026-09-28). Default off:
+# the registered live campaigns ran the per-pod mean.
+EVAL_DEMAND_RATE_FROM_COUNT = os.environ.get("POLYFORGE_EVAL_DEMAND_RATE") == "count"
 # AI-gateway replicas for the live plane. DEFAULT 1 -- the chart's value, and
 # unchanged behaviour.
 #
@@ -827,6 +832,7 @@ def operator_install_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
          "--set=planner.image.tag=dev",
          "--set=features.url=http://polyforge-control-plane.polyforge.svc:80",
          f"--set=features.adminKeySecret.name={ADMIN_SECRET_NAME}",
+         *(["--set=features.rateFromCount=true"] if EVAL_DEMAND_RATE_FROM_COUNT else []),
          f"--set=planner.limits.replicas={size.limits_replicas}",
          f"--set=planner.limits.cacheMB={size.limits_cache_mb}",
          # jcac-calibrated (session 48): the planner's two corrections, on
@@ -856,6 +862,12 @@ def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
             "POLYFORGE_EVAL_LIVE_AI=1 requires POLYFORGE_EVAL_SHARED_PG=1: "
             "gateway telemetry must land in the store eval-export reads, or "
             "every AI metric would silently read zero"
+        )
+    if EVAL_DEMAND_RATE_FROM_COUNT and not EVAL_SHARED_PG:
+        raise RuntimeError(
+            "POLYFORGE_EVAL_DEMAND_RATE=count requires POLYFORGE_EVAL_SHARED_PG=1: "
+            "on per-pod SQLite each pod counts only its own events, so "
+            "event_count / window would read ~1/N of demand again, silently"
         )
     if EVAL_LIVE_AI and not TIER_BACKENDS_JSON:
         raise RuntimeError(

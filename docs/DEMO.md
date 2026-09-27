@@ -295,8 +295,12 @@ demand signal is a request rate counted inside each control-plane pod
 (`internal/telemetry/rate.go`), and the feature API averages those per-pod
 rates. With 16 pods behind a load-balancing Service, the planner saw roughly
 one twelfth of the real CRUD demand in this run (tenant t00: 4.1 chat
-requests/s sent, 0.36 reported). That is a defect in the live demand signal,
-under investigation; if you show Part C, say so.
+requests/s sent, 0.36 reported). That is a defect in the live demand signal
+(`research/analysis/RESULTS_MASTER.md`, finding of 2026-09-28). An opt-in fix
+reads the rate from the shared store instead; add
+`$env:POLYFORGE_EVAL_DEMAND_RATE = "count"` before the run to use it, and the
+planner visibly grows the tenants' caches (128 MB to 256-512 MB) during the
+load. If you show Part C, say which signal you ran.
 
 Say: "The same controller code that ran in the simulator is now a service in
 the cluster. Every 10 seconds the operator asks the planner for a plan and

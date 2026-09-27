@@ -63,6 +63,23 @@ Pareto-undominated system" claim is false: on mean cost and violation, KEDA and
 static are also on the front (`RESULTS.md`, computed since 2026-09-26). Do not cite
 this paragraph without this correction.
 
+*Finding (2026-09-28): the live planner under-read demand behind replicated pods.*
+The operator's demand for each tenant is the mean of the `RPSWindow` stamps on its
+telemetry events, and each control-plane pod stamps with its own in-process rate
+(`internal/telemetry/rate.go`). Behind N load-balanced pods each stamp is about 1/N
+of the tenant's rate. Measured on a 16-pod kind cluster (`ai_cacheable`, one tenant,
+one 10-s window): chat 5.5 req/s sent, 0.32 read; crud_read 6.0 and 0.28; embed 3.7
+and 0.22 — 17–22x low. This touches every live campaign that ran a planner arm with
+more than one control-plane pod after the 2026-08-08 rate fix: B1, B1′, B1″ (the
+CRUD share; the single-replica gateway's AI stamps are exact), `RESULTS_TRACE_LIVE.md`,
+`RESULTS_MULTINODE.md` and the V8 soak. In B1′/B1″ the pod count was the planner's own
+replica decision, so the signal it read fell as it scaled up. How much any verdict
+moved is **not measured**; no registered verdict is changed by this note. An opt-in
+fix computes the rate as `event_count / window` from the shared store
+(`POLYFORGE_EVAL_DEMAND_RATE=count`, chart `features.rateFromCount`); on the same cell
+it changed the planner's cache decisions (128 MB for every tenant → 512/256 MB) with
+no measurable outcome change there, because that cell has no live cache path.
+
 ---
 
 ## Campaign ledger (chronological)

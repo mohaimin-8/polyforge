@@ -25,6 +25,7 @@ var knownKinds = map[string]bool{
 // planner needs (internal/telemetry.FeatureRow).
 type featureRow struct {
 	Service      string  `json:"service"`
+	EventCount   int     `json:"event_count"`
 	AvgRPSWindow float64 `json:"avg_rps_window"`
 	AvgLatencyMS float64 `json:"avg_latency_ms"`
 	P95LatencyMS float64 `json:"p95_latency_ms"`
@@ -38,6 +39,11 @@ type featureSet struct {
 	// never decoded it, so under heavy load the demand estimate was computed
 	// from an ever-shorter early slice and *fell* as load rose, silently.
 	Truncated bool `json:"truncated"`
+	// Since and Until are the window the server actually counted over. It
+	// sets Until when it runs the query, so a slow call widens the window
+	// past the operator's request; RateFromCount divides by this one.
+	Since time.Time `json:"since"`
+	Until time.Time `json:"until"`
 }
 
 // FeatureDemandSource derives planner demand from the control plane's
@@ -64,12 +70,34 @@ type FeatureDemandSource struct {
 	// average is strictly worse than a reactive one, which is the opposite
 	// of what the live plane is meant to demonstrate.
 	Window time.Duration
+	// RateFromCount computes each kind's rate as event_count / Window
+	// instead of the mean of the events' RPSWindow stamps. The stamps come
+	// from an in-process RateTracker, so behind N load-balanced pods each
+	// one reports about 1/N of the tenant's rate and their mean inherits
+	// that; a 16-pod kind run (2026-09-28) read 0.36 rps for a tenant
+	// sending 4.1. A shared store (PostgreSQL) holds every pod's events, so
+	// the count is exact whatever the pod count; on per-pod SQLite it is not. Opt-in (POLYFORGE_PLANNER_DEMAND_RATE
+	// =count): off keeps the signal the registered live campaigns ran on.
+	RateFromCount bool
 }
 
 // DefaultDemandWindow matches DefaultPlanInterval. Kept as its own constant
 // rather than imported to avoid a controllers -> planner import cycle; the
 // operator test asserts they agree.
 const DefaultDemandWindow = 10 * time.Second
+
+// ParseDemandRate reads POLYFORGE_PLANNER_DEMAND_RATE: "count" turns on
+// RateFromCount; "" or "mean" keeps the registered per-pod mean. Anything
+// else is an error, so a typo cannot silently keep the attenuated signal.
+func ParseDemandRate(mode string) (bool, error) {
+	switch mode {
+	case "", "mean":
+		return false, nil
+	case "count":
+		return true, nil
+	}
+	return false, fmt.Errorf("POLYFORGE_PLANNER_DEMAND_RATE must be \"count\", \"mean\" or unset, got %q", mode)
+}
 
 func NewFeatureDemandSource(baseURL, token string) *FeatureDemandSource {
 	return &FeatureDemandSource{
@@ -130,6 +158,10 @@ func (f *FeatureDemandSource) TenantDemand(ctx context.Context, tenantID string)
 				"prefix of the window, not the window")
 	}
 
+	countWindow := window
+	if !features.Since.IsZero() && features.Until.After(features.Since) {
+		countWindow = features.Until.Sub(features.Since)
+	}
 	demand := Demand{RPS: map[string]float64{}, CrudBaseMs: 50.0}
 	var latencyWeight, latencySum float64
 	for _, row := range features.Items {
@@ -137,12 +169,16 @@ func (f *FeatureDemandSource) TenantDemand(ctx context.Context, tenantID string)
 		if !knownKinds[kind] {
 			kind = "crud_read"
 		}
-		demand.RPS[kind] += row.AvgRPSWindow
-		latencySum += row.AvgLatencyMS * row.AvgRPSWindow
-		latencyWeight += row.AvgRPSWindow
+		rate := row.AvgRPSWindow
+		if f.RateFromCount {
+			rate = float64(row.EventCount) / countWindow.Seconds()
+		}
+		demand.RPS[kind] += rate
+		latencySum += row.AvgLatencyMS * rate
+		latencyWeight += rate
 		// Realized p95 per kind: the worst of the rows that fold into the
 		// kind (conservative: a smaller headroom is the safe error).
-		if row.P95LatencyMS > 0 && row.AvgRPSWindow > 0 {
+		if row.P95LatencyMS > 0 && rate > 0 {
 			if demand.RealizedP95Ms == nil {
 				demand.RealizedP95Ms = map[string]float64{}
 			}

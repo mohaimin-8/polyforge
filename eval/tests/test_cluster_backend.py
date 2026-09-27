@@ -601,3 +601,30 @@ def test_the_tuned_live_hpa_arm_carries_the_tuned_target_and_jcacs_floor(tmp_pat
     published = install("replica-only")
     assert "targetCPUUtilization" not in published and "minReplicas" not in published
     assert "replica-only-tuned" not in cb.OPERATOR_SYSTEMS
+
+
+# --- planner demand rate (2026-09-28 finding) --------------------------
+
+def _operator_install(plan):
+    return " ".join(next(c for c in plan if c and c[0] == "helm"
+                         and "polyforge-operator" in " ".join(c)))
+
+
+def test_demand_rate_from_count_is_opt_in(monkeypatch, tmp_path):
+    # Off by default: the registered live campaigns ran the per-pod mean.
+    monkeypatch.setattr(cb, "EVAL_DEMAND_RATE_FROM_COUNT", False)
+    plan = cb.command_plan(_run(system="jcac"), tmp_path)
+    assert "features.rateFromCount" not in _operator_install(plan)
+    monkeypatch.setattr(cb, "EVAL_DEMAND_RATE_FROM_COUNT", True)
+    monkeypatch.setattr(cb, "EVAL_SHARED_PG", True)
+    plan = cb.command_plan(_run(system="jcac"), tmp_path)
+    assert "--set=features.rateFromCount=true" in _operator_install(plan)
+
+
+def test_demand_rate_from_count_requires_a_shared_store(monkeypatch, tmp_path):
+    # On per-pod SQLite each pod counts only its own events: count / window
+    # would read ~1/N again, silently. Same guard as LIVE_AI.
+    monkeypatch.setattr(cb, "EVAL_DEMAND_RATE_FROM_COUNT", True)
+    monkeypatch.setattr(cb, "EVAL_SHARED_PG", False)
+    with pytest.raises(RuntimeError, match="SHARED_PG"):
+        cb.command_plan(_run(system="jcac"), tmp_path)
