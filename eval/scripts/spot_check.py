@@ -1,7 +1,10 @@
 """W35c spot-check: replay N random valid runs and compare every metric to
-the stored row. Tolerance is ±3% (roadmap contract); the sim backend is
-deterministic so any drift at all means the harness leaks state between
-runs — dig in, don't shrug.
+the stored row. The sim backend is deterministic, so the default tolerance
+is ZERO: any drift at all means the harness leaks state between runs -- dig
+in, don't shrug. (It was ±3%, the W34 roadmap contract, which a
+bit-identical replay never needed and which could only hide real drift;
+measured 0.0 on FAIR_J and the original matrix, audit 2026-09-26.)
+`--tolerance` loosens it deliberately.
 
 Usage (from eval/):
     python scripts/spot_check.py experiments/full.yaml --n 10 --seed 2026
@@ -21,7 +24,7 @@ from harness import results, sim_backend  # noqa: E402
 from harness.config import expand, load  # noqa: E402
 from harness.results import METRIC_COLUMNS  # noqa: E402
 
-TOLERANCE = 0.03
+TOLERANCE = 0.0
 
 
 def main() -> None:
@@ -29,6 +32,8 @@ def main() -> None:
     ap.add_argument("experiment")
     ap.add_argument("--n", type=int, default=10)
     ap.add_argument("--seed", type=int, default=2026, help="which runs get sampled")
+    ap.add_argument("--tolerance", type=float, default=TOLERANCE,
+                    help="relative drift allowed per metric (default 0: exact replay)")
     args = ap.parse_args()
 
     spec = load(args.experiment)
@@ -58,7 +63,7 @@ def main() -> None:
             denom = max(abs(a), abs(b), 1e-9)
             drift = abs(a - b) / denom
             worst = max(worst, drift)
-            if drift > TOLERANCE:
+            if drift > args.tolerance:
                 failures.append(f"{run_id} {name}: stored={a} replayed={b} drift={drift:.4f}")
         print(f"  {run_id} {run.system:16s} {run.workload:16s} ok (max drift so far {worst:.2e})")
 
@@ -67,7 +72,7 @@ def main() -> None:
         for f in failures:
             print("  " + f)
         raise SystemExit(1)
-    print(f"spot-check: {len(sample)} runs replayed, worst drift {worst:.2e} (tolerance {TOLERANCE})")
+    print(f"spot-check: {len(sample)} runs replayed, worst drift {worst:.2e} (tolerance {args.tolerance})")
 
 
 if __name__ == "__main__":
