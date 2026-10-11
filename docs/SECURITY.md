@@ -190,6 +190,30 @@ fragile step is a security gate that stops running silently. `go.mod`'s comment
 already recorded this happening once (17 reachable vulns on 1.25.5); it
 happened again, and this time nothing could say so for a week.
 
+## 2026-10-12 finding: thirteen reachable advisories after Go 1.25 left support (FIXED)
+
+**Severity: high; this time the gate did its job.** The first CI run after the
+advisories were published (a3a90c9) went red in `vulncheck`: **13 reachable**
+vulnerabilities. Eleven are in the standard library of the pinned 1.25.14
+(`net/http`, `crypto/tls`, `mime/multipart`, `html/template`; GO-2026-6599,
+6600, 6603, 6605, 6607, 6608, 6610-6613, 6617), several also in
+`golang.org/x/net` v0.56.0; one in `golang.org/x/text` v0.39.0 (GO-2026-6629);
+and one in the OTLP trace exporter v1.44.0, which logged exporter endpoint URLs
+at info level (GO-2026-6505).
+
+Go 1.25 left support when 1.27 shipped, so no 1.25 patch release carries the
+stdlib fixes: the first fixed toolchain is **1.26.9**.
+
+**Fixed** by moving the pin to `toolchain go1.26.9` (the `go` directive rises
+to 1.26.0 with `x/net` v0.60.0), `x/net` v0.60.0, `x/text` v0.42.0 and
+OpenTelemetry v1.45.0, and re-pinning the three Go Dockerfiles to
+`golang:1.26.9` by index digest. Verified locally before pushing: `govulncheck`
+v1.8.0 reports 0 reachable vulnerabilities, `go vet` is clean, and all 29 Go
+packages pass on the new toolchain.
+
+**The lesson:** a patch pin also ages out with its release line. Re-pinning
+inside 1.25 stopped being possible the day 1.27 shipped.
+
 ## Session-43 finding: unbounded metric cardinality, remotely triggerable (FIXED)
 
 **Severity: high. Found by accident, by an instrument check** — the L6 `/metrics`
