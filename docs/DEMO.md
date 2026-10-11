@@ -16,6 +16,22 @@ and adds about 15 minutes; it is optional.
 | C. Kubernetes, live (optional) | the operator and planner drive a real cluster | 15 min | Docker, kind, kubectl, helm, k6 |
 | D. The evidence is real | tests pass and every record regenerates byte for byte | 5 min | Go, Python |
 
+## One command
+
+```powershell
+python scripts/demo_all.py            # everything, about 12 minutes (needs Docker for Part C)
+python scripts/demo_all.py --pause    # the same, waiting for Enter between parts
+python scripts/demo_all.py --no-cluster   # without Kubernetes, about 2 minutes
+```
+
+It runs Parts A to D below in order, checks every layer and every link between
+them, prints one results board, and opens the knob trace and the evidence site.
+Part C announces each link the moment it is verified: every layer running,
+Policies Applied, pods = sum of Policy replicas, telemetry arriving, the planner
+in control, the planner changing knobs, every plan audited. Everything it starts
+is stopped and the kind cluster is deleted afterwards. The sections below are
+the same parts run by hand, with what to say at each step.
+
 ---
 
 ## 0. The day before: rehearse (about 30 minutes)
@@ -308,8 +324,8 @@ applies it to real Deployments, the cache budget and the model tier. On a
 rented GPU server with three real models (Qwen 0.5B, 3B and 7B), the first
 live run lost: its model of the servers was about 1,000 times too
 pessimistic. With online calibration it won in the primary cell (B1',
-`RESULTS_WAVE4_CALIBRATED.md`). A five-seed replication is pre-registered and
-waits for cloud access."
+`RESULTS_WAVE4_CALIBRATED.md`). A five-seed replication was pre-registered, but
+I could not fund the cloud time, so it was not run."
 
 With `POLYFORGE_EVAL_KEEP_CLUSTER=1` the cluster stays up after the run. Remove
 it afterwards:
@@ -325,7 +341,7 @@ Remove-Item Env:POLYFORGE_EVAL_KEEP_CLUSTER, Env:POLYFORGE_EVAL_SHARED_PG
 
 ```powershell
 go test ./...                               # all Go packages, about 40 seconds
-python -m pytest research/jcac_sim -q       # the controller and simulator, 204 tests, seconds
+python -m pytest research/jcac_sim -q       # the controller and simulator, 204 tests, about 3 minutes
 python scripts/reproduce.py                 # about 20 minutes: start it first
 ```
 

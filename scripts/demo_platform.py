@@ -379,33 +379,39 @@ def _keep_running() -> None:
     input("[Enter] stops everything ... ")
 
 
-def main(argv=None) -> int:
-    args = _parse(argv)
+def run_demo(pause: bool = False, keep_running: bool = False, no_build: bool = False) -> Checks:
+    """Every act, every check; the Checks carry the verdicts (demo_all reads them)."""
+    checks = Checks()
     ports = [*SERVICE_PORTS, *(port for _, (port, _) in MOCK_TIERS)]
     if busy := busy_ports(ports):
-        print(f"Ports {busy} are already in use: stop whatever holds them (a previous "
-              "demo, or scripts/run-control-plane.ps1) and rerun.")
-        return 2
+        checks.record("ports free", False, f"{busy} already in use: stop whatever holds them "
+                      "(a previous demo, or scripts/run-control-plane.ps1) and rerun")
+        return checks
     WORK.mkdir(parents=True, exist_ok=True)
     for stale in WORK.glob("demo.db*"):
         stale.unlink()
     print("PolyForge live platform demo\n\nStarting the services:")
-    missing = any(not (WORK / f"{n}{EXE}").exists() for n in ("control-plane", "ai-gateway"))
-    if missing or not args.no_build:
-        build()
-    checks, services = Checks(), Services()
+    services = Services()
     try:
+        missing = any(not (WORK / f"{n}{EXE}").exists() for n in ("control-plane", "ai-gateway"))
+        if missing or not no_build:
+            build()
         start_all(services)
-        run_acts(checks, args.pause)
+        run_acts(checks, pause)
         checks.summary()
-        if args.keep_running:
+        if keep_running:
             _keep_running()
     except Exception as err:  # reported as a FAIL, never a bare traceback mid-demo
         checks.record("demo aborted", False, f"{type(err).__name__}: {err}")
         checks.summary()
     finally:
         services.stop()
-    return checks.exit_code()
+    return checks
+
+
+def main(argv=None) -> int:
+    args = _parse(argv)
+    return run_demo(args.pause, args.keep_running, args.no_build).exit_code()
 
 
 if __name__ == "__main__":
