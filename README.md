@@ -35,8 +35,8 @@ fresh, shared seeds. What the evidence now supports:
   its cell (B1′, WL-H1′ PASS), but on one host × one seed, in-sample, and with a
   replica-only comparator later shown to be a harness artifact
   (`ERRATUM_WAVE4_REPLICA_ONLY.md`). A five-seed replication with a held-out cell
-  and a tuned live HPA is pre-registered (`PREREG_WAVE4_REPLICATION.md`) and waits
-  on cloud access.
+  and a tuned live HPA was pre-registered (`PREREG_WAVE4_REPLICATION.md`) but not
+  run: the author could not fund it (status 2026-10-12).
 - **Withdrawn:** every comparative cost claim (−70% on BurstGPT, −42% and −7.1% on
   Azure, the matrix cost wins), the claim that joint control "wins J in every
   campaign", and the claim that it is the only Pareto-undominated system. The cost
@@ -108,6 +108,13 @@ The current implementation provides a persistent control-plane backend:
 SQLite remains the zero-infrastructure development path. PostgreSQL is the production path and requires separate admin and application roles so row-level security is testable rather than bypassed accidentally.
 
 ## Run
+
+To see the whole system working in one command (services, controller comparison,
+a Kubernetes control loop checked link by link, and the evidence), run
+`python scripts/demo_all.py` (about 14 minutes; `--no-cluster` skips Kubernetes). What
+each part shows and means is in [docs/DEMO.md](docs/DEMO.md).
+
+To run the control plane on its own:
 
 ```powershell
 .\scripts\run-control-plane.ps1
@@ -358,7 +365,7 @@ and `scripts/check_prereg_timing.py` checks each campaign ran after its protocol
   (WL-H2 PASS in every run). A 24 h CRUD-plane soak completed with 25,806,353
   requests, zero dropped and zero restarts. The first live check (Phase 7) ran
   with a planner that read zero demand (`ERRATUM_ZERO_DEMAND_PLANNER.md`). A
-  five-seed live replication is pre-registered and pending.
+  five-seed live replication was pre-registered but not run (unfunded).
 - **Latency granularity.** Request-level p95, not token-level TTFT/TPOT:
   continuous-batching dynamics belong to the llm-d/AIBrix-class actuation
   layer beneath PolyForge's portfolio decisions (`docs/RELATED_WORK.md`
