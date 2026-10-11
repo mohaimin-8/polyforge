@@ -171,3 +171,20 @@ follow, both made before any run and with no data seen:
 - **The budget cap is $55**, replacing $70. The instance is terminated at
   $55 of accrued cost, or when the matrix completes, whichever comes first.
 
+
+## Status note (2026-10-12): not run
+
+Added after registration; the registered text above is unchanged. No run of
+`eval/experiments/wave4_replication.yaml` has taken place, and none is
+planned: the author cannot fund another sitting. The AWS account was
+suspended for identity verification on 2026-09-28, before any launch, and
+its access key no longer authenticates (checked 2026-10-12).
+
+- **WL-R1 and WL-R2 are not evaluated.** Nothing is inferred from the
+  registered predictions (WL-R1 was predicted to FAIL).
+- The live evidence for the corrected controller therefore remains B1′
+  alone, with the four limits listed under "Why this exists".
+- If the sitting is ever funded, this protocol applies unchanged, with
+  amendment 1. Using the replica-independent demand signal
+  (`RESULTS_MASTER.md`, finding of 2026-09-28) would need a further pre-run
+  amendment.
