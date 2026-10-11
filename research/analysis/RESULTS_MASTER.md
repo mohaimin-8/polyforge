@@ -80,6 +80,13 @@ fix computes the rate as `event_count / window` from the shared store
 it changed the planner's cache decisions (128 MB for every tenant → 512/256 MB) with
 no measurable outcome change there, because that cell has no live cache path.
 
+*Status (2026-10-12): the five-seed live replication was not run.* The author could not
+fund it (`PREREG_WAVE4_REPLICATION.md`, status note); WL-R1/WL-R2 are not evaluated. The
+live evidence for the calibrated controller remains B1′ alone: one host, two reps,
+in-sample, cheaper than the three valid comparators (tier-only −17.7%, the published
+controller −20.5%, cache-only −82.5%). Its replica-only comparison, like B1's, is void
+(`ERRATUM_WAVE4_REPLICA_ONLY.md`); do not quote "−99%" or "70× cheaper".
+
 ---
 
 ## Campaign ledger (chronological)
