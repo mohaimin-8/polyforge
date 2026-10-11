@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -147,7 +148,7 @@ func rowJSON(event telemetry.Event) string {
 	b.WriteString(`","rps_window":`)
 	b.WriteString(formatFloat(event.RPSWindow))
 	b.WriteString(`,"payload_bytes":`)
-	b.WriteString(fmt.Sprintf("%d", event.PayloadBytes))
+	b.WriteString(strconv.Itoa(event.PayloadBytes))
 	b.WriteString(`,"latency_ms":`)
 	b.WriteString(formatFloat(event.LatencyMS))
 	b.WriteString(`,"cache_hit":`)
@@ -161,7 +162,7 @@ func rowJSON(event telemetry.Event) string {
 	b.WriteString(`,"model_tier":`)
 	b.WriteString(quoteJSON(event.ModelTier))
 	b.WriteString(`,"child_spans":`)
-	b.WriteString(fmt.Sprintf("%d", event.ChildSpans))
+	b.WriteString(strconv.Itoa(event.ChildSpans))
 	b.WriteString("}")
 	return b.String()
 }

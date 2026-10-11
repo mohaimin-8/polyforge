@@ -50,10 +50,14 @@ jobs:
         run: test -z "$(gofmt -l .)"
       - name: Vet
         run: go vet ./...
+      # The linter refuses a module whose Go version is newer than the Go it
+      # was built with: v2.6.2 (built with go1.25) stopped at the go1.26.9
+      # toolchain pin (2026-10-12). v2.12.2 is built with go1.26.2, the
+      # smallest step that can lint this module; move it with the pin.
       - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.6.2
+          version: v2.12.2
       # TestLivePlannerContract and TestCellsScaleOnShippedPath skip without
       # this URL, and CI never set it -- so the only check that crosses the
       # Go/Python boundary to the shipped planner, and the only one that
