@@ -2,7 +2,6 @@ package platform
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -102,23 +101,16 @@ func bearerToken(r *http.Request) string {
 	return ""
 }
 
-// authorizeBearer enforces RBAC for JWT credentials: a bad token is 401, a
-// valid token for a different tenant or with insufficient scope is 403 —
-// the same contract authorizeTenant applies to API keys.
-func (s *Server) authorizeBearer(w http.ResponseWriter, r *http.Request, token, tenantID, requiredScope string) bool {
+// bearerCredential resolves a JWT for tenantID: its scope, or the refusal. A
+// bad token is 401 and a valid token for a different tenant is 403 — the
+// contract authorizeTenant applies to API keys, which also checks the scope.
+func (s *Server) bearerCredential(token, tenantID string) (scope string, status int, err error) {
 	claims, err := s.issuer.Verify(token)
 	if err != nil {
-		s.writeError(w, r, http.StatusUnauthorized, tenant.ErrUnauthorized)
-		return false
+		return "", http.StatusUnauthorized, tenant.ErrUnauthorized
 	}
 	if claims.TenantID != tenantID {
-		s.writeError(w, r, http.StatusForbidden, tenant.ErrForbidden)
-		return false
+		return "", http.StatusForbidden, tenant.ErrForbidden
 	}
-	if !tenant.ScopeAllows(claims.Scope, requiredScope) {
-		s.writeError(w, r, http.StatusForbidden,
-			fmt.Errorf("%w: this endpoint requires the %q scope", tenant.ErrForbidden, requiredScope))
-		return false
-	}
-	return true
+	return claims.Scope, 0, nil
 }
