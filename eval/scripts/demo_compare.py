@@ -78,8 +78,9 @@ def _print_notes(args: argparse.Namespace, tenants: int) -> None:
               "charge and kept a\npinned 128 MB cache. Rerun without --published for "
               "the fair comparison.")
     if args.steps != RECORDS_STEPS or tenants != RECORDS_TENANTS:
-        print(f"\nNote: J's cost term is normalised for {RECORDS_TENANTS} tenants x "
-              f"{RECORDS_STEPS} steps, so this J is not on the records' scale.")
+        print(f"\nNote: J's cost term is per scored tenant-step, as in the records, but "
+              f"the records use {RECORDS_TENANTS} tenants x {RECORDS_STEPS} steps;\n"
+              "compare this J only with runs of the same scenario.")
 
 
 def main() -> None:

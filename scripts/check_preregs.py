@@ -100,6 +100,10 @@ NO_RECORD = {
         "inert (mean_excess 4.8319 -> 4.8314 across a 32x increase, b184aee). "
         "The prereg stays frozen and PREREG_BUDGET_PARITY discloses that its "
         "ladder is not run.",
+    "PREREG_WAVE4_REPLICATION":
+        "registered 2026-09-26 but not run: the author could not fund the "
+        "sitting; the protocol's status note (2026-10-12) records WL-R1/WL-R2 "
+        "as not evaluated.",
     "PREREG_LIVE_SOAK_V6":
         "attempt 8 produced no scoreable sitting, so it has no record of its "
         "own; its evidence is quoted inside RESULTS_LIVE_SOAK_V7.md, which "
