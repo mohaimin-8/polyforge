@@ -227,6 +227,9 @@ class PlannerCore:
             tid = entry.get("tenant_id")
             if not tid or not isinstance(tid, str):
                 raise ValueError("tenant_id is required and must be a string")
+            if tid in configs:
+                # A second entry used to overwrite the first silently.
+                raise ValueError(f"duplicate tenant_id {tid!r} in one request")
             state = entry.get("state") or {}
             demand_obj = entry.get("demand") or {}
             if not isinstance(state, dict) or not isinstance(demand_obj, dict):

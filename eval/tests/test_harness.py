@@ -344,12 +344,21 @@ class TestDemo:
                 assert got[attr] == expected[attr], (name, attr)
 
     def test_j_is_the_records_composite_objective(self):
-        # stats.composite_objective: cost/(119*8)/0.01 + 2*viol + 0.5*(1-Jain)
+        # stats.composite_objective: cost/(119*8)/0.01 + 2*viol + 0.5*(1-Jain),
+        # i.e. cost per scored tenant-step of the 8-tenant, 120-step design.
         metrics = {"total_cost_usd": 9.52, "mean_violation": 0.1, "mean_jain": 0.9}
         assert demo.composite_j(metrics) == pytest.approx(1.0 + 0.2 + 0.05)
+        assert demo.composite_j(metrics, tenants=8, steps=120) == pytest.approx(1.25)
+
+    def test_j_normalises_cost_by_the_scenario_actually_run(self):
+        # A 12-step run scores 11 steps: the same spend per tenant-step must
+        # give the same cost term, not one 119/11 times too small.
+        per_step = {"total_cost_usd": 9.52 * 11 / 119, "mean_violation": 0.1, "mean_jain": 0.9}
+        assert demo.composite_j(per_step, tenants=8, steps=12) == pytest.approx(1.25)
         c = self._comparison()
         for o in c.outcomes:
-            assert o.metrics["J"] == pytest.approx(demo.composite_j(o.metrics))
+            assert o.metrics["J"] == pytest.approx(
+                demo.composite_j(o.metrics, tenants=c.tenants, steps=12))
 
     def test_deltas_are_relative_to_the_baseline(self):
         c = self._comparison(systems=demo.PUBLISHED_SYSTEMS,
@@ -1968,3 +1977,37 @@ def test_the_calibrated_blind_arm_is_the_calibrated_controller_believing_publish
     spec = tiny_spec(systems=["jcac_calibrated_blind"], workloads=["agentic"], shared_seeds=True,
                      model_form={"wu_ai_scale": 0})
     assert sim_backend.execute(expand(spec)[0])["metrics"]["total_cost_usd"] > 0
+
+
+class TestArmWeights:
+    """SystemSpec.beta and .gamma must reach the controller on the general
+    harness path. beta used to be forwarded only by trace_matrix.run_one, so
+    the registered beta-ladder arms run through sim_backend were plain jcac."""
+
+    def _weights_seen(self, monkeypatch, system):
+        seen = {}
+        real_run = sim_backend.simulate.run
+
+        def spy(controller, *args, **kwargs):
+            seen["weights"] = kwargs.get("weights")
+            return real_run(controller, *args, **kwargs)
+
+        monkeypatch.setattr(sim_backend.simulate, "run", spy)
+        sim_backend.execute(RunSpec(
+            experiment="t", backend="sim", system=system, workload="ai_uncacheable",
+            tenant_mix="uniform", cluster_size="small", rep=0, steps=4, run_id="w",
+            seed=1, store_timeseries=False))
+        return seen["weights"]
+
+    def test_beta_ladder_arm_runs_with_its_slo_weight(self, monkeypatch):
+        weights = self._weights_seen(monkeypatch, "jcac_b64")
+        assert weights is not None and weights.beta == 64.0
+        assert weights.gamma == 0.5  # unset fields keep the published default
+
+    def test_gamma_arm_keeps_its_fairness_weight(self, monkeypatch):
+        weights = self._weights_seen(monkeypatch, "jcac_nofairness")
+        assert weights is not None and weights.gamma == 0.0 and weights.beta == 2.0
+
+    def test_published_arm_still_passes_no_weights(self, monkeypatch):
+        # R4: the published controller must replay bit-identically.
+        assert self._weights_seen(monkeypatch, "jcac") is None

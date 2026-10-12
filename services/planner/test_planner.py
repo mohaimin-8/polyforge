@@ -98,6 +98,13 @@ class PlannerCoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             core.plan({"tenants": [tenant("a", state={"tier": "colossal"})]})
 
+    def test_rejects_a_tenant_listed_twice(self):
+        # The second entry used to overwrite the first silently, so the plan
+        # answered a request the operator never sent.
+        core = PlannerCore()
+        with self.assertRaisesRegex(ValueError, "duplicate tenant_id"):
+            core.plan({"tenants": [tenant("a"), tenant("a", hourly_budget_usd=50.0)]})
+
 
 class PlannerHTTPTests(unittest.TestCase):
     @classmethod

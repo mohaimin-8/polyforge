@@ -88,12 +88,14 @@ LABEL_COL = 30
 VALUE_COL = 22
 
 
-def composite_j(metrics: dict) -> float:
-    """The records' J, constants included (research/analysis/stats.py,
-    composite_objective): cost normalised per scored tenant-step of the
-    8-tenant, 120-step design, plus 2 x violation plus 0.5 x (1 - Jain).
-    It equals the records' J exactly at the default steps and an 8-tenant mix."""
-    return (metrics["total_cost_usd"] / (119 * 8) / 0.01
+def composite_j(metrics: dict, tenants: int = 8, steps: int = 120) -> float:
+    """The records' J (research/analysis/stats.py, composite_objective): cost
+    per scored tenant-step in units of the controller's 0.01 USD scale, plus
+    2 x violation plus 0.5 x (1 - Jain). A run of `steps` scores steps - 1 of
+    them, so the 8-tenant, 120-step defaults give the records' 119 x 8 exactly;
+    any other scenario is normalised by what it actually scored."""
+    scored_tenant_steps = max(1, steps - 1) * tenants
+    return (metrics["total_cost_usd"] / scored_tenant_steps / 0.01
             + 2.0 * metrics["mean_violation"] + 0.5 * (1.0 - metrics["mean_jain"]))
 
 
@@ -149,7 +151,8 @@ def _run_system(name: str, scenario: dict, collect_rows: bool) -> SystemOutcome:
     out = sim_backend.execute(run)
     raw = out["metrics"]
     metrics = {key: raw[key] for key, *_ in METRIC_ROWS if key != "J"}
-    metrics["J"] = composite_j(raw)
+    metrics["J"] = composite_j(raw, tenants=len(TENANT_MIXES[scenario["tenant_mix"]]),
+                               steps=scenario["steps"])
     return SystemOutcome(system=name, label=LABELS.get(name, name), wall_s=out["wall_s"],
                          metrics=metrics, rows=tuple(out["timeseries"] or ()))
 

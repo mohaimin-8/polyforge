@@ -120,9 +120,13 @@ def execute(run: RunSpec) -> dict:
     if spec.seeded:
         params["seed"] = run.seed
 
-    weights = None
-    if spec.gamma is not None:
-        weights = Weights(gamma=spec.gamma)
+    # An arm's own weights reach the controller; unset fields keep the
+    # published defaults, and an arm that sets none passes None (R4). beta was
+    # forwarded only by trace_matrix.run_one, so the registered beta-ladder
+    # arms (jcac_b4..b64) ran here as plain jcac (final check-up, 2026-10-13).
+    weight_kw = {name: value for name, value in (("beta", spec.beta), ("gamma", spec.gamma))
+                 if value is not None}
+    weights = Weights(**weight_kw) if weight_kw else None
 
     started = time.time()
     result = simulate.run(
