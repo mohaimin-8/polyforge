@@ -262,6 +262,17 @@ HELM_VALUES_BY_SYSTEM = {
 }
 
 
+# Arms whose behaviour the live stack actually implements (final check-up,
+# 2026-10-13). The other entries above pass keys the chart ignores
+# (autoscaling.keda/firm/layered, cache.policy, planner.gamma), so a live run
+# of them would deploy a plain pod and record it under the baseline's name.
+# Every committed cluster experiment uses only these.
+LIVE_WIRED_SYSTEMS = frozenset({
+    "jcac", "jcac-calibrated", "jcac-calibrated-dwell", "cache-only", "tier-only",
+    "hpa", "replica-only", "replica-only-tuned",
+})
+
+
 class BackendUnavailable(RuntimeError):
     pass
 
@@ -857,6 +868,12 @@ def operator_install_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
 def command_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
     """The exact subprocess sequence for one run, in order. Split out so
     tests and --dry-run can inspect it without Docker."""
+    if run.system not in LIVE_WIRED_SYSTEMS:
+        raise RuntimeError(
+            f"system {run.system!r} has no live wiring on the cluster backend "
+            f"(wired: {sorted(LIVE_WIRED_SYSTEMS)}); its helm keys are ignored "
+            "by the chart, so the run would measure a plain pod"
+        )
     if EVAL_LIVE_AI and not EVAL_SHARED_PG:
         raise RuntimeError(
             "POLYFORGE_EVAL_LIVE_AI=1 requires POLYFORGE_EVAL_SHARED_PG=1: "

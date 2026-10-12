@@ -628,3 +628,20 @@ def test_demand_rate_from_count_requires_a_shared_store(monkeypatch, tmp_path):
     monkeypatch.setattr(cb, "EVAL_SHARED_PG", False)
     with pytest.raises(RuntimeError, match="SHARED_PG"):
         cb.command_plan(_run(system="jcac"), tmp_path)
+
+
+# --- unwired arms (final check-up, 2026-10-13) --------------------------
+
+@pytest.mark.parametrize("system", ["keda", "firm", "static", "gptcache", "jcac_nojoint",
+                                    "jcac_noeviction", "jcac_noclassifier", "jcac_nofairness"])
+def test_an_arm_with_no_live_wiring_is_refused(system, tmp_path):
+    # Their helm keys (autoscaling.keda, cache.policy, planner.gamma, ...)
+    # are ignored by the chart, so a live run would record a plain pod under
+    # the baseline's name.
+    with pytest.raises(RuntimeError, match="no live wiring"):
+        cb.command_plan(_run(system=system), tmp_path)
+
+
+@pytest.mark.parametrize("system", sorted(cb.LIVE_WIRED_SYSTEMS))
+def test_every_wired_arm_still_plans(system, tmp_path):
+    assert cb.command_plan(_run(system=system), tmp_path)

@@ -187,7 +187,10 @@ get_cloudflared() {
 }
 
 tunnel_one() {
-  local name="$1" port="$2" log="$LOG_DIR/tunnel-$name.log"
+  # Two statements: under set -u, one `local` expands log="...$name" before
+  # name is assigned, so `tunnels` and `up-split` died at once (2026-10-13).
+  local name="$1" port="$2"
+  local log="$LOG_DIR/tunnel-$name.log"
   ./cloudflared tunnel --url "http://127.0.0.1:$port" --no-autoupdate     >"$log" 2>&1 &
   echo "$!" >>"$PID_FILE"
   local tries=0 url=""

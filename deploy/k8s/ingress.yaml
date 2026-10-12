@@ -10,10 +10,9 @@ spec:
   rules:
     - http:
         paths:
-          # /api → control-plane, per the W10 routing layout. /auth is
-          # reserved for the future split-out auth service; today the
-          # control-plane serves /v1/auth/* itself.
-          - path: /api
+          # /v1 → control-plane: it serves /v1/... (including /v1/auth/*)
+          # and nothing under /api, so the old /api rule 404'd every call.
+          - path: /v1
             pathType: Prefix
             backend:
               service:

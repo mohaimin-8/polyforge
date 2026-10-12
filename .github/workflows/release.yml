@@ -6,8 +6,12 @@ name: release
 # to leak). Verify any of them with:
 #
 #   cosign verify ghcr.io/mohaimin-8/polyforge/<component>:<tag> \
-#     --certificate-identity-regexp 'github.com/mohaimin-8/polyforge' \
+#     --certificate-identity-regexp '^https://github\.com/mohaimin-8/polyforge/\.github/workflows/release\.yml@refs/tags/v' \
 #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
+#
+# The identity pattern is anchored to THIS workflow on a version tag. The
+# unanchored 'github.com/mohaimin-8/polyforge' it replaced (2026-10-13)
+# accepted any workflow, branch or repository whose identity contained it.
 #
 # Session 42: this built ONLY control-plane. The repository ships four
 # deployable images, and `helm install polyforge-operator` pulls the operator
@@ -30,7 +34,30 @@ permissions:
   id-token: write # cosign keyless signing
 
 jobs:
+  # 2026-10-13: v1.0.0 was signed and published with 20 known Go
+  # vulnerabilities, because nothing here scanned before signing and CI scans
+  # only HEAD. No image is built, signed or pushed unless the tagged source
+  # passes the same reachability gate CI runs.
+  vulncheck:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Vulnerability scan (reachable symbols)
+        env:
+          GOVULNCHECK_VERSION: v1.8.0
+        run: |
+          GOTOOLCHAIN=auto go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
+          go version
+          "$(go env GOPATH)/bin/govulncheck" ./...
+
   image:
+    needs: vulncheck
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

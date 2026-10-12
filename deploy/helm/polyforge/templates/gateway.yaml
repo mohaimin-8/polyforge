@@ -68,9 +68,9 @@ spec:
             {{- end }}
             {{- if .Values.gateway.rateLimit.requestsPerMinute }}
             - name: POLYFORGE_RATE_LIMIT_RPM
-              value: {{ .Values.gateway.rateLimit.requestsPerMinute | quote }}
+              value: {{ .Values.gateway.rateLimit.requestsPerMinute | int64 | quote }}
             - name: POLYFORGE_RATE_LIMIT_BURST
-              value: {{ .Values.gateway.rateLimit.burst | quote }}
+              value: {{ .Values.gateway.rateLimit.burst | int64 | quote }}
             {{- end }}
           readinessProbe:
             httpGet:

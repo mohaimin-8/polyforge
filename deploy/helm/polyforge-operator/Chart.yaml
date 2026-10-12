@@ -7,7 +7,10 @@ description: >-
   budget and model tier per tenant.
 type: application
 version: 0.3.0
-appVersion: "1.0.0"
+# Image tags default to appVersion, and release.yml tags images with the git
+# tag as written (v1.0.0), so appVersion carries the v. It read "1.0.0", which
+# no release ever pushed: installs from a checkout hit ErrImagePull (2026-10-13).
+appVersion: "v1.0.0"
 kubeVersion: ">=1.27.0"
 home: https://github.com/mohaimin-8/polyforge
 sources:

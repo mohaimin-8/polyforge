@@ -3,4 +3,7 @@ name: polyforge
 description: PolyForge control-plane — multi-tenant AI workload control plane (thesis W10 chart)
 type: application
 version: 0.2.0
-appVersion: "1.0.0"
+# Image tags default to appVersion, and release.yml tags images with the git
+# tag as written (v1.0.0), so appVersion carries the v. It read "1.0.0", which
+# no release ever pushed: installs from a checkout hit ErrImagePull (2026-10-13).
+appVersion: "v1.0.0"
