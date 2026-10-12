@@ -58,6 +58,11 @@ func (w testWriter) Write(p []byte) (int, error) {
 func startEnv(t *testing.T) (client.Client, func()) {
 	t.Helper()
 	if os.Getenv("KUBEBUILDER_ASSETS") == "" {
+		// CI sets POLYFORGE_REQUIRE_ENVTEST so missing binaries fail the
+		// step instead of skipping every test while go test prints ok.
+		if os.Getenv("POLYFORGE_REQUIRE_ENVTEST") == "1" {
+			t.Fatal("KUBEBUILDER_ASSETS unset but POLYFORGE_REQUIRE_ENVTEST=1")
+		}
 		t.Skip("KUBEBUILDER_ASSETS unset; run setup-envtest first")
 	}
 	env := &envtest.Environment{

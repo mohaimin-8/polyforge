@@ -102,8 +102,9 @@ jobs:
       # binaries envtest runs against, and never enters the shipped artifact.
       # Two facts collide here. Every tagged version of its module - the only
       # ones published are v0.24.0, v0.24.1 and v0.25.0 - declares `go 1.26.0`,
-      # and this repo pins the toolchain to 1.25.12 because that is where a set
-      # of reachable stdlib CVEs is fixed. So the TOOL is built with an auto
+      # and this repo then pinned the toolchain to 1.25.x for its stdlib CVE
+      # fixes (since 2026-10-12 it is go1.26.9, which satisfies the tool's
+      # directive; the auto toolchain stays as a guard). So the TOOL is built with an auto
       # toolchain while the TESTS still run under the pinned one; the pin that
       # matters for the product is untouched.
       #
@@ -115,6 +116,9 @@ jobs:
         env:
           ENVTEST_VERSION: v0.24.1
           ENVTEST_K8S: 1.31.0
+          # Missing apiserver binaries fail the step instead of skipping all
+          # three tests while go test prints ok (2026-10-13).
+          POLYFORGE_REQUIRE_ENVTEST: "1"
         run: |
           tool="sigs.k8s.io/controller-runtime/tools/setup-envtest@${ENVTEST_VERSION}"
           GOTOOLCHAIN=auto go run "$tool" use "$ENVTEST_K8S" --bin-dir "$RUNNER_TEMP/envtest"
@@ -320,6 +324,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Full history: test_erratum_zero_demand_planner checks cited first
+          # commits against git and skipped on every depth-1 run (2026-10-13).
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -431,6 +439,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: azure/setup-helm@v4
+        with:
+          version: v4.2.3 # the action's default is 'latest': a floating gate
       - name: Lint charts
         run: |
           helm lint deploy/helm/polyforge
@@ -489,4 +499,29 @@ jobs:
             echo "$bad"
             exit 1
           fi
+
+          # 2026-10-13: the repository check above strips the tag, so charts
+          # defaulting to "1.0.0" while release.yml pushes "v1.0.0" passed it
+          # and every install from a checkout hit ErrImagePull. release.yml tags
+          # with the git tag as written, so every default tag must carry the v.
+          for chart in deploy/helm/polyforge deploy/helm/polyforge-operator; do
+            app=$(sed -nE 's/^appVersion:[[:space:]]*"?([^"]*)"?.*/\1/p' "$chart/Chart.yaml")
+            case "$app" in
+              v*) ;;
+              *) echo "FAIL: $chart appVersion '$app' lacks the v that release.yml tags images with"; exit 1 ;;
+            esac
+          done
+          tags=$(grep -hE '^[[:space:]]+image:' on.yaml off.yaml app.yaml gw.yaml \
+            | sed -E 's#^[[:space:]]+image:[[:space:]]*##; s#"##g' | grep -v '@sha256:' \
+            | sed -E 's#^.*:##' | sort -u)
+          echo "rendered default tags:"; echo "$tags"
+          untagged=$(echo "$tags" | grep -v '^v' || true)
+          if [ -n "$untagged" ]; then
+            echo "FAIL: default image tag(s) release.yml never pushes: $untagged"; exit 1
+          fi
+
+          # The control plane serves /v1/... only; an Ingress on any other
+          # prefix (it was /api) answers every API call with 404.
+          grep -A2 'paths:' app.yaml | grep -q 'path: /v1$' \
+            || { echo "FAIL: the default Ingress does not route /v1"; exit 1; }
 

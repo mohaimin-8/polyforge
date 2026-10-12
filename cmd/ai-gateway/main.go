@@ -211,7 +211,7 @@ func main() {
 			CacheShared:   os.Getenv("POLYFORGE_CACHE_SHARED") == "1",
 			TierProviders: tierProviders,
 			AdminKey:      os.Getenv("POLYFORGE_ADMIN_KEY"),
-			RateLimit:     rateLimitFromEnv(),
+			RateLimit:     rateLimitFromEnv(log),
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
@@ -284,13 +284,41 @@ func duckDuckGoSearch(ctx context.Context, query string) ([]agent.SearchResult, 
 // limiter, because a run's arrival rates are the experiment, not a policy
 // under test: `joint_stress` bursts one tenant to 1,200 AI RPM, twice the
 // default, and every session-45..48 "12.3% failed" was this limiter's 429.
-func rateLimitFromEnv() gateway.RateLimit {
-	rpm, _ := strconv.Atoi(os.Getenv("POLYFORGE_RATE_LIMIT_RPM"))
-	burst, _ := strconv.Atoi(os.Getenv("POLYFORGE_RATE_LIMIT_BURST"))
-	if rpm <= 0 || burst <= 0 {
-		return gateway.RateLimit{}
+func rateLimitFromEnv(log *slog.Logger) gateway.RateLimit {
+	limit, err := parseRateLimit(os.Getenv("POLYFORGE_RATE_LIMIT_RPM"), os.Getenv("POLYFORGE_RATE_LIMIT_BURST"))
+	if err != nil {
+		log.Error("invalid gateway rate limit", "error", err)
+		os.Exit(1)
 	}
-	return gateway.RateLimit{RequestsPerMinute: rpm, Burst: burst}
+	return limit
+}
+
+// parseRateLimit reads the two settings: unset or zero means no limit is
+// configured, as before. A malformed value is an error: it used to read as
+// 0, which turned the limiter off silently (Helm renders 1e6 as "1e+06").
+func parseRateLimit(rpmRaw, burstRaw string) (gateway.RateLimit, error) {
+	parse := func(name, raw string) (int, error) {
+		if raw == "" {
+			return 0, nil
+		}
+		v, err := strconv.Atoi(raw)
+		if err != nil || v < 0 {
+			return 0, fmt.Errorf("%s=%q is not a non-negative integer", name, raw)
+		}
+		return v, nil
+	}
+	rpm, err := parse("POLYFORGE_RATE_LIMIT_RPM", rpmRaw)
+	if err != nil {
+		return gateway.RateLimit{}, err
+	}
+	burst, err := parse("POLYFORGE_RATE_LIMIT_BURST", burstRaw)
+	if err != nil {
+		return gateway.RateLimit{}, err
+	}
+	if rpm <= 0 || burst <= 0 {
+		return gateway.RateLimit{}, nil
+	}
+	return gateway.RateLimit{RequestsPerMinute: rpm, Burst: burst}, nil
 }
 
 func envOr(name, fallback string) string {

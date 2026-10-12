@@ -43,7 +43,9 @@ service:
 ingress:
   enabled: true
   className: nginx
-  path: /api
+  # The control plane serves /v1/... and nothing under /api: the old /api
+  # default answered every API call through the Ingress with 404 (2026-10-13).
+  path: /v1
 
 rateLimit:
   requestsPerMinute: 600

@@ -60,9 +60,9 @@ spec:
               value: {{ .Values.redis.url | quote }}
             {{- end }}
             - name: POLYFORGE_RATE_LIMIT_RPM
-              value: {{ .Values.rateLimit.requestsPerMinute | quote }}
+              value: {{ .Values.rateLimit.requestsPerMinute | int64 | quote }}
             - name: POLYFORGE_RATE_LIMIT_BURST
-              value: {{ .Values.rateLimit.burst | quote }}
+              value: {{ .Values.rateLimit.burst | int64 | quote }}
           readinessProbe:
             httpGet:
               path: /healthz

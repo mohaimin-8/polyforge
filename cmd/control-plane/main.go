@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -128,8 +129,8 @@ func main() {
 		os.Exit(1)
 	}
 	rateLimit := platform.RateLimitConfig{
-		RequestsPerMinute: envInt("POLYFORGE_RATE_LIMIT_RPM", 600),
-		Burst:             envInt("POLYFORGE_RATE_LIMIT_BURST", 60),
+		RequestsPerMinute: envInt(log, "POLYFORGE_RATE_LIMIT_RPM", 600),
+		Burst:             envInt(log, "POLYFORGE_RATE_LIMIT_BURST", 60),
 	}
 
 	// With Redis, rate limiting (sliding window) and idempotency replay are
@@ -222,7 +223,7 @@ func main() {
 	workloadRegistry := online.NewRegistry(0)
 	poller := online.NewPoller(tenantRepository, telemetryRepository, predictor, driftDetector,
 		workloadPublisher, workloadRegistry, log, online.Config{
-			Interval: time.Duration(envInt("POLYFORGE_CLASSIFIER_INTERVAL_SECONDS", 10)) * time.Second,
+			Interval: time.Duration(envInt(log, "POLYFORGE_CLASSIFIER_INTERVAL_SECONDS", 10)) * time.Second,
 		})
 	pollCtx, stopPoller := context.WithCancel(ctx)
 	defer stopPoller()
@@ -319,16 +320,30 @@ func applyRedisTimeouts(options *redis.Options) {
 	redisopt.Apply(options)
 }
 
-func envInt(name string, fallback int) int {
-	value := os.Getenv(name)
-	if value == "" {
-		return fallback
-	}
-	parsed, err := strconv.Atoi(value)
+// envInt reads a non-negative integer setting, or the fallback when unset.
+// A malformed value stops the process: falling back silently turned Helm's
+// "1e+06" rendering of a large rate limit into the 600 RPM default.
+func envInt(log *slog.Logger, name string, fallback int) int {
+	value, err := parseEnvInt(os.Getenv(name), fallback)
 	if err != nil {
-		return fallback
+		log.Error("invalid integer environment variable", "name", name, "error", err)
+		os.Exit(1)
 	}
-	return parsed
+	return value
+}
+
+func parseEnvInt(raw string, fallback int) (int, error) {
+	if raw == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%q is not an integer", raw)
+	}
+	if parsed < 0 {
+		return 0, fmt.Errorf("%q is negative", raw)
+	}
+	return parsed, nil
 }
 
 // envLogLevel reads a slog level name (debug, info, warn, error) from the
