@@ -142,7 +142,7 @@ time — **167×200, 132×201, 127×202** — and immediately found a defect.
 
 | Severity | Finding | Disposition |
 |---|---|---|
-| Medium | **NUL byte in user input reaches PostgreSQL → HTTP 500.** `GET /v1/tenants/{id}/projects?cursor=%00` and a ` ` inside a JSON body both surfaced `invalid byte sequence for encoding "UTF8": 0x00 (SQLSTATE 22021)` as a server fault | **FIXED** — `rejectNullBytes` middleware (URL) + a body check in `readJSON`; both now return 400 `invalid_argument`. Pinned by `TestNullByteInputIsRejectedWith400` |
+| Medium | **NUL byte in user input reaches PostgreSQL → HTTP 500.** `GET /v1/tenants/{id}/projects?cursor=%00` and a `\x00` inside a JSON body both surfaced `invalid byte sequence for encoding "UTF8": 0x00 (SQLSTATE 22021)` as a server fault | **FIXED** — `rejectNullBytes` middleware (URL) + a body check in `readJSON`; both now return 400 `invalid_argument`. Pinned by `TestNullByteInputIsRejectedWith400` |
 | Info | Unix timestamp disclosure (rule 10096, ×1) on `/metrics` | **Accepted** — Prometheus `process_start_time_seconds`; no security value to an attacker |
 
 **What the NUL finding was and was not.** It was *not* injection: the query
@@ -189,6 +189,35 @@ leaving it to CI: `govulncheck` goes from seven reachable vulnerabilities to
 fragile step is a security gate that stops running silently. `go.mod`'s comment
 already recorded this happening once (17 reachable vulns on 1.25.5); it
 happened again, and this time nothing could say so for a week.
+
+## 2026-10-13 finding: bogus keys could lock a named tenant out of the control plane (FIXED)
+
+**Severity: high.** Found by the final check-up's security review. The
+control plane's rate-limit middleware ran before authentication and keyed
+every credentialed request on `/v1/tenants/{id}/...` to `tenant:<id>`,
+whether or not the credential was valid. A caller holding no valid
+credential, knowing only a tenant id (a non-secret slug), could send bogus
+keys, spend that tenant's whole budget (default 600/min, burst 60) and keep
+its real traffic in 429 for as long as the flood lasted. Another tenant's
+valid key or JWT did the same. It is the bug class the 2026-09-26 audit had
+fixed in the AI gateway; the control plane's older limiter never got it.
+
+**Fixed** by giving the control plane the gateway's two-stage admission
+(`internal/platform/server.go`):
+
+- the middleware key never names a tenant: credentialed requests are
+  keyed by credential fingerprint, uncredentialed ones by source address;
+- `authorizeTenant` and `authorizeAdmin` reserve one unit of the source's
+  failed-authentication budget before checking anything, keep it for a
+  missing, wrong or other-tenant credential, and refund it otherwise;
+- only a credential valid for the tenant then spends `tenant:<id>`, so the
+  W13 rule holds: a tenant cannot dodge its budget by minting keys.
+
+Pinned by `internal/platform/limiter_auth_test.go`: bogus keys, another
+tenant's valid key, and another tenant's valid JWT all leave the victim's
+budget untouched; successes do not spend the source budget; admin-key
+guessing is budgeted per source. The existing Redis fail-open test passes
+unchanged; `go test -race` is clean.
 
 ## 2026-10-12 finding: thirteen reachable advisories after Go 1.25 left support (FIXED)
 

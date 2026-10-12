@@ -69,9 +69,13 @@ type Server struct {
 	// an adversary who could pressure Redis also removed admission control.
 	// Now a Redis error degrades to this local bucket instead of admitting.
 	fallbackLimiter RequestLimiter
-	metrics         *metrics
-	issuer          *auth.Issuer
-	tracer          trace.Tracer
+	// authFailures is the per-source failed-authentication budget, reserved
+	// before a credential is checked and refunded when the check succeeds
+	// (authorizeTenant, authorizeAdmin). In-process like the AI gateway's.
+	authFailures *rateLimiter
+	metrics      *metrics
+	issuer       *auth.Issuer
+	tracer       trace.Tracer
 
 	idempotencyStore idempotency.Store
 	analytics        AnalyticsEnqueuer
@@ -176,6 +180,7 @@ func NewServer(log *slog.Logger, tenants tenant.Repository, telemetry telemetry.
 	} else if localBucket != nil {
 		s.limiter = localBucket
 	}
+	s.authFailures = newRateLimiter(cfg.RateLimit)
 	s.analytics = cfg.Analytics
 	s.workloads = cfg.Workloads
 	s.idempotencyStore = cfg.IdempotencyStore
@@ -735,29 +740,79 @@ func (s *Server) policyRecommendation(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, controller.Recommend(result))
 }
 
-// authorizeTenant authenticates the tenant API key and enforces its scope.
-// Authentication failures are 401; a valid key without the required scope is
-// 403 so the caller can distinguish a bad credential from missing authority.
+// authorizeTenant authenticates the tenant credential (API key or JWT) and
+// enforces its scope. Authentication failures are 401; a valid credential
+// without the required scope is 403 so the caller can distinguish a bad
+// credential from missing authority.
+//
+// Admission is two-stage, as in the AI gateway (final check-up, 2026-10-13):
+// the attempt first reserves from its SOURCE's failed-authentication budget,
+// and only a credential valid for this tenant then spends the TENANT's
+// budget. The tenant budget used to be spent in middleware before any check,
+// so bogus keys sent to /v1/tenants/{id}/... could lock a named tenant out.
 func (s *Server) authorizeTenant(w http.ResponseWriter, r *http.Request, tenantID, requiredScope string) bool {
-	if token := bearerToken(r); token != "" {
-		return s.authorizeBearer(w, r, token, tenantID, requiredScope)
-	}
-	secret := r.Header.Get("X-PolyForge-API-Key")
-	if strings.TrimSpace(secret) == "" {
-		s.writeError(w, r, http.StatusUnauthorized, tenant.ErrUnauthorized)
+	source, ok := s.reserveAuthAttempt(w, r)
+	if !ok {
 		return false
 	}
-	key, err := s.tenants.AuthenticateAPIKey(r.Context(), tenantID, secret)
-	if err != nil {
-		s.writeError(w, r, statusFor(err), err)
+	scope, status, err := s.tenantCredential(r, tenantID)
+	// A missing or wrong credential, or one valid only for another tenant,
+	// keeps the reservation; a key-store failure (5xx) is not the caller's.
+	s.settleAuthAttempt(source, status >= 400 && status < 500)
+	if status != 0 {
+		s.writeError(w, r, status, err)
 		return false
 	}
-	if !tenant.ScopeAllows(key.Scope, requiredScope) {
+	if s.limiter != nil {
+		if allowed, retryAfter := s.allow(r, "tenant:"+tenantID); !allowed {
+			s.tooManyRequests(w, r, retryAfter)
+			return false
+		}
+	}
+	if !tenant.ScopeAllows(scope, requiredScope) {
 		s.writeError(w, r, http.StatusForbidden,
 			fmt.Errorf("%w: this endpoint requires the %q scope", tenant.ErrForbidden, requiredScope))
 		return false
 	}
 	return true
+}
+
+// tenantCredential resolves the request's credential for tenantID: its
+// scope on success, otherwise the status and error to answer with.
+func (s *Server) tenantCredential(r *http.Request, tenantID string) (string, int, error) {
+	if token := bearerToken(r); token != "" {
+		return s.bearerCredential(token, tenantID)
+	}
+	secret := r.Header.Get("X-PolyForge-API-Key")
+	if strings.TrimSpace(secret) == "" {
+		return "", http.StatusUnauthorized, tenant.ErrUnauthorized
+	}
+	key, err := s.tenants.AuthenticateAPIKey(r.Context(), tenantID, secret)
+	if err != nil {
+		return "", statusFor(err), err
+	}
+	return key.Scope, 0, nil
+}
+
+// reserveAuthAttempt spends one unit of the source's failed-authentication
+// budget before any credential is checked, so a burst of bad credentials
+// reaches the key store at most the budget's capacity times; settleAuthAttempt
+// gives the unit back when the attempt did not fail.
+func (s *Server) reserveAuthAttempt(w http.ResponseWriter, r *http.Request) (string, bool) {
+	source := peerHost(r)
+	if s.authFailures != nil {
+		if ok, retryAfter := s.authFailures.allow("authfail:" + source); !ok {
+			s.tooManyRequests(w, r, retryAfter)
+			return source, false
+		}
+	}
+	return source, true
+}
+
+func (s *Server) settleAuthAttempt(source string, failed bool) {
+	if s.authFailures != nil && !failed {
+		s.authFailures.refund("authfail:" + source)
+	}
 }
 
 // isAdmin reports whether the request carries the platform admin key. It
@@ -768,8 +823,17 @@ func (s *Server) isAdmin(r *http.Request) bool {
 		subtle.ConstantTimeCompare([]byte(provided), []byte(s.adminKey)) == 1
 }
 
+// authorizeAdmin answers 401 unless the request carries the admin key. Key
+// guesses spend their source's failed-authentication budget, as tenant
+// credentials do.
 func (s *Server) authorizeAdmin(w http.ResponseWriter, r *http.Request) bool {
-	if !s.isAdmin(r) {
+	source, ok := s.reserveAuthAttempt(w, r)
+	if !ok {
+		return false
+	}
+	admin := s.isAdmin(r)
+	s.settleAuthAttempt(source, !admin)
+	if !admin {
 		s.writeError(w, r, http.StatusUnauthorized, tenant.ErrUnauthorized)
 		return false
 	}
@@ -1055,39 +1119,59 @@ func (s *Server) rateLimit(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		key := rateLimitKey(r)
-		ok, retryAfter, err := s.limiter.Allow(r.Context(), key)
-		if err != nil {
-			// Degrade to the in-process bucket rather than failing fully
-			// open: an adversary who can pressure Redis must not also remove
-			// admission control. Only if there is no local fallback at all do
-			// we admit (and log it).
-			if s.fallbackLimiter != nil {
-				ok, retryAfter, err = s.fallbackLimiter.Allow(r.Context(), key)
-			}
-			if err != nil || s.fallbackLimiter == nil {
-				s.log.Warn("rate limiter unavailable; admitting request",
-					"request_id", requestID(r.Context()), "error", err)
-				next.ServeHTTP(w, r)
-				return
-			}
-			s.log.Warn("primary rate limiter unavailable; degraded to local bucket",
-				"request_id", requestID(r.Context()))
-		}
-		if !ok {
-			w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(retryAfter.Seconds())))))
-			s.writeError(w, r, http.StatusTooManyRequests, errRateLimited)
+		if ok, retryAfter := s.allow(r, rateLimitKey(r)); !ok {
+			s.tooManyRequests(w, r, retryAfter)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-func rateLimitKey(r *http.Request) string {
+// allow spends one request from key's budget on the primary limiter. On a
+// primary failure it degrades to the in-process bucket rather than failing
+// fully open: an adversary who can pressure Redis must not also remove
+// admission control. Only with no local fallback at all is the request
+// admitted (and logged).
+func (s *Server) allow(r *http.Request, key string) (bool, time.Duration) {
+	ok, retryAfter, err := s.limiter.Allow(r.Context(), key)
+	if err == nil {
+		return ok, retryAfter
+	}
+	if s.fallbackLimiter != nil {
+		ok, retryAfter, err = s.fallbackLimiter.Allow(r.Context(), key)
+	}
+	if err != nil || s.fallbackLimiter == nil {
+		s.log.Warn("rate limiter unavailable; admitting request",
+			"request_id", requestID(r.Context()), "error", err)
+		return true, 0
+	}
+	s.log.Warn("primary rate limiter unavailable; degraded to local bucket",
+		"request_id", requestID(r.Context()))
+	return ok, retryAfter
+}
+
+func (s *Server) tooManyRequests(w http.ResponseWriter, r *http.Request, retryAfter time.Duration) {
+	w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(retryAfter.Seconds())))))
+	s.writeError(w, r, http.StatusTooManyRequests, errRateLimited)
+}
+
+// peerHost is the TCP peer's host. X-Forwarded-For is deliberately not
+// trusted: a header the caller writes cannot choose whose budget it spends.
+func peerHost(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil || host == "" {
-		host = r.RemoteAddr
+		return r.RemoteAddr
 	}
+	return host
+}
+
+// rateLimitKey is the middleware's key, decided before authentication, so it
+// never names a tenant: a credential is only a claim until it is checked.
+// The per-tenant budget (W13) is spent in authorizeTenant once a credential
+// valid for that tenant is in hand, so a tenant still cannot dodge it by
+// minting keys, and a caller who only knows a tenant id cannot spend it.
+func rateLimitKey(r *http.Request) string {
+	host := peerHost(r)
 	if r.URL.Path == "/v1/tenants" {
 		return "admin:" + host
 	}
@@ -1100,15 +1184,6 @@ func rateLimitKey(r *http.Request) string {
 	}
 	if credential == "" {
 		return "anon:" + host
-	}
-	// Credentialed traffic on a tenant-scoped path shares one window per
-	// tenant (the W13 per-tenant limit), so a tenant cannot dodge its budget
-	// by minting more keys. Requests without a credential never spend a
-	// tenant's budget — they stay host-keyed above.
-	if rest, ok := strings.CutPrefix(r.URL.Path, "/v1/tenants/"); ok {
-		if id, _, _ := strings.Cut(rest, "/"); id != "" {
-			return "tenant:" + id
-		}
 	}
 	return "key:" + secretFingerprint(credential)
 }
@@ -1181,6 +1256,16 @@ func (l *rateLimiter) allow(key string) (bool, time.Duration) {
 	}
 	bucket.tokens--
 	return true, 0
+}
+
+// refund returns one token to key's bucket: the reservation it gives back
+// turned out not to be a failed authentication.
+func (l *rateLimiter) refund(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if bucket := l.buckets[key]; bucket != nil {
+		bucket.tokens = math.Min(l.capacity, bucket.tokens+1)
+	}
 }
 
 func (l *rateLimiter) prune(now time.Time) {
