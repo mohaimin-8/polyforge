@@ -48,8 +48,23 @@ def test_the_committed_report_is_what_a_fresh_build_produces():
     ("BurstGPT cost p-value 4.3e-06", r"HPA/KEDA/FIRM ($p \le 4.3{\times}10^{-6}$, $n{=}96$)"),
     ("1,800-run matrix: beats every tuned baseline on cost, d_z 0.66-1.12", r"($\dz$ 0.66--1.12); on real"),
     ("-joint-control ablation +2884% cost", r"$-$joint $+2884\%$ cost"),
-    ("composite J: 'wins in every campaign' list stops at the real-demand replay",
+    ("composite J p <= 5.5e-5 quoted for 'wins in every campaign'",
      r"($p \le 5.5{\times}10^{-5}$) --- and is the only Pareto-undominated system"),
+    # Audit 2026-09-26 and the 2026-10-12 status: each sample is a line the
+    # thesis, slides or paper carried when the rows were added.
+    ("only Pareto-undominated system", r"and is the only Pareto-undominated system --- non-dominated in 48 of"),
+    ("composite J: beats every tuned baseline, in every campaign",
+     r"together beats every tuned per-layer baseline on the composite objective in"),
+    ("composite J: beats every tuned baseline, in every campaign",
+     r"\small Wins composite $J$ vs.\ every tuned baseline"),
+    ("composite J: beats every tuned baseline, in every campaign",
+     r"$J$ in every campaign, incl.\ vs.\ a learned (RL) controller; the"),
+    ("B1': the corrected controller beats all four live arms",
+     r"the corrected controller beats every one of the four comparators on cost at"),
+    ("B1': the corrected controller beats all four live arms",
+     r"FAIL); the corrected controller beats all four arms at"),
+    ("Phase 7 live ordinal check read as a ranking (DISAGREE)",
+     r"Live ordinal check: DISAGREE; 24\,h soak (SK-H4 PASS, SK-H1/H3 FAIL);"),
 ])
 def test_each_claim_pattern_finds_the_sentence_it_exists_for(label, sample):
     mod = _mod()
@@ -68,6 +83,18 @@ def test_a_withdrawn_number_beside_its_withdrawal_is_not_drift(tmp_path):
     label, _, _, where, n_qualified = rows["BurstGPT cost -70% vs tuned HPA/KEDA/FIRM"]
     assert where == [f"{bare.as_posix()}:1"]
     assert n_qualified == 1
+
+
+def test_naming_the_rl_or_concurrency_campaign_no_longer_qualifies_a_j_claim(tmp_path):
+    # Before the audit those names marked the 'list has grown' reading; after
+    # it the whole claim is withdrawn, so listing more campaigns qualifies
+    # nothing (slides.tex carried exactly this line).
+    mod = _mod()
+    doc = tmp_path / "slides.tex"
+    doc.write_text(r"$J$ in every campaign, incl.\ vs.\ a learned (RL) controller; the", encoding="utf-8")
+    rows = {r[0]: r for r in mod.contradicted({doc: doc.read_text(encoding="utf-8")})}
+    _, _, _, where, n_qualified = rows["composite J: beats every tuned baseline, in every campaign"]
+    assert where == [f"{doc.as_posix()}:1"] and n_qualified == 0
 
 
 def test_the_azure_pattern_ignores_another_papers_minus_42():
