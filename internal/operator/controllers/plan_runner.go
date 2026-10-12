@@ -141,6 +141,9 @@ func (p *PlanRunner) RunOnce(ctx context.Context) error {
 	span.SetAttributes(attribute.Int("cells", len(cells)))
 
 	resp := planner.Response{Plans: make(map[string]planner.Plan, len(inputs))}
+	// Each tenant is audited with the solver of the cell that planned it; a
+	// single resp.Solver held only the LAST cell's name (2026-10-13).
+	solverOf := make(map[string]string, len(inputs))
 	for i, cell := range cells {
 		planCtx, cancel := context.WithTimeout(ctx, planCallTimeout)
 		cellResp, err := p.Planner.Plan(planCtx, planner.Request{
@@ -159,9 +162,9 @@ func (p *PlanRunner) RunOnce(ctx context.Context) error {
 			p.fallback(ctx, inputs, policies, err)
 			return nil // fallback is the designed behavior, not a cycle error
 		}
-		resp.Solver = cellResp.Solver
 		for id, plan := range cellResp.Plans {
 			resp.Plans[id] = plan
+			solverOf[id] = cellResp.Solver
 		}
 	}
 
@@ -169,7 +172,7 @@ func (p *PlanRunner) RunOnce(ctx context.Context) error {
 	for _, input := range inputs {
 		plan := resp.Plans[input.TenantID]
 		satisfactions = append(satisfactions, 1.0-plan.ProjectedViolation)
-		if err := p.apply(ctx, policies[input.TenantID], input, plan, resp.Solver); err != nil && p.Log != nil {
+		if err := p.apply(ctx, policies[input.TenantID], input, plan, solverOf[input.TenantID]); err != nil && p.Log != nil {
 			p.Log.Error("apply plan", "tenant", input.TenantID, "error", err)
 		}
 	}

@@ -245,6 +245,9 @@ func (s *Server) authenticate(r *http.Request, tenantID string) (tenant.APIKey, 
 	key, err := s.tenants.AuthenticateAPIKey(r.Context(), tenantID, secret)
 	if err != nil {
 		if !errors.Is(err, tenant.ErrUnauthorized) {
+			// The caller sees a generic 500; the cause is logged here, as the
+			// control plane's writeError does for its own 5xx.
+			s.log.Error("api key lookup failed", "tenant", tenantID, "error", err)
 			return tenant.APIKey{}, http.StatusInternalServerError, "invalid API key"
 		}
 		return tenant.APIKey{}, http.StatusUnauthorized, "invalid API key"

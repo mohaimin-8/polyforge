@@ -136,10 +136,17 @@ func TestHeadToHeadCostAwareBeatsDeployedBaselines(t *testing.T) {
 			costAware.CostPerRequest, results["gdsf"].CostPerRequest)
 	}
 	// The roadmap's overhead gate, scaled to the simulator: full request
-	// handling stays far inside 5ms even with O(n) victim scans.
+	// handling stays far inside 5ms even with O(n) victim scans. Under the
+	// race detector (CI's coverage run) the same code runs several-fold
+	// slower, and a contended run measured lfu at 7.7ms (final check-up,
+	// 2026-10-13): the 5ms claim is checked on normal builds only.
+	gate := 5 * time.Millisecond
+	if raceEnabled {
+		gate = 50 * time.Millisecond
+	}
 	for name, result := range results {
-		if result.OverheadP99 > 5*time.Millisecond {
-			t.Errorf("%s p99 overhead %s exceeds 5ms", name, result.OverheadP99)
+		if result.OverheadP99 > gate {
+			t.Errorf("%s p99 overhead %s exceeds %s", name, result.OverheadP99, gate)
 		}
 	}
 }
