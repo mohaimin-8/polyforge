@@ -448,3 +448,64 @@ func TestPlanRunnerDefaultsBudgetWhenAbsent(t *testing.T) {
 		t.Errorf("absent budget default = %v, want 5.0", got)
 	}
 }
+
+// cellSolverPlanner answers each call (one per planning cell) with its own
+// solver name, planning only the tenants that cell sent.
+type cellSolverPlanner struct{ calls int }
+
+func (s *cellSolverPlanner) Plan(_ context.Context, req planner.Request) (planner.Response, error) {
+	s.calls++
+	resp := planner.Response{
+		Solver: []string{"solver-cell-1", "solver-cell-2"}[(s.calls-1)%2],
+		Plans:  map[string]planner.Plan{},
+	}
+	for _, in := range req.Tenants {
+		resp.Plans[in.TenantID] = planner.Plan{Replicas: 3, CacheMB: 128, Tier: "small"}
+	}
+	return resp, nil
+}
+
+// Final check-up (2026-10-13): with planning cells on, the last cell's solver
+// name was written into every tenant's audit entry, so a tenant planned by
+// another cell (e.g. a fallback solver) was recorded under the wrong one.
+func TestPlanRunnerAuditsEachTenantWithItsOwnCellsSolver(t *testing.T) {
+	objs := []client.Object{}
+	for _, name := range []string{"acme", "globex"} {
+		objs = append(objs,
+			&pfv1alpha1.Tenant{
+				ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID("uid-" + name)},
+				Spec:       pfv1alpha1.TenantSpec{IsolationMode: pfv1alpha1.IsolationPool, SLOClass: pfv1alpha1.SLOStandard},
+			},
+			&pfv1alpha1.Policy{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec: pfv1alpha1.PolicySpec{TenantRef: name, Replicas: 2, ReplicaMin: 1, ReplicaMax: 5,
+					CacheSizeMB: 128, ModelTier: pfv1alpha1.ModelTierSmall},
+			},
+			&pfv1alpha1.Budget{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec:       pfv1alpha1.BudgetSpec{TenantRef: name, HourlyCapMilliUSD: 2500},
+			})
+	}
+	c := newTenantClient(t, objs...)
+	demands := stubDemand{demands: map[string]planner.Demand{
+		"acme":   {RPS: map[string]float64{"chat": 2.0}, CrudBaseMs: 50},
+		"globex": {RPS: map[string]float64{"chat": 2.0}, CrudBaseMs: 50},
+	}}
+	stub := &cellSolverPlanner{}
+	audit := &recordingAudit{}
+	runner := &PlanRunner{Client: c, Planner: stub, Demands: demands, Audit: audit, CellSize: 1}
+
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if stub.calls != 2 {
+		t.Fatalf("planner calls = %d, want 2 (one per cell)", stub.calls)
+	}
+	solvers := map[string]string{}
+	for _, entry := range audit.entries {
+		solvers[entry.Tenant] = entry.Solver
+	}
+	if len(solvers) != 2 || solvers["acme"] == solvers["globex"] {
+		t.Fatalf("each cell's tenant must carry its own cell's solver, got %v", solvers)
+	}
+}

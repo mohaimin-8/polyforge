@@ -2,16 +2,20 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	pfv1alpha1 "polyforge/internal/operator/api/v1alpha1"
 )
@@ -367,5 +371,43 @@ func TestPolicyExplicitTargetDeployment(t *testing.T) {
 	}
 	if got.Spec.Replicas == nil || *got.Spec.Replicas != 3 {
 		t.Errorf("replicas = %v, want 3", got.Spec.Replicas)
+	}
+}
+
+// Final check-up (2026-10-13): the failure branches wrote status once, so a
+// conflict with the plan runner's 10s status writes surfaced as a reconcile
+// error instead of the designed condition + requeue. They now retry like the
+// success path.
+func TestPolicyMissingDeploymentSurvivesAStatusConflict(t *testing.T) {
+	policy := testPolicy(pfv1alpha1.PolicySpec{
+		Replicas: 2, ReplicaMin: 1, ReplicaMax: 10, CacheSizeMB: 128, ModelTier: pfv1alpha1.ModelTierSmall,
+	})
+	conflicts := 0
+	c := fake.NewClientBuilder().
+		WithScheme(newScheme(t)).
+		WithObjects(policy).
+		WithStatusSubresource(&pfv1alpha1.Policy{}).
+		WithInterceptorFuncs(interceptor.Funcs{
+			SubResourceUpdate: func(ctx context.Context, cl client.Client, sub string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				if conflicts == 0 {
+					conflicts++
+					return apierrors.NewConflict(schema.GroupResource{Resource: "policies"}, obj.GetName(),
+						errors.New("the object has been modified"))
+				}
+				return cl.SubResource(sub).Update(ctx, obj, opts...)
+			},
+		}).Build()
+
+	res := reconcilePolicy(t, c) // fails the test on a reconcile error
+	if res.RequeueAfter != targetMissingRequeue {
+		t.Errorf("requeue after = %v, want %v", res.RequeueAfter, targetMissingRequeue)
+	}
+	var got pfv1alpha1.Policy
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "acme"}, &got); err != nil {
+		t.Fatal(err)
+	}
+	applied := meta.FindStatusCondition(got.Status.Conditions, ConditionApplied)
+	if applied == nil || applied.Reason != "TargetMissing" {
+		t.Errorf("Applied condition = %+v, want TargetMissing after one conflict", applied)
 	}
 }

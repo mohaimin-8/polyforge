@@ -3,6 +3,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -92,7 +93,10 @@ func (r *TenantReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if err := ensure(ctx, &tenant, ns); err != nil {
 			span.SetStatus(codes.Error, err.Error())
 			r.setReady(&tenant, metav1.ConditionFalse, "ReconcileError", err.Error())
-			_ = r.Status().Update(ctx, &tenant)
+			if serr := r.Status().Update(ctx, &tenant); serr != nil {
+				// Both failures are returned: the status write used to be discarded.
+				return ctrl.Result{}, errors.Join(err, fmt.Errorf("record ReconcileError status: %w", serr))
+			}
 			return ctrl.Result{}, err
 		}
 	}

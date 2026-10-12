@@ -74,8 +74,7 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	ns, name, err := splitTarget(policy.Spec.TargetDeployment, policy.Spec.TenantRef)
 	if err != nil {
-		r.setApplied(&policy, metav1.ConditionFalse, "InvalidTarget", err.Error())
-		return ctrl.Result{}, r.Status().Update(ctx, &policy)
+		return ctrl.Result{}, r.markNotApplied(ctx, req, "InvalidTarget", err.Error())
 	}
 
 	total, err := r.sharedTargetReplicas(ctx, ns, name)
@@ -86,9 +85,8 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if err := r.scaleDeployment(ctx, ns, name, total); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.setApplied(&policy, metav1.ConditionFalse, "TargetMissing",
-				fmt.Sprintf("deployment %s/%s does not exist yet", ns, name))
-			if serr := r.Status().Update(ctx, &policy); serr != nil {
+			if serr := r.markNotApplied(ctx, req, "TargetMissing",
+				fmt.Sprintf("deployment %s/%s does not exist yet", ns, name)); serr != nil {
 				return ctrl.Result{}, serr
 			}
 			return ctrl.Result{RequeueAfter: targetMissingRequeue}, nil
@@ -105,8 +103,7 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if r.GatewayKnobs != nil {
 		if err := r.GatewayKnobs.Push(ctx, policy.Spec.TenantRef,
 			string(tier), cacheMB); err != nil {
-			r.setApplied(&policy, metav1.ConditionFalse, "GatewayKnobsFailed", err.Error())
-			if serr := r.Status().Update(ctx, &policy); serr != nil {
+			if serr := r.markNotApplied(ctx, req, "GatewayKnobsFailed", err.Error()); serr != nil {
 				return ctrl.Result{}, serr
 			}
 			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
@@ -149,6 +146,22 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 // clampReplicas enforces the safety bounds. A max below min is treated as a
 // misconfiguration in favor of the floor: availability beats cost.
+// markNotApplied records a failed reconcile as Applied=False with the given
+// reason, retrying on conflict like the success path. The plan runner writes
+// this object's status every 10s, so a single unretried write (as the failure
+// branches used to do) surfaced routinely as a reconcile error instead of the
+// designed condition and requeue (final check-up, 2026-10-13).
+func (r *PolicyReconciler) markNotApplied(ctx context.Context, req ctrl.Request, reason, msg string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var fresh pfv1alpha1.Policy
+		if err := r.Get(ctx, req.NamespacedName, &fresh); err != nil {
+			return err
+		}
+		r.setApplied(&fresh, metav1.ConditionFalse, reason, msg)
+		return r.Status().Update(ctx, &fresh)
+	})
+}
+
 func clampReplicas(spec *pfv1alpha1.PolicySpec) int32 {
 	replicas := spec.Replicas
 	if replicas < spec.ReplicaMin {
