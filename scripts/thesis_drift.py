@@ -92,13 +92,41 @@ CONTRADICTED = [
      "GPTCache composite-J comparison survives at the smaller margin (LF-H2 "
      "PASS). Do not cite +2884% without the caveat.",
      "RESULTS_LAYERED_FIX.md"),
-    ("composite J: 'wins in every campaign' list stops at the real-demand replay",
+    ("composite J p <= 5.5e-5 quoted for 'wins in every campaign'",
      r"5\.5\s*(\{\\times\}|\\times|e-0?5)",
-     "still true, and the list has since grown: the 2026-stack concurrency "
-     "arm (p=1.3e-44), the 32-tenant slice (p≤2.2e-4), the Azure replay "
-     "(p≤5.3e-22) and the offline-trained RL joint controller over the same "
-     "action space (p=2.9e-28, d_z=−0.708).",
-     "RESULTS_CONCURRENCY.md, RESULTS_TENANT_SCALE.md, RESULTS_LEARNED.md"),
+     "the p-value stands for the comparison it scored, but that comparison used "
+     "the published comparators; the 'wins J in every campaign' reading it was "
+     "quoted for is withdrawn (see the 'beats every tuned baseline' row).",
+     "RESULTS_FAIR_J.md"),
+    # --- audit 2026-09-26 and the 2026-10-12 status -------------------------
+    ("only Pareto-undominated system",
+     r"only\s+Pareto[- ]undominated",
+     "false: on mean cost and violation KEDA and static are also on the front "
+     "(RESULTS.md computes the front since the 2026-09-26 audit).",
+     "RESULTS.md"),
+    ("composite J: beats every tuned baseline, in every campaign",
+     r"beats every tuned|vs\.?\\?\s*every tuned baseline|\$J\$ in every campaign",
+     "withdrawn: those campaigns scored the published comparators (LRU charge, "
+     "pinned 128 MB cache, edge-of-grid tuning). Against fair comparators on "
+     "fresh shared seeds J ties HPA (FJ-H1 FAIL, ΔJ −0.0037 = −0.9%) and beats "
+     "KEDA by 7% (FJ-H2); with both re-tuned per cluster size it ties HPA and "
+     "does not beat KEDA (RT-H1/H2 FAIL). The layered three-knob stack is "
+     "beaten by 53–60% (FJ-H3, RT-H3 PASS): cite that instead.",
+     "RESULTS_FAIR_J.md, RESULTS_RETUNED.md"),
+    ("B1': the corrected controller beats all four live arms",
+     r"beats (every one of the|all) four (comparators|arms)",
+     "three valid arms, not four: the replica-only arm ran with one tenant "
+     "pinned to the large tier, so that comparison is void. The corrected "
+     "controller beat tier-only (−17.7%), the published controller (−20.5%) and "
+     "cache-only (−82.5%) on one host × two reps, in-sample; the five-seed "
+     "replication was registered but not run (unfunded).",
+     "ERRATUM_WAVE4_REPLICA_ONLY.md, RESULTS_WAVE4_CALIBRATED.md, PREREG_WAVE4_REPLICATION.md"),
+    ("Phase 7 live ordinal check read as a ranking (DISAGREE)",
+     r"DISAGREE",
+     "that sitting's planner read zero demand for every tenant (RPSWindow was "
+     "never populated before 2026-08-08), so its jcac arm held its initial "
+     "configuration, and 10 of 12 runs were valid: a wiring check, not a ranking.",
+     "ERRATUM_ZERO_DEMAND_PLANNER.md"),
 ]
 
 # A registered hypothesis tag, as records_index.py reads it.
@@ -161,8 +189,10 @@ QUALIFIED = re.compile(
     r"withdrawn|as tuned|caveat|published comparator|layered comparator|adjudicat|"
     r"not the (thesis's )?claim|history of the claim|no longer|superseded|WITHDRAWN|"
     r"smaller (number|margin)|percentage.*withdrawn|\(Not\)|never the|as published|"
-    r"shrinks to|rank test|eviction parity|budget parity|concurrency arm|learned \(RL\)|"
-    r"RL\) joint|withdrew|shrinks from",
+    # "concurrency arm" and "learned (RL)" used to qualify the J claim, when
+    # naming more campaigns meant "the list has grown"; the audit withdrew the
+    # claim itself, so naming campaigns qualifies nothing any more.
+    r"shrinks to|rank test|eviction parity|budget parity|withdrew|shrinks from",
     re.IGNORECASE)
 QUALIFIER_WINDOW = 3
 
