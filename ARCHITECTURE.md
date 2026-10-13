@@ -6,8 +6,11 @@ embeddings, agent chains) from the same tenants on the same
 infrastructure. The research claim: per-layer local optima (an autoscaler
 here, a cache there, a model router somewhere else) do not compose into a
 joint optimum; a controller that plans **replicas, semantic-cache budget,
-and model tier together** dominates them on cost, SLO compliance, and
-fairness simultaneously.
+and model tier together** does better on the composite objective than a
+layered stack that holds the same knobs separately (53–60%), and ties fairly
+tuned HPA. It was designed to dominate on cost, SLO and fairness at once; the
+pre-registered campaigns did not show that (`research/analysis/RESULTS_MASTER.md`
+has the guards and the weight sensitivity).
 
 ## The loop, end to end
 
@@ -110,6 +113,6 @@ than absolute noisy-neighbor detection (0015).
 
 - Formal taxonomy: `research/TAXONOMY.md` (paper §3)
 - Cost-aware eviction study: `cmd/evictionbench` → `research/results/eviction_comparison.csv` (paper §4)
-- JCAC formulation + Pareto sweep: `research/jcac_sim` (paper §5)
-- Evaluation: `eval/` + `research/analysis/` (paper §8) — 1,800-run
+- JCAC formulation + Pareto sweep: `research/jcac_sim` (paper §4)
+- Evaluation: `eval/` + `research/analysis/` (paper §7) — 1,800-run
   matrix, ablations, ANOVA/effect sizes, 12 figures

@@ -22,17 +22,29 @@ fresh, shared seeds. What the evidence now supports:
   ties (`RESULTS_FAIR_J.md`, FJ-H1 FAIL: ΔJ −0.0037, −0.9% of HPA's J, 95% CI
   [−0.0234, +0.0166] includes zero). With HPA and KEDA re-tuned per
   cluster size over grids whose optima are interior, it ties HPA exactly and no
-  longer beats KEDA (`RESULTS_RETUNED.md`, RT-H1/RT-H2 FAIL); the re-tuned
-  reactive arms halve SLO overshoot at about 24% more cost.
+  longer beats KEDA (`RESULTS_RETUNED.md`, RT-H1/RT-H2 FAIL). The re-tuned HPA
+  has half the joint controller's SLO overshoot (`mean_excess` 0.1051 vs 0.2117)
+  at 24% more cost; the re-tuned KEDA has 0.39× at 40% more cost; every RT SLO
+  guard FAILS. These readings depend on J's lateness weight and its 1.0 cap
+  (`SENSITIVITY_FAIR.md`, exploratory): against re-tuned HPA the registered
+  weight sits on the crossover, and at a lateness weight of 4 or more the
+  re-tuned HPA and KEDA are better.
 - **Jointness beats a layered design.** Against a layered stack that holds all
   three knobs but controls each separately, the joint controller wins by 53–60%
-  on J (FJ-H3, RT-H3 PASS). This survives a planner that believes the wrong model
-  on all four measured model forms (`RESULTS_STRUCTURAL_MISMATCH.md`, SM-H2), but
-  not on a plant fitted to the live evidence, where the layered stack is better.
+  on J (FJ-H3, RT-H3 PASS). Its SLO guard passes in FAIR_J but fails in RETUNED,
+  where the joint controller's `mean_excess` is 0.2117 against the layered
+  stack's 0.0294; with lateness uncapped, the RETUNED win shows no difference at
+  the registered weight (`SENSITIVITY_FAIR.md`). The FAIR_J win survives a
+  planner that believes the wrong model on all four measured model forms
+  (`RESULTS_STRUCTURAL_MISMATCH.md`, SM-H2), but not on a plant fitted to the
+  live evidence, where the layered stack is better.
 - **On live hardware the controller must calibrate its model online.** The
   published controller lost to its own tier-only ablation live (B1, WL-H1 FAIL);
-  its plant model was about 1,000× too pessimistic. With online calibration it won
-  its cell (B1′, WL-H1′ PASS), but on one host × one seed, in-sample, and with a
+  its plant model predicted 3,500 ms CRUD p95 at the cell's peak, which the
+  cluster served at 1 ms (`PREREG_WAVE4_CALIBRATED.md`), and the calibrated run
+  measured a replica capacity of 1,123 work units against the 100 assumed
+  (`live_plant_b1prime.json`, 11×). With online calibration it won its cell
+  (B1′, WL-H1′ PASS), but on one host × one seed, in-sample, and with a
   replica-only comparator later shown to be a harness artifact
   (`ERRATUM_WAVE4_REPLICA_ONLY.md`). A five-seed replication with a held-out cell
   and a tuned live HPA was pre-registered (`PREREG_WAVE4_REPLICATION.md`) but not
@@ -88,11 +100,11 @@ The current implementation provides a persistent control-plane backend:
 - trace research infrastructure: Azure/Alibaba/LMSYS ETL to a normalized schema (`research/traces/`), deterministic replay driver (`cmd/replay`) with cross-language stream-hash proof
 - workload classifier: 12-feature pipeline, trained softmax model with drift-guarded JSON artifact (`cmd/classifier-train`, ADR 0012), formal 5-class taxonomy (`research/TAXONOMY.md`)
 - online classification: per-tenant labels every 10s with PSI drift detection, label-change events to NATS, admin dashboard at `/admin/workloads` (W27)
-- cost-aware semantic-cache eviction: per-tenant bounded cache, 6-policy benchmark (`cmd/evictionbench`, `research/results/eviction_comparison.csv`), paper section at `research/paper/sec-eviction.tex` (W28)
+- cost-aware semantic-cache eviction: per-tenant bounded cache, 6-policy benchmark (`cmd/evictionbench`, `research/results/eviction_comparison.csv`), paper section in `research/paper/sec-design.tex` (W28)
 - Kubernetes operator (`cmd/operator`): Tenant/WorkloadProfile/Policy/Budget CRDs with status subresources, ordered finalizer teardown, replica-bound guardrails, OTel-traced reconciles (ADR 0013, W29)
-- JCAC joint controller: MPC formulation + offline simulator with Pareto sweep (`research/jcac_sim`, `research/paper/sec-jcac.tex`, W30); live planner service (`services/planner`) called by the operator every 10s with last-good-plan fallback and NATS action audit (ADR 0014, W31)
-- multi-tenant fairness: peer-relative noisy-neighbor detector on eBPF-shaped signals feeding an interference penalty into the planner, Jain's index exported per plan cycle (ADR 0015, W32; Pixie adapter + soak deferred to the harness environment)
-- evaluation harness (`eval/`): YAML-driven experiment matrix with deterministic run IDs, resume, retry-on-flake, and a standardized DuckDB result schema; sim backend verified, cluster backend (kind + Helm + k6) code-complete for the cloud box (W33)
+- JCAC joint controller: MPC formulation + offline simulator with Pareto sweep (`research/jcac_sim`, paper formulation in `research/paper/sec-design.tex`, W30); live planner service (`services/planner`) called by the operator every 10s with last-good-plan fallback and NATS action audit (ADR 0014, W31)
+- multi-tenant fairness: peer-relative noisy-neighbor detector on eBPF-shaped signals feeding an interference penalty into the planner, Jain's index exported per plan cycle (ADR 0015, W32)
+- evaluation harness (`eval/`): YAML-driven experiment matrix with deterministic run IDs, resume, retry-on-flake, and a standardized DuckDB result schema; sim backend verified, cluster backend (kind + Helm + k6) used for the live sittings (W33)
 - five tuned baselines — HPA, KEDA, FIRM-replica (OSDI '20 re-implementation), static over-provisioned, GPTCache+LRU — each grid-searched with committed sweep evidence (`eval/baselines/TUNING.md`, W34); the audit found every published optimum on a grid edge, and the extended sweeps and per-size re-tuning are in `research/analysis/TUNING_EXTENDED.md` and `eval/baselines/tuned_arms.yaml`
 - 1,800-run full matrix + 500-run ablation matrix executed and validated: exact row counts, zero duplicate/NULL rows, 10/10 bit-identical spot-check replays, Holm-corrected KS reproducibility gate (`eval/SMOKE_BUGS.md`, W35)
 - statistical analysis: two-way ANOVA, Cohen's d vs every baseline, 95% CIs, per-component ablation significance, 12 publication figures (600-DPI PNG + vector PDF, color-blind-safe) — `research/analysis/RESULTS.md` (W36)
@@ -262,6 +274,17 @@ The Compose database uses trust authentication and binds only to `127.0.0.1`; it
 Every measured claim traces to a committed script and a results file
 (single reading entry point: `research/analysis/RESULTS_MASTER.md`).
 
+**One-command reproduction of all committed records:**
+
+```bash
+pip install -r eval/requirements-reproduce.txt
+python scripts/reproduce.py    # or --check to verify, --out <dir> to set output
+```
+
+**Manual reproduction by phase.** Running a generator directly rewrites its committed
+record; set `POLYFORGE_ANALYSIS_OUT` and `POLYFORGE_FIG_DIR` to a scratch directory
+first unless that is what you want.
+
 ```bash
 # Harness matrices (sim backend, runs anywhere)
 cd eval && pip install -r requirements.txt
@@ -270,18 +293,18 @@ python scripts/validate_results.py experiments/full.yaml
 
 # Statistical analysis, figures, exploratory weight sensitivity
 cd ../research/analysis
-python run_analysis.py && python sensitivity_j.py
+python run_analysis.py && python sensitivity_j.py && python sensitivity_fair.py
 python effect_sizes.py        # d_z + bootstrap CIs (the citable unit)
 python planner_scaling.py     # joint-planner latency vs tenant count
 python cache_hit_precision.py --conversations '<lmsys glob>'  # hit quality (gated data)
-python forecast_azure.py      # second real trace (run etl_azure_llm.py first)
+python forecast_azure.py      # second real trace (run research/traces/etl_azure_llm.py first)
 
 # Calibration (Phase 6): CPU congestion + GPU tier table
 cd ../calibration && python measure_congestion.py            # ~35 min
 # GPU half: push kaggle_tier_bench.py as a Kaggle GPU kernel (see file docstring)
 
 # Live cluster smoke (Phase 7, needs Docker — a Codespace works out of the box)
-bash scripts/phase7_kind_run.sh
+cd ../.. && bash scripts/phase7_kind_run.sh
 ```
 
 Real datasets (BurstGPT v2.0, gated LMSYS-Chat-1M, Azure LLM inference

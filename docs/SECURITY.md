@@ -26,7 +26,7 @@ dependency or image. Out of scope: malicious cluster admin, hardware.
 | API6 | Unrestricted Access to Sensitive Business Flows | ✅ | Tenant provisioning and isolation promotion are admin-only and audited to the outbox; idempotency keys (W13) stop replay-driven resource creation. |
 | API7 | Server Side Request Forgery | ✅ | LLM/embedding base URLs are operator config, not user input (`POLYFORGE_TIER_BACKENDS`, parsed at startup — a tenant cannot set a provider URL). The agent's web-search tool fetches a fixed search endpoint with the query URL-encoded — user text never becomes a URL. **Redirect-based egress is now closed (session 35):** every outbound client — both model providers and the search tool — refuses to follow any 3xx (`internal/ai/gateway/egress.go` `egressClient`), so a compromised or malicious upstream cannot 302 the process into fetching an internal address (cloud metadata at 169.254.169.254, a sibling service, localhost). Network-level containment (W24 NetworkPolicies) remains as a second layer. Residual: no positive host allowlist — containment is by fixed config + no-redirect, not an enumerated allowlist. |
 | API8 | Security Misconfiguration | ✅ | Default-deny NetworkPolicies (`deploy/k8s/networkpolicies.yaml`), mTLS everywhere via Linkerd (W22), distroless runtime image, secrets out of env into Vault chain (W23), gitleaks in CI over full history. Dev-mode manifests carry self-labeled `dev-only` placeholders. |
-| API9 | Improper Inventory Management | ✅ | One OpenAPI document (`api/openapi.yaml`) linted in CI and kept in parity with the mux; ADRs document every surface; SBOM per build (CI) and per image (release workflow). |
+| API9 | Improper Inventory Management | ✅ | Two OpenAPI documents (`api/openapi.yaml` for the control plane, `api/ai-gateway.openapi.yaml` for the AI gateway) linted in CI and kept in parity with their muxes; ADRs document every surface; SBOM per build (CI) and per image (release workflow). |
 | API10 | Unsafe Consumption of APIs | ✅ | Every upstream response (LLM providers, Vault, OIDC, search) is size-capped (`io.LimitReader`), schema-decoded, and status-checked; provider failures map to 502 without echoing upstream bodies to clients. |
 
 ## Network
@@ -243,6 +243,13 @@ packages pass on the new toolchain.
 **The lesson:** a patch pin also ages out with its release line. Re-pinning
 inside 1.25 stopped being possible the day 1.27 shipped.
 
+**The published v1.0.0 images are affected.** The `v1.0.0` tag pins
+`toolchain go1.25.14`, so the images the release workflow pushed to
+`ghcr.io/mohaimin-8/polyforge/<component>:v1.0.0` carry the standard-library
+advisories above. The source is fixed; shipping fixed images needs a v1.0.1
+tag, which is the maintainer's decision. Until then, build from source rather
+than pulling v1.0.0.
+
 ## Session-43 finding: unbounded metric cardinality, remotely triggerable (FIXED)
 
 **Severity: high. Found by accident, by an instrument check** — the L6 `/metrics`
@@ -300,8 +307,9 @@ trade-off and is disclosed in `scripts/soak_observer.sh`.
 
 ## Known gaps (honest list)
 
-1. ZAP scan and the compromised-pod simulation have not been executed —
-   both need Docker/K8s this machine lacks; runbooks are in place.
+1. The compromised-pod simulation has not been executed; its runbook is in place.
+   (This item also listed the ZAP scan until 2026-10-14. ZAP has since run —
+   unauthenticated, OpenAPI-driven and authenticated; results in the ZAP section above.)
 2. Vector index and semantic cache are in-memory and unencrypted at rest
    (acceptable: rebuildable caches, not systems of record).
 3. No per-process egress allowlist (API7) — containment is network-level.
@@ -321,7 +329,7 @@ trade-off and is disclosed in `scripts/soak_observer.sh`.
    `golang.org/x/text`, reachable from the OIDC token exchange and the
    Postgres migration path) sitting in the tree with nothing to catch it.
 
-   Last manual sweep 2026-08-06: **0 reachable**, after
+   Last manual sweep 2026-10-13: **0 reachable**, after
    `google.golang.org/grpc` v1.81.1 → v1.82.1 cleared GO-2026-6061 (xDS
    RBAC / HTTP-2 transport), which *was* reachable via
    `analytics.Batcher.Close`. Two unreachable advisories were cleared in
@@ -383,9 +391,9 @@ control plane the table describes. Six gaps were closed:
   credential-protected and pin their inbound peers, and the admin surfaces
   require the admin key. Deploy on an enforcing CNI (Calico) and run the
   verification command in the manifest header to confirm the policy is live.
-- **ZAP baseline scan (`scripts/zap-baseline.sh`).** Ready and correct;
-  requires Docker to run, which this development machine does not have. Run it
-  in the Codespace/cloud sitting alongside the B1 live plane.
+- **ZAP baseline scan (`scripts/zap-baseline.sh`).** Infrastructure-gated when
+  this list was written (no Docker on the development machine); it has run since
+  Docker became available — see the ZAP section above (corrected 2026-10-14).
 - **mTLS (Linkerd), Vault secret chain, cosign signing, SBOM.** cosign
   keyless signing and syft SBOM generation **do run in CI/release on every
   push** (`.github/workflows/{ci,release}.yml`) — verified there, just not on

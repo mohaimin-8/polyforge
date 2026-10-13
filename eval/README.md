@@ -89,10 +89,10 @@ invalid runs keep their error strings in `runs` and never reach analysis.
      autoscaling/v2 HPA (metrics-server installed per run), the eval base
      values run the pod self-contained (SQLite on emptyDir, no ingress,
      limiter opened), and the hpa arm is verified end-to-end
-     (`experiments/phase7_smoke.yaml`). The `jcac` arm (session 17,
-     not yet run live): `operator_install_plan()` installs the operator
-     chart with the planner, creates per-tenant Tenant/Policy/Budget CRs
-     mirroring the sim world, and ends with `kubectl wait
+     (`experiments/phase7_smoke.yaml`). The `jcac` arm (**verified live, B1
+     executed and scored 2026-09-15**): `operator_install_plan()` installs
+     the operator chart with the planner, creates per-tenant Tenant/Policy/Budget
+     CRs mirroring the sim world, and ends with `kubectl wait
      --for=condition=Applied` on every Policy — the honesty gate is
      executable, so a run in which the operator never scaled the target
      fails before any load. Capacity parity is a cell property: every arm

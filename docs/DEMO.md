@@ -19,9 +19,9 @@ and adds about 15 minutes; it is optional.
 ## One command
 
 ```powershell
-python scripts/demo_all.py            # everything, about 12 minutes (needs Docker for Part C)
+python scripts/demo_all.py            # everything, ~12–14 minutes (needs Docker for Part C)
 python scripts/demo_all.py --pause    # the same, waiting for Enter between parts
-python scripts/demo_all.py --no-cluster   # without Kubernetes, about 2 minutes
+python scripts/demo_all.py --no-cluster   # without Kubernetes, ~8 minutes
 ```
 
 It runs Parts A to D below in order, checks every layer and every link between
@@ -322,10 +322,11 @@ Say: "The same controller code that ran in the simulator is now a service in
 the cluster. Every 10 seconds the operator asks the planner for a plan and
 applies it to real Deployments, the cache budget and the model tier. On a
 rented GPU server with three real models (Qwen 0.5B, 3B and 7B), the first
-live run lost: its model of the servers was about 1,000 times too
-pessimistic. With online calibration it won in the primary cell (B1',
-`RESULTS_WAVE4_CALIBRATED.md`). A five-seed replication was pre-registered, but
-I could not fund the cloud time, so it was not run."
+live run lost: its model predicted 3,500 ms where the server answered in 1 ms,
+and it assumed a server could take 100 units of work where the calibrated run
+measured about 1,120. With online calibration it won in the primary cell (B1', `RESULTS_WAVE4_CALIBRATED.md`). A
+five-seed replication was pre-registered, but I could not fund the cloud time,
+so it was not run."
 
 With `POLYFORGE_EVAL_KEEP_CLUSTER=1` the cluster stays up after the run. Remove
 it afterwards:
@@ -387,7 +388,7 @@ across the whole programme. The failures are published too.
 | cache side channel over the wire | shared AUC 1.000; per-tenant 0.502 | `eval/results/security/RESULTS_WIRE_ATTACK.md` |
 | real-data cache hit rate | 29.6% at similarity 0.85 (LMSYS, 200k turns) | `SEMANTIC_CACHE.md` |
 | live GPU, first run (B1) | joint controller +23.3% cost vs its tier-only ablation: FAIL | `RESULTS_WAVE4_LIVE_PLANE.md` |
-| live GPU, calibrated (B1') | cheapest of 4 comparators at equal fairness: PASS | `RESULTS_WAVE4_CALIBRATED.md` |
+| live GPU, calibrated (B1') | cheapest of 3 valid comparators at equal fairness: PASS | `RESULTS_WAVE4_CALIBRATED.md` |
 | scaling | 1,024 tenants: one plan 71 s; 32-tenant cells 195 ms each | `PLANNER_CELLS.md` |
 | 24-hour live soak | 25,806,353 requests, 0 dropped, 0 restarts | `RESULTS_LIVE_SOAK_V8.md` |
 | registered tests | 96 with p; 60 PASS; 51 survive programme-wide Holm | `HYPOTHESIS_LEDGER.md` |
@@ -426,7 +427,7 @@ a fully pre-registered, reproducible evaluation that reports its own failures.
 | symptom | fix |
 |---|---|
 | `Ports [8080] are already in use` | stop the other control plane (or a previous demo) and rerun |
-| `go: command not found` | install Go 1.25, or run `python scripts/demo_platform.py --no-build` if `tmp/demo/*.exe` already exist |
+| `go: command not found` | install Go 1.26.9, or run `python scripts/demo_platform.py --no-build` if `tmp/demo/*.exe` already exist |
 | act 6 shows `none yet` | the classifier relabels every 10 s; rerun the script (it waits up to 45 s) |
 | `failed to connect to the docker API` | start Docker Desktop and wait until it says "Engine running" |
 | cluster run ends at once with "valid" | its result file already has the run: delete `eval/results/demo_cluster*` and rerun |

@@ -10,7 +10,7 @@ both capacities.
 - One change per PR; describe what breaks without it.
 - Every behavioral change needs a test that fails before and passes after.
 - Architectural decisions get an ADR in `docs/adr/` — see the existing
-  fifteen for the format. If a change contradicts an ADR, amend the ADR in
+  sixteen for the format. If a change contradicts an ADR, amend the ADR in
   the same PR, don't silently diverge.
 
 ## Getting a dev environment

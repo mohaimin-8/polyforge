@@ -1,8 +1,12 @@
-# Experiment cluster IaC (W35a)
+# Experiment cluster IaC (W35a) — HISTORICAL/UNUSED
 
-Reproducible 4-node k3s cluster on Hetzner Cloud for the W35a smoke runs
-and the W35b full matrix. One `apply` gives a working kubeconfig in about
-two minutes; `destroy` guarantees the meter stops.
+**Historical (2026-10-14):** not used by any live sitting. The live campaigns ran
+on single AWS hosts provisioned by `scripts/aws_box.py`, and nothing in CI or
+`scripts/` references this directory. Kept for the record as written:
+
+Reproducible 4-node k3s cluster on Hetzner Cloud for
+the W35a smoke runs and the W35b full matrix. One `apply` gives a working
+kubeconfig in about two minutes; `destroy` guarantees the meter stops.
 
 ## Usage
 
