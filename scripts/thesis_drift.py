@@ -127,6 +127,21 @@ CONTRADICTED = [
      "never populated before 2026-08-08), so its jcac arm held its initial "
      "configuration, and 10 of 12 runs were valid: a wiring check, not a ranking.",
      "ERRATUM_ZERO_DEMAND_PLANNER.md"),
+    # --- final check-up 2026-10-14 ------------------------------------------
+    ("Security: uncontested novelty",
+     r"uncontested",
+     "not novel: the timing side channel on a shared semantic cache is prior "
+     "art (Early Bird, arXiv 2409.20002). The contribution is the measured "
+     "defence frontier, and the wire execution ran over loopback on one host.",
+     "RESULTS_MASTER.md, RESULTS_WIRE_ATTACK.md"),
+    ("joint control dominates tuned per-layer baselines",
+     r"dominates\s+tuned",
+     "not shown: J ties fair and re-tuned HPA (FJ-H1, RT-H1 FAIL) and does not "
+     "beat re-tuned KEDA (RT-H2 FAIL). It beats the layered stack by 53–60% "
+     "(FJ-H3, RT-H3 PASS), but RETUNED's SLO guard fails, and every reading "
+     "moves with J's lateness weight and cap (against re-tuned HPA the "
+     "registered weight 2 is the crossover).",
+     "RESULTS_FAIR_J.md, RESULTS_RETUNED.md, SENSITIVITY_FAIR.md"),
 ]
 
 # A registered hypothesis tag, as records_index.py reads it.
