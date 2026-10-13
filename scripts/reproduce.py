@@ -158,6 +158,10 @@ CAMPAIGN_RECORDS = [
     ("analysis_vtc.py", [], "VTC_FAIRNESS.md"),
     ("coordination_gap.py", ["--anchored"], "COORD_GAP_ANCHORED.md"),
     ("sensitivity_j.py", [], "SENSITIVITY_J.md"),
+    # Final check-up 2026-10-14, EXPLORATORY: the FAIR_J and RETUNED
+    # comparisons at other lateness weights and with the cap removed. Imports
+    # both frozen scorers, so it rebuilds from the same committed exports.
+    ("sensitivity_fair.py", [], "SENSITIVITY_FAIR.md"),
     # Both traces of the budget-parity campaign are in, so the record joins
     # the gate as PREREG_BUDGET_PARITY requires. It was deliberately held out
     # while only Azure had landed: an interim record cannot carry a
