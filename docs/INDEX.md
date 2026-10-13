@@ -25,16 +25,17 @@ detail — every record, the hypotheses it names, and whether the gate rebuilds 
 | [REPRODUCE.md](REPRODUCE.md) | **How to verify every published number** — run this first |
 | [DEMO.md](DEMO.md) | **How to demonstrate PolyForge live**: the platform, the controller comparison, a kind cluster, the evidence gate; what each result means |
 
-## 2. Live status — what is being worked on
+## 2. Live status — engineering complete, writing held
+
+All engineering work finished: Phase 4 (AWS rerun) not funded. Writing deferred pending author direction.
 
 | Document | What it is |
 |---|---|
-| [PUBLICATION_ROADMAP.md](PUBLICATION_ROADMAP.md) | Work packages WP1-WP15: execute order (§2), progress table (§6). Accurate as history; it no longer names what is next |
-| [MAIN_WORKING_PATH.md](MAIN_WORKING_PATH.md) | Milestone narrative. Context, not scheduling — the roadmap governs order |
-| [COMPLETION_ROADMAP.md](COMPLETION_ROADMAP.md) | **What is left that is not the thesis.** Track A: fix the gateway tier pin and re-sit B1. Track B: Zenodo, images, baseline, Azure scoping |
-| [FINAL_ROADMAP.md](FINAL_ROADMAP.md) | **100% of what is left that is not writing.** Absorbs ZERO_COST + COMPLETION Track A/B; adds theory (T1 S3 exact walk), real-trace live sitting, latency semantics, p99/TTFT, cache embedder. Writing held in §9 |
-| [ZERO_COST_ROADMAP.md](ZERO_COST_ROADMAP.md) | **The $0 route to a scored B1.** Why the free-route block is our batch-1 tier server, not the P100; phased plan (preflight fix -> batched server -> re-bench -> score); writing HELD until the author says |
-| [REMAINING_WORK.md](REMAINING_WORK.md) | Open items and known gaps |
+| [PUBLICATION_ROADMAP.md](PUBLICATION_ROADMAP.md) | Work packages WP1-WP15: execute order (§2), progress table (§6). Historical record of how all engineering landed |
+| [FINAL_ROADMAP.md](FINAL_ROADMAP.md) | **Executed roadmap** (§0 maps weaknesses to teams; §7 is the order). All engineering tasks completed or recorded as unfunded/deferred |
+| [MAIN_WORKING_PATH.md](MAIN_WORKING_PATH.md) | Milestone narrative. Context, not scheduling |
+| [COMPLETION_ROADMAP.md](COMPLETION_ROADMAP.md), [ZERO_COST_ROADMAP.md](ZERO_COST_ROADMAP.md) | Historical: earlier plans, absorbed into FINAL_ROADMAP |
+| [REMAINING_WORK.md](REMAINING_WORK.md) | Historical list of open items; the current state is this section's first line |
 | [THESIS_DRIFT.md](THESIS_DRIFT.md) | **Generated** (`scripts/thesis_drift.py`): what the thesis, slides and paper draft still say that the records withdrew or bounded, the records no document cites, the figures none includes. The writing's checklist; changes no document |
 | [WP14_SOAK_RESTORE.md](WP14_SOAK_RESTORE.md) | How to restore the live-soak apparatus |
 
@@ -47,16 +48,20 @@ detail — every record, the hypotheses it names, and whether the gate rebuilds 
 
 The methodological core. Two file families, both load-bearing:
 
-**`PREREG_*.md` (44)** — pre-registrations. Each was committed **and pushed
-before** its run; the push event is the timestamp anchor. They are what makes
+**`PREREG_*.md` (52)** — pre-registrations. Each was committed **and pushed
+before** its run, except two committed after their first runs and disclosed as
+such (`PREREG_EVICTION_PARITY`, `PREREG_ORDER_PERMUTATION`;
+`scripts/check_prereg_timing.py` judges every campaign); the push event is the
+timestamp anchor. They are what makes
 the results pre-registered rather than post-hoc. Never edit one after its run.
 
-**`RESULTS_*.md`** — generated records, plus `RESULTS.md`, `ADVANCED.md`,
-`FAIRNESS_V2.md` and `PHASE7_ORDINAL.md`, which predate the naming convention.
-Each one the gate covers must regenerate byte-identically; the ones it does not
-cover carry their reason in the `UNGATED` table of `scripts/reproduce.py`, and
-the gate fails if a record is in neither place. See `RECORDS_INDEX.md` for the
-current split. Records are written by their generator scripts, never by hand.
+**`RESULTS_*.md` and the other generated records** (`RESULTS.md`,
+`ADVANCED.md`, `FAIRNESS_V2.md`, `PHASE7_ORDINAL.md`, the audit's
+`REANALYSIS_*.md`, `ERRATUM_*.md`, `SENSITIVITY_*.md`, `TUNING_EXTENDED.md`,
+`HYPOTHESIS_LEDGER.md`). The gate regenerates 73 of them. Each gated record regenerates byte-identically; the
+ones the gate does not cover carry their reason in the `UNGATED` table of
+`scripts/reproduce.py`. See `RECORDS_INDEX.md` for the current split. Records
+are written by their generator scripts, never by hand.
 
 ```
 pip install -r eval/requirements-reproduce.txt   # PINNED: byte-identity is
@@ -123,14 +128,15 @@ precision — the ceiling is response stochasticity).
 
 | Document | What it is |
 |---|---|
-| [WAVE3_LIVE_RUNBOOK.md](WAVE3_LIVE_RUNBOOK.md) | Live-plane run procedure |
-| [WAVE4_FREE_ROUTE.md](WAVE4_FREE_ROUTE.md) | Free-tier route for wave 4 |
+| [WAVE3_LIVE_RUNBOOK.md](WAVE3_LIVE_RUNBOOK.md) | WAVE 3 live-plane run procedure |
+| [WAVE4_RENTED_HOST_RUNBOOK.md](WAVE4_RENTED_HOST_RUNBOOK.md) | WAVE 4 live-plane run procedure (GPU host) |
+| [WAVE4_FREE_ROUTE.md](WAVE4_FREE_ROUTE.md) | Free-tier route for wave 4 (historical) |
 | [PHASE7_JCAC_PLAN.md](PHASE7_JCAC_PLAN.md) | Phase 7 JCAC plan |
 | [EXECUTION_PLAN.md](EXECUTION_PLAN.md) | Original execution plan (historical) |
 
 ## 6. Design records
 
-[adr/](adr/) — 16 architecture decision records.
+[adr/](adr/) — 16 architecture decision records (ADR-0001 through ADR-0016).
 [milestones/](milestones/) — M0 setup, M1 backend core, M2 observability.
 
 ## 7. Archive

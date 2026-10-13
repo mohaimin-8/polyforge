@@ -22,10 +22,12 @@ tree with **no DuckDB files at all**: **16/16 records byte-identical, 19/19
 figures rebuilt.** CI runs the clean-checkout tier on every push
 (`reproduce` job in `.github/workflows/ci.yml`).
 
-That is the whole generated corpus — the v1/v2/v3 records plus all eleven
-campaign records (concurrency, learned control, both risk campaigns,
-tenant scale, sim chaos, and the five economy/structural-form reruns) — so
-a reviewer with nothing but a clone can re-derive every published number.
+That is the whole generated corpus — the v1/v2/v3 records plus all campaign
+records including concurrency, learned control, both risk campaigns, tenant
+scale, sim chaos, economy/structural-form reruns, audit-phase reruns, and
+the live-soak and Wave 4 campaigns — so a reviewer with nothing but a clone
+can re-derive every published number. The gate regenerates **73 records** and
+**21 figures** byte-identically.
 
 Figures are held to their data three ways, each printed on its own line of
 the report: **figure content** — the platform-independent dump of what each
@@ -43,10 +45,10 @@ the third only where the renderer matches.
 
 | tier | inputs | what re-derives |
 |---|---|---|
-| **git** (clean clone) | committed `eval/results/metrics_*.csv.gz` run-level exports, `agg_*.csv.gz` timeseries aggregates, security JSON/CSVs, trace-replay CSVs, and `eval/harness/trace_cache/window0.json.gz` | **everything: all 38 gated records and all 19 figures** |
-| **archive** (Zenodo DuckDBs restored into `eval/results/`; deposit [10.5281/zenodo.22801195](https://doi.org/10.5281/zenodo.22801195)) | + `raw_sim*.duckdb`, `ablations.duckdb`, `forecasters.duckdb`, `realism.duckdb`, `fairness_v2.duckdb`, … | the same 16/19, plus the full timeseries for any *new* analysis |
+| **git** (clean clone) | committed `eval/results/metrics_*.csv.gz` run-level exports, `agg_*.csv.gz` timeseries aggregates, security JSON/CSVs, trace-replay CSVs, and `eval/harness/trace_cache/window0.json.gz` | **everything: all 73 gated records and all 21 figures** |
+| **archive** (Zenodo DuckDBs restored into `eval/results/`; deposit [10.5281/zenodo.22801195](https://doi.org/10.5281/zenodo.22801195)) | + `raw_sim*.duckdb`, `ablations.duckdb`, `forecasters.duckdb`, `realism.duckdb`, `fairness_v2.duckdb`, … | the same, plus the full timeseries for any *new* analysis |
 | **rerun** (hours of compute) | `eval/experiments/*.yaml` via `python -m harness.runner` | the raw databases themselves, seed-deterministic per run_id |
-| **live** (author-gated hosts) | `docs/WAVE3_LIVE_RUNBOOK.md`, `PREREG_WAVE4_LIVE_PLANE.md` | the live campaign CSVs |
+| **live** (author-gated hosts) | `docs/WAVE3_LIVE_RUNBOOK.md`, `docs/WAVE4_RENTED_HOST_RUNBOOK.md`, `PREREG_WAVE4_LIVE_PLANE.md` | the live campaign CSVs |
 
 The archive tier no longer re-derives *more* than the git tier; it exists
 for work that needs the raw per-step data rather than the published
