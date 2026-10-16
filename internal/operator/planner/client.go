@@ -8,11 +8,32 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 )
+
+// RejectedError is a planner that answered but refused the request (HTTP
+// 4xx): deterministic, so the identical call fails again next cycle, unlike
+// an outage or a 5xx that may clear. Callers tell the two apart with
+// IsRejected (review 2026-10-16: a planner KeyError surfaced as a 400 that
+// looked exactly like "planner down" and held the last plan forever).
+type RejectedError struct {
+	Status int
+	Body   string
+}
+
+func (e *RejectedError) Error() string {
+	return fmt.Sprintf("planner rejected the request (%d): %s", e.Status, e.Body)
+}
+
+// IsRejected reports whether err is (or wraps) a planner 4xx rejection.
+func IsRejected(err error) bool {
+	var rejected *RejectedError
+	return errors.As(err, &rejected)
+}
 
 // Demand is one tenant's observed request mix over the last control window.
 //
@@ -158,6 +179,9 @@ func (c *HTTPClient) Plan(ctx context.Context, req Request) (Response, error) {
 	payload, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return Response{}, fmt.Errorf("read planner response: %w", err)
+	}
+	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+		return Response{}, &RejectedError{Status: resp.StatusCode, Body: string(payload)}
 	}
 	if resp.StatusCode != http.StatusOK {
 		return Response{}, fmt.Errorf("planner returned %d: %s", resp.StatusCode, payload)

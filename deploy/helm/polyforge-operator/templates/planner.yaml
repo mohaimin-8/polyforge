@@ -56,6 +56,12 @@ spec:
             {{- if .Values.planner.replicaDwellSteps }}
             - --replica-dwell-steps={{ .Values.planner.replicaDwellSteps }}
             {{- end }}
+            {{- if or .Values.planner.anchorMoves .Values.planner.convergeSweeps }}
+            - --anchor-moves
+            {{- end }}
+            {{- if .Values.planner.convergeSweeps }}
+            - --converge-sweeps
+            {{- end }}
             - --state-file=/var/lib/polyforge/planner-state.json
           {{- if .Values.planner.auth.enabled }}
           # Defence in depth for /v1/plan and /v1/state, which steer every

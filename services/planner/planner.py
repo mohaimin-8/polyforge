@@ -121,6 +121,14 @@ class PlannerCore:
         pin_published_physics()
         self._controller: JCACController | None = None
         self._signature: tuple | None = None
+        # Learned per-tenant state of tenants absent from the latest call.
+        # The operator's planning cells call this one (single-writer) service
+        # once per cell, so "absent from this call" usually means "in another
+        # cell", not "departed": parking keeps each tenant's forecast history,
+        # capacity scale, AI latency offset and dwell state for its next call
+        # instead of cold-starting it every cycle (review 2026-10-16). Bounded:
+        # the oldest parked tenant is dropped past PARKED_MAX.
+        self._parked: dict[str, dict] = {}
         self._defaults = {"alpha": 1.0, "beta": 2.0, "gamma": 0.5}
         self._defaults.update(default_weights or {})
         # Deployment-selected forecaster (Wave 5): the service could
@@ -163,7 +171,27 @@ class PlannerCore:
     def snapshot(self) -> dict:
         """Serializable planner state for failover/hand-off. Thread-safe."""
         with self._lock:
-            return self._controller.snapshot() if self._controller else {}
+            return self._snapshot_locked()
+
+    def _snapshot_locked(self) -> dict:
+        """The controller's snapshot plus every PARKED tenant in the same
+        format. With planning cells the controller holds only the last
+        cell's tenants; without the parked ones a restart or a failover
+        cold-started every other cell (review 2026-10-16)."""
+        if self._controller is None and not self._parked:
+            return {}
+        snap = self._controller.snapshot() if self._controller else {"forecasts": {}}
+        for key in ("capacity_scale", "ai_latency_offset_ms", "replica_move"):
+            snap.setdefault(key, {})
+        for tid, state in self._parked.items():
+            if tid in snap["forecasts"]:
+                continue
+            snap["forecasts"][tid] = state["forecast"].snapshot()
+            snap["capacity_scale"][tid] = state["capacity_scale"]
+            snap["ai_latency_offset_ms"][tid] = state["ai_latency_offset_ms"]
+            if state["replica_move"] is not None:
+                snap["replica_move"][tid] = list(state["replica_move"])
+        return snap
 
     def restore(self, data: dict) -> int:
         """Buffer a snapshot; apply immediately to any tenants the live
@@ -186,22 +214,50 @@ class PlannerCore:
         self._controller.restore(self._pending_restore)
         applied = known & snap_tids
         # Drop tenants already reconciled so the buffer only carries the
-        # not-yet-seen remainder (and stops re-applying stale history).
+        # not-yet-seen remainder (and stops re-applying stale history). Every
+        # per-tenant field is carried: the remainder used to keep only the
+        # forecasts and capacity scales, so a tenant restored on a later call
+        # lost its AI latency offset and dwell state (review 2026-10-16).
         remaining = {
-            "forecasts": {t: s for t, s in (self._pending_restore.get("forecasts") or {}).items()
-                          if t not in applied},
-            "capacity_scale": {t: s for t, s in (self._pending_restore.get("capacity_scale") or {}).items()
-                               if t not in applied},
+            key: {t: s for t, s in (self._pending_restore.get(key) or {}).items() if t not in applied}
+            for key in ("forecasts", "capacity_scale", "ai_latency_offset_ms", "replica_move")
         }
         self._pending_restore = remaining if remaining["forecasts"] else None
         return len(applied)
+
+    PARKED_MAX = 4096
+
+    @staticmethod
+    def _take(ctl: JCACController, tid: str) -> dict:
+        """Remove and return one tenant's learned state from `ctl`."""
+        ctl._projected.pop(tid, None)
+        return {"forecast": ctl.forecasts.pop(tid),
+                "capacity_scale": ctl.capacity_scale.pop(tid, 1.0),
+                "ai_latency_offset_ms": ctl.ai_latency_offset_ms.pop(tid, 0.0),
+                "replica_move": ctl._replica_move.pop(tid, None)}
+
+    @staticmethod
+    def _restore(ctl: JCACController, tid: str, state: dict) -> None:
+        """Install one tenant's learned state into `ctl`."""
+        ctl.forecasts[tid] = state["forecast"]
+        ctl.capacity_scale[tid] = state["capacity_scale"]
+        ctl.ai_latency_offset_ms[tid] = state["ai_latency_offset_ms"]
+        if state["replica_move"] is not None:
+            ctl._replica_move[tid] = state["replica_move"]
+        else:
+            ctl._replica_move.pop(tid, None)
+
+    def _park(self, ctl: JCACController, tid: str) -> None:
+        self._parked[tid] = self._take(ctl, tid)
+        while len(self._parked) > self.PARKED_MAX:
+            self._parked.pop(next(iter(self._parked)))
 
     def _persist_state_file(self) -> None:
         if not self._state_file or self._controller is None:
             return
         try:
             tmp = self._state_file.with_suffix(self._state_file.suffix + ".tmp")
-            tmp.write_text(json.dumps(self._controller.snapshot()), encoding="utf-8")
+            tmp.write_text(json.dumps(self._snapshot_locked()), encoding="utf-8")
             tmp.replace(self._state_file)  # atomic swap; no half-written file
         except OSError:
             pass  # durability is best-effort; never fail a plan on a disk error
@@ -237,6 +293,11 @@ class PlannerCore:
             tier = state.get("tier", "small")
             if tier not in TIERS:
                 raise ValueError(f"unknown tier {tier!r}")
+            # An unknown bound used to fall back to the full envelope inside
+            # knob_admits, silently un-pinning the knob it was meant to pin.
+            for bound in ("tier_min", "tier_max"):
+                if bound in entry and entry[bound] not in TIERS:
+                    raise ValueError(f"unknown {bound} {entry[bound]!r}")
             # Cache/tier knob bounds (PREREG_WAVE4_LIVE_PLANE.md §Arms): a
             # pinned (min==max) knob makes the controller re-optimize the free
             # knob alone. Absent bounds fall back to the full envelope
@@ -287,6 +348,9 @@ class PlannerCore:
         )
         if self._controller is None or signature != self._signature:
             old = self._controller
+            if old is not None:
+                for tid in [t for t in old.forecasts if t not in configs]:
+                    self._park(old, tid)
             self._controller = JCACController(
                 configs,
                 weights=Weights(alpha=signature[0], beta=signature[1], gamma=signature[2]),
@@ -300,32 +364,41 @@ class PlannerCore:
                 converge_sweeps=self._converge_sweeps,
             )
             self._signature = signature
+            new = self._controller
             if old is not None:
                 # A weights/limits retune rebuilds the optimizer, not the
-                # observations: surviving tenants keep their demand history
-                # and learned capacity corrections.
-                for tid, forecast in old.forecasts.items():
-                    if tid in self._controller.forecasts:
-                        self._controller.forecasts[tid] = forecast
-                for tid, scale in old.capacity_scale.items():
-                    if tid in self._controller.capacity_scale:
-                        self._controller.capacity_scale[tid] = scale
+                # observations: surviving tenants keep every piece of learned
+                # state -- demand history, capacity correction, AI latency
+                # offset, dwell -- and the cycle clock dwell is measured on.
+                # (The offset and dwell used to reset here, so a calibrated
+                # planner forgot the plant on every retune.)
+                new._cycle = old._cycle
+                for tid in [t for t in old.forecasts if t in new.forecasts]:
+                    self._restore(new, tid, self._take(old, tid))
+            for tid in configs:
+                if tid in self._parked and (old is None or tid not in old.forecasts):
+                    self._restore(new, tid, self._parked.pop(tid))
         else:
             ctl = self._controller
             ctl.configs = configs  # budgets/SLO may be retuned live
-            # Tenant churn reconciliation: arrivals get a fresh forecaster
-            # (matching the fleet's method), departures are dropped,
-            # survivors keep their history untouched.
+            # Tenant reconciliation: tenants absent from this call are parked
+            # with their learned state (another cell, or a departure); a
+            # returning tenant gets its parked state back; a genuinely new
+            # one gets fresh state for EVERY per-tenant field -- a missing
+            # AI latency offset used to raise KeyError under headroom
+            # calibration on every call, and the operator held its last plan
+            # forever (review 2026-10-16). Survivors are untouched.
             method = (next(iter(ctl.forecasts.values())).method
                       if ctl.forecasts else self._forecast_method)
-            for tid in configs:
-                if tid not in ctl.forecasts:
-                    ctl.forecasts[tid] = Forecast(method=method)
-                    ctl.capacity_scale[tid] = 1.0
             for tid in [t for t in ctl.forecasts if t not in configs]:
-                del ctl.forecasts[tid]
-                ctl.capacity_scale.pop(tid, None)
-                ctl._projected.pop(tid, None)
+                self._park(ctl, tid)
+            for tid in configs:
+                if tid in ctl.forecasts:
+                    continue
+                parked = self._parked.pop(tid, None)
+                self._restore(ctl, tid, parked if parked is not None else {
+                    "forecast": Forecast(method=method), "capacity_scale": 1.0,
+                    "ai_latency_offset_ms": 0.0, "replica_move": None})
 
         # Seed restored history before planning, so the very first plan after
         # a failover already reflects the pre-failover demand history.

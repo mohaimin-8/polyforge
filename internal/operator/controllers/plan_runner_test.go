@@ -509,3 +509,26 @@ func TestPlanRunnerAuditsEachTenantWithItsOwnCellsSolver(t *testing.T) {
 		t.Fatalf("each cell's tenant must carry its own cell's solver, got %v", solvers)
 	}
 }
+
+// A planner rejection (4xx) is counted apart from an outage, so a cycle that
+// fails identically forever is visible as a planner bug (review 2026-10-16).
+func TestPlanRunnerCountsRejectionsApartFromOutages(t *testing.T) {
+	for _, tc := range []struct {
+		err   error
+		cause string
+	}{
+		{&planner.RejectedError{Status: 400, Body: "KeyError"}, "rejected"},
+		{errors.New("planner unreachable: dial tcp: refused"), "unavailable"},
+	} {
+		c, _ := plannerFixtures(t)
+		runner := &PlanRunner{Client: c, Planner: &stubPlanner{err: tc.err},
+			Demands: demandFor("acme"), Audit: &recordingAudit{}}
+		before := testutil.ToFloat64(fallbackCycles.WithLabelValues(tc.cause))
+		if err := runner.RunOnce(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if got := testutil.ToFloat64(fallbackCycles.WithLabelValues(tc.cause)) - before; got != 1 {
+			t.Errorf("%s: fallback counter moved by %v, want 1", tc.cause, got)
+		}
+	}
+}
