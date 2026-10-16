@@ -21,6 +21,13 @@ corrections are applied across all of them at 0.05:
 Tests scored without a p-value (confidence-interval and rule-based verdicts)
 are counted but cannot enter a p-value correction.
 
+A registered FAIL enters both corrections at p = 1 (review 2026-10-16). Its
+printed p is often two-sided or for an effect in the WRONG direction (V3
+H1', RQ-H2 violation: tiny p, effect against the registered one), and a FAIL
+can never support a registered-direction claim; at its printed p it ranked
+first, "rejected", and loosened every later Holm threshold. At p = 1 it ranks
+last, which is the conservative placement for every PASS.
+
     python hypothesis_ledger.py
 """
 
@@ -162,7 +169,7 @@ def split(rows: list[dict]) -> tuple[list[dict], list[dict]]:
 
 def build() -> str:
     rows, no_p = split(ledger())
-    pvals = {r["key"]: r["p"] for r in rows}
+    pvals = {r["key"]: (r["p"] if r["verdict"] == "PASS" else 1.0) for r in rows}
     holm = holm_bonferroni(pvals, ALPHA)
     by = benjamini_yekutieli(pvals, ALPHA)
     passes = [r for r in rows if r["verdict"] == "PASS"]
@@ -185,6 +192,12 @@ def build() -> str:
          f"{len({r['record'] for r in no_p})} records carry a verdict but no p-value (confidence-interval and "
          f"rule-based readings; {sum(r['verdict'] == 'PASS' for r in no_p)} PASS). They cannot enter a "
          "p-value correction and are not counted above.", "",
+         "A registered FAIL enters both corrections at p = 1: its printed p is often two-sided or for an "
+         "effect against the registered direction, and a FAIL cannot support a registered-direction claim "
+         "(ranking it first at its printed p loosened every later Holm threshold). Rows marked a/b that test "
+         "the same treatment against `hpa_fair` and `keda_fair` on a trace often carry identical statistics "
+         "(the two comparators score the same there); they are counted as printed, so the family is larger "
+         "than the number of distinct comparisons, which only makes Holm stricter.", "",
          "## Registered PASS verdicts that do not survive the programme-wide correction", ""]
     if lost_holm:
         L += ["| record | section | test | registered p | Holm threshold | survives BY? |",
