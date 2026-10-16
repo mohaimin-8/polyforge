@@ -98,6 +98,31 @@ in-sample, cheaper than the three valid comparators (tier-only −17.7%, the pub
 controller −20.5%, cache-only −82.5%). Its replica-only comparison, like B1's, is void
 (`ERRATUM_WAVE4_REPLICA_ONLY.md`); do not quote "−99%" or "70× cheaper".
 
+*Finding (2026-10-16): what the J results rest on.* Three pre-registered campaigns
+on fresh shared seeds separated the parts the earlier comparisons bundled
+(`RESULTS_JOINTNESS.md`, `RESULTS_ACTUATION.md`, `RESULTS_QUALITY.md`):
+- **Coordination between one tenant's knobs is real and small.** With objective,
+  forecaster, model, budget and caps held fixed, joint search beats independent
+  per-knob search by ΔJ −0.0066 [−0.0121, −0.0022] (about 1.7% of J) and
+  one-knob-at-a-time search by −0.0009, both inside the registered ±0.025
+  equivalence margin (JN-C1/C2 PASS and EQUIVALENT). With answer quality priced
+  into J, the difference is +0.0012 and −0.0001 (QL-C1/C2 FAIL, EQUIVALENT).
+- **The 53–60% win over the layered stack (FJ-H3, RT-H3) measured that stack's
+  price-blind tier rule.** A layered stack with no tier layer ties the joint
+  controller (JN-B1 FAIL, +0.0178 [−0.003, +0.042]; better on small clusters and
+  the AI workloads); with a quality-priced router it ties again (QL-B1 FAIL). Do
+  not cite FJ-H3/RT-H3 as evidence that the knobs must be controlled jointly.
+- **Against capped reactive control the result is a tie with instant actuation**
+  (JN-B4 FAIL vs capped HPA; JN-B5 PASS vs capped KEDA, −0.0229) **and a win with
+  one-interval actuation lag** (AC-H3 −0.0204, AC-H4 −0.0279, both with their SLO
+  guards passing). The lag mode has no tier-switch lag and no backlog.
+- **Where the controller wins:** the large cluster, against every baseline, in
+  all three campaigns. **What it leans on:** shedding AI (tier `none`) on about 7%
+  of tenant-steps; held to never shedding it loses to capped HPA (+0.0573
+  [+0.0225, +0.0938]) and, under lag, to every comparator.
+- It beats a static equal share by 5–7% (JN-B3, AC-H2, QL-B3 PASS); the SLO guard
+  fails there in all three.
+
 ---
 
 ## Campaign ledger (chronological)
