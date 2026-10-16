@@ -116,6 +116,10 @@ CAMPAIGN_RECORDS = [
     # FAIR_J comparators re-tuned per cluster size (tuned_arms.yaml). Rebuilds
     # from the committed export metrics_matrix_retuned.csv.gz.
     ("analysis_retuned.py", [], "RESULTS_RETUNED.md"),
+    # PREREG_JOINTNESS / PREREG_ACTUATION (2026-10-16), each from its committed
+    # export metrics_matrix_{jointness,actuation}.csv.gz.
+    ("analysis_jointness.py", [], "RESULTS_JOINTNESS.md"),
+    ("analysis_actuation.py", [], "RESULTS_ACTUATION.md"),
     # Audit 2026-09-26, EXPLORATORY: the published tuning optima were grid
     # edges; rebuilds from the committed sweeps in eval/baselines.
     ("analysis_tuning_extended.py", [], "TUNING_EXTENDED.md"),
