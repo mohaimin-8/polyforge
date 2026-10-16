@@ -1,0 +1,28 @@
+# PREREG_ACTUATION.md (2026-10-16) -- the post-audit comparisons with
+# reconfiguration realism on: replicas added this interval serve next
+# interval, a grown cache serves half-warm, billing follows the nominal
+# configuration immediately (simulate.effective_state). Every post-audit
+# matrix ran with instant actuation. Frozen and pushed before any run.
+#
+#   jcac_converged      treatment
+#   jcac_tier_floor     the treatment that never sheds AI
+#   layered_small_tuned the layered stack with no tier layer
+#   static_share        equal cluster share, cheapest tier, never adapts
+#   hpa_fair_capped     hpa_fair inside the cluster caps
+#   keda_fair_capped    keda_fair inside the cluster caps
+#
+# Arms and tuning are PREREG_JOINTNESS's, unchanged (no re-tuning under lag).
+name: matrix_actuation
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+transition_costs: true
+systems: [jcac_converged, jcac_tier_floor, layered_small_tuned, static_share,
+          hpa_fair_capped, keda_fair_capped]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_actuation.duckdb
+retries: 2
+timeseries_reps: 0
