@@ -1,0 +1,206 @@
+"""PREREG_JOINTNESS.md -> RESULTS_JOINTNESS.md: what the composite-objective
+results rest on, separated -- coordination between one tenant's knobs, the
+competence of the comparators, the ability to shed AI, the planned SLO term.
+
+FROZEN with the pre-registration; not edited after the run. The test is the
+one PREREG_FAIR_J froze, imported from its (equally frozen) scorer, so this
+campaign is judged by the identical rule; the equivalence reading is new
+and registered here.
+
+    python analysis_jointness.py
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from analysis_fair_j import (  # noqa: E402
+    BOOT_N, BOOT_SEED, DESIGN, NI_MARGIN, TREATMENT, complete_design_points, design_diffs,
+    noninferior, score, superiority,
+)
+from stats import composite_objective, record_path  # noqa: E402
+
+RESULTS = HERE.parents[1] / "eval" / "results"
+DB = RESULTS / "raw_sim_jointness.duckdb"
+CSV = RESULTS / "metrics_matrix_jointness.csv.gz"
+RECORD = "RESULTS_JOINTNESS.md"
+
+# One Holm family of 7 (PREREG_JOINTNESS, Tests).
+CONFIRMATORY = {
+    "JN-C1": "jcac_decoupled",
+    "JN-C2": "jcac_knobwise",
+    "JN-B1": "layered_small_tuned",
+    "JN-B2": "layered_costaware_tuned",
+    "JN-B3": "static_share",
+    "JN-B4": "hpa_fair_capped",
+    "JN-B5": "keda_fair_capped",
+}
+COORDINATION = ("JN-C1", "JN-C2")
+EQ_MARGIN = 0.025          # registered equivalence margin on design-point mean ΔJ
+# Descriptive contrasts, (label, arm a, arm b): ΔJ = a − b.
+DESCRIPTIVE = [
+    ("never shedding: tier floor − treatment", "jcac_tier_floor", TREATMENT),
+    ("planned SLO term: violation − log1p(excess)", "jcac_violation", TREATMENT),
+    ("tier floor vs capped HPA", "jcac_tier_floor", "hpa_fair_capped"),
+    ("RT-H3 replicated: treatment vs registered layered stack", TREATMENT, "jcac_nojoint_v2_retuned"),
+    ("RT-H1 replicated: treatment vs re-tuned HPA (over the caps)", TREATMENT, "hpa_fair_retuned"),
+    ("what the caps cost HPA: capped − uncapped", "hpa_fair_capped", "hpa_fair_retuned"),
+]
+ARMS = [TREATMENT, "jcac_decoupled", "jcac_knobwise", "jcac_tier_floor", "jcac_violation",
+        "jcac_nojoint_v2_retuned", "layered_costaware_tuned", "layered_small_tuned",
+        "static_share", "hpa_fair_retuned", "hpa_fair_capped", "keda_fair_capped"]
+SIZES = ["small", "medium", "large"]
+AI_WORKLOADS = ["ai_cacheable", "ai_uncacheable", "agentic"]
+GUARDS = ["tier_none_step_share", "budget_overrun_step_share", "clamp_violation_step_share",
+          "plan_fallback_share", "plan_repaired_share", "capped_cycle_share"]
+METRICS = [("total_cost_usd", "cost $"), ("mean_violation", "violation"),
+           ("mean_excess", "excess"), ("mean_jain", "Jain")]
+BASE_COLUMNS = ["system", "workload", "tenant_mix", "cluster_size", "rep", "total_cost_usd",
+                "mean_violation", "mean_jain", "mean_excess"]
+
+
+def load() -> pd.DataFrame:
+    if DB.exists():
+        import duckdb
+
+        con = duckdb.connect(str(DB), read_only=True)
+        try:
+            return con.execute(
+                "select r.system, r.workload, r.tenant_mix, r.cluster_size, r.rep, "
+                "m.total_cost_usd, m.mean_violation, m.mean_jain, m.mean_excess, "
+                + ", ".join(f"m.{g}" for g in GUARDS)
+                + " from runs r join metrics m on r.run_id = m.run_id where r.status = 'valid'"
+            ).fetchdf()
+        finally:
+            con.close()
+    return pd.read_csv(CSV, float_precision="round_trip")[BASE_COLUMNS + GUARDS]
+
+
+def prepare(df: pd.DataFrame) -> pd.DataFrame:
+    df = complete_design_points(df, ARMS)
+    return df.assign(J=composite_objective(df))
+
+
+def direction(r: dict) -> str:
+    """Registered reading of a comparison's CI (as PREREG_RETUNED)."""
+    if r["ci"][1] < 0:
+        return "treatment better"
+    if r["ci"][0] > 0:
+        return "comparator better"
+    return "no difference shown"
+
+
+def equivalent(r: dict) -> bool:
+    """Registered equivalence: the 95% bootstrap CI of the mean ΔJ lies
+    strictly inside (−EQ_MARGIN, +EQ_MARGIN) -- two one-sided tests at
+    2.5% each, so it is stricter than a 90% TOST."""
+    return -EQ_MARGIN < r["ci"][0] and r["ci"][1] < EQ_MARGIN
+
+
+def _fmt_ci(r: dict) -> str:
+    return f"[{r['ci'][0]:+.4f}, {r['ci'][1]:+.4f}]"
+
+
+def _rel(df: pd.DataFrame, comp: str, metric: str) -> float:
+    """Mean of `metric` for the treatment relative to `comp`, as a share."""
+    b = df[df.system == comp][metric].mean()
+    return (df[df.system == TREATMENT][metric].mean() - b) / b if b else float("nan")
+
+
+def build(df: pd.DataFrame) -> str:
+    n_all = df[DESIGN].drop_duplicates().shape[0]
+    df = prepare(df)
+    n_dp = df[DESIGN].drop_duplicates().shape[0]
+    res = score(df, CONFIRMATORY)
+    L = ["# What the composite-objective results rest on: coordination, comparators, shedding", "",
+         "Generated by `analysis_jointness.py`, frozen with `PREREG_JOINTNESS.md`. Treatment "
+         f"`{TREATMENT}`. Unit: the design point (reps averaged); {n_dp} of {n_all} design points "
+         "complete for every arm (listwise rule). A PASS needs the one-sided Wilcoxon p at or below its "
+         "Holm threshold AND the 95% bootstrap CI of the mean difference entirely below 0 "
+         f"({BOOT_N:,} resamples, seed {BOOT_SEED}); the PREREG_FAIR_J rule, imported from its scorer. "
+         "Negative = the treatment is better.", "",
+         "## Per-arm means", "",
+         "| arm | J | cost $ | violation | excess | Jain | AI shed | budget overrun | clamp breaks | "
+         "fallback plans | repaired plans | capped cycles |",
+         "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+    for arm in ARMS:
+        s = df[df.system == arm]
+        guards = " | ".join("—" if s[g].isna().all() else f"{s[g].mean():.1%}" for g in GUARDS)
+        L.append(f"| `{arm}` | {s.J.mean():.4f} | {s.total_cost_usd.mean():.4f} | "
+                 f"{s.mean_violation.mean():.4f} | {s.mean_excess.mean():.4f} | {s.mean_jain.mean():.4f} | "
+                 f"{guards} |")
+    L += ["", "## Confirmatory: JN-C1, JN-C2, JN-B1..B5 (one Holm family of 7)", "",
+          "| id | vs | design points | ΔJ | d_z | 95% CI of ΔJ | treatment better in | Wilcoxon p | "
+          "Holm threshold | verdict | direction |", "|---|---|---:|---:|---:|---|---:|---:|---:|---|---|"]
+    for hid, r in res.items():
+        L.append(f"| **{hid}** | `{CONFIRMATORY[hid]}` | {r['n']} | {r['mean']:+.4f} | {r['dz']:+.2f} | "
+                 f"{_fmt_ci(r)} | {r['better']:.0%} | {r['p']:.3g} | {r['threshold']:.4f} | "
+                 f"{'PASS' if r['pass'] else 'FAIL'} | {direction(r)} |")
+    L += ["", f"## Coordination: equivalence within ±{EQ_MARGIN} J (registered reading)", "",
+          "| id | vs | ΔJ | 95% CI | equivalent? |", "|---|---|---:|---|---|"]
+    for hid in COORDINATION:
+        r = res[hid]
+        L.append(f"| {hid}-EQ | `{CONFIRMATORY[hid]}` | {r['mean']:+.4f} | {_fmt_ci(r)} | "
+                 f"{'EQUIVALENT' if equivalent(r) else 'not shown'} |")
+    L += ["", f"## SLO guard: `mean_excess` non-inferiority (one-sided 95% bootstrap bound < {NI_MARGIN})", "",
+          "| guard | vs | mean diff | 95% upper bound | verdict |", "|---|---|---:|---:|---|"]
+    for hid, comp in CONFIRMATORY.items():
+        g = noninferior(design_diffs(df, TREATMENT, comp, "mean_excess"))
+        L.append(f"| {hid}-NI | `{comp}` | {g['mean']:+.4f} | {g['ucb']:+.4f} | "
+                 f"{'PASS' if g['ni'] else 'FAIL'} |")
+    L += ["", "## Per metric, treatment vs each confirmatory comparator (descriptive)", "",
+          "| vs | " + " | ".join(f"Δ{name} [95% CI]" for _, name in METRICS) + " | cost, relative |",
+          "|---|" + "---|" * len(METRICS) + "---:|"]
+    for comp in CONFIRMATORY.values():
+        cells = []
+        for metric, _ in METRICS:
+            r = superiority(design_diffs(df, TREATMENT, comp, metric))
+            cells.append(f"{r['mean']:+.4f} {_fmt_ci(r)}")
+        L.append(f"| `{comp}` | " + " | ".join(cells) + f" | {_rel(df, comp, 'total_cost_usd'):+.1%} |")
+    L += ["", "## Descriptive contrasts", "", "| contrast | ΔJ | 95% CI | Δexcess | AI shed (a / b) |",
+          "|---|---:|---|---:|---|"]
+    for label, a, b in DESCRIPTIVE:
+        r = superiority(design_diffs(df, a, b, "J"))
+        e = design_diffs(df, a, b, "mean_excess").mean()
+        sa = df[df.system == a].tier_none_step_share.mean()
+        sb = df[df.system == b].tier_none_step_share.mean()
+        L.append(f"| {label} | {r['mean']:+.4f} | {_fmt_ci(r)} | {e:+.4f} | {sa:.1%} / {sb:.1%} |")
+    L += ["", "## Per cluster size, treatment vs each confirmatory comparator (descriptive)", "",
+          "| cluster | vs | design points | ΔJ | 95% CI | direction |", "|---|---|---:|---:|---|---|"]
+    for size in SIZES:
+        sub = df[df.cluster_size == size]
+        for comp in CONFIRMATORY.values():
+            r = superiority(design_diffs(sub, TREATMENT, comp, "J"))
+            L.append(f"| {size} | `{comp}` | {r['n']} | {r['mean']:+.4f} | {_fmt_ci(r)} | {direction(r)} |")
+    L += ["", "## Per workload, treatment vs each confirmatory comparator (descriptive)", "",
+          "| workload | vs | ΔJ | treatment better in |", "|---|---|---:|---:|"]
+    for comp in CONFIRMATORY.values():
+        ma = df[df.system == TREATMENT].groupby(DESIGN).J.mean()
+        mb = df[df.system == comp].groupby(DESIGN).J.mean()
+        d = (ma - mb).dropna()
+        for wl, sub in d.groupby(level="workload"):
+            L.append(f"| `{wl}` | `{comp}` | {sub.mean():+.4f} | {int((sub < 0).sum())}/{len(sub)} |")
+    ai = df[df.workload.isin(AI_WORKLOADS)]
+    L += ["", "## AI workloads only (descriptive; where the cache and tier knobs act)", "",
+          "| vs | design points | ΔJ | 95% CI | direction |", "|---|---:|---:|---|---|"]
+    for comp in CONFIRMATORY.values():
+        r = superiority(design_diffs(ai, TREATMENT, comp, "J"))
+        L.append(f"| `{comp}` | {r['n']} | {r['mean']:+.4f} | {_fmt_ci(r)} | {direction(r)} |")
+    L.append("")
+    return "\n".join(L) + "\n"
+
+
+def main() -> int:
+    out = record_path(RECORD)
+    out.write_text(build(load()), encoding="utf-8")
+    print(f"wrote {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

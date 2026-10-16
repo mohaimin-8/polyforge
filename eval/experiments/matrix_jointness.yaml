@@ -1,0 +1,36 @@
+# PREREG_JOINTNESS.md (2026-10-16) -- what the composite-objective results
+# rest on, separated: coordination between one tenant's knobs, the ability to
+# shed AI, the planned SLO term, and the competence of the comparators.
+# Frozen and pushed before any run of this experiment.
+#
+#   jcac_converged            treatment (as in PREREG_FAIR_J / PREREG_RETUNED)
+#   jcac_decoupled            same objective and information, knobs searched
+#                             independently and combined (no coordination)
+#   jcac_knobwise             same, one knob at a time to a fixed point
+#   jcac_tier_floor           treatment that never sheds AI (tier floor
+#                             'small', clamped fallback)
+#   jcac_violation            treatment planning on capped `violation`
+#   jcac_nojoint_v2_retuned   the registered layered stack (RT-H3 comparator)
+#   layered_costaware_tuned   layered stack, cost-aware tier layer, re-tuned
+#   layered_small_tuned       layered stack, no tier layer, re-tuned
+#   static_share              equal cluster share, cheapest tier, never adapts
+#   hpa_fair_retuned          the RT-H1 comparator (ignores cluster caps)
+#   hpa_fair_capped           hpa_fair inside the cluster caps, re-tuned there
+#   keda_fair_capped          keda_fair inside the cluster caps, re-tuned there
+#
+# Cells mirror the headline matrix. The new experiment name gives fresh
+# seeds; shared_seeds gives every arm in a cell identical demand. New DB.
+name: matrix_jointness
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_converged, jcac_decoupled, jcac_knobwise, jcac_tier_floor, jcac_violation,
+          jcac_nojoint_v2_retuned, layered_costaware_tuned, layered_small_tuned, static_share,
+          hpa_fair_retuned, hpa_fair_capped, keda_fair_capped]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_jointness.duckdb
+retries: 2
+timeseries_reps: 0
