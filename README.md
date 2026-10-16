@@ -29,15 +29,19 @@ fresh, shared seeds. What the evidence now supports:
   (`SENSITIVITY_FAIR.md`, exploratory): against re-tuned HPA the registered
   weight sits on the crossover, and at a lateness weight of 4 or more the
   re-tuned HPA and KEDA are better.
-- **Jointness beats a layered design.** Against a layered stack that holds all
-  three knobs but controls each separately, the joint controller wins by 53–60%
-  on J (FJ-H3, RT-H3 PASS). Its SLO guard passes in FAIR_J but fails in RETUNED,
-  where the joint controller's `mean_excess` is 0.2117 against the layered
-  stack's 0.0294; with lateness uncapped, the RETUNED win shows no difference at
-  the registered weight (`SENSITIVITY_FAIR.md`). The FAIR_J win survives a
-  planner that believes the wrong model on all four measured model forms
-  (`RESULTS_STRUCTURAL_MISMATCH.md`, SM-H2), but not on a plant fitted to the
-  live evidence, where the layered stack is better.
+- **Coordinating the knobs is worth about 2% of J.** The 53–60% win over the
+  registered layered stack (FJ-H3, RT-H3) came from that stack's price-blind tier
+  rule: a layered stack with no tier layer ties the joint controller
+  (`RESULTS_JOINTNESS.md`, JN-B1 FAIL). With everything else held fixed, searching
+  the three knobs jointly beats searching them independently by 1.7% of J and one
+  at a time by 0.2%, both inside a pre-registered ±0.025 equivalence margin
+  (JN-C1/C2); with answer quality priced into J, by nothing (`RESULTS_QUALITY.md`,
+  QL-C1/C2). The controller's measurable edge is the large cluster, where it beats
+  every baseline, and actuation lag: with replicas one interval late it beats
+  capped HPA and KEDA by 5–7% of J with its SLO guard passing
+  (`RESULTS_ACTUATION.md`, AC-H3/H4). It sheds AI traffic on about 7% of
+  tenant-steps; held to never shedding, it loses to capped HPA. On a plant fitted
+  to the live evidence the layered stack is better (`RESULTS_STRUCTURAL_MISMATCH.md`).
 - **On live hardware the controller must calibrate its model online.** The
   published controller lost to its own tier-only ablation live (B1, WL-H1 FAIL);
   its plant model predicted 3,500 ms CRUD p95 at the cell's peak, which the
@@ -58,8 +62,8 @@ fresh, shared seeds. What the evidence now supports:
   real-trace forecasting results, the semantic-cache measurements, and the
   planning-cell scaling result.
 
-Across the programme, 96 registered tests carry a p-value; 60 passed as registered,
-and 51 of those survive a programme-wide Holm correction
+Across the programme, 112 registered tests carry a p-value; 69 passed as registered,
+and 54 of those survive a programme-wide Holm correction
 (`research/analysis/HYPOTHESIS_LEDGER.md`). The audit report is outside the
 repository; the fixes and re-runs are commits `fe23712` onward on this branch.
 

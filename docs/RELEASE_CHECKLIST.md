@@ -18,11 +18,19 @@ version predated the evidence site, the AWS sittings and the caption gate.)
 
 ## 2. Records and pre-registrations — done, gated
 
-- 59 records regenerate byte-identically (`scripts/reproduce.py`); 21 more
-  carry a stated reason in `UNGATED`; 48 pre-registrations; `check_preregs.py`
-  proves no registered text moved after its result existed.
+- 77 records regenerate byte-identically (`scripts/reproduce.py`; CI
+  `reproduce` job, 2026-10-16); 18 more carry a stated reason in `UNGATED`;
+  55 pre-registrations; `check_preregs.py` proves no registered text moved
+  after its result existed, and `check_prereg_timing.py` judges 50 of 52
+  campaigns ran after their protocol (2 disclosed).
 - `research/analysis/RECORDS_INDEX.md` (generated) enumerates all of them;
   `OSF_REGISTRATION.md` carries the 29 OSF rows.
+- [ ] The 7 protocols written after the OSF mirror (FAIR_J, STRUCTURAL_MISMATCH,
+      RETUNED, WAVE4_REPLICATION, JOINTNESS, ACTUATION, QUALITY) are git-only.
+      Their pushes carry server-side times (GitHub Actions run creation), and
+      JOINTNESS/ACTUATION and QUALITY were archived by Software Heritage within
+      seconds of their push (save requests 2560095 and 2560208). **Human:** add
+      them to the OSF project as a post-run registration, stated as such.
 - [x] OSF mirror registered 2026-09-19: **https://doi.org/10.17605/OSF.IO/DYZKV**
       (all 48 protocols + index + commit map, frozen and public; project
       https://osf.io/wt7em/). A post-run witness, stated as such; the git
@@ -78,15 +86,16 @@ multi-node sitting (`RESULTS_MULTINODE.md`), the trace-driven cluster
 `RESULTS_WAVE4_DWELL.md`; runbook `WAVE4_RENTED_HOST_RUNBOOK.md`). Every box
 is terminated and the AWS key is deactivated; nothing is running.
 
-## 7. The text — rewritten to the records (2026-09-16)
+## 7. The text — NOT current (revised 2026-10-16)
 
-`thesis/report` (62 pp.) and `thesis/slides` (16 frames) now state the
-adjudicated claims: the cost percentages are withdrawn and replaced by the
-feasibility result, every gated record is cited, all 21 figures are in.
-`docs/THESIS_DRIFT.md` (generated; CI keeps it current) reads 0 bare claims /
-0 uncited records / 0 unplaced figures. `research/paper/main.tex` is still the
-FGCS skeleton with TODO blocks — carve it from the thesis chapters when a
-venue is chosen. Author fill-ins remain: author/degree/university macros in
+`thesis/report` and `thesis/slides` were rewritten to the records on
+2026-09-16, and the FGCS manuscript (`research/paper/`) was drafted on
+2026-09-21. Both predate the 2026-09-26 audit and the campaigns since
+(FAIR_J, RETUNED, JOINTNESS, ACTUATION, QUALITY). `docs/THESIS_DRIFT.md`
+(generated; CI keeps it current) lists every contradicted claim still made bare,
+with file and line — 7 of 12 on 2026-10-16 — and the records no document cites
+yet. The text must be rewritten to the records before submission; that is the
+author's work. Author fill-ins also remain: author/degree/university macros in
 `thesis/report/main.tex`.
 
 ## 8. Submission-adjacent — human
