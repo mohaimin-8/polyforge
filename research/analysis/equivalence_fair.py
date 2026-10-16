@@ -1,0 +1,171 @@
+"""What the post-audit "ties" are: equivalence bounds, detectable effects,
+the per-metric trade, and the Pareto fronts -- DECLARED EXPLORATORY.
+
+Written 2026-10-16 for the final review. RESULTS_FAIR_J and RESULTS_RETUNED
+report superiority tests; a FAIL there was later read as a "tie" (FJ-H1
+against `hpa_fair`, RT-H1 against re-tuned HPA), and a superiority FAIL is
+not evidence of equivalence. A statistician reviewer asks three things the
+records do not answer:
+
+- How large a difference do the data rule out? (the equivalence margin the
+  90% CI supports, i.e. two one-sided tests at 5%)
+- How large a difference could the design have detected? (the minimum
+  detectable effect at the design-point unit, power 0.8)
+- What is the tie made of? (cost, violation, excess and Jain separately, and
+  which arms are Pareto non-dominated per design point)
+
+Rules of this analysis:
+- EXPLORATORY. Nothing here is pre-registered and no registered verdict
+  changes.
+- Same unit, data, listwise rule and bootstrap as the frozen scorers, which
+  this imports rather than restates: design points (reps averaged), 10,000
+  resamples, seed 20260926. The registered ΔJ must reproduce exactly;
+  test_equivalence_fair.py pins that against both frozen scorers.
+- The minimum detectable effect uses the normal approximation for a paired
+  one-sided test, (z_(1-α) + z_0.8) · sd(d) / sqrt(n), at α = 0.05 and at the
+  strictest Holm threshold of a family of 3 (α/3).
+
+    python equivalence_fair.py
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from scipy import stats as sps
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import analysis_fair_j as fair_j  # noqa: E402
+import analysis_retuned as retuned  # noqa: E402
+from stats import composite_objective, record_path  # noqa: E402
+
+RECORD = "EQUIVALENCE_FAIR.md"
+TREATMENT = fair_j.TREATMENT
+POWER = 0.8
+METRICS = [("total_cost_usd", "cost $"), ("mean_violation", "violation"),
+           ("mean_excess", "excess"), ("mean_jain", "Jain")]
+FRONTS = {"cost, violation, 1−Jain": ("total_cost_usd", "mean_violation", "unfair"),
+          "cost, excess, 1−Jain": ("total_cost_usd", "mean_excess", "unfair")}
+
+
+def campaigns() -> dict[str, tuple[pd.DataFrame, dict[str, str], list[str]]]:
+    """Each campaign's design-point-complete frame exactly as its frozen
+    scorer builds it, its confirmatory family and its arms."""
+    fair_arms = [fair_j.TREATMENT, fair_j.ALSO, *fair_j.PRIMARY.values(), *fair_j.SECONDARY.values()]
+    out = {}
+    for name, df, family, arms in (("FAIR_J", fair_j.load(), fair_j.PRIMARY, fair_arms),
+                                   ("RETUNED", retuned.load(), retuned.PRIMARY, retuned.ARMS)):
+        df = fair_j.complete_design_points(df, arms)
+        out[name] = (df.assign(J=composite_objective(df)), family, arms)
+    return out
+
+
+def equivalence(d: np.ndarray) -> dict:
+    """The 90% percentile-bootstrap CI of the mean (two one-sided tests at
+    5%), and the smallest symmetric margin it lies inside."""
+    means = fair_j.boot_means(d)
+    lo, hi = float(np.percentile(means, 5.0)), float(np.percentile(means, 95.0))
+    return {"n": len(d), "mean": float(d.mean()), "ci90": (lo, hi), "margin": max(abs(lo), abs(hi))}
+
+
+def mde(d: np.ndarray, alpha: float) -> float:
+    """Minimum detectable mean difference, paired one-sided test, power 0.8."""
+    z = sps.norm.ppf(1 - alpha) + sps.norm.ppf(POWER)
+    return float(z * d.std(ddof=1) / np.sqrt(len(d)))
+
+
+def nondominated(points: np.ndarray) -> np.ndarray:
+    """Boolean mask of rows not dominated by any other row (lower is better
+    in every column; dominance needs <= everywhere and < somewhere)."""
+    keep = np.ones(len(points), dtype=bool)
+    for i, p in enumerate(points):
+        others = np.delete(points, i, axis=0)
+        if np.any(np.all(others <= p, axis=1) & np.any(others < p, axis=1)):
+            keep[i] = False
+    return keep
+
+
+def front_counts(df: pd.DataFrame, arms: list[str], columns: tuple[str, str, str]) -> dict[str, int]:
+    """Per arm, the design points at which it is Pareto non-dominated among
+    `arms` on design-point means of `columns`."""
+    means = (df[df.system.isin(arms)].assign(unfair=1.0 - df.mean_jain)
+             .groupby(fair_j.DESIGN + ["system"])[list(columns)].mean())
+    counts = {arm: 0 for arm in arms}
+    for _, block in means.groupby(level=fair_j.DESIGN):
+        mask = nondominated(block.to_numpy())
+        for (*_, arm), ok in zip(block.index, mask):
+            counts[arm] += int(ok)
+    return counts
+
+
+def _rel(df: pd.DataFrame, comp: str, metric: str) -> float:
+    b = df[df.system == comp][metric].mean()
+    return (df[df.system == TREATMENT][metric].mean() - b) / b if b else float("nan")
+
+
+def build() -> str:
+    L = ["# What the post-audit ties are: equivalence, detectable effects, the trade, the fronts", "",
+         "Generated by `equivalence_fair.py` from the committed FAIR_J and RETUNED exports. "
+         "**Exploratory; changes no registered verdict.** Unit: the design point (reps averaged), "
+         "listwise as the frozen scorers; bootstrap 10,000 resamples, seed 20260926. Δ = treatment "
+         f"(`{TREATMENT}`) − comparator; negative = the treatment is lower (better for cost, "
+         "violation and excess; worse for Jain).", "",
+         "## Equivalence and detectable effects on J", "",
+         "A superiority FAIL is not a tie. The 90% CI below is two one-sided tests at 5%: the data rule "
+         "out any mean difference outside it. *Margin* is the smallest symmetric bound it fits inside; "
+         "*MDE* is the smallest mean difference the design detects with power 0.8.", "",
+         "| campaign | vs | design points | ΔJ | 90% CI | margin ruled out | as % of comparator J | "
+         "MDE (α 0.05) | MDE (α 0.05/3) |", "|---|---|---:|---:|---|---:|---:|---:|---:|"]
+    data = campaigns()
+    for name, (df, family, _) in data.items():
+        for hid, comp in family.items():
+            d = fair_j.design_diffs(df, TREATMENT, comp, "J")
+            e = equivalence(d)
+            base = df[df.system == comp].J.mean()
+            L.append(f"| {name} | `{comp}` ({hid}) | {e['n']} | {e['mean']:+.4f} | "
+                     f"[{e['ci90'][0]:+.4f}, {e['ci90'][1]:+.4f}] | {e['margin']:.4f} | "
+                     f"{e['margin'] / base:.1%} | {mde(d, 0.05):.4f} | {mde(d, 0.05 / 3):.4f} |")
+    L += ["", "## What each comparison is made of: per-metric differences", "",
+          "| campaign | vs | " + " | ".join(f"Δ{n} [95% CI]" for _, n in METRICS)
+          + " | cost, relative | violation, relative | excess, relative |",
+          "|---|---|" + "---|" * len(METRICS) + "---:|---:|---:|"]
+    for name, (df, family, _) in data.items():
+        for hid, comp in family.items():
+            cells = []
+            for metric, _ in METRICS:
+                r = fair_j.superiority(fair_j.design_diffs(df, TREATMENT, comp, metric))
+                cells.append(f"{r['mean']:+.4f} [{r['ci'][0]:+.4f}, {r['ci'][1]:+.4f}]")
+            L.append(f"| {name} | `{comp}` | " + " | ".join(cells)
+                     + f" | {_rel(df, comp, 'total_cost_usd'):+.1%} | {_rel(df, comp, 'mean_violation'):+.1%}"
+                     f" | {_rel(df, comp, 'mean_excess'):+.1%} |")
+    for label, columns in FRONTS.items():
+        L += ["", f"## Pareto non-dominance per design point ({label}; lower is better)", "",
+              "| campaign | arm | design points non-dominated | of |", "|---|---|---:|---:|"]
+        for name, (df, _, arms) in data.items():
+            n = df[fair_j.DESIGN].drop_duplicates().shape[0]
+            for arm, k in front_counts(df, arms, columns).items():
+                L.append(f"| {name} | `{arm}` | {k} | {n} |")
+    L += ["", "## Reading", "",
+          "- A comparison is a tie in the strong sense only where its margin ruled out is small next "
+          "to the comparator's J and its MDE; a large margin means the data are consistent with a "
+          "real difference either way.",
+          "- The per-metric rows show what J nets out: a cost difference in one direction and a "
+          "lateness difference in the other can sum to a ΔJ near zero.",
+          "- Non-dominance counts several arms per design point; a count near the number of design "
+          "points means the arm is on the front almost everywhere, not that it wins.", ""]
+    return "\n".join(L)
+
+
+def main() -> int:
+    out = record_path(RECORD)
+    out.write_text(build(), encoding="utf-8")
+    print(f"wrote {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
