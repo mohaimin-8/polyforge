@@ -1,0 +1,28 @@
+# PREREG_HELDOUT.md (2026-10-16) -- the JOINTNESS comparisons on two
+# workload classes no tuning slice or earlier campaign has seen: demand from
+# a two-state Markov-modulated process (random bursts, no period), one
+# CRUD-only and one mixed CRUD+AI. Frozen and pushed before any run.
+#
+#   jcac_converged       treatment
+#   jcac_decoupled       HO-C1: knobs searched independently and combined
+#   layered_small_tuned  HO-B1: layered stack with no tier layer
+#   static_share         HO-B3: equal cluster share, cheapest tier
+#   hpa_fair_capped      HO-B4: HPA inside the cluster caps
+#   keda_fair_capped     HO-B5: KEDA inside the cluster caps
+#   jcac_tier_floor      descriptive: the treatment that never sheds AI
+#
+# Arms, parameters and tuning are PREREG_JOINTNESS's, unchanged. New
+# experiment name -> fresh seeds; shared_seeds -> identical demand per cell.
+name: matrix_heldout
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_converged, jcac_decoupled, layered_small_tuned, static_share,
+          hpa_fair_capped, keda_fair_capped, jcac_tier_floor]
+workloads: [mmpp_crud, mmpp_mixed]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_heldout.duckdb
+retries: 2
+timeseries_reps: 0
