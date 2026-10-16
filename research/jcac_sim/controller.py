@@ -406,6 +406,7 @@ class JCACController:
         belief_form: str | None = None,
         knob_search: str = "joint",
         objective_term: str | None = None,
+        quality_weight: float = 0.0,
     ):
         self.configs = configs
         # Audit 2026-09-26 (simulator CRITICAL): `_project` calls the very
@@ -649,6 +650,17 @@ class JCACController:
         if objective_term not in (None, "violation"):
             raise ValueError(f"objective_term must be None or 'violation', not {objective_term!r}")
         self.objective_term = objective_term
+        # Quality follow-up (opt-in): price the answer-quality loss
+        # (model.StepMetrics.quality_loss) in the plan at this weight per
+        # tenant-step -- the weight the QUALITY scorer prices it at. It
+        # rides inside `_project`'s SLO accumulator divided by beta, so the
+        # candidate score gains exactly quality_weight * loss. 0.0 (the
+        # default) never touches the published expression (R4).
+        if quality_weight < 0.0:
+            raise ValueError("quality_weight must be non-negative")
+        if quality_weight and self.weights.beta <= 0.0:
+            raise ValueError("quality_weight needs a positive SLO weight beta")
+        self.quality_weight = quality_weight
 
     def snapshot(self) -> dict:
         """Serializable planner state for failover (W31): per-tenant forecast
@@ -958,6 +970,8 @@ class JCACController:
                 # instead of the unbounded log1p(excess); None (the default)
                 # is the published expression, verbatim (R4).
                 obj += m.violation if self.objective_term == "violation" else math.log1p(m.excess)
+                if self.quality_weight:
+                    obj += self.quality_weight / self.weights.beta * m.quality_loss
         else:
             believed = self._believed_state(state)
             tier_belief = self.belief_scale.get("tier_cost", 1.0)
@@ -969,6 +983,8 @@ class JCACController:
                 cost += m.cost_infra_usd + tier_belief * m.cost_tier_usd
                 violation += m.violation
                 obj += m.violation if self.objective_term == "violation" else math.log1p(m.excess)
+                if self.quality_weight:
+                    obj += self.quality_weight / self.weights.beta * m.quality_loss
         n = max(1, len(horizon))
         out = (cost / n, violation / n, obj / n)
         self._project_memo[key] = out

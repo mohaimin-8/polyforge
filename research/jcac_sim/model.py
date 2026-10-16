@@ -95,6 +95,38 @@ MEM_POWER_W_PER_GB = 0.4
 TIER_ENERGY_WH_PER_REQ = {"none": 0.0, "small": 0.15, "mid": 0.6, "large": 2.4}
 CARBON_INTENSITY_G_PER_KWH = 400.0
 
+# --- Answer quality (separation follow-up, 2026-10-16) ---------------------
+# J prices cost, lateness and fairness but not what an answer is worth, so
+# the tier knob reduces to "the cheapest tier that meets latency" (a review's
+# first construct objection). Quality is REPORTED for every run and PRICED
+# only by arms/scorers that opt in (controller `quality_weight`, the QUALITY
+# scorer); nothing here changes any existing output.
+#
+# Per-tier quality: the Qwen2.5 Technical Report (arXiv 2412.15115), Tables
+# 8-10, instruction-tuned models the live tiers run (small = 0.5B, mid = 3B,
+# large = 7B), on the 11 benchmarks reported for all three: MMLU-Pro,
+# MMLU-redux, LiveBench 0831, GPQA, MATH, GSM8K, HumanEval, MBPP, MultiPL-E,
+# LiveCodeBench, IFEval. The index is their mean / 100, computed below.
+TIER_BENCHMARKS = {
+    "small": (15.0, 24.1, 12.6, 29.8, 34.4, 49.6, 35.4, 49.6, 28.5, 5.1, 27.9),
+    "mid": (43.7, 64.4, 26.8, 30.3, 65.9, 86.7, 74.4, 72.7, 60.2, 19.9, 58.2),
+    "large": (56.3, 75.4, 35.9, 36.4, 75.5, 91.6, 84.8, 79.2, 70.4, 28.7, 71.2),
+}
+TIER_QUALITY = {"none": 0.0, **{t: sum(v) / len(v) / 100.0 for t, v in TIER_BENCHMARKS.items()}}
+# A semantic-cache hit returns a stored answer to a merely similar prompt.
+# CACHE_PRECISION.md (real LMSYS-Chat-1M): response-agreement precision 0.313
+# at the operating threshold tau = 0.85 against the proxy's stochasticity
+# ceiling 0.338 (its tau = 0.95 near-duplicate row); the record says to cite
+# the relative reading, so a hit keeps that share of the answer's quality.
+CACHE_HIT_RELATIVE_PRECISION = 0.313 / 0.338
+
+
+def quality_shortfall(tier: str) -> float:
+    """Share of the best tier's answer quality a request served on `tier`
+    loses: 0 on `large`, 1 when AI is shed (`none`)."""
+    return 1.0 - TIER_QUALITY[tier] / TIER_QUALITY["large"]
+
+
 _DEFAULT_REPLICA_POWER_W = REPLICA_POWER_W
 _DEFAULT_MEM_POWER_W_PER_GB = MEM_POWER_W_PER_GB
 _DEFAULT_TIER_ENERGY_WH_PER_REQ = dict(TIER_ENERGY_WH_PER_REQ)
@@ -508,6 +540,11 @@ class StepMetrics:
     # `cost_usd`, so nothing that reads cost can be perturbed by them.
     energy_kwh: float = 0.0
     carbon_g: float = 0.0
+    # Answer-quality loss: traffic-weighted share of the best tier's quality
+    # this step's AI answers lose (misses on the serving tier, hits from the
+    # cache at its relative precision), weighted like `violation` by the AI
+    # share of traffic. Reporting-only unless an arm opts in to pricing it.
+    quality_loss: float = 0.0
 
 
 def _mixture_p95_ms(branches: list[tuple[float, float, bool]], tail: float) -> float:
@@ -596,8 +633,14 @@ def evaluate_step(
     # AI latency: cache hits are flat-fast, misses pay the tier price.
     ai_p95 = 0.0
     miss_rps = 0.0
+    quality_lost = 0.0
     if ai_rps > 0.0:
         weighted_ms = 0.0
+        # A miss is answered by the serving tier; a hit by a stored answer,
+        # assumed written by the cheapest real tier when AI is shed.
+        miss_loss = quality_shortfall(state.tier)
+        hit_loss = 1.0 - CACHE_HIT_RELATIVE_PRECISION * (
+            1.0 - quality_shortfall(state.tier if state.tier != "none" else "small"))
         branches: list[tuple[float, float, bool]] = []
         for kind in AI_KINDS:
             rate = demand.rps.get(kind, 0.0)
@@ -610,6 +653,7 @@ def evaluate_step(
                 miss_ms = tier_base_latency_ms(kind, state.tier) * inflate
             weighted_ms += rate * (hit_share * CACHE_HIT_LATENCY_MS + (1.0 - hit_share) * miss_ms)
             miss_rps += rate * (1.0 - hit_share)
+            quality_lost += rate * (hit_share * hit_loss + (1.0 - hit_share) * miss_loss)
             if MIXTURE_P95:
                 branches.append((rate * hit_share, CACHE_HIT_LATENCY_MS, True))
                 branches.append((rate * (1.0 - hit_share), miss_ms, False))
@@ -665,6 +709,7 @@ def evaluate_step(
         cost_tier_usd=cost_tier,
         energy_kwh=energy_kwh,
         carbon_g=energy_kwh * CARBON_INTENSITY_G_PER_KWH,
+        quality_loss=quality_lost / total_rps if total_rps > 0.0 else 0.0,
     )
 
 

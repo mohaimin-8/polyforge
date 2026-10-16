@@ -40,6 +40,8 @@ GUARD_COLUMNS = (
     "plan_fallback_share",
     "plan_repaired_share",
     "capped_cycle_share",
+    # Not a guard: the answer-quality loss (quality follow-up), same rules.
+    "mean_quality_loss",
 )
 
 _SCHEMA = """
