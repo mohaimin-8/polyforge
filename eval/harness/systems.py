@@ -163,6 +163,7 @@ class SystemSpec:
         description: str = "",
         tuned_from: str | None = None,
         tuned_arm: str | None = None,
+        tier_min: str | None = None,
     ):
         self.controller = controller
         self.params = params or {}
@@ -204,12 +205,23 @@ class SystemSpec:
         # (tune_arms.py tunes an ARM as the harness runs it, at every size).
         # None, as for every published arm, reads tuned.yaml alone.
         self.tuned_arm = tuned_arm
+        # V-series separation arm (jcac_tier_floor): raises every tenant's
+        # TenantConfig.tier_min to this value, excluding lower tiers from the
+        # candidate lattice (sim_backend's analogue of a Policy CRD tier
+        # floor). None (default) leaves every existing arm's configs
+        # untouched, so it replays bit-identically (R4).
+        _TIERS = ("none", "small", "mid", "large")  # model.TIERS; checked by a test
+        if tier_min is not None and tier_min not in _TIERS:
+            raise ValueError(f"tier_min must be one of {_TIERS}, not {tier_min!r}")
+        if tier_min is not None and "tier" in knob_freeze:
+            raise ValueError("tier_min would un-pin a knob_freeze tier pin; refuse both")
+        self.tier_min = tier_min
 
 
 # Controllers with no tuning grid by design: JCAC's weights are the published
-# objective, static has no knob, and the learned controller is trained
-# (baselines/train_learned.py), not grid-searched.
-NO_GRID_CONTROLLERS = frozenset({"jcac", "static", "learned"})
+# objective, static and static_share have no knob, and the learned controller
+# is trained (baselines/train_learned.py), not grid-searched.
+NO_GRID_CONTROLLERS = frozenset({"jcac", "static", "static_share", "learned"})
 
 # Arms that ran WITHOUT their base's tuned parameters in committed campaigns.
 # They stay exactly as run so those campaigns replay bit-identically; each has
@@ -260,6 +272,74 @@ SYSTEMS: dict[str, SystemSpec] = {
                     "(headroom-calibrated capacity, learned tier-latency offset, "
                     "half-replica switching penalty): does learning from the "
                     "plant rescue a planner that believes the wrong model form?",
+    ),
+    # --- V-series separation arms (knob coordination vs. objective shape) --
+    # Opt-in ablations of jcac_converged, each changing exactly one property:
+    # how one tenant's knobs are searched (decoupled, knobwise), whether AI
+    # may be shed to tier "none" (tier_floor), and the SLO term planned on
+    # (violation). `jcac` and `jcac_converged` are untouched (R4).
+    "jcac_decoupled": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True,
+                        "knob_search": "decoupled"},
+        description="jcac_converged with NO coordination between one tenant's "
+                    "knobs: each is best-responded on its own 1-D set at the "
+                    "anchored incumbent (an empty set holds that knob), the "
+                    "winners are combined, and an arbiter keeps the best "
+                    "feasible move/hold subset if the combination breaks the "
+                    "budget or a cap (controller._best_for_tenant_decoupled)",
+    ),
+    "jcac_knobwise": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True,
+                        "knob_search": "knobwise"},
+        description="jcac_converged searching one knob at a time, iterated to "
+                    "a fixed point: never scores a two-knob move "
+                    "(controller._best_for_tenant_knobwise)",
+    ),
+    "jcac_tier_floor": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True,
+                        "clamped_fallback": True},
+        tier_min="small",
+        description="jcac_converged that never sheds AI: tier 'none' leaves "
+                    "the lattice (floor 'small') and the infeasible-lattice "
+                    "fallback is the clamped one, which serves on the "
+                    "cheapest admitted tier -- possibly over budget",
+    ),
+    "jcac_violation": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True,
+                        "objective_term": "violation"},
+        description="jcac_converged planning on the capped `violation` term "
+                    "instead of the unbounded log1p(excess) -- the term the "
+                    "published J score reports",
+    ),
+    # --- Separation campaign comparators (2026-10-16) ----------------------
+    # The competent versions of the comparators a baseline audit found
+    # wanting; each tuned per cluster size AS RUN (tune_arms.py --arms).
+    "layered_costaware_tuned": SystemSpec(
+        "layered_costaware", tuned_from="hpa", tuned_arm="layered_costaware_tuned",
+        description="The layered stack with a cost-aware tier layer: the "
+                    "cheapest tier whose projected AI p95 meets target, else "
+                    "the cheapest; replica layer re-tuned per size",
+    ),
+    "layered_small_tuned": SystemSpec(
+        "layered_small", tuned_from="hpa", tuned_arm="layered_small_tuned",
+        description="The layered stack with no tier layer (cheapest tier "
+                    "always); replica layer re-tuned per size",
+    ),
+    "static_share": SystemSpec(
+        "static_share",
+        description="Best-static lower bound: an equal share of the cluster "
+                    "per tenant on the cheapest tier, never adapting",
+    ),
+    "hpa_fair_capped": SystemSpec(
+        "hpa_capped", static_cache_mb=512, tuned_from="hpa", tuned_arm="hpa_fair_capped",
+        description="hpa_fair inside the cluster replica and cache caps the "
+                    "joint controller obeys (baselines.CapEnforced), "
+                    "target_rho re-tuned per size under those caps",
+    ),
+    "keda_fair_capped": SystemSpec(
+        "keda_capped", static_cache_mb=512, tuned_from="keda", tuned_arm="keda_fair_capped",
+        description="keda_fair inside the cluster caps (baselines.CapEnforced), "
+                    "rps_per_replica re-tuned per size under those caps",
     ),
     "jcac_anchored": SystemSpec(
         "jcac", params={"anchor_moves": True},

@@ -33,6 +33,7 @@ import simulate  # noqa: E402
 from controller import ClusterLimits, Weights  # noqa: E402
 from model import CONTROL_INTERVAL_S, WORK_UNITS, Demand  # noqa: E402
 from harness.systems import SYSTEMS, lru_miss_cost_factor, tuned_params  # noqa: E402
+from harness.sim_backend import apply_arm_bounds  # noqa: E402
 
 TRACE = REPO_ROOT / "research" / "traces" / "out" / "burstgpt_real.csv.gz"
 # Written through stats.record_path like every other generator. It used to
@@ -120,7 +121,9 @@ def run_one(args: tuple) -> dict:
     system, widx, buckets = args
     spec = SYSTEMS[system]
     tenant_ids = [f"t{i:02d}" for i in range(TENANTS)]
-    configs = simulate.default_configs(tenant_ids)
+    # An arm's knob pins and tier floor, as on the matrix substrate; a no-op
+    # on every published arm (R4).
+    configs = apply_arm_bounds(spec, simulate.default_configs(tenant_ids))
     params = dict(tuned_params().get(spec.controller, {}))
     params.update(spec.params)
     if spec.seeded:

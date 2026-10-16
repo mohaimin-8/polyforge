@@ -55,6 +55,24 @@ def test_published_solver_is_bit_identical_to_before_the_flag():
     assert h.hexdigest() == GOLDEN
 
 
+# The same digest for the jcac_converged TREATMENT (anchor_moves +
+# converge_sweeps), recorded at 7d21086 before the separation arms (knob_search,
+# guard counters, the shared _fallback) touched controller.py (2026-10-16).
+GOLDEN_CONVERGED = "4d8352a5a4768d3e1c098681cb45cb580bfc21f2a071ee7a4fe00ee97e45db70"
+
+
+def test_converged_treatment_is_bit_identical_to_before_the_separation_arms():
+    h = hashlib.sha256()
+    for wl, mix, size, seed in GOLDEN_CELLS:
+        tids, buckets, configs, limits = workloads.build(wl, mix, size, seed, 40)
+        r = simulate.run("jcac", tids, buckets, configs=configs, limits=limits,
+                         collect_rows=False, jitter_seed=seed,
+                         controller_params={"anchor_moves": True, "converge_sweeps": True})
+        h.update(repr((r.total_cost_usd, r.mean_violation, r.mean_jain,
+                       r.cache_hit_rate)).encode())
+    assert h.hexdigest() == GOLDEN_CONVERGED
+
+
 def _count_improvable(params: dict, monkeypatch) -> tuple[int, int, int]:
     """Run every CHECK_CELL; after each plan() count tenants whose best
     unilateral move scores strictly below their plan. Returns (cycles,

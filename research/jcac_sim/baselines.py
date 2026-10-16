@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import math
 import random
+from dataclasses import replace
 
 import model
 
@@ -784,6 +785,141 @@ class GPTCacheV2Controller(GPTCacheLRUController):
         return latency_ranked_tier(config, state, demand)
 
 
+# --- Separation campaign comparators (2026-10-16) ---------------------------
+# A baseline audit found the layered stack loses to the joint controller
+# through its tier rule, which ranks tiers by latency and never by price,
+# and that reactive comparators ignore the cluster caps the joint controller
+# obeys. These arms are the competent versions a reviewer asks for. They are
+# reachable only through new registry names, so every published arm runs the
+# exact code it was measured with (R4).
+
+def cheapest_meeting_tier(config: TenantConfig, state: TenantState, demand: Demand) -> str:
+    """A cost-aware router's rule: the cheapest admitted tier whose projected
+    AI p95 meets the tenant's target, else the cheapest admitted tier -- it
+    never pays for a tier that does not buy the SLO. Same information as the
+    latency-ranked rule (one `evaluate_step` projection per tier); still
+    layer-local: no other tenant, no fairness term, no budget."""
+    if sum(demand.rps.get(k, 0.0) for k in AI_KINDS) <= 0.0:
+        return state.tier
+    admissible = [t for t in TIER_PRICE_ORDER if config.knob_admits(state.cache_mb, t)]
+    if not admissible:
+        return state.tier
+    target = SLO_BASE_MS["ai"] * SLO_CLASS_FACTOR[config.slo_class]
+    for tier in admissible:
+        probe = TenantState(replicas=state.replicas, cache_mb=state.cache_mb, tier=tier)
+        if evaluate_step(config, probe, demand).ai_p95_ms <= target:
+            return tier
+    return admissible[0]
+
+
+class LayeredCostAwareController(LayeredController):
+    """The layered stack with a cost-aware tier layer (`cheapest_meeting_tier`)
+    in place of the latency-ranked one; replica and cache layers inherited."""
+
+    name = "layered_costaware"
+
+    def _tier_rule(self, config: TenantConfig, state: TenantState, demand: Demand) -> str:
+        return cheapest_meeting_tier(config, state, demand)
+
+
+class LayeredSmallController(LayeredController):
+    """The layered stack with no tier layer: AI is always served on the
+    cheapest admitted tier. Replica and cache layers inherited."""
+
+    name = "layered_small"
+
+    def _tier_rule(self, config: TenantConfig, state: TenantState, demand: Demand) -> str:
+        admissible = [t for t in TIER_PRICE_ORDER if config.knob_admits(state.cache_mb, t)]
+        return admissible[0] if admissible else state.tier
+
+
+class StaticShareController:
+    """The best-static lower bound on the value of control: every tenant gets
+    an equal share of the cluster -- replicas floor(cap / N) within its own
+    bounds, the largest cache level not above cache cap / N -- on the
+    cheapest admitted tier, and never adapts. Needs the cluster limits
+    (`set_limits`), which `simulate.run` passes to any baseline with the hook."""
+
+    name = "static_share"
+
+    def __init__(self, configs: dict[str, TenantConfig]):
+        self.configs = configs
+        self.limits = None
+
+    def set_limits(self, limits) -> None:
+        self.limits = limits
+
+    def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
+        if self.limits is None:
+            raise ValueError("static_share needs the cluster limits (set_limits)")
+        n = max(1, len(states))
+        share_r = self.limits.replicas // n
+        levels = [c for c in CACHE_LEVELS_MB if c <= self.limits.cache_mb // n]
+        out = {}
+        for tid, state in states.items():
+            config = self.configs[tid]
+            fits = [c for c in levels if any(config.knob_admits(c, t) for t in TIER_PRICE_ORDER)]
+            if not fits:
+                # The share is below this tenant's own cache floor: its floor
+                # wins, as replica_min does below (a bound is never broken).
+                fits = [min((c for c in CACHE_LEVELS_MB
+                             if any(config.knob_admits(c, t) for t in TIER_PRICE_ORDER)),
+                            default=levels[0])]
+            cache_mb = max(fits)
+            tiers = [t for t in TIER_PRICE_ORDER if config.knob_admits(cache_mb, t)]
+            replicas = max(config.replica_min, min(config.replica_max, share_r))
+            out[tid] = TenantState(replicas=replicas, cache_mb=cache_mb,
+                                   tier=tiers[0] if tiers else state.tier)
+        return out
+
+
+class CapEnforced:
+    """Wrap a baseline so it obeys the cluster caps the joint controller
+    obeys: after the inner plan, the tenant holding the most replicas gives
+    one back until the replica total fits (ties: lowest tenant id), then the
+    tenant holding the most cache steps down a level until the cache total
+    fits -- the pods and memory the scheduler could not place. Never below a
+    tenant's own floor. Reachable only through `*_capped` registry names."""
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.configs = inner.configs
+        self.name = f"{inner.name}_capped"
+        self.limits = None
+
+    def set_limits(self, limits) -> None:
+        self.limits = limits
+        if hasattr(self.inner, "set_limits"):
+            self.inner.set_limits(limits)
+
+    def observe_feedback(self, realized_violation: dict[str, float]) -> None:
+        observe = getattr(self.inner, "observe_feedback", None)
+        if observe is not None:
+            observe(realized_violation)
+
+    def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
+        if self.limits is None:
+            raise ValueError(f"{self.name} needs the cluster limits (set_limits)")
+        out = dict(self.inner.plan(states, demands))
+        while sum(s.replicas for s in out.values()) > self.limits.replicas:
+            movable = [t for t in sorted(out) if out[t].replicas > self.configs[t].replica_min]
+            if not movable:
+                break
+            tid = max(movable, key=lambda t: out[t].replicas)
+            out[tid] = replace(out[tid], replicas=out[tid].replicas - 1)
+        while sum(s.cache_mb for s in out.values()) > self.limits.cache_mb:
+            movable = [t for t in sorted(out)
+                       if out[t].cache_mb in CACHE_LEVELS_MB
+                       and CACHE_LEVELS_MB.index(out[t].cache_mb) > 0
+                       and self.configs[t].knob_admits(
+                           CACHE_LEVELS_MB[CACHE_LEVELS_MB.index(out[t].cache_mb) - 1], out[t].tier)]
+            if not movable:
+                break
+            tid = max(movable, key=lambda t: out[t].cache_mb)
+            out[tid] = replace(out[tid], cache_mb=CACHE_LEVELS_MB[CACHE_LEVELS_MB.index(out[tid].cache_mb) - 1])
+        return out
+
+
 BASELINES = (
     StaticController,
     HPAController,
@@ -796,6 +932,9 @@ BASELINES = (
     LearnedJointController,
     LayeredV2Controller,
     GPTCacheV2Controller,
+    LayeredCostAwareController,
+    LayeredSmallController,
+    StaticShareController,
 )
 
 
@@ -883,6 +1022,8 @@ def make_baseline(name: str, configs: dict[str, TenantConfig], **params):
     knobs (W34 grid search sweeps them); unknown names fail loudly."""
     if name.endswith("_budget"):
         return BudgetFiltered(make_baseline(name[: -len("_budget")], configs, **params))
+    if name.endswith("_capped"):
+        return CapEnforced(make_baseline(name[: -len("_capped")], configs, **params))
     for cls in BASELINES:
         if cls.name == name:
             return cls(configs, **params)
