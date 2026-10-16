@@ -31,7 +31,7 @@ class WorkloadClass:
 
     name: str
     base_rps: dict  # kind -> requests/second at scale 1.0
-    shape: str  # steady | bursty | wave | sawtooth
+    shape: str  # steady | bursty | wave | sawtooth | ... | mmpp (seeded, built in `build`)
     crud_base_ms: float
 
 
@@ -124,7 +124,51 @@ WORKLOAD_CLASSES = {
         shape="bursty",
         crud_base_ms=50.0,
     ),
+    # --- Held-out classes (PREREG_HELDOUT, 2026-10-16) ----------------------
+    # Never used by any tuning slice or earlier campaign. Demand follows a
+    # two-state Markov-modulated process (`mmpp`, below): bursts arrive at
+    # random, not on a period, so no forecaster can lock onto a cycle -- the
+    # opposite of every class above, whose shapes are deterministic curves.
+    "mmpp_crud": WorkloadClass(
+        name="mmpp_crud",
+        base_rps={"crud_read": 25.0, "crud_write": 7.0, "batch": 1.0},
+        shape="mmpp",
+        crud_base_ms=45.0,
+    ),
+    "mmpp_mixed": WorkloadClass(
+        name="mmpp_mixed",
+        base_rps={"chat": 3.0, "embed": 2.0, "agent": 0.8, "crud_read": 8.0, "crud_write": 2.0},
+        shape="mmpp",
+        crud_base_ms=55.0,
+    ),
 }
+
+# The `mmpp` shape (frozen with PREREG_HELDOUT): per tenant, a two-state
+# Markov chain over control steps -- quiet at 0.4x, burst at 2.5x (the
+# `bursty` class's peak) -- entering a burst w.p. 0.08 per step and leaving
+# w.p. 0.25 (mean burst 4 steps, mean gap 12.5, burst share 0.242, mean level
+# 0.91x), times mean-one lognormal noise (sigma 0.15). Drawn from its own
+# stream keyed by (seed, tenant), so no other class's demand changes.
+MMPP_LOW, MMPP_HIGH = 0.4, 2.5
+MMPP_P_UP, MMPP_P_DOWN = 0.08, 0.25
+MMPP_NOISE_SIGMA = 0.15
+
+
+def mmpp_factors(seed: int, tid: str, n: int) -> list[float]:
+    """The `mmpp` demand multipliers for one tenant over `n` steps, starting
+    from the chain's stationary distribution. Deterministic in (seed, tid)."""
+    rng = random.Random(f"mmpp|{seed}|{tid}")
+    high = rng.random() < MMPP_P_UP / (MMPP_P_UP + MMPP_P_DOWN)
+    out = []
+    for _ in range(n):
+        level = MMPP_HIGH if high else MMPP_LOW
+        noise = math.exp(rng.gauss(-0.5 * MMPP_NOISE_SIGMA ** 2, MMPP_NOISE_SIGMA))
+        out.append(level * noise)
+        if high:
+            high = rng.random() >= MMPP_P_DOWN
+        else:
+            high = rng.random() < MMPP_P_UP
+    return out
 
 
 def workload_has_ai(workload: str) -> bool:
@@ -257,11 +301,16 @@ def build(workload: str, tenant_mix: str, cluster_size: str, seed: int, steps: i
         # which is what makes multi-tenant packing non-trivial.
         phases[tid] = rng.uniform(0.0, 2.0 * math.pi)
 
+    # The stochastic shape is drawn per tenant up front; every periodic shape
+    # keeps its closed form (and every published class its exact demand).
+    mmpp = ({tid: mmpp_factors(seed, tid, steps + 1) for tid in tenant_ids}
+            if cls.shape == "mmpp" else None)
     buckets = []
     for step in range(steps + 1):
         per_tenant = {}
         for tid, slot in zip(tenant_ids, slots):
-            factor = _shape_factor(cls.shape, step, phases[tid]) * slot.scale
+            shape = mmpp[tid][step] if mmpp is not None else _shape_factor(cls.shape, step, phases[tid])
+            factor = shape * slot.scale
             rps = {kind: rate * factor for kind, rate in cls.base_rps.items()}
             per_tenant[tid] = Demand(rps=rps, crud_base_ms=cls.crud_base_ms)
         buckets.append(per_tenant)
