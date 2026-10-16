@@ -162,6 +162,9 @@ CAMPAIGN_RECORDS = [
     # comparisons at other lateness weights and with the cap removed. Imports
     # both frozen scorers, so it rebuilds from the same committed exports.
     ("sensitivity_fair.py", [], "SENSITIVITY_FAIR.md"),
+    # Exploratory (2026-10-16): equivalence bounds, MDEs, per-metric trade and
+    # Pareto fronts for the FAIR_J / RETUNED comparisons, from their exports.
+    ("equivalence_fair.py", [], "EQUIVALENCE_FAIR.md"),
     # Both traces of the budget-parity campaign are in, so the record joins
     # the gate as PREREG_BUDGET_PARITY requires. It was deliberately held out
     # while only Azure had landed: an interim record cannot carry a
