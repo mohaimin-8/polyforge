@@ -74,6 +74,15 @@ version predated the evidence site, the AWS sittings and the caption gate.)
       anonymously: every tag list answers HTTP 200 and
       `helm pull oci://ghcr.io/mohaimin-8/polyforge/charts/polyforge-operator --version 1.0.0`
       succeeds with no login.
+- [x] Tag `v1.0.1` (2026-10-16) → `release.yml` passed its govulncheck gate, then
+      built, SBOM'd and cosign-signed all four images at `:v1.0.1` and pushed
+      both charts at OCI tag `1.0.1` (charts `polyforge` 0.2.1 /
+      `polyforge-operator` 0.3.1, appVersion `v1.0.1`). Verified anonymously: all
+      four `v1.0.1` manifests answer HTTP 200 and `helm pull
+      oci://ghcr.io/mohaimin-8/polyforge/charts/polyforge-operator --version 1.0.1`
+      succeeds with no login. v1.0.1 carries the go1.26.9 toolchain and the
+      planner/operator fixes of 2026-10-16; **install v1.0.1, not v1.0.0** (whose
+      images carry go1.25.14 and known advisories).
 - [ ] Optional: register the chart on artifacthub.io.
 
 ## 6. Live evidence — done
