@@ -32,6 +32,16 @@ METRIC_COLUMNS = (
     "ai_p95_ms",
 )
 
+# Nullable reporting-only guard metrics (simulate.RunResult; separation
+# campaign 2026-10-16). Live runs and every committed DB leave them NULL.
+GUARD_COLUMNS = (
+    "budget_overrun_step_share",
+    "clamp_violation_step_share",
+    "plan_fallback_share",
+    "plan_repaired_share",
+    "capped_cycle_share",
+)
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
     run_id          TEXT PRIMARY KEY,
@@ -104,6 +114,10 @@ def connect(path: str | Path) -> duckdb.DuckDBPyConnection:
     # required column would retroactively invalidate its rows.
     con.execute("ALTER TABLE metrics ADD COLUMN IF NOT EXISTS mean_excess DOUBLE")
     con.execute("ALTER TABLE metrics ADD COLUMN IF NOT EXISTS tier_none_step_share DOUBLE")
+    # Guard metrics (separation campaign, 2026-10-16): nullable, outside
+    # METRIC_COLUMNS, for the same reason as the pair above.
+    for column in GUARD_COLUMNS:
+        con.execute(f"ALTER TABLE metrics ADD COLUMN IF NOT EXISTS {column} DOUBLE")
     return con
 
 
@@ -222,12 +236,14 @@ def record(con: duckdb.DuckDBPyConnection, run: RunSpec, status: str, attempts: 
                 "INSERT INTO metrics "
                 "(run_id, total_cost_usd, mean_violation, violation_step_share, "
                 "mean_jain, cache_hit_rate, crud_p95_ms, ai_p95_ms, "
-                "crud_p99_ms, ai_p99_ms, mean_excess, tier_none_step_share, steps) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "crud_p99_ms, ai_p99_ms, mean_excess, tier_none_step_share, steps, "
+                + ", ".join(GUARD_COLUMNS) + ") "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?" + ",?" * len(GUARD_COLUMNS) + ")",
                 [run.run_id] + [metrics[c] for c in METRIC_COLUMNS]
                 + [metrics.get("crud_p99_ms"), metrics.get("ai_p99_ms"),
                    metrics.get("mean_excess"), metrics.get("tier_none_step_share"),
-                   metrics["steps"]],
+                   metrics["steps"]]
+                + [metrics.get(c) for c in GUARD_COLUMNS],
             )
             rows = outcome.get("timeseries") or []
             if rows:

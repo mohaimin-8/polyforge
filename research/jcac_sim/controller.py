@@ -30,6 +30,7 @@ this is what prevents oscillation between adjacent plans.
 from __future__ import annotations
 
 import contextlib
+import itertools
 import math
 import random
 from dataclasses import dataclass, field, replace
@@ -367,6 +368,8 @@ class JCACController:
     """
 
     MAX_SWEEPS = 50   # convergent solver's safety cap; `last_converged` reports hitting it
+    KNOB_SEARCHES = ("joint", "decoupled", "knobwise")
+    MAX_KNOB_ROUNDS = 20  # knobwise fixed-point cap; strict improvement ends it far sooner
     CAP_LEARN = 0.15  # multiplicative step when projection was optimistic
     CAP_RECOVER = 0.02  # additive drift back toward trusting the model
     CAP_TOLERANCE = 0.02  # |realized - projected| below this is agreement
@@ -401,6 +404,8 @@ class JCACController:
         replica_dwell_steps: int = 0,
         converge_sweeps: bool = False,
         belief_form: str | None = None,
+        knob_search: str = "joint",
+        objective_term: str | None = None,
     ):
         self.configs = configs
         # Audit 2026-09-26 (simulator CRITICAL): `_project` calls the very
@@ -611,6 +616,39 @@ class JCACController:
         self.last_sweeps = 0
         self.last_converged: bool | None = None
         self._last_plan_ctx: tuple | None = None
+        # V-series separation arms: how the three knobs of ONE tenant are
+        # searched, with the same information and the same shared objective.
+        #   "joint"     the full replica x cache x tier product (published;
+        #               `_best_for_tenant`, byte-identical, R4);
+        #   "decoupled" three independent 1-D best responses at the anchored
+        #               incumbent, combined, with a move/hold feasibility
+        #               repair (`_best_for_tenant_decoupled`) -- three
+        #               single-knob controllers and an arbiter;
+        #   "knobwise"  1-D best responses taken one knob at a time and
+        #               iterated to a fixed point (`_best_for_tenant_knobwise`)
+        #               -- the strongest search that never scores a
+        #               two-knob move.
+        # Both alternatives draw from the joint lattice's own clamps, so they
+        # need anchored moves for the same reason converge_sweeps does.
+        if knob_search not in self.KNOB_SEARCHES:
+            raise ValueError(f"knob_search must be one of {self.KNOB_SEARCHES}, not {knob_search!r}")
+        if knob_search != "joint" and not anchor_moves:
+            raise ValueError(f"knob_search={knob_search!r} requires anchor_moves=True")
+        self.knob_search = knob_search
+        # Reporting-only guard counters (never read by a decision): tenant
+        # plans that came from the infeasible-lattice fallback, plans the
+        # decoupled arbiter had to repair, and cycles that hit MAX_SWEEPS.
+        self.guard_counts = {"tenant_plans": 0, "fallback_plans": 0,
+                             "repaired_plans": 0, "cycles": 0, "capped_cycles": 0}
+        self._plan_origin: dict[str, str] = {}
+        # V-series separation arm (jcac_violation): plan against the capped
+        # `violation` term instead of the unbounded `log1p(excess)` the
+        # published objective uses (see `_project`). None (the default) is
+        # the published expression, verbatim (R4); "violation" is the only
+        # other accepted value.
+        if objective_term not in (None, "violation"):
+            raise ValueError(f"objective_term must be None or 'violation', not {objective_term!r}")
+        self.objective_term = objective_term
 
     def snapshot(self) -> dict:
         """Serializable planner state for failover (W31): per-tenant forecast
@@ -823,11 +861,18 @@ class JCACController:
         # both sweeps draw candidates from the interval-start lattice so
         # coordination cannot compound the per-interval actuation clamps.
         origin = dict(states) if self.anchor_moves else None
+        # Separation arms (opt-in): the sweep loop itself is untouched -- only
+        # which per-tenant chooser it calls differs, so every knob search
+        # plugs into the identical cross-tenant machinery (same sweep order,
+        # same anchor_moves and converge_sweeps semantics).
+        chooser = {"joint": self._best_for_tenant,
+                   "decoupled": self._best_for_tenant_decoupled,
+                   "knobwise": self._best_for_tenant_knobwise}[self.knob_search]
         sweeps, changed = 0, True
         while changed if self.converge_sweeps else sweeps < 2:
             changed = False
             for tid in self._sweep_order():
-                new = self._best_for_tenant(tid, chosen, horizons, origin, cost_horizons)
+                new = chooser(tid, chosen, horizons, origin, cost_horizons)
                 changed = changed or new != chosen[tid]
                 chosen[tid] = new
             sweeps += 1
@@ -836,6 +881,12 @@ class JCACController:
         self.last_sweeps = sweeps
         self.last_converged = (not changed) if self.converge_sweeps else None
         self._last_plan_ctx = (dict(chosen), horizons, origin, cost_horizons)
+        g = self.guard_counts
+        g["cycles"] += 1
+        g["capped_cycles"] += self.last_converged is False
+        g["tenant_plans"] += len(chosen)
+        g["fallback_plans"] += sum(self._plan_origin.get(t) == "fallback" for t in chosen)
+        g["repaired_plans"] += sum(self._plan_origin.get(t) == "repaired" for t in chosen)
 
         if self.replica_dwell_steps:
             for tid, state in chosen.items():
@@ -903,7 +954,10 @@ class JCACController:
                                   self._planning_demand(tid, demand), **extra)
                 cost += m.cost_usd
                 violation += m.violation
-                obj += math.log1p(m.excess)
+                # jcac_violation (opt-in): plan on the capped `violation`
+                # instead of the unbounded log1p(excess); None (the default)
+                # is the published expression, verbatim (R4).
+                obj += m.violation if self.objective_term == "violation" else math.log1p(m.excess)
         else:
             believed = self._believed_state(state)
             tier_belief = self.belief_scale.get("tier_cost", 1.0)
@@ -914,7 +968,7 @@ class JCACController:
                                   self._planning_demand(tid, demand), **extra)
                 cost += m.cost_infra_usd + tier_belief * m.cost_tier_usd
                 violation += m.violation
-                obj += math.log1p(m.excess)
+                obj += m.violation if self.objective_term == "violation" else math.log1p(m.excess)
         n = max(1, len(horizon))
         out = (cost / n, violation / n, obj / n)
         self._project_memo[key] = out
@@ -1011,25 +1065,200 @@ class JCACController:
         # published path keeps its enumeration-order tie-break (R4).
         if (self.converge_sweeps and incumbent_score is not None
                 and not best_score < incumbent_score):
+            self._plan_origin[tid] = "search"
             return current
         # An entirely infeasible lattice (tight budget + tight cluster)
         # falls back to shedding cost: floor replicas, no cache, no model.
         if best_score == float("inf"):
-            shed = (self._clamped_shed(tid, base) if self.clamped_fallback
-                    else TenantState(replicas=config.replica_min, cache_mb=0, tier="none"))
-            if not self.degrade_gracefully:
-                return shed
-            # Graceful degradation (PREREG_DEGRADE): prefer serving on the
-            # cheapest affordable tier at the replica floor over a designed
-            # outage. Never violates budget or the cluster replica cap.
-            if others_replicas + config.replica_min <= self.limits.replicas:
-                for tier in ("small", "mid", "large"):
-                    cand = TenantState(replicas=config.replica_min, cache_mb=0, tier=tier)
-                    cost, _, _ = self._project(tid, cand, horizons[tid])
-                    if cost <= budget_per_step:
-                        return cand
-            return shed
+            return self._fallback(tid, base, horizons, budget_per_step, others_replicas)
+        self._plan_origin[tid] = "search"
         return best_state
+
+    def _fallback(self, tid: str, base: TenantState, horizons: dict[str, list[Demand]],
+                  budget_per_step: float, others_replicas: int) -> TenantState:
+        """The published infeasible-lattice response, shared by every knob
+        search: shed (clamped when `clamped_fallback`), or with
+        `degrade_gracefully` the cheapest affordable tier at the replica
+        floor. Extracted verbatim from `_best_for_tenant` (R4)."""
+        config = self.configs[tid]
+        self._plan_origin[tid] = "fallback"
+        shed = (self._clamped_shed(tid, base) if self.clamped_fallback
+                else TenantState(replicas=config.replica_min, cache_mb=0, tier="none"))
+        if not self.degrade_gracefully:
+            return shed
+        # Graceful degradation (PREREG_DEGRADE): prefer serving on the
+        # cheapest affordable tier at the replica floor over a designed
+        # outage. Never violates budget or the cluster replica cap.
+        if others_replicas + config.replica_min <= self.limits.replicas:
+            for tier in ("small", "mid", "large"):
+                cand = TenantState(replicas=config.replica_min, cache_mb=0, tier=tier)
+                cost, _, _ = self._project(tid, cand, horizons[tid])
+                if cost <= budget_per_step:
+                    return cand
+        return shed
+
+    def _admitted_anchor(self, tid: str, base: TenantState) -> TenantState:
+        """The anchored incumbent the 1-D searches hold the other knobs at:
+        `base` itself when its (cache, tier) is admitted, otherwise the
+        nearest admitted pair inside the cache clamp -- fewest cache levels
+        moved, then fewest tier steps, then the cheaper tier. Without it, a
+        base the bounds reject (tier "none" after a shed, under a tier
+        floor) empties every 1-D set and the fallback repeats forever."""
+        config = self.configs[tid]
+        if config.knob_admits(base.cache_mb, base.tier):
+            return base
+        levels = model.CACHE_LEVELS_MB
+        ci = levels.index(base.cache_mb) if base.cache_mb in levels else 0
+        ti = TIERS.index(base.tier) if base.tier in TIERS else 0
+        options = [(abs(levels.index(c) - ci), abs(TIERS.index(t) - ti), TIERS.index(t), c, t)
+                   for c in neighbor_cache_levels(base.cache_mb) for t in TIERS
+                   if config.knob_admits(c, t)]
+        if not options:
+            return base
+        *_, cache_mb, tier = min(options)
+        return replace(base, cache_mb=cache_mb, tier=tier)
+
+    def _knob_candidates(self, tid: str, base: TenantState, held: TenantState,
+                         knob: str) -> list[TenantState]:
+        """One knob's 1-D candidate set: the values the joint lattice around
+        `base` offers for `knob` (replica deltas past the dwell rule, the
+        neighbouring cache levels, every tier), with the other two knobs at
+        `held`'s values and only admitted pairs kept. Every member is also a
+        member of `_lattice(tid, base)`, so no search leaves the per-interval
+        clamps."""
+        config = self.configs[tid]
+        if knob == "replicas":
+            if not config.knob_admits(held.cache_mb, held.tier):
+                return []
+            return [apply_action(config, base, delta, held.cache_mb, held.tier)
+                    for delta in DELTA_REPLICAS
+                    if not (delta and self._dwell_blocks(tid, delta))]
+        if knob == "cache":
+            return [replace(held, cache_mb=cache_mb)
+                    for cache_mb in neighbor_cache_levels(base.cache_mb)
+                    if config.knob_admits(cache_mb, held.tier)]
+        return [replace(held, tier=tier) for tier in TIERS
+                if config.knob_admits(held.cache_mb, tier)]
+
+    def _best_for_tenant_decoupled(
+        self,
+        tid: str,
+        chosen: dict[str, TenantState],
+        horizons: dict[str, list[Demand]],
+        origin: dict[str, TenantState] | None = None,
+        cost_horizons: dict[str, list[Demand]] | None = None,
+    ) -> TenantState:
+        """knob_search="decoupled": three single-knob controllers and an
+        arbiter. Each knob is best-responded on its own 1-D set with the
+        other two held at the anchored incumbent, scored with the identical
+        `_candidate_score`; no candidate that moves two knobs is scored to
+        choose a knob's value. A knob whose 1-D set is entirely infeasible
+        HOLDS -- an independent controller with no feasible move stays put,
+        it does not shed the tenant. The three winners are then combined. If
+        the combination breaks the joint budget or a cluster cap, the
+        arbiter keeps the best feasible of the other move/hold subsets (a
+        feasibility repair that never searches new values); only when every
+        subset, holding everything included, is infeasible does the shared
+        fallback run. `_best_for_tenant` is untouched (R4)."""
+        config = self.configs[tid]
+        current = chosen[tid]
+        base = current if origin is None else origin[tid]
+        anchor = self._admitted_anchor(tid, base)
+        budget_per_step = config.hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
+        others = self._others(tid, chosen, horizons, cost_horizons)
+
+        def score_of(candidate: TenantState) -> float | None:
+            return self._candidate_score(tid, candidate, base, others, horizons,
+                                         cost_horizons, budget_per_step)
+
+        winners = {}
+        for knob in ("replicas", "cache", "tier"):
+            best_state, best_score = anchor, float("inf")
+            for candidate in self._knob_candidates(tid, base, anchor, knob):
+                score = score_of(candidate)
+                if score is not None and score < best_score:
+                    best_score, best_state = score, candidate
+            winners[knob] = best_state  # the anchor itself when nothing is feasible
+
+        def subset(moved: tuple[bool, ...]) -> TenantState:
+            return replace(
+                anchor,
+                replicas=winners["replicas"].replicas if moved[0] else anchor.replicas,
+                cache_mb=winners["cache"].cache_mb if moved[1] else anchor.cache_mb,
+                tier=winners["tier"].tier if moved[2] else anchor.tier,
+            )
+
+        pick = subset((True, True, True))
+        pick_score = score_of(pick)
+        repaired = pick_score is None
+        if repaired:
+            pick = None
+            for moved in itertools.product((True, False), repeat=3):
+                candidate = subset(moved)
+                score = score_of(candidate)
+                if score is not None and (pick_score is None or score < pick_score):
+                    pick, pick_score = candidate, score
+        if pick is None:
+            return self._fallback(tid, base, horizons, budget_per_step, others[5])
+        # Convergent solver only: the same strict-improvement gate as
+        # `_best_for_tenant`, so the cross-tenant sweep still terminates.
+        if self.converge_sweeps:
+            current_score = score_of(current)
+            if current_score is not None and not pick_score < current_score:
+                self._plan_origin[tid] = "search"
+                return current
+        self._plan_origin[tid] = "repaired" if repaired else "search"
+        return pick
+
+    def _best_for_tenant_knobwise(
+        self,
+        tid: str,
+        chosen: dict[str, TenantState],
+        horizons: dict[str, list[Demand]],
+        origin: dict[str, TenantState] | None = None,
+        cost_horizons: dict[str, list[Demand]] | None = None,
+    ) -> TenantState:
+        """knob_search="knobwise": block-coordinate descent over one
+        tenant's three knobs. From the anchored incumbent, each knob in turn
+        moves to its best value on its 1-D set with the other two at their
+        CURRENT values, and rounds repeat until one changes nothing. A move
+        is accepted only if it strictly improves the score (or makes an
+        infeasible state feasible), so the search ends on the finite
+        lattice. It is the strongest search that never scores a two-knob
+        move: it can follow a shared valley one knob at a time but cannot
+        cross a ridge that needs two knobs to move together. The end state
+        is a member of the joint lattice; if it is infeasible the shared
+        fallback runs."""
+        config = self.configs[tid]
+        current = chosen[tid]
+        base = current if origin is None else origin[tid]
+        budget_per_step = config.hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
+        others = self._others(tid, chosen, horizons, cost_horizons)
+
+        def score_of(candidate: TenantState) -> float | None:
+            return self._candidate_score(tid, candidate, base, others, horizons,
+                                         cost_horizons, budget_per_step)
+
+        state = self._admitted_anchor(tid, base)
+        state_score = score_of(state)
+        for _ in range(self.MAX_KNOB_ROUNDS):
+            changed = False
+            for knob in ("replicas", "cache", "tier"):
+                for candidate in self._knob_candidates(tid, base, state, knob):
+                    score = score_of(candidate)
+                    if score is not None and (state_score is None or score < state_score):
+                        state, state_score, changed = candidate, score, True
+            if not changed:
+                break
+        if state_score is None:
+            return self._fallback(tid, base, horizons, budget_per_step, others[5])
+        if self.converge_sweeps:
+            current_score = score_of(current)
+            if current_score is not None and not state_score < current_score:
+                self._plan_origin[tid] = "search"
+                return current
+        self._plan_origin[tid] = "search"
+        return state
 
     def _clamped_shed(self, tid: str, base: TenantState) -> TenantState:
         """The shed move inside the lattice's own guardrails: the largest

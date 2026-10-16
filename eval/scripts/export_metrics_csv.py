@@ -48,6 +48,14 @@ def main() -> None:
     # letting newer campaigns carry the metrics their records need (R4).
     have = {r[0] for r in con.execute("DESCRIBE metrics").fetchall()}
     extra = [c for c in ("mean_excess", "tier_none_step_share") if c in have]
+    # The guard metrics (separation campaign, 2026-10-16) likewise, but only
+    # when a column actually holds data: any older DB re-opened by the
+    # current harness gains them as empty columns, and its export must not
+    # change.
+    for c in ("budget_overrun_step_share", "clamp_violation_step_share",
+              "plan_fallback_share", "plan_repaired_share", "capped_cycle_share"):
+        if c in have and con.execute(f"SELECT count({c}) FROM metrics").fetchone()[0]:
+            extra.append(c)
     extra_sql = "".join(f", m.{c}" for c in extra)
 
     rows = con.execute(

@@ -47,6 +47,35 @@ def _freeze_knobs(configs: dict, knobs: frozenset[str]) -> dict:
     return out
 
 
+def _apply_tier_floor(configs: dict, floor: str) -> dict:
+    """Raise every tenant's `tier_min` to `floor`, excluding every tier below
+    it from the candidate lattice (the sim analogue of a Policy CRD tier
+    floor) -- the opt-in `jcac_tier_floor` arm's "never shed to none"
+    constraint. The published infeasible-lattice fallback constructs
+    `TenantState(tier="none")` directly, outside `knob_admits`, so a floor
+    alone does not stop shedding: `jcac_tier_floor` pairs it with
+    `clamped_fallback`, whose shed serves on the cheapest admitted tier.
+    Called only for arms that declare `tier_min`, so every other arm's
+    configs are untouched and its records replay bit-identically."""
+    from dataclasses import replace
+
+    return {tid: replace(cfg, tier_min=floor) for tid, cfg in configs.items()}
+
+
+def apply_arm_bounds(spec, configs: dict) -> dict:
+    """An arm's per-tenant knob bounds -- its `knob_freeze` pins, then its
+    `tier_min` floor -- applied to `configs`. Every substrate that runs an
+    arm calls this, so an arm means the same thing on the matrix, on the
+    real-trace replays and in the live-vs-sim comparison. Both attributes
+    are empty on every published arm, so this returns `configs` unchanged
+    there (R4); SystemSpec refuses a tier floor over a tier pin."""
+    if spec.knob_freeze:
+        configs = _freeze_knobs(configs, spec.knob_freeze)
+    if spec.tier_min:
+        configs = _apply_tier_floor(configs, spec.tier_min)
+    return configs
+
+
 def _apply_economy(economy: tuple) -> None:
     """Set the model economy for this run. Called unconditionally so a
     pooled worker process is stateless: an empty override restores the
@@ -101,8 +130,7 @@ def execute(run: RunSpec) -> dict:
     tenant_ids, buckets, configs, limits = workloads.build(
         run.workload, run.tenant_mix, run.cluster_size, run.seed, run.steps
     )
-    if spec.knob_freeze:
-        configs = _freeze_knobs(configs, spec.knob_freeze)
+    configs = apply_arm_bounds(spec, configs)
 
     params = base_params(spec, run.cluster_size)
     # Chaos settings are engine-level, not controller knobs: the controller
@@ -167,6 +195,12 @@ def execute(run: RunSpec) -> dict:
             # 30 s outage). Nullable in the DB, so old records are unaffected.
             "mean_excess": result.mean_excess,
             "tier_none_step_share": result.tier_none_step_share,
+            # Guard metrics (separation campaign): reporting-only, nullable.
+            "budget_overrun_step_share": result.budget_overrun_step_share,
+            "clamp_violation_step_share": result.clamp_violation_step_share,
+            "plan_fallback_share": result.plan_fallback_share,
+            "plan_repaired_share": result.plan_repaired_share,
+            "capped_cycle_share": result.capped_cycle_share,
             "steps": result.steps,
         },
         "timeseries": result.rows,

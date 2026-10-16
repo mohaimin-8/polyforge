@@ -8,6 +8,13 @@ hpa_fair:
     target_rho: 0.05
   small:
     target_rho: 0.05
+hpa_fair_capped:
+  large:
+    target_rho: 0.075
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.1
 jcac_nojoint_v2_tuned:
   large:
     target_rho: 0.05
@@ -22,3 +29,24 @@ keda_fair:
     rps_per_replica: 0.15
   small:
     rps_per_replica: 0.15
+keda_fair_capped:
+  large:
+    rps_per_replica: 0.15
+  medium:
+    rps_per_replica: 0.25
+  small:
+    rps_per_replica: 0.5
+layered_costaware_tuned:
+  large:
+    target_rho: 0.8
+  medium:
+    target_rho: 0.8
+  small:
+    target_rho: 0.8
+layered_small_tuned:
+  large:
+    target_rho: 0.1
+  medium:
+    target_rho: 0.075
+  small:
+    target_rho: 0.05

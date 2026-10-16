@@ -45,6 +45,7 @@ from controller import ClusterLimits, Weights  # noqa: E402
 from harness import trace_demand as td  # noqa: E402
 from harness import workloads as W  # noqa: E402
 from harness.systems import SYSTEMS, lru_miss_cost_factor, tuned_params  # noqa: E402
+from harness.sim_backend import apply_arm_bounds  # noqa: E402
 from stats import record_path  # noqa: E402
 
 LIVE_DB = REPO_ROOT / "eval" / "results" / "trace_live.duckdb"
@@ -108,7 +109,7 @@ def sim_row(system: str, buckets, size_name: str) -> dict:
                            replicas=size.limits_replicas)
     spec = SYSTEMS[system]
     tenant_ids = [f"t{i:02d}" for i in range(tm.TENANTS)]
-    configs = simulate.default_configs(tenant_ids)
+    configs = apply_arm_bounds(spec, simulate.default_configs(tenant_ids))
     params = dict(tuned_params().get(spec.controller, {}))
     params.update(spec.params)
     if spec.seeded:

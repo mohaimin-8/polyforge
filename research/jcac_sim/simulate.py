@@ -153,6 +153,18 @@ class RunResult:
     # Reporting-only, enters no objective, and absent from `summary()` so every
     # record generated through that path replays bit-identically (R4).
     total_tier_cost_usd: float = 0.0
+    # Guard metrics (separation campaign, 2026-10-16). Reporting-only, enter
+    # no objective, absent from `summary()` (R4): tenant-steps whose billed
+    # cost exceeds the tenant's per-step budget; nominal moves outside the
+    # +/-2 replica and one-cache-level clamps; and, for a controller exposing
+    # `guard_counts`, the share of tenant plans that came from the
+    # infeasible-lattice fallback or the decoupled arbiter's repair, and the
+    # share of cycles that hit the sweep cap. None = the controller has none.
+    budget_overrun_step_share: float = 0.0
+    clamp_violation_step_share: float = 0.0
+    plan_fallback_share: float | None = None
+    plan_repaired_share: float | None = None
+    capped_cycle_share: float | None = None
     steps: int = 0
     rows: list = field(default_factory=list)
 
@@ -170,6 +182,18 @@ class RunResult:
             "mean_excess": round(self.mean_excess, 4),
             "tier_none_step_share": round(self.tier_none_step_share, 4),
         }
+
+
+def clamp_broken(prev: TenantState, nominal: TenantState) -> bool:
+    """A nominal move outside the per-interval clamps every JCAC lattice
+    obeys: more than 2 replicas, or more than one cache level. Reactive
+    baselines are not bound by them, so for those this is descriptive."""
+    if abs(nominal.replicas - prev.replicas) > 2:
+        return True
+    levels = model.CACHE_LEVELS_MB
+    if prev.cache_mb in levels and nominal.cache_mb in levels:
+        return abs(levels.index(nominal.cache_mb) - levels.index(prev.cache_mb)) > 1
+    return prev.cache_mb != nominal.cache_mb
 
 
 def _percentile(values: list[float], q: float) -> float:
@@ -326,6 +350,7 @@ def run(
     result = RunResult(controller=controller_name)
     viol_sum = jain_sum = excess_sum = 0.0
     viol_steps = tenant_steps = tier_none_steps = 0
+    overrun_steps = clamp_steps = 0
     crud_p95s: list[float] = []
     ai_p95s: list[float] = []
     ai_hit_rps = ai_total_rps = 0.0
@@ -392,6 +417,9 @@ def run(
             else:
                 cost += m.cost_infra_usd
             result.total_cost_usd += cost
+            budget_step = configs[tid].hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
+            overrun_steps += 1 if cost > budget_step else 0
+            clamp_steps += 1 if clamp_broken(prev_states[tid], nominal) else 0
             viol_sum += m.violation
             viol_steps += 1 if m.violation > 0.0 else 0
             excess_sum += m.excess
@@ -439,6 +467,13 @@ def run(
         result.violation_step_share = viol_steps / tenant_steps
         result.mean_excess = excess_sum / tenant_steps
         result.tier_none_step_share = tier_none_steps / tenant_steps
+        result.budget_overrun_step_share = overrun_steps / tenant_steps
+        result.clamp_violation_step_share = clamp_steps / tenant_steps
+    guards = getattr(ctl, "guard_counts", None)
+    if guards and guards["tenant_plans"]:
+        result.plan_fallback_share = guards["fallback_plans"] / guards["tenant_plans"]
+        result.plan_repaired_share = guards["repaired_plans"] / guards["tenant_plans"]
+        result.capped_cycle_share = guards["capped_cycles"] / max(1, guards["cycles"])
     if result.steps:
         result.mean_jain = jain_sum / result.steps
     if ai_total_rps > 0.0:
