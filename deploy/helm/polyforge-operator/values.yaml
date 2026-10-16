@@ -77,6 +77,14 @@ planner:
   # (B1' follow-up: damping for the corrected arm's replica oscillation).
   # 0 = off = every registered arm.
   replicaDwellSteps: 0
+  # Solver mode (audit 2026-09-26). anchorMoves draws every sweep's candidates
+  # from the interval-start lattice, so no tenant moves more than +/-2
+  # replicas per interval (the published solver can move +/-4 through its
+  # second sweep). convergeSweeps sweeps to a fixed point (the simulator's
+  # `jcac_converged` treatment) and implies anchorMoves. Both off = the
+  # published jcac solver every live campaign ran.
+  anchorMoves: false
+  convergeSweeps: false
   # Shared bearer token guarding /v1/plan and /v1/state. On by default: those
   # routes steer every tenant's capacity and export/overwrite per-tenant demand
   # history, and the NetworkPolicy below is inert on CNIs that do not enforce

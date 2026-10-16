@@ -31,8 +31,27 @@ var jainGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 	Help: "Jain's fairness index over per-tenant projected SLO satisfaction, per plan cycle.",
 })
 
+// fallbackCycles counts plan cycles that held the last good plan, by cause:
+// "rejected" (the planner answered 4xx -- deterministic, it recurs every
+// cycle until the request or the planner changes) or "unavailable"
+// (unreachable, timeout, 5xx, malformed plan). A rejected count that keeps
+// climbing is a planner bug, not an outage; the log line alone could not say
+// which (review 2026-10-16).
+var fallbackCycles = prometheus.NewCounterVec(prometheus.CounterOpts{
+	Name: "polyforge_operator_plan_fallback_cycles_total",
+	Help: "Plan cycles that held the last good plan, by cause (rejected|unavailable).",
+}, []string{"cause"})
+
 func init() {
-	metrics.Registry.MustRegister(jainGauge)
+	metrics.Registry.MustRegister(jainGauge, fallbackCycles)
+}
+
+// fallbackCause labels a planner error for fallbackCycles.
+func fallbackCause(err error) string {
+	if planner.IsRejected(err) {
+		return "rejected"
+	}
+	return "unavailable"
 }
 
 const (
@@ -379,8 +398,15 @@ func nonZeroInt32Ptr(v int32) *int32 {
 // fallback marks every planned tenant as running on its last good plan.
 // Specs are deliberately untouched: the previous plan stays applied.
 func (p *PlanRunner) fallback(ctx context.Context, inputs []planner.TenantInput, policies map[string]*pfv1alpha1.Policy, cause error) {
+	label := fallbackCause(cause)
+	fallbackCycles.WithLabelValues(label).Inc()
 	if p.Log != nil {
-		p.Log.Warn("planner unavailable, holding last good plan", "error", cause)
+		if label == "rejected" {
+			p.Log.Error("planner rejected the plan request, holding last good plan; "+
+				"this recurs every cycle until the request or the planner changes", "error", cause)
+		} else {
+			p.Log.Warn("planner unavailable, holding last good plan", "error", cause)
+		}
 	}
 	for _, input := range inputs {
 		policy := policies[input.TenantID]

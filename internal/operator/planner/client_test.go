@@ -155,6 +155,27 @@ func TestHTTPClientSurfacesServerErrors(t *testing.T) {
 	}
 }
 
+// A 4xx is a deterministic rejection the operator must tell apart from an
+// outage (review 2026-10-16); a 5xx stays an ordinary, possibly transient error.
+func TestHTTPClientTypesRejectionsApartFromServerErrors(t *testing.T) {
+	for _, tc := range []struct {
+		status   int
+		rejected bool
+	}{{http.StatusBadRequest, true}, {http.StatusUnauthorized, true}, {http.StatusInternalServerError, false}} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, `{"error":"KeyError: 'z'"}`, tc.status)
+		}))
+		_, err := NewHTTPClient(server.URL, time.Second).Plan(context.Background(), planRequest())
+		server.Close()
+		if err == nil {
+			t.Fatalf("%d accepted as a plan", tc.status)
+		}
+		if got := IsRejected(err); got != tc.rejected {
+			t.Errorf("status %d: IsRejected = %v, want %v (%v)", tc.status, got, tc.rejected, err)
+		}
+	}
+}
+
 func TestHTTPClientTimesOut(t *testing.T) {
 	block := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

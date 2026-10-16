@@ -644,3 +644,95 @@ class SolverModePlumbingTests(unittest.TestCase):
     def test_convergence_without_anchoring_fails_at_boot(self):
         with self.assertRaises(ValueError):
             PlannerCore(converge_sweeps=True)
+
+
+class TenantStateContinuityTests(unittest.TestCase):
+    """Review 2026-10-16. The operator's planning cells call ONE planner
+    service once per cell, and a tenant can arrive mid-run under headroom
+    calibration. Absent tenants are parked, not dropped, and an arrival gets
+    every per-tenant field."""
+
+    AI = {"rps": {"crud_read": 5.0, "chat": 4.0}, "crud_base_ms": 50.0,
+          "realized_p95_ms": {"crud_read": 1.0, "chat": 1300.0}}
+
+    def test_arrival_under_headroom_calibration_plans_instead_of_crashing(self):
+        core = PlannerCore(headroom_calibration=True)
+        for _ in range(3):
+            core.plan({"tenants": [tenant("a", demand=self.AI)]})
+        out = core.plan({"tenants": [tenant("a", demand=self.AI), tenant("z", demand=self.AI)]})
+        self.assertIn("z", out["plans"])
+        self.assertIn("z", core._controller.ai_latency_offset_ms)
+        core.plan({"tenants": [tenant("a", demand=self.AI), tenant("z", demand=self.AI)]})
+
+    def test_cells_on_one_core_keep_the_history_of_a_monolithic_core(self):
+        names = ["a", "b", "c", "d"]
+        mono = PlannerCore()
+        for _ in range(5):
+            mono.plan({"tenants": [tenant(n) for n in names]})
+        shared = PlannerCore()
+        cells = [["a", "b", "c"], ["d"]]  # uneven: limits differ per call
+        for _ in range(5):
+            for cell in cells:
+                shared.plan({"tenants": [tenant(n) for n in cell],
+                             "limits": {"replicas": 3 * len(cell), "cache_mb": 256 * len(cell)}})
+        for n in names:
+            held = (shared._controller.forecasts.get(n) or shared._parked[n]["forecast"])
+            self.assertEqual(len(held.history), len(mono._controller.forecasts[n].history), n)
+
+    def test_retune_keeps_the_learned_ai_offset(self):
+        core = PlannerCore(headroom_calibration=True)
+        for _ in range(4):
+            core.plan({"tenants": [tenant("a", demand=self.AI)]})
+        learned = core._controller.ai_latency_offset_ms["a"]
+        self.assertNotEqual(learned, 0.0)
+        core.plan({"tenants": [tenant("a", demand={"rps": self.AI["rps"], "crud_base_ms": 50.0})],
+                   "weights": {"alpha": 1, "beta": 2, "gamma": 1.5}})
+        self.assertEqual(core._controller.ai_latency_offset_ms["a"], learned)
+
+    def test_returning_tenant_gets_its_parked_history_back(self):
+        core = PlannerCore()
+        for _ in range(3):
+            core.plan({"tenants": [tenant("a"), tenant("b")]})
+        forecast_b = core._controller.forecasts["b"]
+        core.plan({"tenants": [tenant("a")]})
+        self.assertNotIn("b", core._controller.forecasts)
+        core.plan({"tenants": [tenant("a"), tenant("b")]})
+        self.assertIs(core._controller.forecasts["b"], forecast_b)
+
+    def test_unknown_tier_bound_is_rejected_not_ignored(self):
+        with self.assertRaises(ValueError):
+            PlannerCore().plan({"tenants": [tenant("a", tier_min="Small")]})
+
+
+class ParkedStateFailoverTests(unittest.TestCase):
+    """Review 2026-10-16: tenants parked by planning cells must be in the
+    failover snapshot, and a restore on a fresh process must hand every
+    per-tenant field back when the tenant reappears."""
+
+    AI = {"rps": {"crud_read": 5.0, "chat": 4.0}, "crud_base_ms": 50.0,
+          "realized_p95_ms": {"crud_read": 1.0, "chat": 1300.0}}
+
+    def test_parked_tenants_are_in_the_snapshot(self):
+        core = PlannerCore()
+        for _ in range(3):
+            core.plan({"tenants": [tenant("a"), tenant("b")]})
+        core.plan({"tenants": [tenant("a")]})
+        snap = core.snapshot()
+        self.assertIn("b", snap["forecasts"])
+        self.assertIn("b", snap["capacity_scale"])
+
+    def test_restart_restores_a_parked_tenant_with_its_offset(self):
+        core = PlannerCore(headroom_calibration=True)
+        for _ in range(4):
+            core.plan({"tenants": [tenant("a", demand=self.AI), tenant("b", demand=self.AI)]})
+        offset_b = core._controller.ai_latency_offset_ms["b"]
+        history_b = len(core._controller.forecasts["b"].history)
+        core.plan({"tenants": [tenant("a", demand=self.AI)]})   # b parked
+        snap = json.loads(json.dumps(core.snapshot()))
+        fresh = PlannerCore(headroom_calibration=True)
+        fresh.restore(snap)
+        fresh.plan({"tenants": [tenant("a", demand=self.AI)]})  # b still absent: stays pending
+        fresh.plan({"tenants": [tenant("a", demand=self.AI), tenant("b", demand=self.AI)]})
+        self.assertNotEqual(offset_b, 0.0)
+        self.assertGreaterEqual(len(fresh._controller.forecasts["b"].history), history_b)
+        self.assertNotEqual(fresh._controller.ai_latency_offset_ms["b"], 0.0)
