@@ -165,6 +165,9 @@ class RunResult:
     plan_fallback_share: float | None = None
     plan_repaired_share: float | None = None
     capped_cycle_share: float | None = None
+    # Answer-quality loss per tenant-step (model.StepMetrics.quality_loss),
+    # reporting-only and absent from `summary()` (R4).
+    mean_quality_loss: float = 0.0
     steps: int = 0
     rows: list = field(default_factory=list)
 
@@ -351,6 +354,7 @@ def run(
     viol_sum = jain_sum = excess_sum = 0.0
     viol_steps = tenant_steps = tier_none_steps = 0
     overrun_steps = clamp_steps = 0
+    quality_sum = 0.0
     crud_p95s: list[float] = []
     ai_p95s: list[float] = []
     ai_hit_rps = ai_total_rps = 0.0
@@ -421,6 +425,7 @@ def run(
             overrun_steps += 1 if cost > budget_step else 0
             clamp_steps += 1 if clamp_broken(prev_states[tid], nominal) else 0
             viol_sum += m.violation
+            quality_sum += m.quality_loss
             viol_steps += 1 if m.violation > 0.0 else 0
             excess_sum += m.excess
             tier_none_steps += 1 if serving.tier == "none" else 0
@@ -469,6 +474,7 @@ def run(
         result.tier_none_step_share = tier_none_steps / tenant_steps
         result.budget_overrun_step_share = overrun_steps / tenant_steps
         result.clamp_violation_step_share = clamp_steps / tenant_steps
+        result.mean_quality_loss = quality_sum / tenant_steps
     guards = getattr(ctl, "guard_counts", None)
     if guards and guards["tenant_plans"]:
         result.plan_fallback_share = guards["fallback_plans"] / guards["tenant_plans"]

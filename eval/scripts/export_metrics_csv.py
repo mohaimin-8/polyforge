@@ -53,7 +53,8 @@ def main() -> None:
     # current harness gains them as empty columns, and its export must not
     # change.
     for c in ("budget_overrun_step_share", "clamp_violation_step_share",
-              "plan_fallback_share", "plan_repaired_share", "capped_cycle_share"):
+              "plan_fallback_share", "plan_repaired_share", "capped_cycle_share",
+              "mean_quality_loss"):
         if c in have and con.execute(f"SELECT count({c}) FROM metrics").fetchone()[0]:
             extra.append(c)
     extra_sql = "".join(f", m.{c}" for c in extra)

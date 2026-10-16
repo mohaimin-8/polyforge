@@ -341,6 +341,54 @@ SYSTEMS: dict[str, SystemSpec] = {
         description="keda_fair inside the cluster caps (baselines.CapEnforced), "
                     "rps_per_replica re-tuned per size under those caps",
     ),
+    # --- Quality follow-up (PREREG_QUALITY, 2026-10-16) ---------------------
+    # J priced with the answer-quality loss at 2.0 (model.TIER_QUALITY), under
+    # the measured GPU price ladder the experiment sets, at EQUAL constraints:
+    # no arm carries a per-tenant budget filter (no comparator has one) and
+    # every arm stays inside the cluster caps. Comparators tuned under those
+    # conditions (tune_arms.py --quality).
+    "jcac_quality": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True, "quality_weight": 2.0,
+                        "enforce_budget": False},
+        description="jcac_converged planning on the quality-priced objective, with "
+                    "no per-tenant budget filter (the comparators have none)",
+    ),
+    "jcac_quality_decoupled": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True, "quality_weight": 2.0,
+                        "enforce_budget": False, "knob_search": "decoupled"},
+        description="jcac_quality with the knobs searched independently and combined",
+    ),
+    "jcac_quality_knobwise": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True, "quality_weight": 2.0,
+                        "enforce_budget": False, "knob_search": "knobwise"},
+        description="jcac_quality searching one knob at a time to a fixed point",
+    ),
+    "jcac_quality_budget": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True, "quality_weight": 2.0},
+        description="jcac_quality WITH the published per-tenant budget filter",
+    ),
+    "layered_quality_capped": SystemSpec(
+        "layered_quality_capped", params={"quality_weight": 2.0}, tuned_from="hpa",
+        tuned_arm="layered_quality_capped",
+        description="layered_quality_tuned inside the cluster caps "
+                    "(baselines.CapEnforced), replica layer tuned under them",
+    ),
+    "layered_quality_tuned": SystemSpec(
+        "layered_quality", params={"quality_weight": 2.0}, tuned_from="hpa",
+        tuned_arm="layered_quality_tuned",
+        description="The layered stack whose tier layer is a quality-priced local "
+                    "router (J's own weights, layer-local); replica layer tuned",
+    ),
+    "hpa_quality_capped": SystemSpec(
+        "hpa_capped", static_cache_mb=512, tuned_from="hpa", tuned_arm="hpa_quality_capped",
+        description="hpa_fair inside the cluster caps on a fixed AI tier; tier and "
+                    "target_rho tuned jointly under the quality-priced J",
+    ),
+    "static_share_quality": SystemSpec(
+        "static_share", tuned_arm="static_share_quality",
+        description="Equal cluster share on a fixed tier, tier tuned under the "
+                    "quality-priced J",
+    ),
     "jcac_anchored": SystemSpec(
         "jcac", params={"anchor_moves": True},
         description="PolyForge with per-interval move clamps enforced across "

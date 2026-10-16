@@ -70,9 +70,13 @@ class HPAController:
 
     name = "hpa"
 
-    def __init__(self, configs: dict[str, TenantConfig], target_rho: float = 0.6):
+    def __init__(self, configs: dict[str, TenantConfig], target_rho: float = 0.6,
+                 tier: str | None = None):
         self.configs = configs
         self.target_rho = target_rho
+        # Quality follow-up: serve AI on this fixed tier (a tuned parameter of
+        # the quality comparators). None = carry the state's tier, as published.
+        self.tier = tier
 
     def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
         out = {}
@@ -82,7 +86,8 @@ class HPAController:
             rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * model.REPLICA_CAPACITY_WU)
             desired = math.ceil(state.replicas * rho / self.target_rho) if rho > 0 else config.replica_min
             delta = max(-2, min(2, desired - state.replicas))
-            out[tid] = apply_action(config, state, delta, state.cache_mb, state.tier)
+            tier = state.tier if self.tier is None else self.tier
+            out[tid] = apply_action(config, state, delta, state.cache_mb, tier)
         return out
 
 
@@ -842,9 +847,11 @@ class StaticShareController:
 
     name = "static_share"
 
-    def __init__(self, configs: dict[str, TenantConfig]):
+    def __init__(self, configs: dict[str, TenantConfig], tier: str | None = None):
         self.configs = configs
         self.limits = None
+        # Quality follow-up: a fixed tier (tuned); None = the cheapest admitted.
+        self.tier = tier
 
     def set_limits(self, limits) -> None:
         self.limits = limits
@@ -868,9 +875,48 @@ class StaticShareController:
             cache_mb = max(fits)
             tiers = [t for t in TIER_PRICE_ORDER if config.knob_admits(cache_mb, t)]
             replicas = max(config.replica_min, min(config.replica_max, share_r))
-            out[tid] = TenantState(replicas=replicas, cache_mb=cache_mb,
-                                   tier=tiers[0] if tiers else state.tier)
+            if self.tier is not None and self.tier in tiers:
+                tier = self.tier
+            else:
+                tier = tiers[0] if tiers else state.tier
+            out[tid] = TenantState(replicas=replicas, cache_mb=cache_mb, tier=tier)
         return out
+
+
+def quality_aware_tier(config: TenantConfig, state: TenantState, demand: Demand,
+                       quality_weight: float, beta: float = 2.0,
+                       cost_scale_usd: float = 0.01) -> str:
+    """A router that optimises the quality-priced objective LOCALLY: the
+    admitted tier minimising one step's cost / cost_scale + beta * violation
+    + quality_weight * quality loss, with the replicas and cache held where
+    they are -- J's own weights, layer-local (it sees no other tenant, no
+    forecast and no other knob's move). Ties keep the cheaper tier."""
+    if sum(demand.rps.get(k, 0.0) for k in AI_KINDS) <= 0.0:
+        return state.tier
+    admissible = [t for t in TIER_PRICE_ORDER if config.knob_admits(state.cache_mb, t)]
+    if not admissible:
+        return state.tier
+
+    def local(tier: str) -> float:
+        m = evaluate_step(config, replace(state, tier=tier), demand)
+        return m.cost_usd / cost_scale_usd + beta * m.violation + quality_weight * m.quality_loss
+
+    return min(admissible, key=local)
+
+
+class LayeredQualityController(LayeredController):
+    """The layered stack whose tier layer is a quality-priced local router
+    (`quality_aware_tier`); replica and cache layers inherited."""
+
+    name = "layered_quality"
+
+    def __init__(self, configs: dict[str, TenantConfig], target_rho: float = 0.6,
+                 quality_weight: float = 2.0):
+        super().__init__(configs, target_rho=target_rho)
+        self.quality_weight = quality_weight
+
+    def _tier_rule(self, config: TenantConfig, state: TenantState, demand: Demand) -> str:
+        return quality_aware_tier(config, state, demand, self.quality_weight)
 
 
 class CapEnforced:
@@ -935,6 +981,7 @@ BASELINES = (
     LayeredCostAwareController,
     LayeredSmallController,
     StaticShareController,
+    LayeredQualityController,
 )
 
 

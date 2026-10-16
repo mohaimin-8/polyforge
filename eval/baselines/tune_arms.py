@@ -59,13 +59,42 @@ ARMS: dict[str, tuple[str, list]] = {
 }
 SIZES = ("small", "medium", "large")
 
+# Quality follow-up (PREREG_QUALITY). Its comparators are tuned under the
+# campaign's own conditions: the measured GPU price ladder (PREREG_TIER_RATIO_V2,
+# matrix_gpu_econ_v2: 1 : 1.475 : 1.518) and J priced with the answer-quality
+# loss at QUALITY_WEIGHT. Each grid is a list of parameter sets; only
+# target_rho is checked against its grid edges (the tier is categorical).
+GPU_ECONOMY = {"small": 1.0e-4, "mid": 1.475e-4, "large": 1.518e-4}
+QUALITY_WEIGHT = 2.0
+TIER_GRID = ("small", "mid", "large")
+QUALITY_ARMS: dict[str, list[dict]] = {
+    "hpa_quality_capped": [{"target_rho": r, "tier": t} for t in TIER_GRID for r in RHO_WIDE],
+    "layered_quality_tuned": [{"target_rho": r} for r in RHO_WIDE],
+    "layered_quality_capped": [{"target_rho": r} for r in RHO_WIDE],
+    "static_share_quality": [{"tier": t} for t in TIER_GRID],
+}
+
 
 def score_controller(controller: str, params: dict, cluster: str, *,
-                     miss_cost_factor: float = 1.0, initial_cache_mb: int | None = None) -> dict:
-    """One setting on the tuning slice: J and its three terms."""
+                     miss_cost_factor: float = 1.0, initial_cache_mb: int | None = None,
+                     quality_weight: float = 0.0, economy: dict | None = None) -> dict:
+    """One setting on the tuning slice: J and its three terms. With
+    `quality_weight`, J also prices the answer-quality loss (a fourth term,
+    reported only then); `economy` sets the tier prices for these runs and is
+    reset afterwards, so a pooled worker stays stateless."""
     if _JITTER_SALT != 0x5F3759DF:
         raise SystemExit("sim_backend's jitter salt no longer matches tune.py's")
-    terms = {"cost_norm": 0.0, "violation": 0.0, "unfair": 0.0}
+    tune.simulate.model.set_economy(tier_cost_usd_per_req=economy)
+    try:
+        return _score_slice(controller, params, cluster, miss_cost_factor, initial_cache_mb,
+                            quality_weight)
+    finally:
+        tune.simulate.model.set_economy()
+
+
+def _score_slice(controller: str, params: dict, cluster: str, miss_cost_factor: float,
+                 initial_cache_mb: int | None, quality_weight: float) -> dict:
+    terms = {"cost_norm": 0.0, "violation": 0.0, "unfair": 0.0, "quality": 0.0}
     n = len(tune.TUNING_CELLS) * tune.TUNING_REPS
     for wl, mix in tune.TUNING_CELLS:
         for rep in range(tune.TUNING_REPS):
@@ -83,11 +112,16 @@ def score_controller(controller: str, params: dict, cluster: str, *,
                                    / tune.COST_SCALE_USD) / n
             terms["violation"] += result.mean_violation / n
             terms["unfair"] += (1.0 - result.mean_jain) / n
+            terms["quality"] += result.mean_quality_loss / n
     j = tune.ALPHA * terms["cost_norm"] + tune.BETA * terms["violation"] + tune.GAMMA * terms["unfair"]
+    if quality_weight:
+        j += quality_weight * terms["quality"]
+    else:
+        terms.pop("quality")
     return {"mean_objective": round(j, 5), **{k: round(v, 5) for k, v in terms.items()}}
 
 
-def score_arm(arm: str, overrides: dict, cluster: str) -> dict:
+def score_arm(arm: str, overrides: dict, cluster: str, quality: bool = False) -> dict:
     """The arm as sim_backend.execute runs it, with `overrides` on its params.
     Refuses arms whose execution adds anything this replay omits."""
     spec = SYSTEMS[arm]
@@ -112,7 +146,9 @@ def score_arm(arm: str, overrides: dict, cluster: str) -> dict:
     return score_controller(
         spec.controller, params, cluster,
         miss_cost_factor=lru_miss_cost_factor() if spec.lru_eviction else 1.0,
-        initial_cache_mb=spec.static_cache_mb)
+        initial_cache_mb=spec.static_cache_mb,
+        quality_weight=QUALITY_WEIGHT if quality else 0.0,
+        economy=GPU_ECONOMY if quality else None)
 
 
 def write(path: Path, rows: list[dict]) -> None:
@@ -128,6 +164,38 @@ def _score_one(job: tuple) -> dict:
     return {knob: value, **score_arm(arm, {knob: value}, size)}
 
 
+def _score_quality(job: tuple) -> dict:
+    arm, params, size = job
+    return {**params, **score_arm(arm, dict(params), size, quality=True)}
+
+
+def tune_quality(workers: int, arms: list[str] | None = None) -> dict[str, dict[str, dict]]:
+    """Per arm and size, the best parameter set on QUALITY_ARMS's grid under
+    the GPU economy and the quality-priced J."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    tuned: dict[str, dict[str, dict]] = {}
+    for arm, grid in QUALITY_ARMS.items():
+        if arms and arm not in arms:
+            continue
+        tuned[arm] = {}
+        for size in SIZES:
+            jobs = [(arm, params, size) for params in grid]
+            with ProcessPoolExecutor(max_workers=max(1, workers)) as ex:
+                rows = list(ex.map(_score_quality, jobs))
+            for row in rows:
+                print(f"  {arm}@{size} {row}", flush=True)
+            write(OUT / "grids_arms" / f"{arm}_{size}.csv", rows)
+            best = min(rows, key=lambda r: r["mean_objective"])
+            if "target_rho" in best:
+                same_tier = [r for r in rows if r.get("tier") == best.get("tier")]
+                edges = (min(r["target_rho"] for r in same_tier), max(r["target_rho"] for r in same_tier))
+                if best["target_rho"] in edges:
+                    raise SystemExit(f"{arm}@{size}: optimum target_rho={best['target_rho']} is a grid edge")
+            tuned[arm][size] = {k: best[k] for k in grid[0]}
+    return tuned
+
+
 def main(argv: list[str] | None = None) -> None:
     import argparse
     from concurrent.futures import ProcessPoolExecutor
@@ -137,7 +205,17 @@ def main(argv: list[str] | None = None) -> None:
                     help="tune only these arms and MERGE them into tuned_arms.yaml "
                          "(every other entry is kept verbatim); default: all, rewritten")
     ap.add_argument("--workers", type=int, default=1, help="parallel processes")
+    ap.add_argument("--quality", action="store_true",
+                    help="tune the PREREG_QUALITY comparators (GPU economy, quality-priced J) "
+                         "and MERGE them into tuned_arms.yaml")
+    ap.add_argument("--quality-arms", nargs="+", choices=list(QUALITY_ARMS),
+                    help="with --quality: only these arms")
     args = ap.parse_args(argv)
+    if args.quality:
+        tuned = yaml.safe_load((OUT / "tuned_arms.yaml").read_text(encoding="utf-8")) or {}
+        tuned.update(tune_quality(args.workers, args.quality_arms))
+        _write_tuned(tuned)
+        return
     check = score_controller("hpa", {"target_rho": 0.3}, "medium")["mean_objective"]
     if check != round(tune.score_combo("hpa", {"target_rho": 0.3}), 5):
         raise SystemExit(f"score_controller drifted from tune.score_combo ({check})")
@@ -161,6 +239,10 @@ def main(argv: list[str] | None = None) -> None:
             if best[knob] in (values[0], values[-1]):
                 raise SystemExit(f"{arm}@{size}: optimum {knob}={best[knob]} is a grid edge; widen the grid")
             tuned[arm][size] = {knob: best[knob]}
+    _write_tuned(tuned)
+
+
+def _write_tuned(tuned: dict) -> None:
     header = ("# Per-size best-of-grid parameters for the FAIR_J comparator arms.\n"
               "# Generated by tune_arms.py (see its docstring); read only by arms that\n"
               "# declare `tuned_arm`. Regenerate with: python baselines/tune_arms.py\n")

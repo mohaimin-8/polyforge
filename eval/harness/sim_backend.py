@@ -201,6 +201,7 @@ def execute(run: RunSpec) -> dict:
             "plan_fallback_share": result.plan_fallback_share,
             "plan_repaired_share": result.plan_repaired_share,
             "capped_cycle_share": result.capped_cycle_share,
+            "mean_quality_loss": result.mean_quality_loss,
             "steps": result.steps,
         },
         "timeseries": result.rows,

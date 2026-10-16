@@ -15,6 +15,16 @@ hpa_fair_capped:
     target_rho: 0.05
   small:
     target_rho: 0.1
+hpa_quality_capped:
+  large:
+    target_rho: 0.1
+    tier: large
+  medium:
+    target_rho: 0.05
+    tier: large
+  small:
+    target_rho: 0.4
+    tier: large
 jcac_nojoint_v2_tuned:
   large:
     target_rho: 0.05
@@ -43,6 +53,20 @@ layered_costaware_tuned:
     target_rho: 0.8
   small:
     target_rho: 0.8
+layered_quality_capped:
+  large:
+    target_rho: 0.1
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.4
+layered_quality_tuned:
+  large:
+    target_rho: 0.1
+  medium:
+    target_rho: 0.075
+  small:
+    target_rho: 0.05
 layered_small_tuned:
   large:
     target_rho: 0.1
@@ -50,3 +74,10 @@ layered_small_tuned:
     target_rho: 0.075
   small:
     target_rho: 0.05
+static_share_quality:
+  large:
+    tier: large
+  medium:
+    tier: large
+  small:
+    tier: large
