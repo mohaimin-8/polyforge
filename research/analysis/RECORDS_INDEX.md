@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 85 |
-| regenerated and compared | 70 |
+| records | 88 |
+| regenerated and compared | 73 |
 | outside the gate, reason stated | 15 |
 | outside the gate, no entry | 0 |
 
@@ -27,6 +27,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `COORD_GAP_ANCHORED.md` | CG-H1 | yes |
 | `DEGRADE_PROBE.md` | DG-H1, DG-H2 | yes |
 | `EFFECT_SIZES.md` | - | yes |
+| `EQUIVALENCE_FAIR.md` | FJ-H1, FJ-H2, FJ-H3, RT-H1, RT-H2, RT-H3 | yes |
 | `ERRATUM_WAVE4_REPLICA_ONLY.md` | WL-H1, WL-H2 | yes |
 | `ERRATUM_ZERO_DEMAND_PLANNER.md` | LC-H1 | yes |
 | `FAIRNESS_V2.md` | - | yes |
@@ -34,7 +35,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `FORECAST_MR.md` | - | no, reason stated |
 | `FORECAST_TRACE.md` | - | no, reason stated |
 | `FORECAST_TRACE_REAL.md` | - | no, reason stated |
-| `HYPOTHESIS_LEDGER.md` | BP-H1a, BP-H1b, BP-H2a, BP-H2b, CQ-H1, CQ-H2, EP-H1a, EP-H1b, EP-H3, EP-H4, FJ-H1, FJ-H2, FJ-H3, LF-H1, LF-H2, LR-H1, LR-H2, MM-H1, MM-H2, RB-H1, RB-H3, RQ-H2, RT-H1, RT-H2, RT-H3, SK-H1, SM-H1, SM-H2, TP-H1a, TP-H1b, TP-H3a, TP-H3b, TS-H1a, TS-H1b | yes |
+| `HYPOTHESIS_LEDGER.md` | AC-H1, AC-H2, AC-H3, AC-H4, BP-H1a, BP-H1b, BP-H2a, BP-H2b, CQ-H1, CQ-H2, EP-H1a, EP-H1b, EP-H3, EP-H4, FJ-H1, FJ-H2, FJ-H3, LF-H1, LF-H2, LR-H1, LR-H2, MM-H1, MM-H2, RB-H1, RB-H3, RQ-H2, RT-H1, RT-H2, RT-H3, SK-H1, SM-H1, SM-H2, TP-H1a, TP-H1b, TP-H3a, TP-H3b, TS-H1a, TS-H1b | yes |
 | `OBJECTIVE_FORM.md` | - | yes |
 | `PHASE7_ORDINAL.md` | - | yes |
 | `PLANNER_CELLS.md` | PS-H1, PS-H2, PS-H3 | no, reason stated |
@@ -45,6 +46,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `REANALYSIS_MATRIX.md` | - | yes |
 | `REANALYSIS_NONINFERIORITY.md` | BP-H2, BP-H2a, BP-H2b, EP-H3, MM-H2, TP-H3, TP-H3a, TP-H3b | yes |
 | `RESULTS.md` | - | yes |
+| `RESULTS_ACTUATION.md` | AC-H1, AC-H2, AC-H3, AC-H4 | yes |
 | `RESULTS_BUDGET_PARITY.md` | BP-H1, BP-H1a, BP-H1b, BP-H2, BP-H2a, BP-H2b, BP-H3 | yes |
 | `RESULTS_CACHE_CEILING.md` | - | no, reason stated |
 | `RESULTS_CHAOS_SIM.md` | CH-H1, CH-H2, CH-H3, CH-H4 | yes |
@@ -53,6 +55,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_EVICTION_PARITY.md` | EP-H1a, EP-H1b, EP-H2, EP-H3, EP-H4 | yes |
 | `RESULTS_FAIR_J.md` | FJ-H1, FJ-H2, FJ-H3 | yes |
 | `RESULTS_HK_ADOPTION.md` | HK-H1, HK-H2 | yes |
+| `RESULTS_JOINTNESS.md` | RT-H1, RT-H3 | yes |
 | `RESULTS_LAYERED_FIX.md` | LF-H1, LF-H2 | yes |
 | `RESULTS_LEARNED.md` | LR-H1, LR-H2 | yes |
 | `RESULTS_LIVE_CHAOS_P99.md` | LC-H1 | yes |
