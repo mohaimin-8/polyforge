@@ -1,0 +1,39 @@
+# PREREG_QUALITY.md (2026-10-16) -- joint control when the tier knob trades
+# answer quality: J priced with the answer-quality loss at 2.0
+# (model.TIER_QUALITY: Qwen2.5 Technical Report, Tables 8-10; cache hits at
+# the measured relative precision), under the measured GPU price ladder.
+# Frozen and pushed before any run of this experiment.
+#
+# Equal constraints: no arm below carries a per-tenant budget filter except
+# the descriptive jcac_quality_budget, and every arm stays inside the
+# cluster caps.
+#   jcac_quality             treatment: jcac_converged planning on the
+#                            quality-priced objective, no budget filter
+#   jcac_quality_decoupled   the same, knobs searched independently
+#   jcac_quality_knobwise    the same, one knob at a time to a fixed point
+#   layered_quality_capped   layered stack, quality-priced local tier router,
+#                            inside the caps
+#   hpa_quality_capped       capped HPA on a tuned fixed tier
+#   static_share_quality     equal cluster share on a tuned fixed tier
+#   jcac_quality_budget      descriptive: the treatment WITH its budget filter
+#   jcac_converged           descriptive: the quality-blind published treatment
+#
+# The new experiment name gives fresh seeds; shared_seeds gives every arm in
+# a cell identical demand. The economy block is PREREG_TIER_RATIO_V2's.
+name: matrix_quality
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+economy:
+  tier_cost_small: 1.0e-4
+  tier_cost_mid: 1.475e-4
+  tier_cost_large: 1.518e-4
+systems: [jcac_quality, jcac_quality_decoupled, jcac_quality_knobwise, layered_quality_capped,
+          hpa_quality_capped, static_share_quality, jcac_quality_budget, jcac_converged]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_quality.duckdb
+retries: 2
+timeseries_reps: 0
