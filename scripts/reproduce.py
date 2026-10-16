@@ -120,6 +120,9 @@ CAMPAIGN_RECORDS = [
     # export metrics_matrix_{jointness,actuation}.csv.gz.
     ("analysis_jointness.py", [], "RESULTS_JOINTNESS.md"),
     ("analysis_actuation.py", [], "RESULTS_ACTUATION.md"),
+    # PREREG_QUALITY (2026-10-16): J priced with answer quality under the GPU
+    # economy, from its committed export metrics_matrix_quality.csv.gz.
+    ("analysis_quality.py", [], "RESULTS_QUALITY.md"),
     # Audit 2026-09-26, EXPLORATORY: the published tuning optima were grid
     # edges; rebuilds from the committed sweeps in eval/baselines.
     ("analysis_tuning_extended.py", [], "TUNING_EXTENDED.md"),
