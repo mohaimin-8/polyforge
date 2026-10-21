@@ -1,0 +1,36 @@
+# PREREG_WIDTH.md (2026-10-22) -- does coordination between one tenant's
+# knobs pay once a single interval can move far? Plant: the plant fitted to the live B1' runs
+# (PREREG_STRUCTURAL_MISMATCH's live form): AI never loads the replicas.
+# Frozen and pushed before any run of this experiment.
+#
+#   jcac_joint_tracked       joint search, published lattice (+/-2 replicas,
+#                            one cache level), counting disagreements with
+#                            the decoupled search
+#   jcac_decoupled           decoupled search, published lattice
+#   jcac_joint_wide_tracked  joint search, wide lattice (+/-8, any cache
+#                            level), tracked
+#   jcac_decoupled_wide      decoupled search, wide lattice
+#
+# The workloads are the four AI-carrying classes of the matrix family: the
+# cache and tier knobs act only where AI traffic exists. New experiment name
+# -> fresh seeds; shared_seeds -> identical demand per cell.
+name: matrix_width_live
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_joint_tracked, jcac_decoupled, jcac_joint_wide_tracked, jcac_decoupled_wide]
+workloads: [ai_cacheable, ai_uncacheable, agentic, joint_stress]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_matrix_width_live.duckdb
+retries: 2
+timeseries_reps: 0
+model_form:
+  replica_capacity_wu: 1123
+  wu_ai_scale: 0
+  crud_base_scale: 0.013175
+  tier_latency_small: 261.7
+  tier_latency_mid: 751.2
+  tier_latency_large: 2156
+  cacheable_uniform: 1
