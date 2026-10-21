@@ -123,6 +123,9 @@ CAMPAIGN_RECORDS = [
     # PREREG_QUALITY (2026-10-16): J priced with answer quality under the GPU
     # economy, from its committed export metrics_matrix_quality.csv.gz.
     ("analysis_quality.py", [], "RESULTS_QUALITY.md"),
+    # PREREG_HELDOUT (2026-10-16): the JOINTNESS comparisons on two unseen,
+    # non-periodic workloads, from metrics_matrix_heldout.csv.gz.
+    ("analysis_heldout.py", [], "RESULTS_HELDOUT.md"),
     # Audit 2026-09-26, EXPLORATORY: the published tuning optima were grid
     # edges; rebuilds from the committed sweeps in eval/baselines.
     ("analysis_tuning_extended.py", [], "TUNING_EXTENDED.md"),

@@ -106,3 +106,12 @@ As `PREREG_FAIR_J`: one sitting; no re-run, widening, re-tuning or change of arm
 or workloads after the first run; two transient-error retries; a failing run is
 recorded and its design point dropped for every arm; a scorer defect found after
 the run is fixed in a new scorer and a new record.
+
+## Status note (2026-10-22, appended after the registered text)
+
+The sitting started 2026-10-16 12:51 UTC and stopped at about 125 of 840 runs
+when the operator's session ended; no run had failed and nothing was changed.
+It was resumed on 2026-10-22 with the harness's resume rule: runs already
+recorded valid are skipped, so every remaining run executes once, exactly as
+registered. No arm, workload, seed, parameter or scorer was changed, and no
+result was looked at in between.

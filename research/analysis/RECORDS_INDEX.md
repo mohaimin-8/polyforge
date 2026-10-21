@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 89 |
-| regenerated and compared | 74 |
+| records | 90 |
+| regenerated and compared | 75 |
 | outside the gate, reason stated | 15 |
 | outside the gate, no entry | 0 |
 
@@ -54,6 +54,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_DOMINANCE.md` | - | yes |
 | `RESULTS_EVICTION_PARITY.md` | EP-H1a, EP-H1b, EP-H2, EP-H3, EP-H4 | yes |
 | `RESULTS_FAIR_J.md` | FJ-H1, FJ-H2, FJ-H3 | yes |
+| `RESULTS_HELDOUT.md` | - | yes |
 | `RESULTS_HK_ADOPTION.md` | HK-H1, HK-H2 | yes |
 | `RESULTS_JOINTNESS.md` | RT-H1, RT-H3 | yes |
 | `RESULTS_LAYERED_FIX.md` | LF-H1, LF-H2 | yes |
