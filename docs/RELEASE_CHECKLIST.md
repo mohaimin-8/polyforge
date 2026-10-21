@@ -18,18 +18,20 @@ version predated the evidence site, the AWS sittings and the caption gate.)
 
 ## 2. Records and pre-registrations — done, gated
 
-- 77 records regenerate byte-identically (`scripts/reproduce.py`; CI
-  `reproduce` job, 2026-10-16); 18 more carry a stated reason in `UNGATED`;
-  55 pre-registrations; `check_preregs.py` proves no registered text moved
-  after its result existed, and `check_prereg_timing.py` judges 50 of 52
-  campaigns ran after their protocol (2 disclosed).
+- 78 records regenerate byte-identically (`scripts/reproduce.py`; CI
+  `reproduce` job); 18 more carry a stated reason in `UNGATED`; 56
+  pre-registrations; `check_preregs.py` proves no registered text moved after
+  its result existed, and `check_prereg_timing.py` judges 51 of 53 campaigns
+  ran after their protocol (2 disclosed).
 - `research/analysis/RECORDS_INDEX.md` (generated) enumerates all of them;
   `OSF_REGISTRATION.md` carries the 29 OSF rows.
-- [ ] The 7 protocols written after the OSF mirror (FAIR_J, STRUCTURAL_MISMATCH,
-      RETUNED, WAVE4_REPLICATION, JOINTNESS, ACTUATION, QUALITY) are git-only.
+- [ ] The 8 protocols written after the OSF mirror (FAIR_J, STRUCTURAL_MISMATCH,
+      RETUNED, WAVE4_REPLICATION, JOINTNESS, ACTUATION, QUALITY, HELDOUT) are
+      git-only; the upload package is `Thesis Project/osf_upload_2026-10-16/`.
       Their pushes carry server-side times (GitHub Actions run creation), and
-      JOINTNESS/ACTUATION and QUALITY were archived by Software Heritage within
-      seconds of their push (save requests 2560095 and 2560208). **Human:** add
+      JOINTNESS/ACTUATION, QUALITY and HELDOUT were archived by Software
+      Heritage within seconds of their push (save requests 2560095, 2560208,
+      2560399). **Human:** add
       them to the OSF project as a post-run registration, stated as such.
 - [x] OSF mirror registered 2026-09-19: **https://doi.org/10.17605/OSF.IO/DYZKV**
       (all 48 protocols + index + commit map, frozen and public; project
@@ -45,7 +47,9 @@ version predated the evidence site, the AWS sittings and the caption gate.)
 - [x] Published. **Cite the concept DOI https://doi.org/10.5281/zenodo.22801195**
       (always the latest version). Versions: v1 10.5281/zenodo.22801196
       (2026-09-17, 1023 files); v2 10.5281/zenodo.22807022 (2026-09-17,
-      1025 files, adds docs/COMMIT_MAP.md).
+      1025 files, adds docs/COMMIT_MAP.md); v3 10.5281/zenodo.23542675
+      (2026-10-21, 1082 files: every campaign through QUALITY; HELDOUT ran
+      after it — its export is in the repository, its DuckDB goes in v4).
       (Islam, M. M. (2026). PolyForge evaluation artifact: pre-registered
       controller-comparison campaigns (harness, baselines, raw results,
       live-run data, IaC) [Dataset]. Zenodo.)
