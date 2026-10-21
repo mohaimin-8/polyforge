@@ -122,6 +122,13 @@ on fresh shared seeds separated the parts the earlier comparisons bundled
   [+0.0225, +0.0938]) and, under lag, to every comparator.
 - It beats a static equal share by 5–7% (JN-B3, AC-H2, QL-B3 PASS); the SLO guard
   fails there in all three.
+- **None of it generalises to unseen, non-periodic demand** (`RESULTS_HELDOUT.md`,
+  two Markov-modulated workloads no campaign or tuning had used, registered before
+  any run): no baseline is beaten (HO-B3/B4/B5 FAIL, no difference), the no-tier
+  layered stack is better (+0.063 [+0.027, +0.107]) on every cluster size including
+  large, and joint search is worse than decoupled search by +0.0045 [+0.0020,
+  +0.0073] (within the equivalence margin). Every SLO guard fails; the controller
+  sheds AI on 11.3% of tenant-steps. Scope every win above to the periodic matrix.
 
 ---
 

@@ -42,6 +42,10 @@ fresh, shared seeds. What the evidence now supports:
   (`RESULTS_ACTUATION.md`, AC-H3/H4). It sheds AI traffic on about 7% of
   tenant-steps; held to never shedding, it loses to capped HPA. On a plant fitted
   to the live evidence the layered stack is better (`RESULTS_STRUCTURAL_MISMATCH.md`).
+  On two held-out workloads with random, non-periodic bursts that no campaign or
+  tuning had seen, it beats no baseline, loses to the no-tier layered stack, and its
+  coordination advantage reverses (`RESULTS_HELDOUT.md`): the wins above hold on the
+  matrix's periodic workloads only.
 - **On live hardware the controller must calibrate its model online.** The
   published controller lost to its own tier-only ablation live (B1, WL-H1 FAIL);
   its plant model predicted 3,500 ms CRUD p95 at the cell's peak, which the
@@ -62,7 +66,7 @@ fresh, shared seeds. What the evidence now supports:
   real-trace forecasting results, the semantic-cache measurements, and the
   planning-cell scaling result.
 
-Across the programme, 112 registered tests carry a p-value; 69 passed as registered,
+Across the programme, 117 registered tests carry a p-value; 69 passed as registered,
 and 54 of those survive a programme-wide Holm correction
 (`research/analysis/HYPOTHESIS_LEDGER.md`). The audit report is outside the
 repository; the fixes and re-runs are commits `fe23712` onward on this branch.
@@ -323,8 +327,10 @@ is merged).
 **Archived evaluation artifact (DOI):** the raw run databases, every
 pre-registration and record, the live-campaign evidence and the IaC are
 deposited at [https://doi.org/10.5281/zenodo.22801195](https://doi.org/10.5281/zenodo.22801195)
-(Islam, 2026, CC BY 4.0; 1,023 files, SHA-256 manifest). The deposit predates the
-2026-09-26 audit; the audit's campaigns are in this repository until it is refreshed. Restoring its
+(Islam, 2026, CC BY 4.0; SHA-256 manifest). Version 3
+([10.5281/zenodo.23542675](https://doi.org/10.5281/zenodo.23542675), 2026-10-21, 1,082 files)
+carries every campaign through QUALITY; HELDOUT ran after it and is in this repository as its
+run-level export (`eval/results/metrics_matrix_heldout.csv.gz`). Restoring its
 DuckDB files into `eval/results/` enables the archive tier of
 `docs/REPRODUCE.md`. Cite the dataset as:
 
