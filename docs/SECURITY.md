@@ -250,6 +250,26 @@ advisories above. The source is fixed; shipping fixed images needs a v1.0.1
 tag, which is the maintainer's decision. Until then, build from source rather
 than pulling v1.0.0.
 
+**Update (2026-10-16): v1.0.1 shipped the fixed images** (go1.26.9), and the
+charts default to them.
+
+## 2026-10-22: GO-2026-6809, `crypto/x509`, published after v1.0.1 (FIXED)
+
+`vulncheck` went red on a documentation-only commit: GO-2026-6809 in the
+standard library's `crypto/x509`, reachable from our code, fixed in
+**go1.26.10**. It was published after v1.0.1 passed the release gate, so the
+v1.0.1 images carry it.
+
+**Fixed** by moving the pin to `toolchain go1.26.10` and re-pinning the three
+Go Dockerfiles to `golang:1.26.10` by index digest
+(`sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82`, read
+from the registry-1.docker.io index manifest), then tagging **v1.0.2** so the
+published images and charts carry the fix.
+
+**The lesson, again:** a release is clean only on the day it is scanned. The
+CI scan on every push is what caught this; releases need the same scan
+re-run, and a patch release when it turns red.
+
 ## Session-43 finding: unbounded metric cardinality, remotely triggerable (FIXED)
 
 **Severity: high. Found by accident, by an instrument check** — the L6 `/metrics`

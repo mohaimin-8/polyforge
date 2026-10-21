@@ -427,7 +427,7 @@ a fully pre-registered, reproducible evaluation that reports its own failures.
 | symptom | fix |
 |---|---|
 | `Ports [8080] are already in use` | stop the other control plane (or a previous demo) and rerun |
-| `go: command not found` | install Go 1.26.9, or run `python scripts/demo_platform.py --no-build` if `tmp/demo/*.exe` already exist |
+| `go: command not found` | install Go 1.26.10, or run `python scripts/demo_platform.py --no-build` if `tmp/demo/*.exe` already exist |
 | act 6 shows `none yet` | the classifier relabels every 10 s; rerun the script (it waits up to 45 s) |
 | `failed to connect to the docker API` | start Docker Desktop and wait until it says "Engine running" |
 | cluster run ends at once with "valid" | its result file already has the run: delete `eval/results/demo_cluster*` and rerun |
