@@ -202,6 +202,7 @@ def execute(run: RunSpec) -> dict:
             "plan_repaired_share": result.plan_repaired_share,
             "capped_cycle_share": result.capped_cycle_share,
             "mean_quality_loss": result.mean_quality_loss,
+            "coordination_disagreement_share": result.coordination_disagreement_share,
             "steps": result.steps,
         },
         "timeseries": result.rows,

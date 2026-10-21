@@ -63,6 +63,10 @@ SWITCH_PENALTY = 0.05  # objective units per changed knob (hysteresis)
 SWITCH_PENALTY_HALF_REPLICA = 0.5 * (
     model.REPLICA_COST_USD_HR * model.CONTROL_INTERVAL_S / 3600.0) / COST_SCALE_USD
 DELTA_REPLICAS = (-2, -1, 0, 1, 2)
+# Opt-in wide actuation (lattice="wide", PREREG_WIDTH): up to 8 replicas and
+# any cache level per interval. The published lattice is the line above plus
+# one cache level (model.neighbor_cache_levels).
+WIDE_DELTA_REPLICAS = tuple(range(-8, 9))
 
 
 @dataclass
@@ -407,6 +411,8 @@ class JCACController:
         knob_search: str = "joint",
         objective_term: str | None = None,
         quality_weight: float = 0.0,
+        lattice: str = "published",
+        track_coordination: bool = False,
     ):
         self.configs = configs
         # Audit 2026-09-26 (simulator CRITICAL): `_project` calls the very
@@ -661,6 +667,23 @@ class JCACController:
         if quality_weight and self.weights.beta <= 0.0:
             raise ValueError("quality_weight needs a positive SLO weight beta")
         self.quality_weight = quality_weight
+        # Actuation width (opt-in, PREREG_WIDTH). "published": +/-2 replicas and
+        # one cache level per interval, the lattice every published arm runs
+        # (the same tuple and function, so R4 holds). "wide": +/-8 replicas and
+        # any cache level -- the test of whether coordination between knobs
+        # pays once a single interval can move far.
+        if lattice not in ("published", "wide"):
+            raise ValueError(f"lattice must be 'published' or 'wide', not {lattice!r}")
+        self.lattice = lattice
+        self._delta_replicas = DELTA_REPLICAS if lattice == "published" else WIDE_DELTA_REPLICAS
+        # Diagnostic (opt-in): at every joint best response also compute the
+        # decoupled search's pick from the identical inputs and count the
+        # disagreements. Reporting only -- the joint pick is what is returned.
+        if track_coordination and knob_search != "joint":
+            raise ValueError("track_coordination compares against the joint search; use knob_search='joint'")
+        self.track_coordination = track_coordination
+        self.guard_counts["coord_calls"] = 0
+        self.guard_counts["coord_disagreements"] = 0
 
     def snapshot(self) -> dict:
         """Serializable planner state for failover (W31): per-tenant forecast
@@ -880,6 +903,8 @@ class JCACController:
         chooser = {"joint": self._best_for_tenant,
                    "decoupled": self._best_for_tenant_decoupled,
                    "knobwise": self._best_for_tenant_knobwise}[self.knob_search]
+        if self.track_coordination:
+            chooser = self._best_for_tenant_tracked
         sweeps, changed = 0, True
         while changed if self.converge_sweeps else sweeps < 2:
             changed = False
@@ -1113,6 +1138,29 @@ class JCACController:
                     return cand
         return shed
 
+    def _cache_candidates(self, cache_mb: int) -> tuple[int, ...]:
+        """The cache levels one interval may reach from `cache_mb`: one level
+        either way on the published lattice, any level on the wide one."""
+        if self.lattice == "published":
+            return neighbor_cache_levels(cache_mb)
+        return model.CACHE_LEVELS_MB
+
+    def _best_for_tenant_tracked(
+        self,
+        tid: str,
+        chosen: dict[str, TenantState],
+        horizons: dict[str, list[Demand]],
+        origin: dict[str, TenantState] | None = None,
+        cost_horizons: dict[str, list[Demand]] | None = None,
+    ) -> TenantState:
+        """The joint best response, after counting whether the decoupled
+        search would have chosen differently from the identical inputs."""
+        decoupled = self._best_for_tenant_decoupled(tid, chosen, horizons, origin, cost_horizons)
+        joint = self._best_for_tenant(tid, chosen, horizons, origin, cost_horizons)
+        self.guard_counts["coord_calls"] += 1
+        self.guard_counts["coord_disagreements"] += decoupled != joint
+        return joint
+
     def _admitted_anchor(self, tid: str, base: TenantState) -> TenantState:
         """The anchored incumbent the 1-D searches hold the other knobs at:
         `base` itself when its (cache, tier) is admitted, otherwise the
@@ -1127,7 +1175,7 @@ class JCACController:
         ci = levels.index(base.cache_mb) if base.cache_mb in levels else 0
         ti = TIERS.index(base.tier) if base.tier in TIERS else 0
         options = [(abs(levels.index(c) - ci), abs(TIERS.index(t) - ti), TIERS.index(t), c, t)
-                   for c in neighbor_cache_levels(base.cache_mb) for t in TIERS
+                   for c in self._cache_candidates(base.cache_mb) for t in TIERS
                    if config.knob_admits(c, t)]
         if not options:
             return base
@@ -1147,11 +1195,11 @@ class JCACController:
             if not config.knob_admits(held.cache_mb, held.tier):
                 return []
             return [apply_action(config, base, delta, held.cache_mb, held.tier)
-                    for delta in DELTA_REPLICAS
+                    for delta in self._delta_replicas
                     if not (delta and self._dwell_blocks(tid, delta))]
         if knob == "cache":
             return [replace(held, cache_mb=cache_mb)
-                    for cache_mb in neighbor_cache_levels(base.cache_mb)
+                    for cache_mb in self._cache_candidates(base.cache_mb)
                     if config.knob_admits(cache_mb, held.tier)]
         return [replace(held, tier=tier) for tier in TIERS
                 if config.knob_admits(held.cache_mb, tier)]
@@ -1283,12 +1331,12 @@ class JCACController:
         is pinned -- then the cheapest admitted tier (TIERS is cheapest
         first)."""
         config = self.configs[tid]
-        caches = [c for c in neighbor_cache_levels(base.cache_mb)
+        caches = [c for c in self._cache_candidates(base.cache_mb)
                   if any(config.knob_admits(c, t) for t in TIERS)]
         cache_mb = min(caches) if caches else base.cache_mb
         tiers = [t for t in TIERS if config.knob_admits(cache_mb, t)]
         tier = tiers[0] if tiers else base.tier
-        return apply_action(config, base, min(DELTA_REPLICAS), cache_mb, tier)
+        return apply_action(config, base, min(self._delta_replicas), cache_mb, tier)
 
     def _others(self, tid: str, chosen: dict[str, TenantState],
                 horizons: dict[str, list[Demand]],
@@ -1318,10 +1366,10 @@ class JCACController:
         """`tid`'s move-blocked candidates around `base`, in the published
         enumeration order (replica delta, cache level, tier)."""
         config = self.configs[tid]
-        for delta in DELTA_REPLICAS:
+        for delta in self._delta_replicas:
             if delta and self._dwell_blocks(tid, delta):
                 continue
-            for cache_mb in neighbor_cache_levels(base.cache_mb):
+            for cache_mb in self._cache_candidates(base.cache_mb):
                 for tier in TIERS:
                     # Per-tenant knob bounds: a pinned (min==max) cache or tier
                     # removes every off-value candidate, so a cache-only /

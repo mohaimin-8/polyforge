@@ -389,6 +389,24 @@ SYSTEMS: dict[str, SystemSpec] = {
         description="Equal cluster share on a fixed tier, tier tuned under the "
                     "quality-priced J",
     ),
+    # --- Actuation width (PREREG_WIDTH, 2026-10-22) -------------------------
+    # Does coordination between knobs pay once one interval can move far?
+    # The joint arms carry the disagreement diagnostic; their decisions are
+    # jcac_converged's (narrow) by construction (test).
+    "jcac_joint_tracked": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True, "track_coordination": True},
+        description="jcac_converged, counting joint-vs-decoupled disagreements",
+    ),
+    "jcac_joint_wide_tracked": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True, "track_coordination": True,
+                        "lattice": "wide"},
+        description="jcac_converged on the wide lattice (+/-8 replicas, any cache level), tracked",
+    ),
+    "jcac_decoupled_wide": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True, "knob_search": "decoupled",
+                        "lattice": "wide"},
+        description="jcac_decoupled on the wide lattice",
+    ),
     "jcac_anchored": SystemSpec(
         "jcac", params={"anchor_moves": True},
         description="PolyForge with per-interval move clamps enforced across "

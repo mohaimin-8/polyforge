@@ -54,7 +54,7 @@ def main() -> None:
     # change.
     for c in ("budget_overrun_step_share", "clamp_violation_step_share",
               "plan_fallback_share", "plan_repaired_share", "capped_cycle_share",
-              "mean_quality_loss"):
+              "mean_quality_loss", "coordination_disagreement_share"):
         if c in have and con.execute(f"SELECT count({c}) FROM metrics").fetchone()[0]:
             extra.append(c)
     extra_sql = "".join(f", m.{c}" for c in extra)

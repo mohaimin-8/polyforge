@@ -168,6 +168,9 @@ class RunResult:
     # Answer-quality loss per tenant-step (model.StepMetrics.quality_loss),
     # reporting-only and absent from `summary()` (R4).
     mean_quality_loss: float = 0.0
+    # Share of joint best responses the decoupled search would have chosen
+    # differently (controller `track_coordination`); None when not tracked.
+    coordination_disagreement_share: float | None = None
     steps: int = 0
     rows: list = field(default_factory=list)
 
@@ -480,6 +483,8 @@ def run(
         result.plan_fallback_share = guards["fallback_plans"] / guards["tenant_plans"]
         result.plan_repaired_share = guards["repaired_plans"] / guards["tenant_plans"]
         result.capped_cycle_share = guards["capped_cycles"] / max(1, guards["cycles"])
+        if guards.get("coord_calls"):
+            result.coordination_disagreement_share = guards["coord_disagreements"] / guards["coord_calls"]
     if result.steps:
         result.mean_jain = jain_sum / result.steps
     if ai_total_rps > 0.0:
