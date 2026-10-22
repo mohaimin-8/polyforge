@@ -1,0 +1,385 @@
+{
+ "axes": [
+  {
+   "collections": [
+    {
+     "edgecolours": [
+      "#2a78d6ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-0.12",
+        "0.801188877844"
+       ],
+       [
+        "-0.12",
+        "1.96392537884"
+       ]
+      ],
+      [
+       [
+        "0.88",
+        "0.0876859661725"
+       ],
+       [
+        "0.88",
+        "1.29517248303"
+       ]
+      ],
+      [
+       [
+        "1.88",
+        "0.186058881159"
+       ],
+       [
+        "1.88",
+        "1.81444535073"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#e34948ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.12",
+        "0.264172768"
+       ],
+       [
+        "0.12",
+        "1.54594654746"
+       ]
+      ],
+      [
+       [
+        "1.12",
+        "2.12650954098"
+       ],
+       [
+        "1.12",
+        "4.38044081014"
+       ]
+      ],
+      [
+       [
+        "2.12",
+        "2.47626890485"
+       ],
+       [
+        "2.12",
+        "4.83805370798"
+       ]
+      ]
+     ]
+    }
+   ],
+   "legend": [
+    "rate-limited (\u00b12 replicas, 1 cache level)",
+    "wide (\u00b18 replicas, any cache level)"
+   ],
+   "lines": [
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-0.12",
+       "1.34252627172"
+      ],
+      [
+       "0.88",
+       "0.651606768063"
+      ],
+      [
+       "1.88",
+       "0.921347551807"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "_",
+     "points": [
+      [
+       "-0.12",
+       "0.801188877844"
+      ],
+      [
+       "0.88",
+       "0.0876859661725"
+      ],
+      [
+       "1.88",
+       "0.186058881159"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "_",
+     "points": [
+      [
+       "-0.12",
+       "1.96392537884"
+      ],
+      [
+       "0.88",
+       "1.29517248303"
+      ],
+      [
+       "1.88",
+       "1.81444535073"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_nolegend_",
+     "marker": "s",
+     "points": [
+      [
+       "0.12",
+       "0.762432521037"
+      ],
+      [
+       "1.12",
+       "3.24560505946"
+      ],
+      [
+       "2.12",
+       "3.64426266821"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_nolegend_",
+     "marker": "_",
+     "points": [
+      [
+       "0.12",
+       "0.264172768"
+      ],
+      [
+       "1.12",
+       "2.12650954098"
+      ],
+      [
+       "2.12",
+       "2.47626890485"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "_nolegend_",
+     "marker": "_",
+     "points": [
+      [
+       "0.12",
+       "1.54594654746"
+      ],
+      [
+       "1.12",
+       "4.38044081014"
+      ],
+      [
+       "2.12",
+       "4.83805370798"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#52514eff",
+     "label": "_child8",
+     "marker": "None",
+     "points": [
+      [
+       "0",
+       "0"
+      ],
+      [
+       "1",
+       "0"
+      ]
+     ],
+     "style": "--",
+     "width": "0.9"
+    }
+   ],
+   "patches": [],
+   "texts": [],
+   "title": "",
+   "xlabel": "",
+   "xlim": [
+    "-0.232",
+    "2.232"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "live-fitted\n(AI off the replicas)",
+    "published",
+    "coupled\n(AI 3\u00d7 on replicas)"
+   ],
+   "xticks": [
+    "0",
+    "1",
+    "2"
+   ],
+   "ylabel": "coordination gain G = J(decoupled) \u2212 J(joint)\n% of the decoupled arm's J",
+   "ylim": [
+    "-0.149832420918",
+    "5.07557209507"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "\u22121",
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6"
+   ],
+   "yticks": [
+    "-1",
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6"
+   ]
+  },
+  {
+   "collections": [],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#2a78d6ff",
+     "label": "rate-limited (\u00b12 replicas, 1 cache level)",
+     "marker": "o",
+     "points": [
+      [
+       "-0.12",
+       "0.229166050814"
+      ],
+      [
+       "0.88",
+       "0.910977903331"
+      ],
+      [
+       "1.88",
+       "1.03857623555"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    },
+    {
+     "colour": "#e34948ff",
+     "label": "wide (\u00b18 replicas, any cache level)",
+     "marker": "s",
+     "points": [
+      [
+       "0.12",
+       "0.157231756"
+      ],
+      [
+       "1.12",
+       "2.35711367385"
+      ],
+      [
+       "2.12",
+       "3.94897627487"
+      ]
+     ],
+     "style": "None",
+     "width": "1.5"
+    }
+   ],
+   "patches": [],
+   "texts": [],
+   "title": "",
+   "xlabel": "",
+   "xlim": [
+    "-0.232",
+    "2.232"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "live-fitted\n(AI off the replicas)",
+    "published",
+    "coupled\n(AI 3\u00d7 on replicas)"
+   ],
+   "xticks": [
+    "0",
+    "1",
+    "2"
+   ],
+   "ylabel": "joint best responses the decoupled\nsearch would have chosen differently (%)",
+   "ylim": [
+    "-0.0323554699434",
+    "4.13856350081"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "\u22120.5",
+    "0.0",
+    "0.5",
+    "1.0",
+    "1.5",
+    "2.0",
+    "2.5",
+    "3.0",
+    "3.5",
+    "4.0",
+    "4.5"
+   ],
+   "yticks": [
+    "-0.5",
+    "0",
+    "0.5",
+    "1",
+    "1.5",
+    "2",
+    "2.5",
+    "3",
+    "3.5",
+    "4",
+    "4.5"
+   ]
+  }
+ ],
+ "figure": "fig23_width_mechanism",
+ "size_inches": [
+  "12.5",
+  "4.6"
+ ],
+ "texts": []
+}

@@ -126,6 +126,13 @@ CAMPAIGN_RECORDS = [
     # PREREG_HELDOUT (2026-10-16): the JOINTNESS comparisons on two unseen,
     # non-periodic workloads, from metrics_matrix_heldout.csv.gz.
     ("analysis_heldout.py", [], "RESULTS_HELDOUT.md"),
+    # PREREG_WIDTH (2026-10-21): coordination vs actuation width, three plants,
+    # from metrics_matrix_width_{published,coupled,live}.csv.gz.
+    ("analysis_width.py", [], "RESULTS_WIDTH.md"),
+    # fig22 / fig23 (2026-10-22): the adjudication chain and the width mechanism,
+    # each drawn through the frozen scorers from the committed exports.
+    ("fig_adjudication_chain.py", [], "FIGURE_ADJUDICATION_CHAIN.md"),
+    ("fig_width.py", [], "FIGURE_WIDTH.md"),
     # Audit 2026-09-26, EXPLORATORY: the published tuning optima were grid
     # edges; rebuilds from the committed sweeps in eval/baselines.
     ("analysis_tuning_extended.py", [], "TUNING_EXTENDED.md"),

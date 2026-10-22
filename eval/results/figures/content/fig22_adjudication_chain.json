@@ -1,0 +1,1455 @@
+{
+ "axes": [
+  {
+   "collections": [
+    {
+     "edgecolours": [
+      "#1baf7aff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-34.6369443181",
+        "6"
+       ],
+       [
+        "-20.6731525929",
+        "6"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#1baf7aff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-5.43387810003",
+        "5"
+       ],
+       [
+        "4.58570223438",
+        "5"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#1baf7aff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-5.7908155016",
+        "4"
+       ],
+       [
+        "4.09994652522",
+        "4"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#1baf7aff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-5.96772894402",
+        "3"
+       ],
+       [
+        "6.4156620185",
+        "3"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#1baf7aff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-7.08296728392",
+        "2"
+       ],
+       [
+        "1.86541002393",
+        "2"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#1baf7aff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-1.08767310163",
+        "1"
+       ],
+       [
+        "8.85976681003",
+        "1"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#898781ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-8.8105892803",
+        "0"
+       ],
+       [
+        "-1.06222286445",
+        "0"
+       ]
+      ]
+     ]
+    }
+   ],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-27.5419930221",
+       "6"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-34.6369443181",
+       "6"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-20.6731525929",
+       "6"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-0.436944978333",
+       "5"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-5.43387810003",
+       "5"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "4.58570223438",
+       "5"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-0.915546607122",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-5.7908155016",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "4.09994652522",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-0.0300503395657",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-5.96772894402",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "6.4156620185",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-2.53832234896",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-7.08296728392",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "1.86541002393",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "3.8131433561",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-1.08767310163",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#1baf7aff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "8.85976681003",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-4.84605343874",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-8.8105892803",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-1.06222286445",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#52514eff",
+     "label": "_child28",
+     "marker": "None",
+     "points": [
+      [
+       "0",
+       "0"
+      ],
+      [
+       "0",
+       "1"
+      ]
+     ],
+     "style": "--",
+     "width": "0.9"
+    }
+   ],
+   "patches": [],
+   "texts": [],
+   "title": "",
+   "xlabel": "\u0394J, % of comparator's J (< 0: joint better)",
+   "xlim": [
+    "-36.8117798745",
+    "11.0346023664"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "\u221240",
+    "\u221230",
+    "\u221220",
+    "\u221210",
+    "0",
+    "10",
+    "20"
+   ],
+   "xticks": [
+    "-40",
+    "-30",
+    "-20",
+    "-10",
+    "0",
+    "10",
+    "20"
+   ],
+   "ylabel": "",
+   "ylim": [
+    "-0.3",
+    "6.3"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "as published: LRU charge, 128 MB pin, grid-edge tuning\nREANALYSIS_MATRIX (RESULTS.md)",
+    "no LRU charge, 512 MB cache\nREANALYSIS_MATRIX (EVICTION_PARITY)",
+    "fresh shared seeds, converged solver\nFAIR_J FJ-H1",
+    "comparator re-tuned per cluster size\nRETUNED RT-H1",
+    "comparator inside the cluster caps\nJOINTNESS JN-B4",
+    "unseen, non-periodic demand\nHELDOUT HO-B4",
+    "regime: replicas one interval late\nACTUATION AC-H3"
+   ],
+   "yticks": [
+    "6",
+    "5",
+    "4",
+    "3",
+    "2",
+    "1",
+    "0"
+   ]
+  },
+  {
+   "collections": [
+    {
+     "edgecolours": [
+      "#4a3aa7ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-85.4836105823",
+        "4"
+       ],
+       [
+        "-37.5193969237",
+        "4"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#4a3aa7ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-77.2155595991",
+        "3"
+       ],
+       [
+        "-31.5112221707",
+        "3"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#4a3aa7ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-0.842186856459",
+        "2"
+       ],
+       [
+        "10.9053890996",
+        "2"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#4a3aa7ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-1.40099026805",
+        "1"
+       ],
+       [
+        "10.3051136762",
+        "1"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#4a3aa7ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "9.95582414581",
+        "0"
+       ],
+       [
+        "39.488222863",
+        "0"
+       ]
+      ]
+     ]
+    }
+   ],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-60.385123143",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-85.4836105823",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-37.5193969237",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-53.1200413433",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-77.2155595991",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-31.5112221707",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "4.655308464",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-0.842186856459",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "10.9053890996",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "3.9697162585",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-1.40099026805",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "10.3051136762",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "23.3483347589",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "9.95582414581",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#4a3aa7ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "39.488222863",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#52514eff",
+     "label": "_child20",
+     "marker": "None",
+     "points": [
+      [
+       "0",
+       "0"
+      ],
+      [
+       "0",
+       "1"
+      ]
+     ],
+     "style": "--",
+     "width": "0.9"
+    }
+   ],
+   "patches": [],
+   "texts": [],
+   "title": "",
+   "xlabel": "\u0394J, % of comparator's J (< 0: joint better)",
+   "xlim": [
+    "-91.7322022545",
+    "45.7368145353"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "\u2212100",
+    "\u221280",
+    "\u221260",
+    "\u221240",
+    "\u221220",
+    "0",
+    "20",
+    "40",
+    "60"
+   ],
+   "xticks": [
+    "-100",
+    "-80",
+    "-60",
+    "-40",
+    "-20",
+    "0",
+    "20",
+    "40",
+    "60"
+   ],
+   "ylabel": "",
+   "ylim": [
+    "-0.2",
+    "4.2"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "registered stack (latency-ranked tier rule)\nFAIR_J FJ-H3",
+    "same stack, re-tuned per size\nRETUNED RT-H3",
+    "stack with no tier layer\nJOINTNESS JN-B1",
+    "quality priced; quality-aware router\nQUALITY QL-B1",
+    "unseen, non-periodic demand\nHELDOUT HO-B1"
+   ],
+   "yticks": [
+    "4",
+    "3",
+    "2",
+    "1",
+    "0"
+   ]
+  },
+  {
+   "collections": [
+    {
+     "edgecolours": [
+      "#2a78d6ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-2.97536424706",
+        "8"
+       ],
+       [
+        "-0.546985327218",
+        "8"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#2a78d6ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-0.331155513595",
+        "7"
+       ],
+       [
+        "0.928690151355",
+        "7"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#2a78d6ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "0.61582629192",
+        "6"
+       ],
+       [
+        "2.21095436524",
+        "6"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#2a78d6ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-1.96392537884",
+        "5"
+       ],
+       [
+        "-0.801188877844",
+        "5"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#898781ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-1.54594654746",
+        "4"
+       ],
+       [
+        "-0.264172768",
+        "4"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#2a78d6ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-1.29517248303",
+        "3"
+       ],
+       [
+        "-0.0876859661725",
+        "3"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#898781ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-4.38044081014",
+        "2"
+       ],
+       [
+        "-2.12650954098",
+        "2"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#2a78d6ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-1.81444535073",
+        "1"
+       ],
+       [
+        "-0.186058881159",
+        "1"
+       ]
+      ]
+     ]
+    },
+    {
+     "edgecolours": [
+      "#898781ff"
+     ],
+     "facecolours": [],
+     "kind": "LineCollection",
+     "segments": [
+      [
+       [
+        "-4.83805370798",
+        "0"
+       ],
+       [
+        "-2.47626890485",
+        "0"
+       ]
+      ]
+     ]
+    }
+   ],
+   "legend": [],
+   "lines": [
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-1.61739847291",
+       "8"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-2.97536424706",
+       "8"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-0.546985327218",
+       "8"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "0.252872235186",
+       "7"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-0.331155513595",
+       "7"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "0.928690151355",
+       "7"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "1.37805508947",
+       "6"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "0.61582629192",
+       "6"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "2.21095436524",
+       "6"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-1.34252627172",
+       "5"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-1.96392537884",
+       "5"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-0.801188877844",
+       "5"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-0.762432521037",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-1.54594654746",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-0.264172768",
+       "4"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-0.651606768063",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-1.29517248303",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-0.0876859661725",
+       "3"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-3.24560505946",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-4.38044081014",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-2.12650954098",
+       "2"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-0.921347551807",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-1.81444535073",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#2a78d6ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-0.186058881159",
+       "1"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "o",
+     "points": [
+      [
+       "-3.64426266821",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-4.83805370798",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#898781ff",
+     "label": "_nolegend_",
+     "marker": "|",
+     "points": [
+      [
+       "-2.47626890485",
+       "0"
+      ]
+     ],
+     "style": "None",
+     "width": "1.4"
+    },
+    {
+     "colour": "#52514eff",
+     "label": "_child36",
+     "marker": "None",
+     "points": [
+      [
+       "0",
+       "0"
+      ],
+      [
+       "0",
+       "1"
+      ]
+     ],
+     "style": "--",
+     "width": "0.9"
+    }
+   ],
+   "patches": [],
+   "texts": [],
+   "title": "",
+   "xlabel": "\u0394J, % of comparator's J (< 0: joint better)",
+   "xlim": [
+    "-5.19050411164",
+    "2.5634047689"
+   ],
+   "xscale": "linear",
+   "xticklabels": [
+    "\u22126",
+    "\u22124",
+    "\u22122",
+    "0",
+    "2",
+    "4"
+   ],
+   "xticks": [
+    "-6",
+    "-4",
+    "-2",
+    "0",
+    "2",
+    "4"
+   ],
+   "ylabel": "",
+   "ylim": [
+    "-0.4",
+    "8.4"
+   ],
+   "yscale": "linear",
+   "yticklabels": [
+    "published plant and lattice\nJOINTNESS JN-C1",
+    "quality priced\nQUALITY QL-C1",
+    "unseen, non-periodic demand\nHELDOUT HO-C1",
+    "live-fitted plant, rate-limited\nWIDTH",
+    "live-fitted plant, wide steps\nWIDTH",
+    "published plant, rate-limited\nWIDTH",
+    "published plant, wide steps\nWIDTH",
+    "coupled plant, rate-limited\nWIDTH",
+    "coupled plant, wide steps\nWIDTH"
+   ],
+   "yticks": [
+    "8",
+    "7",
+    "6",
+    "5",
+    "4",
+    "3",
+    "2",
+    "1",
+    "0"
+   ]
+  }
+ ],
+ "figure": "fig22_adjudication_chain",
+ "size_inches": [
+  "15.5",
+  "5.6"
+ ],
+ "texts": []
+}
