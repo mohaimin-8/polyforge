@@ -65,11 +65,33 @@ def test_the_committed_report_is_what_a_fresh_build_produces():
      r"FAIL); the corrected controller beats all four arms at"),
     ("Phase 7 live ordinal check read as a ranking (DISAGREE)",
      r"Live ordinal check: DISAGREE; 24\,h soak (SK-H4 PASS, SK-H1/H3 FAIL);"),
+    # WIDTH 2026-10-22: the paper's title and conclusion as they stood.
+    ("per-layer optima do not compose",
+     r"\title{Per-layer optima do not compose: joint replica, semantic-cache and"),
+    ("per-layer optima do not compose", r"campaign. They do not compose. Returning to the contributions of"),
+    ("per-layer optima do not compose", r"    Per-layer local optima do \alert{not} compose. A controller that plans"),
 ])
 def test_each_claim_pattern_finds_the_sentence_it_exists_for(label, sample):
     mod = _mod()
     pattern = next(p for lbl, p, _, _ in mod.CONTRADICTED if lbl == label)
     assert re.search(pattern, sample), f"{label!r}: pattern misses {sample!r}"
+
+
+def test_the_compose_pattern_ignores_the_open_question():
+    # The abstract asks whether the optima compose; only the answer "they do
+    # not" is the contradicted claim.
+    mod = _mod()
+    pattern = next(p for lbl, p, _, _ in mod.CONTRADICTED if lbl == "per-layer optima do not compose")
+    assert not re.search(pattern, "sound alone; whether their local optima compose had not been tested. We")
+    assert not re.search(pattern, r"  \textbf{Question: do per-layer local optima compose?}")
+
+
+def test_no_row_still_recommends_the_layered_stack_win():
+    # JOINTNESS (2026-10-16) showed FJ-H3/RT-H3 measured a price-blind tier
+    # rule; a row telling the author to cite them would re-introduce the claim.
+    mod = _mod()
+    for label, _, now, _ in mod.CONTRADICTED:
+        assert "cite that instead" not in now, label
 
 
 def test_a_withdrawn_number_beside_its_withdrawal_is_not_drift(tmp_path):

@@ -110,9 +110,12 @@ CONTRADICTED = [
      "pinned 128 MB cache, edge-of-grid tuning). Against fair comparators on "
      "fresh shared seeds J ties HPA (FJ-H1 FAIL, ΔJ −0.0037 = −0.9%) and beats "
      "KEDA by 7% (FJ-H2); with both re-tuned per cluster size it ties HPA and "
-     "does not beat KEDA (RT-H1/H2 FAIL). The layered three-knob stack is "
-     "beaten by 53–60% (FJ-H3, RT-H3 PASS): cite that instead.",
-     "RESULTS_FAIR_J.md, RESULTS_RETUNED.md"),
+     "does not beat KEDA (RT-H1/H2 FAIL). The 53–60% win over the layered stack "
+     "(FJ-H3, RT-H3 PASS) measured that stack's price-blind tier rule: with the "
+     "tier pinned to the cheapest model the stack ties (JN-B1 FAIL) and on "
+     "unseen demand it is better (HO-B1). Do not cite it as a joint-control win "
+     "(until 2026-10-22 this row recommended citing it).",
+     "RESULTS_FAIR_J.md, RESULTS_RETUNED.md, RESULTS_JOINTNESS.md, RESULTS_HELDOUT.md"),
     ("B1': the corrected controller beats all four live arms",
      r"beats (every one of the|all) four (comparators|arms)",
      "three valid arms, not four: the replica-only arm ran with one tenant "
@@ -137,11 +140,26 @@ CONTRADICTED = [
     ("joint control dominates tuned per-layer baselines",
      r"dominates\s+tuned",
      "not shown: J ties fair and re-tuned HPA (FJ-H1, RT-H1 FAIL) and does not "
-     "beat re-tuned KEDA (RT-H2 FAIL). It beats the layered stack by 53–60% "
-     "(FJ-H3, RT-H3 PASS), but RETUNED's SLO guard fails, and every reading "
-     "moves with J's lateness weight and cap (against re-tuned HPA the "
-     "registered weight 2 is the crossover).",
-     "RESULTS_FAIR_J.md, RESULTS_RETUNED.md, SENSITIVITY_FAIR.md"),
+     "beat re-tuned KEDA (RT-H2 FAIL). Its 53–60% win over the layered stack "
+     "(FJ-H3, RT-H3) measured that stack's price-blind tier rule (JN-B1 tie; "
+     "HO-B1, the stack better on unseen demand), RETUNED's SLO guard fails, and "
+     "every reading moves with J's lateness weight and cap (against re-tuned "
+     "HPA the registered weight 2 is the crossover).",
+     "RESULTS_FAIR_J.md, RESULTS_RETUNED.md, SENSITIVITY_FAIR.md, RESULTS_JOINTNESS.md, "
+     "RESULTS_HELDOUT.md"),
+    # --- final review 2026-10-16 and WIDTH 2026-10-22 -------------------------
+    ("per-layer optima do not compose",
+     r"do\s+(?:\\\w+\{)?not\}?\s+compose",       # the slides set "not" in \alert{}
+     "not supported; under the published actuation the opposite holds. With "
+     "every knob rate-limited (±2 replicas, one cache level per interval), joint "
+     "and per-knob search are equivalent on all three plants tested (WD-H4) and "
+     "differ on at most 1.04% of decisions. Coordination is worth ~1.7% of J on "
+     "the matrix (JN-C1, equivalent), nothing with quality priced (QL-C1), and "
+     "reverses on unseen demand (HO-C1). It pays only with ±8-replica steps on "
+     "plants where AI work loads the replicas (WD-H1/H2 PASS; not on the "
+     "live-fitted plant, WD-H3), and those steps raise J (WD-H5). The 53–60% "
+     "layered-stack win measured a price-blind tier rule (JN-B1).",
+     "RESULTS_JOINTNESS.md, RESULTS_QUALITY.md, RESULTS_HELDOUT.md, RESULTS_WIDTH.md"),
 ]
 
 # A registered hypothesis tag, as records_index.py reads it.
