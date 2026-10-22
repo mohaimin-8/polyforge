@@ -41,7 +41,7 @@ F.plt.rcParams.update({"axes.titlesize": 8, "axes.labelsize": 7.5, "xtick.labels
 
 # Short IEEE labels for the gated chain rows, keyed by (frame, treatment, comparator).
 LABELS = {
-    ("headline", "jcac", "hpa"): ("As first published", "pre-audit matrix"),
+    ("headline", "jcac", "hpa"): ("As first reported", "pre-audit matrix"),
     ("eviction", "jcac", "hpa_fair"): ("No LRU charge, 512 MB cache", "EVICTION_PARITY"),
     ("fair_j", "jcac_converged", "hpa_fair"): ("Fresh shared seeds, converged solver", "FJ-H1"),
     ("retuned", "jcac_converged", "hpa_fair_retuned"): ("HPA re-tuned per cluster size", "RT-H1"),
@@ -55,7 +55,7 @@ LABELS = {
     ("heldout", "jcac_converged", "layered_small_tuned"): ("Unseen, non-periodic demand", "HO-B1"),
 }
 PANELS = (("A", "(a) Against reactive replica control (HPA)"),
-          ("B", "(b) Against the layered per-knob stack"))
+          ("B", "(b) Against a layered stack of per-layer controllers"))
 
 
 def _sheet_rows(name: str) -> list[list[str]]:
@@ -89,7 +89,7 @@ def draw_chain(rs: list[dict]):
                for t, _ in PANELS}
     # Stacked, full text width: the step labels are long, and side-by-side
     # panels left either the labels or the intervals unreadably small.
-    fig, axes = F.plt.subplots(2, 1, figsize=(7.16, 3.05),
+    fig, axes = F.plt.subplots(2, 1, figsize=(7.16, 2.85),
                                gridspec_kw={"height_ratios": [len(rows_by["A"]), len(rows_by["B"])],
                                             "hspace": 0.95})
     fig.subplots_adjust(left=0.33, right=0.985)
@@ -130,7 +130,7 @@ def draw_width(rows: list[dict]):
     ax.set_xticks(range(len(order)), [names[p] for p in order])
     ax.set_xlim(-0.5, len(order) - 0.5)
     ax.set_ylim(-0.4, 6.6)                     # headroom so the legend clears every interval
-    ax.set_ylabel("coordination gain $G$\n% of decoupled arm's $J$")
+    ax.set_ylabel("gain $G$, % of decoupled $J$\n(> 0: joint better)")
     ax.legend(loc="upper left", handletextpad=0.3, borderaxespad=0.2)
     F._style(ax)
     return fig
