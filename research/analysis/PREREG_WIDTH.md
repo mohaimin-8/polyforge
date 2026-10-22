@@ -120,3 +120,13 @@ failing run is recorded and its design point dropped for every arm; an
 interrupted sitting is resumed with completed runs skipped and the interruption
 disclosed; a scorer defect found after the run is fixed in a new scorer and a
 new record.
+
+## Status note (2026-10-22, appended after the registered text)
+
+The sitting started 2026-10-21 20:34 UTC and stopped at 575 of the published
+plant's 960 runs when the operator's session ended; the coupled and live plants
+had not started. No run had failed and nothing was changed. It was resumed on
+2026-10-22 with the harness's resume rule (runs already recorded valid are
+skipped), as a detached process so a session ending cannot stop it again. No
+arm, plant, workload, seed, parameter or scorer was changed, and no result was
+looked at in between.
