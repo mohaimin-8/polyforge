@@ -26,9 +26,10 @@ fresh, shared seeds. What the evidence now supports:
   has half the joint controller's SLO overshoot (`mean_excess` 0.1051 vs 0.2117)
   at 24% more cost; the re-tuned KEDA has 0.39× at 40% more cost; every RT SLO
   guard FAILS. These readings depend on J's lateness weight and its 1.0 cap
-  (`SENSITIVITY_FAIR.md`, exploratory): against re-tuned HPA the registered
-  weight sits on the crossover, and at a lateness weight of 4 or more the
-  re-tuned HPA and KEDA are better.
+  (`SENSITIVITY_FAIR.md`, exploratory): with the cap as registered, the
+  registered weight of 2 is the crossover against re-tuned HPA, re-tuned HPA
+  is better at a weight of 4, and re-tuned KEDA is better too at 8 (its
+  crossover is 3.05). Without the cap, both are better from a weight of 4.
 - **Coordinating the knobs is worth about 2% of J.** The 53–60% win over the
   registered layered stack (FJ-H3, RT-H3) came from that stack's price-blind tier
   rule: a layered stack with no tier layer ties the joint controller
