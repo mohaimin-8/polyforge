@@ -130,6 +130,34 @@ on fresh shared seeds separated the parts the earlier comparisons bundled
   +0.0073] (within the equivalence margin). Every SLO guard fails; the controller
   sheds AI on 11.3% of tenant-steps. Scope every win above to the periodic matrix.
 
+*Finding (2026-10-22): why coordination buys so little.* `PREREG_WIDTH.md` tested
+the explanation exploratory probes had suggested (disclosed in the protocol, so a
+confirmatory replication on fresh seeds, not a blind test): under rate-limited
+steps the first-order gain of a move is available to per-knob search too, and
+only the interaction terms, second-order in the step, need a joint search.
+Three plants × two actuation lattices × joint vs decoupled search, 960 runs per
+plant, all valid (`RESULTS_WIDTH.md`, figure sheet `FIGURE_WIDTH.md`). All five
+registered predictions held:
+- **On the published, rate-limited lattice (±2 replicas, one cache level per
+  interval) coordination is equivalent to zero on every plant** (WD-H4
+  EQUIVALENT ×3; G = J(decoupled) − J(joint) +0.0044 / +0.0092 / +0.0033 on the
+  published / coupled / live-fitted plant). The two searches pick different
+  moves on at most 1.04% of best responses.
+- **It grows only when one interval may move far and the layers share
+  capacity.** With ±8-replica, any-cache-level steps the gain rises by DiD
+  +0.0187 [+0.0082, +0.0287] on the published plant and +0.0315 [+0.0161,
+  +0.0472] on the coupled plant (WD-H1/H2 PASS), and not on the plant fitted to
+  the live system, where AI work never loads the replicas (WD-H3 EQUIVALENT,
+  DiD −0.0012 [−0.0032, +0.0009]).
+- **Wide steps raise the joint controller's own J on every plant** (WD-H5 PASS
+  ×3; J rate-limited − J wide −0.0152 / −0.0859 / −0.0301): the regime where
+  coordination pays is one the controller should not run in.
+- Programme-wide (`HYPOTHESIS_LEDGER.md`): WD-H2, WD-H5[coupled] and
+  WD-H5[live] survive Holm; WD-H1 survives Benjamini–Yekutieli only, WD-H5[published]
+  its registered family only. Quote them so.
+- Scope: one simulator; the coupled plant is a stress point chosen from a probe
+  grid, not a measured system; nothing here was run live.
+
 ---
 
 ## Campaign ledger (chronological)
@@ -568,6 +596,7 @@ campaign replay bit-identically (spot-check drift **0.00e+00**).
 | End-to-end multi-tenancy at width | **TS-H1a PASS at 32T (all arms, \|d_z\| ≥ 1.02); margin grows with width, d_z −0.96 → −1.32 across 8/32/64 (`RESULTS_TENANT_SCALE.md`)** | any unqualified 64T claim | TS-H1b is an honest FAIL (keda p=0.0102 at n=10, direction-consistent); quote 32T as confirmatory, 64T as large-effect + trend. **Handicapped comparators (check-up 2026-10-14):** every comparator arm here (`hpa`, `keda`, `concurrency`) carries the 1.4581× LRU charge, so the width result is against the published, not the fair, comparators |
 | Risk-aware / quantile planning | **the corrected mechanism works but is not the default: RB-H1 PASS (−0.00232 violation, p=0.0073) while ΔJ is +0.0079 (p=1.9e-07) against the point forecast (`RESULTS_RISK_BUDGET.md`)** | the uncorrected null's numbers (`RESULTS_RISK.md`) as the mechanism's verdict, or any "risk-aware MPC beats the reactive stack on SLO" claim | two campaigns, one changed factor: the null measured a *defect* (the knob fighting the Budget CRD), the follow-up measured the *mechanism* and found it real but net-negative under our weights. RB-H2/RB-H3 both FAILED — no frontier claim, no strict domination; violation vs the reactive stack stays parity-at-lower-cost |
 | vs a learned (RL) joint controller | **MPC beats the offline-trained learned policy on J: −0.376, CI [−0.437, −0.318], p=2.9e-28, d_z=−0.708, at zero training cost (`RESULTS_LEARNED.md`)** | "RL cannot do joint control" | the learned arm is strong and *lower-violation* — it loses on J by spending 2.61× more; the claim is that the optimizer finds the **cheap** joint posture a well-trained learner does not, and needs no training episodes to do it. **Handicapped comparator (check-up 2026-10-14):** both learned arms carry the 1.4581× LRU inference charge (`lru_eviction=True`, `eval/harness/systems.py`) and jcac does not, so part of the 2.61× spend gap is the accounting handicap, not the policy; this comparison has not been re-run against a fair learned arm |
+| Value of controlling the knobs jointly | **JN-C1 −0.0066 [−0.0121, −0.0022] (~1.7% of J), inside the ±0.025 equivalence margin; nothing with quality priced (QL-C1), reversed on unseen demand (HO-C1 +0.0045); equivalent to zero under rate-limited steps on all three WIDTH plants (WD-H4), growing only with wide steps where the layers share capacity (WD-H1/H2), which raise J (WD-H5)** (`RESULTS_JOINTNESS.md`, `RESULTS_WIDTH.md`) | FJ-H3 / RT-H3 (−53…−60% vs the registered layered stack) as evidence that the knobs must be controlled jointly | the layered-stack win measured that stack's latency-ranked, price-blind tier rule: with the tier pinned to the cheapest model the stack ties (JN-B1) and on unseen demand beats the joint controller (HO-B1 +0.063). Added 2026-10-22 |
 
 ## Honest-nulls ledger
 

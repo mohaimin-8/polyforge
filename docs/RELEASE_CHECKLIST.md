@@ -18,21 +18,26 @@ version predated the evidence site, the AWS sittings and the caption gate.)
 
 ## 2. Records and pre-registrations — done, gated
 
-- 78 records regenerate byte-identically (`scripts/reproduce.py`; CI
-  `reproduce` job); 18 more carry a stated reason in `UNGATED`; 56
-  pre-registrations; `check_preregs.py` proves no registered text moved after
-  its result existed, and `check_prereg_timing.py` judges 51 of 53 campaigns
-  ran after their protocol (2 disclosed).
+- 81 records regenerate byte-identically (`scripts/reproduce.py`; CI
+  `reproduce` job; 23 figures with identical plotted data and captions); 18
+  more carry a stated reason in `UNGATED`; 57 pre-registrations;
+  `check_preregs.py` proves no registered text moved after its result existed,
+  and `check_prereg_timing.py` judges 54 of 56 campaigns ran after their
+  protocol (2 disclosed). Counts as of 2026-10-22 (WIDTH).
 - `research/analysis/RECORDS_INDEX.md` (generated) enumerates all of them;
   `OSF_REGISTRATION.md` carries the 29 OSF rows.
-- [ ] The 8 protocols written after the OSF mirror (FAIR_J, STRUCTURAL_MISMATCH,
-      RETUNED, WAVE4_REPLICATION, JOINTNESS, ACTUATION, QUALITY, HELDOUT) are
-      git-only; the upload package is `Thesis Project/osf_upload_2026-10-16/`.
-      Their pushes carry server-side times (GitHub Actions run creation), and
-      JOINTNESS/ACTUATION, QUALITY and HELDOUT were archived by Software
-      Heritage within seconds of their push (save requests 2560095, 2560208,
-      2560399). **Human:** add
-      them to the OSF project as a post-run registration, stated as such.
+- [ ] The 9 protocols written after the OSF mirror (FAIR_J, STRUCTURAL_MISMATCH,
+      RETUNED, WAVE4_REPLICATION, JOINTNESS, ACTUATION, QUALITY, HELDOUT, WIDTH)
+      are git-only; the upload package is `Thesis Project/osf_upload_2026-10-16/`.
+      Their pushes carry server-side times (GitHub Actions run creation), which
+      are the pre-run anchor for all nine. Software Heritage (checked against its
+      API 2026-10-22): JOINTNESS/ACTUATION were archived before their first run
+      (save 2560095, snapshot 10:10:04Z); QUALITY's snapshot (save 2560208) came
+      at 11:02:16Z, after its campaign started, so it is a post-start witness
+      only; the HELDOUT (2560399) and WIDTH (2568089) requests were accepted but
+      their archival visits failed, so neither has a snapshot. (This item said
+      HELDOUT was archived; corrected 2026-10-22.) **Human:** add them to the OSF
+      project as a post-run registration, stated as such.
 - [x] OSF mirror registered 2026-09-19: **https://doi.org/10.17605/OSF.IO/DYZKV**
       (all 48 protocols + index + commit map, frozen and public; project
       https://osf.io/wt7em/). A post-run witness, stated as such; the git

@@ -45,7 +45,14 @@ fresh, shared seeds. What the evidence now supports:
   On two held-out workloads with random, non-periodic bursts that no campaign or
   tuning had seen, it beats no baseline, loses to the no-tier layered stack, and its
   coordination advantage reverses (`RESULTS_HELDOUT.md`): the wins above hold on the
-  matrix's periodic workloads only.
+  matrix's periodic workloads only. Why coordination buys so little
+  (`RESULTS_WIDTH.md`, registered after disclosed probes, run on fresh seeds): with
+  every arm stepping at most ±2 replicas and one cache level per interval, joint and
+  per-knob search differ on at most 1.04% of decisions and their J is equivalent on
+  all three plants tested (WD-H4). Coordination pays only when one interval may move
+  ±8 replicas and the layers share capacity (WD-H1/H2 PASS; not on the plant fitted
+  to the live system, WD-H3), and those wide steps raise the joint controller's own
+  J on every plant (WD-H5).
 - **On live hardware the controller must calibrate its model online.** The
   published controller lost to its own tier-only ablation live (B1, WL-H1 FAIL);
   its plant model predicted 3,500 ms CRUD p95 at the cell's peak, which the
@@ -66,8 +73,8 @@ fresh, shared seeds. What the evidence now supports:
   real-trace forecasting results, the semantic-cache measurements, and the
   planning-cell scaling result.
 
-Across the programme, 117 registered tests carry a p-value; 69 passed as registered,
-and 54 of those survive a programme-wide Holm correction
+Across the programme, 122 registered tests carry a p-value; 74 passed as registered,
+and 57 of those survive a programme-wide Holm correction
 (`research/analysis/HYPOTHESIS_LEDGER.md`). The audit report is outside the
 repository; the fixes and re-runs are commits `fe23712` onward on this branch.
 
@@ -329,8 +336,9 @@ pre-registration and record, the live-campaign evidence and the IaC are
 deposited at [https://doi.org/10.5281/zenodo.22801195](https://doi.org/10.5281/zenodo.22801195)
 (Islam, 2026, CC BY 4.0; SHA-256 manifest). Version 3
 ([10.5281/zenodo.23542675](https://doi.org/10.5281/zenodo.23542675), 2026-10-21, 1,082 files)
-carries every campaign through QUALITY; HELDOUT ran after it and is in this repository as its
-run-level export (`eval/results/metrics_matrix_heldout.csv.gz`). Restoring its
+carries every campaign through QUALITY; HELDOUT and WIDTH ran after it and are in this
+repository as run-level exports (`eval/results/metrics_matrix_heldout.csv.gz`,
+`eval/results/metrics_matrix_width_{published,coupled,live}.csv.gz`). Restoring its
 DuckDB files into `eval/results/` enables the archive tier of
 `docs/REPRODUCE.md`. Cite the dataset as:
 
@@ -341,9 +349,14 @@ DuckDB files into `eval/results/` enables the archive tier of
 **Pre-registrations on OSF:** the first 48 protocols are mirrored, frozen and
 public at [https://doi.org/10.17605/OSF.IO/DYZKV](https://doi.org/10.17605/OSF.IO/DYZKV) (registered after the
 campaigns ran; the git push timestamps remain the pre-run anchor, and
-`scripts/check_preregs.py` proves no protocol changed after its result). The four
-protocols of the audit programme (`PREREG_FAIR_J`, `PREREG_STRUCTURAL_MISMATCH`,
-`PREREG_RETUNED`, `PREREG_WAVE4_REPLICATION`) are git-anchored; 52 protocols in all,
+`scripts/check_preregs.py` proves no protocol changed after its result). The nine
+protocols written after that mirror (`PREREG_FAIR_J`, `PREREG_STRUCTURAL_MISMATCH`,
+`PREREG_RETUNED`, `PREREG_WAVE4_REPLICATION`, `PREREG_JOINTNESS`,
+`PREREG_ACTUATION`, `PREREG_QUALITY`, `PREREG_HELDOUT`, `PREREG_WIDTH`) are
+git-anchored, each push timed server-side by the GitHub Actions run it triggered;
+JOINTNESS and ACTUATION also have a Software Heritage snapshot taken before their
+first run (QUALITY's was taken after its campaign started, and the HELDOUT and WIDTH
+save requests were accepted but their archival visits failed). 57 protocols in all,
 and `scripts/check_prereg_timing.py` checks each campaign ran after its protocol.
 
 ## Limitations (honest boundaries)
