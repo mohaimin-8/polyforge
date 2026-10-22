@@ -4,7 +4,7 @@ One entry point for every document in this repository. Start here rather than
 browsing directories.
 
 The repository holds ~180 markdown files. That number is not accidental clutter:
-the evidence base is **44 pre-registrations plus the records**, and most of the
+the evidence base is **the pre-registrations plus the records**, and most of the
 records are verified byte-identically by `scripts/reproduce.py`. Those cannot be
 merged or rewritten without destroying the reproducibility gate. What *was*
 clutter — superseded planning documents — now lives in [archive/](archive/).
@@ -48,7 +48,7 @@ All engineering work finished: Phase 4 (AWS rerun) not funded. Writing deferred 
 
 The methodological core. Two file families, both load-bearing:
 
-**`PREREG_*.md` (52)** — pre-registrations. Each was committed **and pushed
+**`PREREG_*.md`** — pre-registrations. Each was committed **and pushed
 before** its run, except two committed after their first runs and disclosed as
 such (`PREREG_EVICTION_PARITY`, `PREREG_ORDER_PERMUTATION`;
 `scripts/check_prereg_timing.py` judges every campaign); the push event is the
@@ -82,11 +82,12 @@ a new record, they do not overwrite the old one.
 `content/*.json` = what each one plots, `FIGURES.md` = every caption, which is
 what the site prints under each figure). The gate rebuilds all of them and
 compares the plotted content and the captions on every platform, the bytes
-where the renderer matches. `fig18`–`fig21` are drawn by campaign scripts from
+where the renderer matches. `fig18`–`fig23` are drawn by campaign scripts from
 the scored record's own functions (`analysis_risk*.py`,
 `fig_wave4_calibrated.py` → `FIGURE_WAVE4_CALIBRATED.md`, `fig_wave4_dwell.py`
-→ `FIGURE_WAVE4_DWELL.md`); the two `FIGURE_*.md` sheets are captions plus
-plotted numbers, not records.
+→ `FIGURE_WAVE4_DWELL.md`, `fig_adjudication_chain.py` →
+`FIGURE_ADJUDICATION_CHAIN.md`, `fig_width.py` → `FIGURE_WIDTH.md`); the
+`FIGURE_*.md` sheets are captions plus plotted numbers, not records.
 
 Supporting analyses in the same directory (not all gated): `THEORY_V2.md`,
 `VTC_FAIRNESS.md`, `EFFECT_SIZES.md`, `SENSITIVITY_J.md`, `COORD_GAP*.md`,
