@@ -51,7 +51,7 @@
 \ifblind
 \newcommand{\polyforge}{SysX}
 \newcommand{\jcac}{JC}
-\newcommand{\jcacintro}{a joint controller (JC)}
+\newcommand{\jcacintro}{JC (for joint controller)}
 \else
 \newcommand{\polyforge}{PolyForge}
 \newcommand{\jcac}{JCAC}
@@ -62,18 +62,8 @@
 
 \begin{document}
 
-\title{When Does Joint Autoscaling Pay? A Pre-Registered Simulation Study
-of Replica, Cache, and Model-Tier Control for LLM Serving}
-
-% ---------------------------------------------------------------------
-%  Alternative titles, if the primary does not suit the venue:
-%
-%  When Do Per-Layer Autoscalers Compose? A Pre-Registered Simulation
-%  Study of Joint Replica, Cache, and Model-Tier Control for LLM Serving
-%
-%  Rate-Limited Autoscalers Compose: A Pre-Registered Test of Joint
-%  Replica, Cache, and Model-Tier Control for LLM Serving
-% ---------------------------------------------------------------------
+\title{Joint versus Per-Layer Control of Replicas, Caches, and Model Tiers
+in Multi-Tenant LLM Serving: A Pre-Registered Simulation Study}
 
 % Double-blind submission: no author block, as in the venue's sample
 % paper; the camera-ready version (\blindfalse) prints the authors.
@@ -155,7 +145,7 @@ joint setting, and that one controller should set all three knobs together
 
 Joint control of serving knobs is an active line of work, from model
 variants chosen together with autoscaling~\cite{infaas} to caches chosen
-together with model selectors~\cite{zhu2023}. These systems report gains over separately
+jointly with model selectors~\cite{zhu2023}. These systems report gains over separately
 configured or fixed alternatives. Yet comparisons of controllers are
 sensitive to how well the baselines are tuned and
 instrumented~\cite{chameleon,zhang2026drl,khilji2026}, and
@@ -605,7 +595,10 @@ heavily, and the mid and large tiers cost two and four times the small
 tier's replica work. The \emph{live-fitted} plant follows measurements of
 the deployed system: a replica serves at least 1{,}123 units/s (no
 measured run reached congestion) and AI requests never load it. Joint and decoupled search ran on the published lattice and on a
-wide one ($\Delta r\in\{-8,\dots,8\}$, any cache level).
+wide one ($\Delta r\in\{-8,\dots,8\}$, any cache level). Per tenant, joint
+search then scores up to $17\times6\times4=408$ candidates instead of
+$5\times3\times4=60$, and decoupled search at most $17+6+4=27$ instead
+of $5+3+4=12$.
 
 All five registered predictions held. On the rate-limited lattice the gain
 is small but positive (0.7--1.3\% of the decoupled arm's $J$,
@@ -698,7 +691,10 @@ HPA is better than \jcac{}, and at 8 re-tuned KEDA is too.
 \textit{Internal.} The coupled plant is a stress point chosen from a probe
 grid, not a measured system. \textit{External.} Workloads are synthetic
 periodic classes plus two held-out Markov-modulated ones, with eight
-tenants per mix.
+tenants per mix. \textit{Statistical conclusion.} The intervals resample
+design points, so they generalize over the sampled workloads, mixes and
+cluster sizes and not beyond them; run-to-run noise enters only through
+each point's five-rep mean.
 
 % =====================================================================
 \section{Conclusion}

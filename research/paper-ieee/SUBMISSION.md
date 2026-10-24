@@ -26,8 +26,8 @@ site's countdown, `data-deadline="2026-10-25T17:59:59+00:00"`). Notification
 
 ## CMT fields (paste as plain text)
 
-**Title:** When Does Joint Autoscaling Pay? A Pre-Registered Simulation Study of
-Replica, Cache, and Model-Tier Control for LLM Serving
+**Title:** Joint versus Per-Layer Control of Replicas, Caches, and Model Tiers in
+Multi-Tenant LLM Serving: A Pre-Registered Simulation Study
 
 **Subject area / track:** Track 1, Artificial Intelligence and Data Analytics
 (topic "Distributed and Cloud Computing").
