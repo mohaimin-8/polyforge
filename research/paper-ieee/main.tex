@@ -1,6 +1,13 @@
 \documentclass[conference,a4paper]{IEEEtran}   % ICEEICT 2027: A4, IEEE double column
 \IEEEoverridecommandlockouts
 % The preceding line also enables \IEEEpubid (the copyright line) in conference mode.
+% A4 as the venue requires, with the template's margins (0.75in top, 1in
+% bottom). IEEEtran's a4paper option keeps the Letter text height instead,
+% which leaves a 1.69in bottom margin on the longer A4 page.
+\IEEEsettextheight{0.75in}{1in}
+\IEEEquantizetextheight{c}
+\IEEEsettopmargin{t}{0.75in}
+\IEEEsettopmargin{q}{0sp}
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{graphicx}
@@ -197,6 +204,13 @@ threats to validity and Section~\ref{sec:conclusion} concludes.
 \label{sec:related}
 % =====================================================================
 
+\textit{Caching and routing.} A semantic cache embeds each prompt and
+returns a stored answer when a cached prompt is similar
+enough~\cite{gptcache}, and a cascade queries a cheap model first and
+escalates only when its answer is not reliable enough~\cite{frugalgpt}.
+Both act per request; \polyforge{} sets their budget and tier per tenant
+and per interval.
+
 \textit{Joint control of serving knobs.} Like the systems cited
 above~\cite{infaas,zhu2023}, \polyforge{} adapts the
 model choice together with other knobs. It differs in its knobs
@@ -372,9 +386,12 @@ $[-0.0025,+0.0121]$, an interval that includes zero
 \subsection{Comparators and ablations}
 \label{sec:comparators}
 
-HPA and KEDA arms scale replicas on utilization and request rate, clamped
-like \jcac{} to $\pm2$ replicas per interval, with a fixed cache and
-tier. Their final versions are tuned on a separate slice over grids with
+HPA and KEDA arms scale replicas on utilization and request rate. An HPA
+arm sets $\lceil r\rho/\rho^\ast\rceil$ replicas for utilization $\rho$
+and target $\rho^\ast$, the Kubernetes rule~\cite{k8shpa}, and a KEDA
+arm $\lceil\lambda/\lambda^\ast\rceil$ for request rate $\lambda$ and
+per-replica target $\lambda^\ast$; both are clamped like \jcac{} to
+$\pm2$ replicas per interval and keep a fixed cache and tier. Their final versions are tuned on a separate slice over grids with
 interior optima, re-tuned per cluster size, and held to \jcac{}'s cluster
 caps. Layered stacks run an HPA rule, a cache policy and a tier rule
 independently, with four tier rules: the registered rule (rank tiers by
@@ -421,7 +438,10 @@ matrices and their re-scorings, real-trace replays, robustness reruns,
 controller variants, planner scaling, chaos, soak and live GPU runs, and a
 cache side channel. Across all 57 protocols, 122 registered tests carry a $p$-value;
 74 passed, and 57 of those survive a program-wide Holm correction. All 81 gated records and 23 figures
-regenerate from the committed exports with identical content.
+regenerate from the committed exports with identical content, and one
+script generates every table and data figure of this paper from those
+records, checking the plotted adjudication and width values against the
+committed figure sheets.
 
 % =====================================================================
 \section{Results}
@@ -548,12 +568,27 @@ consistent with its 60\,s planning horizon, which a reactive rule lacks.
 every non-shedding arm, but its violation and excess are higher than those
 of every HPA, KEDA, static and cheapest-tier arm in Table~\ref{tab:arms}.
 Shedding does not come from joint search: the decoupled and knob-wise
-arms shed on 7.7\% and 7.3\% of tenant-steps.
+arms shed on 7.7\% and 7.3\% of tenant-steps. Fig.~\ref{fig:tradeoff}
+shows the trade: the tuned per-layer arms and the cheapest-tier stack
+hold violation at 0.043 to 0.053, against 0.068 for \jcac{}, for 14 to
+24\% more cost.
 Held to never shedding, it costs
 19\% more, its $J$ rises by $0.0677$ $[0.0432,0.0945]$, and it loses to
 capped HPA. Against most baselines its SLO guard fails. On unseen demand,
 tested with instant actuation only, none of its wins survives
 (Table~\ref{tab:post}, last block) and it sheds 11.3\% of tenant-steps.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig_tradeoff.pdf}
+\caption{Mean cost and SLO violation of every arm of Table~\ref{tab:arms}
+(\rec{JOINTNESS}, 60 design points $\times$ 5 reps; cost on a log scale).
+The four \jcac{} variants that shed (blue) are the cheapest arms; the
+tuned per-layer arms and the cheapest-tier stack buy lower violation for
+more cost, and the registered layered rule (violet, right) buys the
+lowest violation at the highest cost.}
+\label{fig:tradeoff}
+\end{figure}
 
 \subsection{Why coordination buys little}
 \label{sec:width}
@@ -639,7 +674,10 @@ well as their tier rule (Table~\ref{tab:arms}).
 
 \textit{How to evaluate one.} Every comparator defect we found favored the
 joint controller; exploratory re-analyses exposed them and registered
-re-scorings removed them. Table~\ref{tab:checklist} turns them into rules.
+re-scorings removed them. Table~\ref{tab:checklist} turns them into rules. The decoupled
+ablation needs no new model: it reuses the joint controller's objective
+and forecast, and its search scores at most 12 candidates per tenant on
+the published lattice.
 
 \begin{table}[!t]
 \caption{A checklist for comparing joint and per-layer control: each rule,

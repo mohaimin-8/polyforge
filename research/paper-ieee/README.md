@@ -2,7 +2,10 @@
 
 `main.tex` is the PolyForge conference paper for ICEEICT 2027, in the IEEE
 conference template (`IEEEtran.cls`, conference mode, A4, two columns, at most
-6 pages including references). Every figure and table sits inside one column.
+6 pages including references). The page is A4, as the venue requires, with the
+margins of the sample IEEE template (0.75 in top, 1 in bottom); IEEEtran's own
+a4paper layout would leave a 1.69 in bottom margin. Every figure and table sits
+inside one column.
 `SUBMISSION.md` records the venue's rules and how the paper meets them.
 
 ## Build
@@ -47,8 +50,8 @@ test.
 python make_assets.py
 ```
 
-This writes the three data figures (`figures/fig_chain.pdf`, `fig_sizes.pdf`,
-`fig_width.pdf`) at IEEE column width and the generated tables
+This writes the four data figures (`figures/fig_chain.pdf`, `fig_sizes.pdf`,
+`fig_width.pdf`, `fig_tradeoff.pdf`) at IEEE column width and the generated tables
 (`tables/tab_campaigns.tex`, `tab_arms.tex`, `tab_post.tex`; `tab_width.tex`
 is kept for reference but not included). It takes every number from the
 records, the run exports, or the gated figure scripts' own functions

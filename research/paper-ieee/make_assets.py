@@ -151,7 +151,7 @@ def draw_chain(rs: list[dict]) -> Figure:
     # One column wide, panels stacked, each on its own x scale (the HPA steps
     # span about 45 points of J, the stack steps about 125). Step labels on
     # the left, the registered test of each step on the right.
-    fig, axes = F.plt.subplots(2, 1, figsize=(3.45, 2.55),
+    fig, axes = F.plt.subplots(2, 1, figsize=(3.45, 2.85),
                                gridspec_kw={"height_ratios": [len(rows_by["A"]), len(rows_by["B"])],
                                             "hspace": 0.5})
     fig.subplots_adjust(left=0.385, right=0.805, top=0.935, bottom=0.125)
@@ -194,7 +194,7 @@ def size_rows() -> dict[str, list[dict]]:
 
 
 def draw_sizes(data: dict[str, list[dict]]) -> Figure:
-    fig, axes = F.plt.subplots(1, 2, figsize=(3.45, 2.05), sharey=True,
+    fig, axes = F.plt.subplots(1, 2, figsize=(3.45, 2.3), sharey=True,
                                gridspec_kw={"wspace": 0.08})
     titles = {"instant": "(a) instant actuation", "lag": "(b) replicas one interval late"}
     for ax, regime in zip(axes, ("instant", "lag")):
@@ -217,7 +217,7 @@ def draw_sizes(data: dict[str, list[dict]]) -> Figure:
 
 
 def draw_width(rows: list[dict]) -> Figure:
-    fig, (ax_g, ax_d) = F.plt.subplots(1, 2, figsize=(3.45, 1.9),
+    fig, (ax_g, ax_d) = F.plt.subplots(1, 2, figsize=(3.45, 2.15),
                                        gridspec_kw={"width_ratios": [1.15, 1], "wspace": 0.42})
     order = width.ORDER
     names = {"live": "live-\nfitted", "published": "pub-\nlished", "coupled": "coupled"}
@@ -244,6 +244,48 @@ def draw_width(rows: list[dict]) -> Figure:
     handles, labels = ax_g.get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=1, frameon=False, bbox_to_anchor=(0.5, 1.15),
                handletextpad=0.3)
+    return fig
+
+
+TRADEOFF_COLOR = {"jc": F.SYSTEM_COLORS["jcac"], "layered": COLOR["layered"], "hpa": COLOR["hpa"],
+                  "keda": COLOR["keda"], "static": COLOR["static"]}
+TRADEOFF_GROUP = {"jcac_converged": "jc", "jcac_decoupled": "jc", "jcac_knobwise": "jc",
+                  "jcac_violation": "jc", "jcac_tier_floor": "jc", "layered_small_tuned": "layered",
+                  "layered_costaware_tuned": "layered", "jcac_nojoint_v2_retuned": "layered",
+                  "static_share": "static", "hpa_fair_retuned": "hpa", "hpa_fair_capped": "hpa",
+                  "keda_fair_capped": "keda"}
+# (label, arm the arrow points at, text position in data coordinates, alignment)
+TRADEOFF_LABELS = (
+    ("JC: joint, decoupled and\nknob-wise search", "jcac_converged", (3.25, 0.098), "left"),
+    ("JC, plans on violation", "jcac_violation", (2.0, 0.112), "left"),
+    ("JC, never sheds", "jcac_tier_floor", (3.25, 0.074), "left"),
+    ("HPA, KEDA, static share,\ncheapest-tier stack", "hpa_fair_capped", (3.25, 0.024), "left"),
+    ("Layered, cost-aware tier", "layered_costaware_tuned", (4.05, 0.124), "right"),
+    ("Layered, registered rule", "jcac_nojoint_v2_retuned", (8.6, 0.040), "right"),
+)
+
+
+def draw_tradeoff(arms: list[dict]) -> Figure:
+    """Mean cost against mean SLO violation for every arm of Table II."""
+    by_arm = {a["arm"]: a for a in arms}
+    fig, ax = F.plt.subplots(figsize=(3.45, 2.25))
+    for a in arms:
+        group = TRADEOFF_GROUP[a["arm"]]
+        ax.plot(a["cost"], a["violation"], "D" if group == "layered" else "o", ms=3.6,
+                color=TRADEOFF_COLOR[group], mec="white", mew=0.4, zorder=3)
+    for text, arm, (tx, ty), ha in TRADEOFF_LABELS:
+        a = by_arm[arm]
+        ax.annotate(text, (a["cost"], a["violation"]), xytext=(tx, ty), textcoords="data", ha=ha, va="center",
+                    fontsize=6, color=F.INK2, linespacing=1.0,
+                    arrowprops={"arrowstyle": "-", "color": F.MUTED, "lw": 0.5, "shrinkA": 1, "shrinkB": 3})
+    ax.set_xscale("log")
+    ax.set_xticks([2, 3, 4, 6, 8], ["2", "3", "4", "6", "8"])
+    ax.xaxis.set_minor_formatter(F.plt.NullFormatter())
+    ax.set_xlim(1.85, 9.5)
+    ax.set_ylim(0, 0.135)
+    ax.set_xlabel("mean cost per run (simulated \\$, log scale)")
+    ax.set_ylabel("mean SLO violation")
+    F._style(ax)
     return fig
 
 
@@ -424,8 +466,9 @@ def main() -> int:
     wrows = width.summary({p: width.aw.prepare(width.aw.load(p)) for p in width.aw.PLANTS})
     check_width(wrows)
     sizes = size_rows()
+    _, arms = table_arms()
     for name, fig in (("fig_chain", draw_chain(rs)), ("fig_sizes", draw_sizes(sizes)),
-                      ("fig_width", draw_width(wrows))):
+                      ("fig_width", draw_width(wrows)), ("fig_tradeoff", draw_tradeoff(arms))):
         fig.savefig(FIGS / f"{name}.pdf", bbox_inches="tight", pad_inches=0.02)
         F.plt.close(fig)
         print(f"wrote figures/{name}.pdf")
