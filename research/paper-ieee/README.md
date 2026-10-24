@@ -58,6 +58,6 @@ records, the run exports, or the gated figure scripts' own functions
 (`fig_adjudication_chain.py`, `fig_width.py`, which use the frozen PREREG
 scorers). It refuses to save if any plotted number differs from the committed
 figure sheets (`FIGURE_ADJUDICATION_CHAIN.md`, `FIGURE_WIDTH.md`), and it
-writes every value it used to `figures/plotted_numbers.json`. Fig. 1 (per-layer
-vs. joint control), Fig. 2 (evaluation workflow) and Table V (checklist) are
-written in `main.tex` itself.
+writes every value it used to `figures/plotted_numbers.json`. Fig. 1 (the system
+workflow in Section III, Methodology) and Table V (checklist) are written in
+`main.tex` itself.

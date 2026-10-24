@@ -151,7 +151,7 @@ def draw_chain(rs: list[dict]) -> Figure:
     # One column wide, panels stacked, each on its own x scale (the HPA steps
     # span about 45 points of J, the stack steps about 125). Step labels on
     # the left, the registered test of each step on the right.
-    fig, axes = F.plt.subplots(2, 1, figsize=(3.45, 2.45),
+    fig, axes = F.plt.subplots(2, 1, figsize=(3.45, 2.3),
                                gridspec_kw={"height_ratios": [len(rows_by["A"]), len(rows_by["B"])],
                                             "hspace": 0.5})
     fig.subplots_adjust(left=0.385, right=0.805, top=0.935, bottom=0.125)
@@ -194,7 +194,7 @@ def size_rows() -> dict[str, list[dict]]:
 
 
 def draw_sizes(data: dict[str, list[dict]]) -> Figure:
-    fig, axes = F.plt.subplots(1, 2, figsize=(3.45, 1.95), sharey=True,
+    fig, axes = F.plt.subplots(1, 2, figsize=(3.45, 1.9), sharey=True,
                                gridspec_kw={"wspace": 0.08})
     titles = {"instant": "(a) instant actuation", "lag": "(b) replicas one interval late"}
     for ax, regime in zip(axes, ("instant", "lag")):
@@ -217,7 +217,7 @@ def draw_sizes(data: dict[str, list[dict]]) -> Figure:
 
 
 def draw_width(rows: list[dict]) -> Figure:
-    fig, (ax_g, ax_d) = F.plt.subplots(1, 2, figsize=(3.45, 1.8),
+    fig, (ax_g, ax_d) = F.plt.subplots(1, 2, figsize=(3.45, 1.75),
                                        gridspec_kw={"width_ratios": [1.15, 1], "wspace": 0.42})
     order = width.ORDER
     names = {"live": "live-\nfitted", "published": "pub-\nlished", "coupled": "coupled"}
@@ -268,7 +268,7 @@ TRADEOFF_LABELS = (
 def draw_tradeoff(arms: list[dict]) -> Figure:
     """Mean cost against mean SLO violation for every arm of Table II."""
     by_arm = {a["arm"]: a for a in arms}
-    fig, ax = F.plt.subplots(figsize=(3.45, 2.05))
+    fig, ax = F.plt.subplots(figsize=(3.45, 1.9))
     for a in arms:
         group = TRADEOFF_GROUP[a["arm"]]
         ax.plot(a["cost"], a["violation"], "D" if group == "layered" else "o", ms=3.6,

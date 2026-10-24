@@ -144,7 +144,7 @@ a Kubernetes-native control plane, and then subjected it to a
 pre-registered evaluation designed to falsify our own hypothesis: seven
 registered campaigns and 15{,}420 simulated runs, with every test scored per
 design point using bootstrap intervals, Holm correction and equivalence
-margins (Fig.~\ref{fig:workflow}, Table~\ref{tab:campaigns}). The controller's advantage did not
+margins (Fig.~\ref{fig:overview}, Table~\ref{tab:campaigns}). The controller's advantage did not
 survive, and a final experiment shows why. Under rate-limited actuation, the
 per-tenant joint problem is locally separable, so each knob can be chosen
 with the other two held fixed at little loss. Operators should
@@ -213,57 +213,91 @@ learned orchestrators found that their apparent robustness often reflected
 comparator collapse or evaluation choices~\cite{khilji2026}.
 
 % =====================================================================
-\section{System and Evaluation Method}
+\section{Methodology}
 \label{sec:method}
 % =====================================================================
 
 \begin{figure}[!t]
 \centering
-\begin{tikzpicture}[font=\scriptsize, >=stealth,
-  ctl/.style={draw, rounded corners=1.5pt, align=center, fill=gray!10,
-              minimum width=15mm, minimum height=7mm, inner sep=1.5pt},
-  knob/.style={draw, rounded corners=1.5pt, align=center, fill=blue!8,
-               minimum width=16mm, minimum height=7mm, inner sep=1.5pt},
-  jnt/.style={draw, rounded corners=1.5pt, align=left, fill=blue!14,
-              text width=25mm, minimum height=26mm, inner sep=2pt},
-  arr/.style={->, semithick},
-  cpl/.style={<->, densely dashed, gray!70!black}]
-\node[knob] (r) at (0,0) {replicas $r_i$};
-\node[knob] (c) at (0,-1.0) {cache $c_i$};
-\node[knob] (t) at (0,-2.0) {tier $\tau_i$};
-\node[ctl, anchor=east] (hpa) at (-1.35,0) {HPA / KEDA\\(utilization)};
-\node[ctl, anchor=east] (cp) at (-1.35,-1.0) {cache\\policy};
-\node[ctl, anchor=east] (rt) at (-1.35,-2.0) {tier\\router};
-\draw[arr] (hpa) -- (r);
-\draw[arr] (cp) -- (c);
-\draw[arr] (rt) -- (t);
-\node[jnt, anchor=west] (j) at (1.4,-1.0) {\textbf{\jcac{}} planner: one search
-  over $(r_i,c_i,\tau_i)$ per tenant every 10\,s on $\Phi$ in (\ref{eq:plan}),
-  with a per-tenant budget filter and steps of $\pm2$ replicas and
-  $\pm1$ cache level};
-\draw[arr] (j.west |- r.east) -- (r.east);
-\draw[arr] (j.west |- c.east) -- (c.east);
-\draw[arr] (j.west |- t.east) -- (t.east);
-\draw[cpl] (r) -- node[fill=white, inner sep=1pt] {hits remove AI work} (c);
-\draw[cpl] (c) -- node[fill=white, inner sep=1pt] {misses pay tier price} (t);
-\node[anchor=south, font=\scriptsize\bfseries] at ($(hpa.north)+(0,0.08)$) {(a) per-layer stack};
-\node[anchor=south, font=\scriptsize\bfseries] at ($(j.north)+(0,0.08)$) {(b) joint planner};
+\begin{tikzpicture}[x=1mm, y=1mm, font=\scriptsize, >=stealth,
+  bx/.style={draw, rounded corners=1.2pt, align=center, fill=blue!8, inner sep=1.3pt},
+  gx/.style={bx, fill=gray!12},
+  jx/.style={bx, fill=blue!16},
+  hd/.style={anchor=west, font=\scriptsize\bfseries},
+  fl/.style={->, semithick},
+  cp/.style={<->, densely dashed, gray!70!black}]
+% ---- Stage 1: demand
+\node[hd] at (6,0) {STAGE 1 --- DEMAND (Sec.~\ref{sec:sim})};
+\node[bx, text width=35mm, minimum height=9.2mm] (wl) at (25.5,-5.6) {five
+  workload classes: steady and bursty CRUD, (un)cacheable AI, agentic};
+\node[bx, text width=35mm, minimum height=9.2mm] (dp) at (66.5,-5.6) {4
+  eight-tenant mixes $\times$ 3 cluster sizes $=$ 60 design points};
+\draw[fl] (46,-10.4) -- node[right] {per-tenant demand, every 10\,s} (46,-13.8);
+% ---- Stage 2: control, one arm per run
+\node[hd] at (6,-15.8) {STAGE 2 --- CONTROL: ONE ARM PER RUN
+  (Sec.~\ref{sec:jcac}, \ref{sec:comparators})};
+\node[font=\scriptsize\bfseries] at (23,-19.9) {(a) per-layer stack};
+\node[font=\scriptsize\bfseries] at (66,-19.9) {(b) joint planner \jcac{}};
+\node[gx, text width=31mm] (a1) at (23,-24.6) {HPA / KEDA $\rightarrow$ replicas $r_i$};
+\node[gx, text width=31mm] (a2) at (23,-31.1) {cache policy $\rightarrow$ cache $c_i$};
+\node[gx, text width=31mm] (a3) at (23,-37.6) {tier router $\rightarrow$ tier $\tau_i$};
+\node[jx, text width=36mm] (b1) at (66,-24.6) {lattice of moves: $\pm2$ replicas,
+  $\pm1$ cache level, 4 tiers};
+\node[jx, text width=36mm] (b2) at (66,-31.1) {per-tenant budget filter};
+\node[jx, text width=36mm] (b3) at (66,-37.6) {exact best responses on $\Phi$
+  (\ref{eq:plan}) until stable (Alg.~\ref{alg:plan})};
+\draw[fl] (b1) -- (b2);
+\draw[fl] (b2) -- (b3);
+\node[font=\scriptsize\itshape] at (46,-43.6) {ablations: decoupled and knob-wise
+  search, same objective and forecast};
+\draw[fl] (46,-45.5) -- node[right] {plan $(r_i,c_i,\tau_i)$ per tenant} (46,-48.9);
+% ---- Stage 3: the simulated plant and its couplings
+\node[hd] at (6,-50.9) {STAGE 3 --- SIMULATED PLANT (Sec.~\ref{sec:sim})};
+\node[bx, text width=21mm, minimum height=7.4mm] (p1) at (17,-56.2) {replicas: 100
+  work\\units/s each};
+\node[bx, text width=23mm, minimum height=7.4mm] (p2) at (46,-56.2) {semantic
+  cache:\\hits $0.85c/(c{+}256)$};
+\node[bx, text width=21mm, minimum height=7.4mm] (p3) at (75,-56.2) {model tier:\\price
+  and latency};
+\draw[cp] (p1) -- (p2);
+\draw[cp] (p2) -- (p3);
+\draw[fl] (46,-60.4) -- node[right] {cost and p95 latency per tenant-step} (46,-63.8);
+% ---- Stage 4: scoring and tests
+\node[hd] at (6,-65.8) {STAGE 4 --- SCORING AND TESTS (Sec.~\ref{sec:stats})};
+\node[bx, text width=25mm, minimum height=7.4mm] (s1) at (20,-71.2) {$J$ of
+  (\ref{eq:J}) per design\\point, 5 shared seeds};
+\node[bx, text width=25mm, minimum height=7.4mm] (s2) at (50,-71.2) {Wilcoxon +
+  Holm,\\bootstrap CI, EQ margin};
+\node[gx, text width=15mm, minimum height=7.4mm] (s3) at (77.5,-71.2) {verdict:
+  PASS,\\tie or EQ};
+\draw[fl] (s1) -- (s2);
+\draw[fl] (s2) -- (s3);
+% ---- the registered protocol spans every stage; the adjudication loop
+\node[gx, rotate=90, minimum width=78.5mm, minimum height=3.6mm, inner sep=0.6pt]
+  (pr) at (1.9,-38.85) {registered protocol: arms, design points, tests, predictions};
+\draw[fl, densely dashed, gray!70!black] (s3.south) -- ++(0,-2.9) -| (pr.west)
+  node[pos=0.25, below, text=black] {defect found in an exploratory re-analysis
+  $\rightarrow$ new registered campaign};
 \end{tikzpicture}
-\caption{Two ways to set the three knobs of a tenant. (a) A layered stack
-gives each knob its own controller and signal. (b) \jcac{} searches all
-three together. Dashed lines mark how the simulated plant couples the knobs;
-replica congestion also inflates the latency of every miss.}
+\caption{System workflow of one run. Dashed in Stage~3: cache hits remove AI
+work from the replicas and every miss pays its tier's price. Dashed loop: a
+comparator defect found in an exploratory re-analysis became a new registered
+campaign.}
 \label{fig:overview}
 \end{figure}
 
-\subsection{\polyforge{} and the \jcac{} Planner}
-\label{sec:jcac}
+\subsection{System Overview}
+\label{sec:overview}
 
 \polyforge{} comprises a Go control plane and gateway with a per-tenant
 semantic cache, a Python planner, and a Kubernetes operator that applies
 plans under guardrails. The deployed planner runs the same controller code
 as the simulator, and the operator's Helm chart exposes the solver
-configuration evaluated here as an opt-in setting.
+configuration evaluated here as an opt-in setting. Fig.~\ref{fig:overview}
+shows the four stages of one simulated run.
+
+\subsection{The \jcac{} Planner}
+\label{sec:jcac}
 
 Every 10\,s, \jcac{} chooses for each tenant $i$ a configuration
 $x_i=(r_i,c_i,\tau_i)$ from a \emph{lattice} of allowed moves anchored at
@@ -400,41 +434,10 @@ Passed, From the Program-Wide Ledger. The Registered Equivalence Readings
 \input{tables/tab_campaigns.tex}
 \end{table}
 
-\begin{figure}[!t]
-\centering
-\begin{tikzpicture}[font=\scriptsize, >=stealth, node distance=1.3mm,
-  wfbox/.style={draw, rounded corners=1.5pt, fill=blue!8, align=left,
-                text width=74mm, inner sep=1.8pt},
-  wflast/.style={wfbox, fill=gray!12},
-  wfarr/.style={->, semithick}]
-\node[wfbox] (r) {\textbf{1 Register.} The protocol fixes the arms, design
-  points, tests and predictions, and is pushed before the first run.};
-\node[wfbox, below=of r] (s) {\textbf{2 Simulate.} The campaign's arms
-  (\jcac{} and its ablations, HPA, KEDA, layered stacks, static share) run
-  every design point on 5 shared seeds.};
-\node[wfbox, below=of s] (t) {\textbf{3 Score and test.} A composite
-  objective such as (\ref{eq:J}) per design point; one-sided Wilcoxon with
-  Holm, 95\% bootstrap interval, $\pm0.025$ equivalence margin.};
-\node[wflast, below=of t] (o) {\textbf{4 Read out.} PASS, tie or EQ per
-  registered test (Table~\ref{tab:campaigns}); the committed records
-  regenerate every table and figure.};
-\draw[wfarr] (r) -- (s);
-\draw[wfarr] (s) -- (t);
-\draw[wfarr] (t) -- (o);
-\draw[wfarr, densely dashed, gray!70!black] (o.west) -- ++(-2.4mm,0) |- (r.west)
-  node[pos=0.25, rotate=90, above, font=\tiny, text=black]
-  {defect $\rightarrow$ new protocol};
-\end{tikzpicture}
-\caption{Evaluation workflow of every campaign. A comparator defect found by
-an exploratory re-analysis was fixed in a new registered campaign (dashed).}
-\label{fig:workflow}
-\end{figure}
-
 \subsection{Statistics and Pre-Registration}
 \label{sec:stats}
 
-Every campaign follows the workflow of Fig.~\ref{fig:workflow}. The unit
-of analysis is the design point, with reps averaged, and every
+The unit of analysis is the design point, with reps averaged, and every
 comparison is paired: both arms run the same design points on the same
 seeds. A directional claim passes only if a one-sided Wilcoxon signed-rank
 test clears its Holm threshold~\cite{holm1979} within the registered family
@@ -699,8 +702,7 @@ stacks did only as well as their tier rule (Table~\ref{tab:arms}).
 \textit{How to evaluate one.} Every comparator defect we found favored the
 joint controller; exploratory re-analyses exposed them, registered
 re-scorings removed them, and Table~\ref{tab:checklist} turns them into
-rules. The decoupled ablation needs no new model, since it reuses the joint
-controller's objective and forecast.
+rules. 
 
 \begin{table}[!t]
 \caption{A Checklist for Comparing Joint and Per-Layer Control}
