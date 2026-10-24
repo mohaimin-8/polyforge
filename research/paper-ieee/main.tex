@@ -108,7 +108,7 @@ router that picks the model tier. Joint controllers rest on the premise that set
 time forfeits gains that only a joint decision can capture. We tested this premise in
 simulation on a Kubernetes-native control plane whose planner sets
 replicas, cache budget and model tier for every tenant, in seven
-pre-registered campaigns totalling 15{,}420 runs. An initial advantage of
+pre-registered campaigns totaling 15{,}420 runs. An initial advantage of
 27.5\% over the autoscaler in a composite objective of cost, latency
 violation and unfairness, and of 53 to 60\% over a layered stack of
 per-layer controllers, disappeared once registered re-scorings removed
@@ -181,12 +181,12 @@ contributions are:
   registered re-scorings.
 \item \textbf{A measurement of coordination and of what remains}
   (Sec.~\ref{sec:remains}, Tables~\ref{tab:arms}--\ref{tab:post},
-  Fig.~\ref{fig:sizes}): with all else fixed, joint search beats per-knob
+  Figs.~\ref{fig:sizes}--\ref{fig:tradeoff}): with all else fixed, joint search beats per-knob
   search by 1.6\% of the objective; against tuned autoscalers, a static
   share and the cheapest-tier stack, the other wins come from the largest
   cluster, actuation lag and shedding (serving AI traffic with no model).
 \item \textbf{A mechanism, confirmed under pre-registration}
-  (Sec.~\ref{sec:width}, Fig.~\ref{fig:width}): coordination grows with
+  (Sec.~\ref{sec:width}, Fig.~\ref{fig:width}, Table~\ref{tab:width}): coordination grows with
   how far one interval may move, and only where the layers share capacity.
 \item \textbf{An evaluation checklist and an open artifact}
   (Table~\ref{tab:checklist}): rules paired with the defects they caught,
@@ -223,7 +223,7 @@ managers fight one another~\cite{nopowerstruggles}, and independent
 per-service autoscalers oscillate where a coordinated one does
 not~\cite{chamulteon}. In process control, Bristol's relative gain array indicates when
 decentralized loops suffice~\cite{bristol1966}; our result is a discrete
-analogue for autoscaling.
+analog for autoscaling.
 
 \textit{Evaluation methodology.} Autoscalers should be compared on a level
 playing field~\cite{chameleon}, and recent re-evaluations show how much a
@@ -318,7 +318,7 @@ candidate is affordable; the outage is priced only through the SLO terms.
 The solver (Algorithm~\ref{alg:plan}) is block-coordinate descent over
 tenants: each tenant best-responds exactly over its lattice, and sweeps repeat until none
 changes, accepting only strict improvements. With uniform fairness
-weights $\Phi$ is an exact potential~\cite{monderer1996}, so the final
+weights, $\Phi$ is an exact potential~\cite{monderer1996}, so the final
 plan is a best response for every tenant; a 50-sweep safety cap was never
 reached where counted (\rec{JOINTNESS}). On one laptop core a plan cycle
 for 8 tenants takes a median 31\,ms (p95 44\,ms) with this convergent
@@ -395,8 +395,9 @@ $\pm2$ replicas per interval and keep a fixed cache and tier. Their final versio
 interior optima, re-tuned per cluster size, and held to \jcac{}'s cluster
 caps. Layered stacks run an HPA rule, a cache policy and a tier rule
 independently, with four tier rules: the registered rule (rank tiers by
-latency, ignore price), the cheapest tier expected to meet the latency
-target, a pin to the cheapest model, and a quality-aware router. A static
+latency, ignore price), a cost-aware rule (the cheapest tier expected to
+meet the latency target), a pin to the cheapest model (the
+\emph{cheapest-tier stack} below), and a quality-aware router. A static
 equal share is the null controller. Only \jcac{} enforces the budget and
 only \jcac{} can shed (Table~\ref{tab:arms}). Two ablations isolate
 coordination. They share \jcac{}'s objective, forecast, budget filter and
@@ -767,9 +768,7 @@ problem locally separable; it grows only with wide steps on layers that
 share capacity, a regime that is worse for this controller anyway.
 Per-knob search that shares a forecast and an objective therefore matches
 joint search when steps are bounded, and a joint controller's gains should
-be read only after the checks of Table~\ref{tab:checklist}. For practitioners
-the test is cheap: before adopting a joint controller, compare it with a
-decoupled search that shares its objective and forecast; on our lattice that search scored at most 12 candidates per tenant instead of 60. The registered
+be read only after the checks of Table~\ref{tab:checklist}. The registered
 five-seed live replication and coordination under tier-switch lag and
 backlog are the next steps. The code, simulator, registered protocols,
 run data and the scripts that regenerate every table and figure are
@@ -802,7 +801,8 @@ documentation. Accessed: Oct.~24, 2026. [Online]. Available:
 \url{https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/}
 
 \bibitem{keda}
-KEDA Authors, ``KEDA: Kubernetes event-driven autoscaling.'' Accessed:
+KEDA Authors, ``KEDA: Kubernetes event-driven autoscaling,'' KEDA
+documentation. Accessed:
 Oct.~24, 2026. [Online]. Available: \url{https://keda.sh}
 
 \bibitem{gptcache}
@@ -824,7 +824,8 @@ model-less inference serving,'' in \textit{Proc. USENIX Annu. Tech. Conf.
 \bibitem{zhu2023}
 B.~Zhu, Y.~Sheng, L.~Zheng, C.~Barrett, M.~I.~Jordan, and J.~Jiao,
 ``Towards optimal caching and model selection for large model inference,''
-in \textit{Adv. Neural Inf. Process. Syst. (NeurIPS)}, vol.~36, 2023.
+in \textit{Adv. Neural Inf. Process. Syst. (NeurIPS)}, vol.~36, 2023,
+pp.~59062--59094.
 
 \bibitem{chameleon}
 A.~Bauer, N.~Herbst, S.~Spinner, A.~Ali-Eldin, and S.~Kounev, ``Chameleon:
