@@ -10,6 +10,8 @@
 \usepackage{array}
 \usepackage{url}
 \usepackage{tikz}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \usetikzlibrary{positioning,calc}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
@@ -152,9 +154,8 @@ joint setting, and that one controller should set all three knobs together
 (Fig.~\ref{fig:overview}b).
 
 Joint control of serving knobs is an active line of work, from model
-variants chosen with autoscaling~\cite{infaas,proteus} to cascades
-deployed with their routing~\cite{cascadia} and caches chosen with model
-selectors~\cite{zhu2023}. These systems report gains over separately
+variants chosen together with autoscaling~\cite{infaas} to caches chosen
+together with model selectors~\cite{zhu2023}. These systems report gains over separately
 configured or fixed alternatives. Yet comparisons of controllers are
 sensitive to how well the baselines are tuned and
 instrumented~\cite{chameleon,zhang2026drl,khilji2026}, and
@@ -207,7 +208,7 @@ threats to validity and Section~\ref{sec:conclusion} concludes.
 % =====================================================================
 
 \textit{Joint control of serving knobs.} Like the systems cited
-above~\cite{infaas,proteus,cascadia,zhu2023}, \polyforge{} adapts the
+above~\cite{infaas,zhu2023}, \polyforge{} adapts the
 model choice together with other knobs. It differs in its knobs
 (replicas, a semantic-cache budget and a model tier per tenant, under
 per-tenant dollar budgets) and in what it measures: the value of
@@ -310,8 +311,8 @@ neighbor, is not shown. A per-tenant dollar budget is a hard filter. A tenant is
 its tier is ``none'', either because that lowers $\Phi$ or because no
 candidate is affordable; the outage is priced only through the SLO terms.
 
-The solver is block-coordinate descent over tenants: each tenant
-best-responds exactly over its lattice, and sweeps repeat until none
+The solver (Algorithm~\ref{alg:plan}) is block-coordinate descent over
+tenants: each tenant best-responds exactly over its lattice, and sweeps repeat until none
 changes, accepting only strict improvements. With uniform fairness
 weights $\Phi$ is an exact potential~\cite{monderer1996}, so the final
 plan is a best response for every tenant; a 50-sweep safety cap was never
@@ -320,13 +321,38 @@ for 8 tenants takes a median 31\,ms (p95 44\,ms) with this convergent
 solver and 23\,ms with the default two-sweep one, far inside the 10\,s
 interval (descriptive, \rec{PLANNER\_TIMING\_SOLVERS}).
 
+\begin{algorithm}[!t]
+\caption{One planning interval of \jcac{}}
+\label{alg:plan}
+\footnotesize
+\begin{algorithmic}[1]
+\Require interval-start state $x^0$, six-step demand forecast, budgets $b_i$
+\For{each tenant $i$}
+  \State $L_i\gets$ moves from $x_i^0$: $\Delta r\in\{-2,\dots,2\}$, $\pm1$ cache
+    level, any tier
+  \State keep the $y\in L_i$ whose projected cost fits $b_i$ (shed $i$ if
+    none does)
+\EndFor
+\State $x\gets x^0$
+\Repeat \Comment{at most 50 sweeps}
+  \For{each tenant $i$}
+    \State $y^\ast\gets\arg\min_{y\in L_i}\Phi(y,x_{-i})$
+      \Comment{exact best response}
+    \If{$\Phi(y^\ast,x_{-i})<\Phi(x)$} \State $x_i\gets y^\ast$ \EndIf
+  \EndFor
+\Until{no tenant changed in the sweep}
+\State apply $x$ for the next 10\,s
+\end{algorithmic}
+\end{algorithm}
+
 \subsection{Plant, workloads and objective}
 \label{sec:sim}
 
 We call the simulated system the \emph{plant}. A replica serves 100 work
 units/s and does the per-request work of every call, so AI requests load
 the replicas (a chat request 20 units, an agent step 40). A cache of
-$c$\,MB hits $0.85\,c/(c+256)$ of a workload's cacheable share. Models run
+$c$\,MB hits $0.85\,c/(c+256)$ of a workload's cacheable share, so even
+the largest, 1024\,MB, hits 68\%. Models run
 outside the plant: each tier has a price per request (\$0, \$$10^{-4}$,
 \$$10^{-3}$, \$$10^{-2}$) and a base latency, and agent traffic needs a
 mid or larger tier. Batching, KV-cache memory, backlog and tier-switch
@@ -396,7 +422,7 @@ family and the 95\% bootstrap interval of the mean paired difference
 reading~\cite{lakens2017} (EQ: the interval inside the registered margin
 of $\pm0.025$\,$J$, about 6\% of \jcac{}'s $J$) bounds a difference's
 size. Most campaigns also carry a non-inferiority guard on SLO excess.
-Each protocol~\cite{nosek2018} fixed arms, design, tests and predictions
+Each protocol fixed arms, design, tests and predictions
 and was pushed before its first run, as commit times and, after the audit,
 server-side CI records show; two early protocols, \rec{EVICTION\_PARITY}
 and \rec{ORDER\_PERMUTATION}, were committed after their first runs and
@@ -531,6 +557,8 @@ consistent with its 60\,s planning horizon, which a reactive rule lacks.
 \jcac{} sheds AI traffic on 7.2\% of tenant-steps and is cheaper than
 every non-shedding arm, but its violation and excess are higher than those
 of every HPA, KEDA, static and cheapest-tier arm in Table~\ref{tab:arms}.
+Shedding does not come from joint search: the decoupled and knob-wise
+arms shed on 7.7\% and 7.3\% of tenant-steps.
 Held to never shedding, it costs
 19\% more, its $J$ rises by $0.0677$ $[0.0432,0.0945]$, and it loses to
 capped HPA. Against most baselines its SLO guard fails. On unseen demand,
@@ -606,7 +634,9 @@ correction.
 
 \textit{When to build a joint controller.} Joint search earns its
 complexity only when one interval may move a tenant far relative to its
-size \emph{and} the layers share a resource. By default HPA may double a
+size \emph{and} the layers share a resource. Here the rate-limited
+lattice moves a tenant by at most an eighth to a third of its replica cap
+per interval, and the wide one by half of it or more. By default HPA may double a
 deployment, or add four pods, every 15\,s, and waits 300\,s before scaling
 down~\cite{k8shpa}; at our tenant sizes (6 to 16 replicas) that resembles
 our wide lattice, while the published lattice is a policy of two pods per
@@ -625,32 +655,26 @@ the defect it catches here, and the measured effect.}
 \centering
 \scriptsize
 \setlength{\tabcolsep}{2.5pt}
-\renewcommand{\rec}[1]{\texttt{#1}}   % tags at table size
-\begin{tabular}{|>{\raggedright\arraybackslash}p{2.0cm}
-                |>{\raggedright\arraybackslash}p{3.0cm}
-                |>{\raggedright\arraybackslash}p{2.85cm}|}
-\hline
-\textbf{Rule} & \textbf{Defect it catches here} & \textbf{Measured effect} \\
-\hline
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.05cm}
+                >{\raggedright\arraybackslash}p{3.05cm}
+                >{\raggedright\arraybackslash}p{2.95cm}@{}}
+\toprule
+Rule & Defect it catches here & Measured effect \\
+\midrule
 One cost model for all arms & Only baselines paid a $1.4581\times$
   surcharge; cache pinned at 128\,MB & $-27.5\%\rightarrow-0.4\%$ vs.\ HPA \\
-\hline
 Interior tuning optima, per size & HPA optimum on a grid edge &
   $-0.9\%\rightarrow0.0\%$ (\rec{RT-H1}) \\
-\hline
 Same caps and step limits & Re-tuned HPA over the small cluster's cap &
   Still a tie (\rec{JN-B4}) \\
-\hline
 A cheapest-tier stack as a baseline & Registered rule ranked tiers by
   latency, at 3.4$\times$ \jcac{}'s cost & $-60.4\%\rightarrow+4.7\%$
   (\rec{JN-B1}) \\
-\hline
 A decoupled ablation & Coordination never isolated & 1.6\% of $J$
   (\rec{JN-C1}) \\
-\hline
 Held-out demand & Periodic workloads only & \jcac{}'s $J$ $+23.3\%$
   (\rec{HO-B1}) \\
-\hline
+\bottomrule
 \end{tabular}
 \end{table}
 
@@ -743,16 +767,6 @@ F.~Romero, Q.~Li, N.~J.~Yadwadkar, and C.~Kozyrakis, ``INFaaS: Automated
 model-less inference serving,'' in \textit{Proc. USENIX Annu. Tech. Conf.
 (ATC)}, 2021, pp.~397--411.
 
-\bibitem{proteus}
-S.~Ahmad, H.~Guan, B.~D.~Friedman, T.~Williams, R.~K.~Sitaraman, and
-T.~Woo, ``Proteus: A high-throughput inference-serving system with accuracy
-scaling,'' in \textit{Proc. 29th ACM Int. Conf. Architectural Support
-Program. Lang. Operating Syst. (ASPLOS)}, 2024, pp.~318--334.
-
-\bibitem{cascadia}
-Y.~Jiang \textit{et al.}, ``Cascadia: An efficient cascade serving system
-for large language models,'' 2025, \textit{arXiv:2506.04203}.
-
 \bibitem{zhu2023}
 B.~Zhu, Y.~Sheng, L.~Zheng, C.~Barrett, M.~I.~Jordan, and J.~Jiao,
 ``Towards optimal caching and model selection for large model inference,''
@@ -808,11 +822,6 @@ S.~Holm, ``A simple sequentially rejective multiple test procedure,''
 D.~Lakens, ``Equivalence tests: A practical primer for $t$ tests,
 correlations, and meta-analyses,'' \textit{Social Psychol. Personality
 Sci.}, vol.~8, no.~4, pp.~355--362, 2017.
-
-\bibitem{nosek2018}
-B.~A.~Nosek, C.~R.~Ebersole, A.~C.~DeHaven, and D.~T.~Mellor, ``The
-preregistration revolution,'' \textit{Proc. Nat. Acad. Sci.}, vol.~115,
-no.~11, pp.~2600--2606, 2018.
 
 \bibitem{qwen25}
 Qwen Team, ``Qwen2.5 technical report,'' 2024, \textit{arXiv:2412.15115}.
