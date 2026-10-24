@@ -268,7 +268,7 @@ TRADEOFF_LABELS = (
 def draw_tradeoff(arms: list[dict]) -> Figure:
     """Mean cost against mean SLO violation for every arm of Table II."""
     by_arm = {a["arm"]: a for a in arms}
-    fig, ax = F.plt.subplots(figsize=(3.45, 2.25))
+    fig, ax = F.plt.subplots(figsize=(3.45, 2.4))
     for a in arms:
         group = TRADEOFF_GROUP[a["arm"]]
         ax.plot(a["cost"], a["violation"], "D" if group == "layered" else "o", ms=3.6,
@@ -452,7 +452,8 @@ def table_width() -> tuple[str, list[dict]]:
                      f"$[{signed(lo)},{signed(hi)}]$ & ${signed(rate)}$ \\\\")
     tex = ("\\begin{tabular}{@{}lrrcr@{}}\n\\toprule\n"
            "Plant & $G_n$ & $G_w$ & DiD [95\\% CI] & $J_n-J_w$ \\\\\n\\midrule\n" + "\n".join(lines) +
-           "\n\\midrule\nTests & \\multicolumn{2}{l}{H4: EQ, all} & H1, H2 PASS; H3 EQ & H5 PASS \\\\\n"
+           "\n\\midrule\nTests & \\multicolumn{2}{l}{\\texttt{WD-H4}: EQ, all} & "
+           "\\texttt{WD-H1}, \\texttt{H2} PASS; \\texttt{H3} EQ & \\texttt{WD-H5} PASS \\\\\n"
            "\\bottomrule\n\\end{tabular}\n")
     return tex, data
 

@@ -420,7 +420,7 @@ passed, from the program-wide ledger. The registered equivalence readings
 \subsection{Statistics and pre-registration}
 \label{sec:stats}
 
-The unit of analysis is the design point, with reps averaged. A
+The unit of analysis is the design point, with reps averaged, and every comparison is paired: both arms run the same design points on the same seeds. A
 directional claim PASSES only if a one-sided Wilcoxon signed-rank test
 clears its Holm threshold~\cite{holm1979} within the campaign's registered
 family and the 95\% bootstrap interval of the mean paired difference
@@ -491,6 +491,8 @@ once re-tuned, and loses again when held to the caps (\rec{FJ-H2},
 stack lost to \jcac{} by 60.4\% and, re-tuned per size, by 53.1\%. Its tier
 rule ranks tiers by latency and ignores price, so it bought the lowest
 violation of any arm at 3.4 times \jcac{}'s spend (Table~\ref{tab:arms}).
+Across the three layered stacks, whose tier rules differ, mean cost per
+run ranges from \$2.70 to \$7.97.
 With the tier pinned to the cheapest model, the stack ties \jcac{}
 (\rec{JN-B1}); a rule that picks the cheapest tier expected to meet the
 latency target loses by 0.3208 in $J$ (\rec{JN-B2}); and a quality-aware
@@ -635,7 +637,21 @@ search then scores up to $17\times6\times4=408$ candidates instead of
 $5\times3\times4=60$, and decoupled search at most $17+6+4=27$ instead
 of $5+3+4=12$.
 
-All five registered predictions held. On the rate-limited lattice the gain
+\begin{table}[!t]
+\caption{Coordination gain per plant in \rec{WIDTH} (48 AI-carrying
+design points $\times$ 5 reps per plant). $G_n$, $G_w$: gain
+$J(\text{decoupled})-J(\text{joint})$ on the rate-limited and wide
+lattices; DiD: $G_w-G_n$ with its 95\% bootstrap CI; $J_n-J_w$: change in
+the joint controller's own $J$ from wide to rate-limited steps (negative:
+wide steps are worse).}
+\label{tab:width}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.4pt}
+\input{tables/tab_width.tex}
+\end{table}
+
+All five registered predictions held (Table~\ref{tab:width}). On the rate-limited lattice the gain
 is small but positive (0.7--1.3\% of the decoupled arm's $J$,
 Fig.~\ref{fig:width}a) and inside the equivalence margin on every plant
 (\rec{WD-H4}); the searches disagree on at most 1.04\% of best responses
@@ -645,8 +661,7 @@ $[0.0161,0.0472]$ on the coupled one (\rec{WD-H1}, \rec{WD-H2}), and
 disagreement rises to 2.4\% and 3.9\%; on the live-fitted plant it does
 not grow ($-0.0012$ $[-0.0032,+0.0009]$, EQ, \rec{WD-H3}). Wide steps also
 raise the joint controller's own $J$ on every plant, by 0.0301, 0.0152 and
-0.0859 on the live-fitted, published and coupled plants (\rec{WD-H5}), so
-coordination pays only in a regime this controller should not run in.
+0.0859 on the live-fitted, published and coupled plants (\rec{WD-H5}), so coordination pays only in a regime this controller should not run in. The coupled plant shows the trade most clearly: there wide steps raise the coordination gain by 0.0315 and the controller's own $J$ by 0.0859.
 WIDTH scores the 48 AI-carrying design points, so its published-plant gain
 (0.0044) is not JOINTNESS's 0.0066 on all 60. The protocol was written
 after exploratory probes on disjoint seeds, so this is a confirmatory
@@ -722,7 +737,10 @@ stack beats it by $0.1052$ in $J$ (\rec{SM-H2}): the simulator flatters
 joint control. One live case study on a single GPU host (two
 reps, controller calibrated on the same plant) is in the artifact; its
 five-seed replication was registered but not run, so we make no live
-claim. \textit{Construct.} $J$'s weights are a choice. In an exploratory
+claim. \textit{Construct.} $J$'s weights are a choice. Answer quality enters
+only the quality-priced campaign, from published benchmark scores rather
+than graded answers, and the cost model prices replica time, cache memory
+and model calls but not network or storage. In an exploratory
 re-scoring the registered lateness weight (the weight of violation in
 $J$) of 2 is exactly the crossover against re-tuned HPA: at 4, re-tuned
 HPA is better than \jcac{}, and at 8 re-tuned KEDA is too.
@@ -749,7 +767,9 @@ problem locally separable; it grows only with wide steps on layers that
 share capacity, a regime that is worse for this controller anyway.
 Per-knob search that shares a forecast and an objective therefore matches
 joint search when steps are bounded, and a joint controller's gains should
-be read only after the checks of Table~\ref{tab:checklist}. The registered
+be read only after the checks of Table~\ref{tab:checklist}. For practitioners
+the test is cheap: before adopting a joint controller, compare it with a
+decoupled search that shares its objective and forecast; on our lattice that search scored at most 12 candidates per tenant instead of 60. The registered
 five-seed live replication and coordination under tier-switch lag and
 backlog are the next steps. The code, simulator, registered protocols,
 run data and the scripts that regenerate every table and figure are
