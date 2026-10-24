@@ -248,6 +248,16 @@ def draw_width(rows: list[dict]) -> Figure:
 
 
 # ---------------------------------------------------------------- tables
+TAB1_HEAD = ("Campaign", "Tag", "Question", "Arms", "Points", "Runs", "PASS")
+TAB2_HEAD = ("Arm", "$\\boldsymbol{J}$", "Cost", "Viol.", "Excess", "Shed", "Over.")
+TAB3_HEAD = ("Comparator", "Test", "$\\boldsymbol{\\Delta J}$", "95\\% CI", "")
+
+
+def bold_row(cells: tuple[str, ...]) -> str:
+    """A header row in bold, as in the venue's sample tables (math cells are emboldened by the caller)."""
+    return " & ".join(c if c.startswith("$") or not c else f"\\textbf{{{c}}}" for c in cells) + " \\\\"
+
+
 CAMPAIGNS = [
     ("FAIR\\_J", "FJ", ["fair_j"], "Fair comparators", "RESULTS_FAIR_J.md"),
     ("RETUNED", "RT", ["retuned"], "Per-size re-tuning", "RESULTS_RETUNED.md"),
@@ -300,11 +310,11 @@ def table_campaigns() -> tuple[str, dict]:
                      "points": points, "pass": passed, "tests": total})
         lines.append(f"{name} & {tag} & {question} & {data[-1]['arms']} & {npoints} & {runs:,} & "
                      f"{passed}/{total} \\\\")
-    body = "\n".join(lines)
-    tex = ("\\begin{tabular}{@{}l l l r r r r@{}}\n\\toprule\n"
-           "Campaign & Tag & Question & Arms & Points & Runs & PASS \\\\\n\\midrule\n"
-           f"{body}\n\\midrule\nTotal & & & & & {tot_runs:,} & {tot_pass}/{tot_tests} \\\\\n"
-           "\\bottomrule\n\\end{tabular}\n")
+    # Ruled grid, as in the venue's sample paper: a rule after every row.
+    body = "\n".join(f"{line}\n\\hline" for line in lines)
+    tex = ("\\begin{tabular}{|l|l|l|r|r|r|r|}\n\\hline\n" + bold_row(TAB1_HEAD) + "\n\\hline\n"
+           f"{body}\n\\textbf{{Total}} & & & & & {tot_runs:,} & {tot_pass}/{tot_tests} \\\\\n"
+           "\\hline\n\\end{tabular}\n")
     return tex, {"rows": data, "runs": tot_runs, "pass": tot_pass, "tests": tot_tests}
 
 
@@ -330,14 +340,13 @@ def table_arms() -> tuple[str, list[dict]]:
         vals = {"J": float(r["J"]), "cost": float(r["cost $"]), "violation": float(r["violation"]),
                 "excess": float(r["excess"]), "shed": r["AI shed"], "overrun": r["budget overrun"]}
         data.append({"arm": arm, **vals})
-        sep = "\\midrule\n" if i in (5, 8) else ""
-        lines.append(f"{sep}{label} & {vals['J']:.4f} & {vals['cost']:.2f} & {vals['violation']:.3f} & "
+        rule = "\\hline\\hline" if i in (4, 7) else "\\hline"   # double rule between arm groups
+        lines.append(f"{label} & {vals['J']:.4f} & {vals['cost']:.2f} & {vals['violation']:.3f} & "
                      f"{vals['excess']:.3f} & {vals['shed'].replace('%', '')} & "
-                     f"{vals['overrun'].replace('%', '')} \\\\")
-    tex = ("\\begin{tabular}{@{}l r r r r r r@{}}\n\\toprule\n"
-           "Arm & $J$ & Cost & Viol. & Excess & Shed & Over. \\\\\n"
-           " & & (\\$) & & & (\\%) & (\\%) \\\\\n\\midrule\n" + "\n".join(lines) +
-           "\n\\bottomrule\n\\end{tabular}\n")
+                     f"{vals['overrun'].replace('%', '')} \\\\\n{rule}")
+    tex = ("\\begin{tabular}{|l|r|r|r|r|r|r|}\n\\hline\n" + bold_row(TAB2_HEAD) + "\n"
+           " & & (\\$) & & & (\\%) & (\\%) \\\\\n\\hline\n" + "\n".join(lines) +
+           "\n\\end{tabular}\n")
     return tex, data
 
 
@@ -372,9 +381,8 @@ def table_post() -> tuple[str, list[dict]]:
         # exists, a parse failure must raise rather than drop the EQ marks.
         eq = ({r["id"].removesuffix("-EQ"): r["equivalent?"]
                for r in md_table(record, EQ_HEADING)} if has_section(record, EQ_HEADING) else {})
-        sep = "\\midrule\n" if col else ""
-        lines.append(f"{sep}\\multicolumn{{5}}{{@{{}}l}}{{\\textit{{{regime}}} "
-                     f"({design_points(exp)} design points)}} \\\\")
+        lines.append(f"\\multicolumn{{5}}{{|l|}}{{\\textit{{{regime}}} "
+                     f"({design_points(exp)} design points)}} \\\\\n\\hline")
         for label, arm, ids in POST:
             test = ids[col]
             if test is None:
@@ -382,13 +390,12 @@ def table_post() -> tuple[str, list[dict]]:
             r = conf[test]
             assert r["vs"] == arm, (test, r["vs"], arm)
             mark = DIRECTION[r["direction"]] + (", EQ" if eq.get(test) == "EQUIVALENT" else "")
-            lines.append(f"\\quad {label} & \\texttt{{{test}}} & ${signed(nums(r['ΔJ'])[0])}$ & "
-                         f"{ci_tex(r['95% CI of ΔJ'])} & {mark} \\\\")
+            lines.append(f"{label} & \\texttt{{{test}}} & ${signed(nums(r['ΔJ'])[0])}$ & "
+                         f"{ci_tex(r['95% CI of ΔJ'])} & {mark} \\\\\n\\hline")
             data.append({"test": test, "vs": arm, "dJ": nums(r["ΔJ"])[0], "ci": nums(r["95% CI of ΔJ"]),
                          "mark": mark})
-    tex = ("\\begin{tabular}{@{}l l r c l@{}}\n\\toprule\n"
-           "Comparator & Test & $\\Delta J$ & 95\\% CI & \\\\\n\\midrule\n" + "\n".join(lines) +
-           "\n\\bottomrule\n\\end{tabular}\n")
+    tex = ("\\begin{tabular}{|l|l|r|c|l|}\n\\hline\n" + bold_row(TAB3_HEAD) + "\n\\hline\n" +
+           "\n".join(lines) + "\n\\end{tabular}\n")
     return tex, data
 
 

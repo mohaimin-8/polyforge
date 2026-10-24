@@ -73,10 +73,9 @@ of Replica, Cache, and Model-Tier Control for LLM Serving}
 %  Replica, Cache, and Model-Tier Control for LLM Serving
 % ---------------------------------------------------------------------
 
-\ifblind
-\author{\IEEEauthorblockN{Anonymous Author(s)}
-\IEEEauthorblockA{\textit{Affiliation withheld for double-blind review}}}
-\else
+% Double-blind submission: no author block, as in the venue's sample
+% paper; the camera-ready version (\blindfalse) prints the authors.
+\ifblind\else
 \author{\IEEEauthorblockN{Md.\ Mohaiminul Islam}
 \IEEEauthorblockA{\textit{Dept.\ of Electronics \& Telecommunication Engineering} \\
 \textit{Rajshahi University of Engineering \& Technology}\\
@@ -153,12 +152,12 @@ joint setting, and that one controller should set all three knobs together
 (Fig.~\ref{fig:overview}b).
 
 Joint control of serving knobs is an active line of work, from model
-variants chosen with autoscaling~\cite{infaas,ipa,proteus} to cascades
+variants chosen with autoscaling~\cite{infaas,proteus} to cascades
 deployed with their routing~\cite{cascadia} and caches chosen with model
 selectors~\cite{zhu2023}. These systems report gains over separately
 configured or fixed alternatives. Yet comparisons of controllers are
 sensitive to how well the baselines are tuned and
-instrumented~\cite{chameleon,melis2018,henderson2018,zhang2026drl}, and
+instrumented~\cite{chameleon,zhang2026drl,khilji2026}, and
 few evaluations isolate what coordination itself is worth. Doing so means
 holding the objective, forecaster, actuation limits, budgets and cost
 model fixed, and changing only whether the knobs are searched jointly.
@@ -193,19 +192,23 @@ contributions are:
   how far one interval may move, and only where the layers share capacity.
 \item \textbf{An evaluation checklist and an open artifact}
   (Table~\ref{tab:checklist}): rules paired with the defects they caught,
-  and code, data and protocols that regenerate every number.
+    and code, data and protocols that regenerate every number.
 \end{itemize}
+
+Section~\ref{sec:related} reviews related work, Section~\ref{sec:method}
+describes the system and the evaluation method, Section~\ref{sec:results}
+reports the results, Section~\ref{sec:lessons} draws lessons for building
+and evaluating joint controllers, Section~\ref{sec:threats} discusses
+threats to validity and Section~\ref{sec:conclusion} concludes.
 
 % =====================================================================
 \section{Related Work}
 \label{sec:related}
 % =====================================================================
 
-\textit{Joint control of serving knobs.} Beyond the systems above, Clipper
-combined a prediction cache with adaptive model selection~\cite{clipper},
-and Cheng and Nguyen pose model selection, GPU provisioning, parallelism
-and routing as one mixed-integer program solved by greedy
-heuristics~\cite{chengnguyen2026}. \polyforge{} differs in its knobs
+\textit{Joint control of serving knobs.} Like the systems cited
+above~\cite{infaas,proteus,cascadia,zhu2023}, \polyforge{} adapts the
+model choice together with other knobs. It differs in its knobs
 (replicas, a semantic-cache budget and a model tier per tenant, under
 per-tenant dollar budgets) and in what it measures: the value of
 coordination with everything else fixed.
@@ -218,13 +221,12 @@ decentralized loops suffice~\cite{bristol1966}; our result is a discrete
 analogue for autoscaling.
 
 \textit{Evaluation methodology.} Autoscalers should be compared on a level
-playing field~\cite{chameleon}. Careful re-evaluations have overturned
-reported gains in language modeling~\cite{melis2018} and exposed fragile
-results in deep reinforcement learning~\cite{henderson2018}; in
-autoscaling, a calibrated rule-based scaler beat six deep RL methods on
-cost~\cite{zhang2026drl}, and a pre-registered re-evaluation of three
-learned orchestrators found their apparent robustness often reflected
-comparator collapse or evaluation choices~\cite{khilji2026}.
+playing field~\cite{chameleon}, and recent re-evaluations show how much a
+reported gain can depend on its baselines: a calibrated rule-based scaler
+beat six deep reinforcement learning methods on cost~\cite{zhang2026drl},
+and a pre-registered re-evaluation of three learned orchestrators found
+their apparent robustness often reflected comparator collapse or
+evaluation choices~\cite{khilji2026}.
 
 % =====================================================================
 \section{System and Evaluation Method}
@@ -337,8 +339,9 @@ three cluster sizes (per-tenant replica caps 6, 10, 16): 60 \emph{design
 points}, each run for 120 ten-second steps (20 simulated minutes). Two campaigns depart from it (Table~\ref{tab:campaigns}):
 HELDOUT runs two Markov-modulated bursty workloads that no tuning or earlier
 campaign had used, and WIDTH runs the four AI-carrying classes, including
-a bursty, cacheable, tier-mixed joint-stress class. Every arm runs 5 reps
-per design point on shared seeds, so all arms see identical demand. Arms
+a bursty, cacheable, tier-mixed joint-stress class. Every \emph{arm}, that is, every controller configuration under
+test, runs 5 \emph{reps} per design point, one per seed; the seeds are
+shared, so all arms see identical demand. Arms
 are scored on
 \begin{equation}
 \label{eq:J}
@@ -408,6 +411,11 @@ regenerate from the committed exports with identical content.
 \section{Results}
 \label{sec:results}
 % =====================================================================
+
+We first trace how the joint controller's initial advantage disappeared
+(Sec.~\ref{sec:chain}), then measure what remains of it
+(Sec.~\ref{sec:remains}) and explain why coordination buys so little
+(Sec.~\ref{sec:width}).
 
 \begin{figure}[!t]
 \centering
@@ -587,9 +595,9 @@ WIDTH scores the 48 AI-carrying design points, so its published-plant gain
 (0.0044) is not JOINTNESS's 0.0066 on all 60. The protocol was written
 after exploratory probes on disjoint seeds, so this is a confirmatory
 replication, not a blind test. Under the program-wide Holm correction three of its five $p$-valued tests
-survive; of the other two, \rec{WD-H1} survives a Benjamini--Yekutieli
-correction~\cite{by2001} and \rec{WD-H5} on the published plant survives
-only within its registered family.
+survive; the other two, \rec{WD-H1} and \rec{WD-H5} on the published
+plant, pass within their registered families but not under that
+correction.
 
 % =====================================================================
 \section{Lessons}
@@ -617,26 +625,32 @@ the defect it catches here, and the measured effect.}
 \centering
 \scriptsize
 \setlength{\tabcolsep}{2.5pt}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.05cm}
-                >{\raggedright\arraybackslash}p{3.05cm}
-                >{\raggedright\arraybackslash}p{2.95cm}@{}}
-\toprule
-Rule & Defect it catches here & Measured effect \\
-\midrule
+\renewcommand{\rec}[1]{\texttt{#1}}   % tags at table size
+\begin{tabular}{|>{\raggedright\arraybackslash}p{2.0cm}
+                |>{\raggedright\arraybackslash}p{3.0cm}
+                |>{\raggedright\arraybackslash}p{2.85cm}|}
+\hline
+\textbf{Rule} & \textbf{Defect it catches here} & \textbf{Measured effect} \\
+\hline
 One cost model for all arms & Only baselines paid a $1.4581\times$
   surcharge; cache pinned at 128\,MB & $-27.5\%\rightarrow-0.4\%$ vs.\ HPA \\
+\hline
 Interior tuning optima, per size & HPA optimum on a grid edge &
   $-0.9\%\rightarrow0.0\%$ (\rec{RT-H1}) \\
+\hline
 Same caps and step limits & Re-tuned HPA over the small cluster's cap &
   Still a tie (\rec{JN-B4}) \\
+\hline
 A cheapest-tier stack as a baseline & Registered rule ranked tiers by
   latency, at 3.4$\times$ \jcac{}'s cost & $-60.4\%\rightarrow+4.7\%$
   (\rec{JN-B1}) \\
+\hline
 A decoupled ablation & Coordination never isolated & 1.6\% of $J$
   (\rec{JN-C1}) \\
+\hline
 Held-out demand & Periodic workloads only & \jcac{}'s $J$ $+23.3\%$
   (\rec{HO-B1}) \\
-\bottomrule
+\hline
 \end{tabular}
 \end{table}
 
@@ -679,15 +693,12 @@ Per-knob search that shares a forecast and an objective therefore matches
 joint search when steps are bounded, and a joint controller's gains should
 be read only after the checks of Table~\ref{tab:checklist}. The registered
 five-seed live replication and coordination under tier-switch lag and
-backlog are the next steps.
+backlog are the next steps. The code, simulator, registered protocols,
+run data and the scripts that regenerate every table and figure are
+publicly archived\ifblind; the links are withheld for double-blind
+review\fi.
 
-\ifblind
-\section*{Data Availability}
-The code, simulator, registered protocols, raw run databases and the
-scripts that regenerate every number, table and figure are publicly
-archived; the links are withheld for double-blind review and will be given
-in the final version.
-\else
+\ifblind\else
 \section*{Data Availability}
 % TODO(author): before submission, publish the Zenodo version built on
 % 2026-10-22 (eval/results/zenodo/polyforge-eval-artifact-2026-10-22.zip),
@@ -732,11 +743,6 @@ F.~Romero, Q.~Li, N.~J.~Yadwadkar, and C.~Kozyrakis, ``INFaaS: Automated
 model-less inference serving,'' in \textit{Proc. USENIX Annu. Tech. Conf.
 (ATC)}, 2021, pp.~397--411.
 
-\bibitem{ipa}
-S.~Ghafouri \textit{et al.}, ``IPA: Inference pipeline adaptation to
-achieve high accuracy and cost-efficiency,'' \textit{J. Syst. Res.},
-vol.~4, no.~1, 2024.
-
 \bibitem{proteus}
 S.~Ahmad, H.~Guan, B.~D.~Friedman, T.~Williams, R.~K.~Sitaraman, and
 T.~Woo, ``Proteus: A high-throughput inference-serving system with accuracy
@@ -758,31 +764,15 @@ A hybrid, proactive auto-scaling mechanism on a level-playing field,''
 \textit{IEEE Trans. Parallel Distrib. Syst.}, vol.~30, no.~4,
 pp.~800--813, 2019.
 
-\bibitem{melis2018}
-G.~Melis, C.~Dyer, and P.~Blunsom, ``On the state of the art of evaluation
-in neural language models,'' in \textit{Proc. Int. Conf. Learn.
-Represent. (ICLR)}, 2018.
-
-\bibitem{henderson2018}
-P.~Henderson, R.~Islam, P.~Bachman, J.~Pineau, D.~Precup, and D.~Meger,
-``Deep reinforcement learning that matters,'' in \textit{Proc. AAAI Conf.
-Artif. Intell.}, vol.~32, no.~1, 2018.
-
 \bibitem{zhang2026drl}
 G.~Zhang, C.~Sun, K.~Zhao, X.~Chu, S.~Sarkani, and J.~Fossaceca, ``When
 does deep RL beat calibrated baselines? A benchmark study on adaptive
 resource control,'' 2026, \textit{arXiv:2605.26418}.
 
-\bibitem{clipper}
-D.~Crankshaw, X.~Wang, G.~Zhou, M.~J.~Franklin, J.~E.~Gonzalez, and
-I.~Stoica, ``Clipper: A low-latency online prediction serving system,'' in
-\textit{Proc. 14th USENIX Symp. Networked Syst. Des. Implement. (NSDI)},
-2017, pp.~613--627.
-
-\bibitem{chengnguyen2026}
-J.~Cheng and D.~T.~Nguyen, ``Scalable joint resource allocation for
-SLO-constrained LLM inference in heterogeneous GPU clouds,'' 2026,
-\textit{arXiv:2604.07472}.
+\bibitem{khilji2026}
+S.~I.~Khilji, A.~Furutanpey, and S.~Dustdar, ``Incentives and evidence in
+learned service orchestration,'' in \textit{Proc. Int. Conf.
+Service-Oriented Syst. Eng. (SOSE)}, 2026, pp.~51--62.
 
 \bibitem{nopowerstruggles}
 R.~Raghavendra, P.~Ranganathan, V.~Talwar, Z.~Wang, and X.~Zhu, ``No
@@ -801,15 +791,14 @@ E.~H.~Bristol, ``On a new measure of interaction for multivariable process
 control,'' \textit{IEEE Trans. Autom. Control}, vol.~11, no.~1,
 pp.~133--134, 1966.
 
-\bibitem{khilji2026}
-S.~I.~Khilji, A.~Furutanpey, and S.~Dustdar, ``Incentives and evidence in
-learned service orchestration,'' in \textit{Proc. Int. Conf.
-Service-Oriented Syst. Eng. (SOSE)}, 2026, pp.~51--62.
+\bibitem{jain1984}
+R.~Jain, D.-M.~Chiu, and W.~R.~Hawe, ``A quantitative measure of fairness
+and discrimination for resource allocation in shared computer systems,''
+Digital Equipment Corp., Tech. Rep. DEC-TR-301, 1984.
 
-\bibitem{nosek2018}
-B.~A.~Nosek, C.~R.~Ebersole, A.~C.~DeHaven, and D.~T.~Mellor, ``The
-preregistration revolution,'' \textit{Proc. Nat. Acad. Sci.}, vol.~115,
-no.~11, pp.~2600--2606, 2018.
+\bibitem{monderer1996}
+D.~Monderer and L.~S.~Shapley, ``Potential games,'' \textit{Games Econ.
+Behav.}, vol.~14, no.~1, pp.~124--143, 1996.
 
 \bibitem{holm1979}
 S.~Holm, ``A simple sequentially rejective multiple test procedure,''
@@ -820,22 +809,13 @@ D.~Lakens, ``Equivalence tests: A practical primer for $t$ tests,
 correlations, and meta-analyses,'' \textit{Social Psychol. Personality
 Sci.}, vol.~8, no.~4, pp.~355--362, 2017.
 
-\bibitem{jain1984}
-R.~Jain, D.-M.~Chiu, and W.~R.~Hawe, ``A quantitative measure of fairness
-and discrimination for resource allocation in shared computer systems,''
-Digital Equipment Corp., Tech. Rep. DEC-TR-301, 1984.
-
-\bibitem{monderer1996}
-D.~Monderer and L.~S.~Shapley, ``Potential games,'' \textit{Games Econ.
-Behav.}, vol.~14, no.~1, pp.~124--143, 1996.
+\bibitem{nosek2018}
+B.~A.~Nosek, C.~R.~Ebersole, A.~C.~DeHaven, and D.~T.~Mellor, ``The
+preregistration revolution,'' \textit{Proc. Nat. Acad. Sci.}, vol.~115,
+no.~11, pp.~2600--2606, 2018.
 
 \bibitem{qwen25}
 Qwen Team, ``Qwen2.5 technical report,'' 2024, \textit{arXiv:2412.15115}.
-
-\bibitem{by2001}
-Y.~Benjamini and D.~Yekutieli, ``The control of the false discovery rate
-in multiple testing under dependency,'' \textit{Ann. Statist.}, vol.~29,
-no.~4, pp.~1165--1188, 2001.
 
 \end{thebibliography}
 
