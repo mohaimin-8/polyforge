@@ -585,6 +585,10 @@ UNGATED = {
     "PLANNER_SCALING.md":
         "as PLANNER_CELLS.md: wall-clock planner latency, machine-dependent "
         "by construction",
+    "PLANNER_TIMING_SOLVERS.md":
+        "as PLANNER_CELLS.md: wall-clock latency of the two solver "
+        "configurations on the machine that ran it; only their ratio carries "
+        "over to another machine",
     "CACHE_PRECISION.md":
         "cache_hit_precision.py requires --conversations, the licence-gated "
         "LMSYS-Chat-1M parquet",
