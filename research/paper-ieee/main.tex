@@ -692,12 +692,10 @@ well as their tier rule (Table~\ref{tab:arms}).
 joint controller; exploratory re-analyses exposed them and registered
 re-scorings removed them. Table~\ref{tab:checklist} turns them into rules. The decoupled
 ablation needs no new model: it reuses the joint controller's objective
-and forecast, and its search scores at most 12 candidates per tenant on
-the published lattice.
+and forecast.
 
 \begin{table}[!t]
-\caption{A checklist for comparing joint and per-layer control: each rule,
-the defect it catches here, and the measured effect.}
+\caption{A checklist for comparing joint and per-layer control.}
 \label{tab:checklist}
 \centering
 \scriptsize
@@ -738,10 +736,9 @@ stack beats it by $0.1052$ in $J$ (\rec{SM-H2}): the simulator flatters
 joint control. One live case study on a single GPU host (two
 reps, controller calibrated on the same plant) is in the artifact; its
 five-seed replication was registered but not run, so we make no live
-claim. \textit{Construct.} $J$'s weights are a choice. Answer quality enters
-only the quality-priced campaign, from published benchmark scores rather
-than graded answers, and the cost model prices replica time, cache memory
-and model calls but not network or storage. In an exploratory
+claim. \textit{Construct.} $J$'s weights are a choice. Answer quality comes from
+published benchmark scores rather than graded answers, and network and
+storage are not priced. In an exploratory
 re-scoring the registered lateness weight (the weight of violation in
 $J$) of 2 is exactly the crossover against re-tuned HPA: at 4, re-tuned
 HPA is better than \jcac{}, and at 8 re-tuned KEDA is too.
@@ -749,9 +746,8 @@ HPA is better than \jcac{}, and at 8 re-tuned KEDA is too.
 grid, not a measured system. \textit{External.} Workloads are synthetic
 periodic classes plus two held-out Markov-modulated ones, with eight
 tenants per mix. \textit{Statistical conclusion.} The intervals resample
-design points, so they generalize over the sampled workloads, mixes and
-cluster sizes and not beyond them; run-to-run noise enters only through
-each point's five-rep mean.
+design points, so they generalize only over the sampled workloads, mixes
+and cluster sizes.
 
 % =====================================================================
 \section{Conclusion}
