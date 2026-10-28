@@ -1,0 +1,24 @@
+# PREREG_REVIEWER_FOLLOWUP.md (2026-10-28), campaign 1 -- reviewer Q5/1c:
+# how does joint control with wide steps compare with the autoscaler run
+# with Kubernetes' default behavior, and with the other baselines?
+# Published plant, the 60-point main matrix. Committed before any run.
+#
+#   jcac_converged            joint search, published lattice (+/-2, one cache level)
+#   jcac_joint_wide_tracked   joint search, wide lattice (+/-8, any cache level)
+#   hpa_fair_capped           re-tuned HPA in the cluster caps, +-2 per interval
+#   hpa_k8s_capped            the same HPA with Kubernetes' default scaling behavior
+#   layered_small_tuned       cheapest-tier layered stack
+#   static_share              equal cluster share, never adapts
+name: matrix_reviewer_wide
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_converged, jcac_joint_wide_tracked, hpa_fair_capped, hpa_k8s_capped,
+          layered_small_tuned, static_share]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_reviewer_wide.duckdb
+retries: 2
+timeseries_reps: 0

@@ -336,6 +336,16 @@ SYSTEMS: dict[str, SystemSpec] = {
                     "joint controller obeys (baselines.CapEnforced), "
                     "target_rho re-tuned per size under those caps",
     ),
+    # Reviewer follow-up (PREREG_REVIEWER_FOLLOWUP): hpa_fair_capped with
+    # Kubernetes' default scaling behavior instead of the +-2 clamp; reuses
+    # hpa_fair_capped's tuned target (not re-tuned for the new policy).
+    "hpa_k8s_capped": SystemSpec(
+        "hpa_capped", static_cache_mb=512, tuned_from="hpa", tuned_arm="hpa_fair_capped",
+        params={"policy": "k8s_default"},
+        description="hpa_fair_capped with Kubernetes' default HPA behavior "
+                    "(scale up by max(100%, 4 pods) per interval, scale down "
+                    "after a 300 s stabilization window)",
+    ),
     "keda_fair_capped": SystemSpec(
         "keda_capped", static_cache_mb=512, tuned_from="keda", tuned_arm="keda_fair_capped",
         description="keda_fair inside the cluster caps (baselines.CapEnforced), "

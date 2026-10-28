@@ -1,0 +1,27 @@
+# PREREG_REVIEWER_FOLLOWUP.md (2026-10-28), campaign 2 -- reviewer Q4/2b:
+# the main comparisons on the plant fitted to the deployed system (the
+# model_form of matrix_width_live: replicas serve 1,123 units/s, AI work
+# never loads them). Planner and plant share this model (no mismatch).
+# Comparators keep their published-plant tuning (not re-tuned here).
+# Committed before any run.
+name: matrix_reviewer_live
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_converged, jcac_decoupled, jcac_tier_floor, hpa_fair_capped, keda_fair_capped,
+          layered_small_tuned, static_share]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_reviewer_live.duckdb
+retries: 2
+timeseries_reps: 0
+model_form:
+  replica_capacity_wu: 1123
+  wu_ai_scale: 0
+  crud_base_scale: 0.013175
+  tier_latency_small: 261.7
+  tier_latency_mid: 751.2
+  tier_latency_large: 2156
+  cacheable_uniform: 1
