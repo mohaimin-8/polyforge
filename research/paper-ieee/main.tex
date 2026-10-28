@@ -17,6 +17,7 @@
 \usepackage{tikz}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{flafter}   % no float before the point where it is defined
 \usetikzlibrary{positioning,calc}
 
 % \blindtrue: double-blind review copy (no authors, links or system names).
@@ -56,7 +57,7 @@
 \begin{document}
 
 \title{Joint versus Per-Layer Control of Replicas, Caches, and Model Tiers
-in Multi-Tenant LLM Serving: A Pre-Registered Simulation Study}
+in a Simulated Multi-Tenant LLM Gateway: A Pre-Registered Study}
 
 \ifblind\else
 \author{\IEEEauthorblockN{Md.\ Mohaiminul Islam}
@@ -80,28 +81,28 @@ Rajshahi 6204, Bangladesh}
 \ifcameraready\IEEEpubidadjcol\fi
 
 \begin{abstract}
-Multi-tenant platforms serving large language models usually manage
-each tenant with three separate mechanisms: a replica autoscaler such as
-the Kubernetes Horizontal Pod Autoscaler, a semantic response cache, and a
-router that selects the model tier. Joint controllers assume that tuning
-these layers independently forfeits gains that only a joint decision can
-capture. We tested this assumption in simulation on a Kubernetes-native
-control plane whose planner sets replicas, cache budget and model tier
-for every tenant, in seven pre-registered campaigns totaling 15{,}420
-runs. An initial advantage of 27.5\% over the autoscaler on a composite
-objective of cost, latency violation and unfairness, and of 53 to 60\% over
-a stack of per-layer controllers, disappeared once registered re-scorings
-removed comparator defects. The joint planner then ties the tuned
-autoscaler within an exploratory equivalence bound of about 5\%, does not
-beat a layered stack that routes to the cheapest tier, and scores 23\% worse
-than that stack on unseen demand; its remaining wins come from the largest
-cluster and from shedding traffic. Coordination itself is worth 1.6\% of
-the objective. A width experiment explains why: when one interval can move
-a tenant by at most two replicas and one cache level, joint and per-layer
-search choose different actions in at most 1.04\% of decisions on all three
-simulated systems. With steps of up to eight replicas and any cache level,
-the coordination gain grows four- to fivefold, but only where language-model
-work loads the replicas, and such steps degrade the controller.
+Platforms serving large language models usually manage each tenant with
+three mechanisms: a replica autoscaler, a semantic response cache,
+and a router that selects the model tier. Joint controllers assume that
+tuning these layers separately forfeits gains only a joint decision can
+capture. We tested this for one joint planner, a receding-horizon controller
+that moves each tenant one bounded step per interval, in a simulated gateway
+whose models run outside the cluster, across seven pre-registered campaigns
+and 15{,}420 runs. An initial advantage of 27.5\% over the autoscaler on a
+composite objective of cost, latency violation and unfairness, and of 53 to
+60\% over a stack of per-layer controllers, disappeared once registered
+re-scorings removed comparator defects. On 60 synthetic design points, the
+joint planner ties the tuned autoscaler and does not beat a layered
+stack that routes to the cheapest tier; on unseen demand, with instant
+actuation, it scores 23\% worse than that stack. Its remaining wins come
+from the largest cluster and from shedding traffic, without which it loses
+to the capped autoscaler. Coordination is worth 1.6\% of the
+objective. A width experiment explains why: when one interval moves a
+tenant by at most two replicas and one cache level, joint and per-layer
+search disagree on at most 1.04\% of decisions. With steps of up to eight
+replicas and any cache level, the gain grows 4.4- to 5.3-fold, but only
+where language-model work loads the replicas, and such steps degrade the
+controller.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -160,12 +161,12 @@ held-out demand. Our contributions are as follows:
   separately registered re-scorings.
 \item \textbf{A measurement of coordination and of what remains}
   (Section~\ref{sec:remains}, Tables~\ref{tab:arms}--\ref{tab:post},
-  Figs.~\ref{fig:sizes}--\ref{fig:tradeoff}): with all else fixed, joint
+  Fig.~\ref{fig:tradeoff}): with all else fixed, joint
   search beats per-knob search by only 1.6\% of the objective, and the
   remaining wins over tuned baselines come from the largest cluster,
   actuation lag and shedding (assigning AI traffic to no model).
 \item \textbf{A mechanism confirmed under pre-registration}
-  (Section~\ref{sec:width}, Fig.~\ref{fig:width}, Table~\ref{tab:width}):
+  (Section~\ref{sec:width}, Fig.~\ref{fig:width}):
   coordination grows with how far one interval may move a tenant, and only
   where the layers share capacity.
 \item \textbf{An evaluation checklist and an open artifact}
@@ -183,12 +184,14 @@ discusses threats to validity, and Section~\ref{sec:conclusion} concludes.
 \label{sec:related}
 % =====================================================================
 
-\textit{Caching and routing.} A semantic cache embeds each prompt and
-returns a stored answer when a cached prompt is sufficiently
-similar~\cite{gptcache}, while a cascade queries a cheap model first and
-escalates only when its answer is not reliable enough~\cite{frugalgpt}.
-Both operate per request; \polyforge{} instead sets the cache budget and the
-tier per tenant and per interval.
+\textit{Serving, caching and routing.} Inference servers such as
+vLLM~\cite{vllm} and Splitwise~\cite{splitwise} manage memory and execution
+phases inside GPU model servers; a semantic cache returns a stored answer
+when a cached prompt is sufficiently similar~\cite{gptcache}; and a
+cascade~\cite{frugalgpt} or a learned router~\cite{routellm} decides which
+model answers a query. These act per request or per server; \polyforge{}
+instead sets each tenant's replicas, cache budget and tier per interval,
+above model servers that run outside its cluster.
 
 \textit{Joint control of serving knobs.} As in~\cite{infaas,zhu2023},
 \polyforge{} adapts the model choice together with other knobs, but it
@@ -198,8 +201,10 @@ everything else held fixed.
 
 \textit{Coordination of independent controllers.} Uncoordinated power
 managers in data centers interfere with one another~\cite{nopowerstruggles},
-and independent per-service autoscalers oscillate where a coordinated
-autoscaler does not~\cite{chamulteon}. In process control, Bristol's
+independent per-service autoscalers oscillate where a coordinated
+autoscaler does not~\cite{chamulteon}, learned managers coordinate the
+resources of whole microservice graphs~\cite{sinan}, and predictive
+autoscalers plan replicas over a forecast horizon~\cite{roy2011}. In process control, Bristol's
 relative gain array indicates when decentralized loops
 suffice~\cite{bristol1966}; our result is a discrete analog of this
 criterion for autoscaling.
@@ -210,12 +215,26 @@ a reported gain can depend on its baselines: a calibrated rule-based scaler
 outperformed six deep reinforcement learning methods on
 cost~\cite{zhang2026drl}, and a pre-registered re-evaluation of three
 learned orchestrators found that their apparent robustness often reflected
-comparator collapse or evaluation choices~\cite{khilji2026}.
+comparator collapse or evaluation choices~\cite{khilji2026}. Unlike that
+study, we adjudicate our own controller and isolate coordination with a
+decoupled-search ablation.
 
 % =====================================================================
 \section{Methodology}
 \label{sec:method}
 % =====================================================================
+
+\subsection{System Overview}
+\label{sec:overview}
+
+\polyforge{} comprises a Go control plane and gateway with a per-tenant
+semantic cache, a Python planner, and a Kubernetes operator that applies
+plans under guardrails. The deployed planner runs the same controller code
+as the simulator, and the operator's Helm chart exposes the solver
+configuration evaluated here as an opt-in setting. Its replicas are the
+tenants' serving pods, which do the per-request work of every call; the
+models run outside the cluster, so no replica is a GPU model server.
+Fig.~\ref{fig:overview} shows the four stages of one simulated run.
 
 \begin{figure}[!t]
 \centering
@@ -286,16 +305,6 @@ campaign.}
 \label{fig:overview}
 \end{figure}
 
-\subsection{System Overview}
-\label{sec:overview}
-
-\polyforge{} comprises a Go control plane and gateway with a per-tenant
-semantic cache, a Python planner, and a Kubernetes operator that applies
-plans under guardrails. The deployed planner runs the same controller code
-as the simulator, and the operator's Helm chart exposes the solver
-configuration evaluated here as an opt-in setting. Fig.~\ref{fig:overview}
-shows the four stages of one simulated run.
-
 \subsection{The \jcac{} Planner}
 \label{sec:jcac}
 
@@ -305,13 +314,16 @@ the state at the start of the interval: $\Delta r\in\{-2,\dots,2\}$, a move
 of at most one cache level (0--1024\,MB in six levels), and
 $\tau\in\{\text{none},\text{small},\text{mid},\text{large}\}$, where
 ``none'' makes no model call, giving at most 60 candidates per tenant.
-Over a six-step (60\,s) forecast horizon, the planner minimizes
+The planner holds each candidate fixed over a six-step (60\,s) horizon
+of a forecast that extends each tenant's linear trend over its last three
+intervals, applies only the first move, and re-plans every interval
+(receding-horizon control with move blocking). It minimizes
 \begin{equation}
 \label{eq:plan}
 \begin{split}
 \Phi(x)={}&\frac{\alpha}{c_0}\sum_i \mathrm{cost}_i
  +\beta\sum_i\log\bigl(1+\mathrm{exc}_i\bigr)\\
- &+\gamma'\bigl(1-\mathrm{Jain}(s)\bigr)
+  &+\gamma\bigl(1-\mathrm{Jain}(s)\bigr)
  +\lambda\sum_i \mathrm{sw}_i ,
 \end{split}
 \end{equation}
@@ -321,9 +333,10 @@ relative overshoot of p95 latency over the tenant's service-level
 objectives (SLOs). The violation $v_i\in[0,1]$ is this overshoot capped at
 1 per request family; $s_i=1-v_i$ enters Jain's fairness
 index~\cite{jain1984}, and $\mathrm{sw}_i$ counts changed knobs. We use
-$\alpha=1$, $\beta=2$, $\gamma'=0.5$, $\lambda=0.05$ and $c_0=\$0.01$ per
-tenant-step. An interference penalty, zero unless a tenant is flagged as
-a noisy neighbor, is omitted from (\ref{eq:plan}). A per-tenant
+$\alpha=1$, $\beta=2$, $\gamma=0.5$, $\lambda=0.05$ and $c_0=\$0.01$ per
+tenant-step. An interference penalty is omitted from (\ref{eq:plan}): it is zero
+unless a tenant is flagged as a noisy neighbor, and no campaign here
+injected one. A per-tenant
 dollar budget acts as a hard filter. A tenant is \emph{shed} when its tier
 is ``none'', either because this lowers $\Phi$ or because no candidate is
 affordable; the resulting outage is priced only through the SLO terms.
@@ -332,7 +345,9 @@ The solver (Algorithm~\ref{alg:plan}) performs block-coordinate descent
 over tenants. Each tenant best-responds exactly over its lattice, and sweeps
 repeat until no tenant changes, accepting only strict improvements. With
 uniform fairness weights, $\Phi$ is an exact potential~\cite{monderer1996},
-so the final plan is a best response for every tenant; a 50-sweep safety
+so the sweeps end where every tenant best-responds to the others: an
+equilibrium of the tenants, not a global optimum, with joint search inside
+each tenant; a 50-sweep safety
 cap was never reached in the runs where it was counted (\rec{JOINTNESS}).
 On a single laptop core, a plan cycle for 8 tenants takes a median of
 31\,ms (p95 44\,ms) with this convergent solver and 23\,ms with the default
@@ -379,7 +394,9 @@ it is scored (Section~\ref{sec:threats}).
 
 The main matrix crosses five workload classes (steady and bursty CRUD,
 cacheable and uncacheable AI, and agentic) with four eight-tenant mixes and
-three cluster sizes (per-tenant replica caps of 6, 10 and 16), giving 60
+three cluster sizes, whose shared caps (24, 48 or 96 replicas and 2, 4
+or 8\,GB of cache) lie below the sum of the per-tenant replica caps (6, 10
+or 16), so tenants contend for one pool. This gives 60
 \emph{design points}, each run for 120 ten-second steps (20 simulated
 minutes). Two campaigns depart from this matrix (Table~\ref{tab:campaigns}).
 HELDOUT runs two Markov-modulated bursty workloads that no tuning step or
@@ -407,7 +424,8 @@ utilization $\rho$ and target $\rho^\ast$, following the Kubernetes
 rule~\cite{k8shpa}, and a KEDA arm sets $\lceil q/q^\ast\rceil$ for request
 rate $q$ and per-replica target $q^\ast$. Both are clamped, like \jcac{},
 to $\pm2$ replicas per interval and keep a fixed cache and tier. Their final
-versions are tuned on a separate slice over grids with interior optima,
+versions are tuned on a separate slice (3 of the 5 workloads, 2 of the 4
+mixes, 2 reps) over grids with interior optima,
 re-tuned per cluster size, and held to the cluster caps of \jcac{}. Layered
 stacks run an HPA rule, a cache policy and a tier rule independently, with
 four tier rules: the registered rule (rank tiers by latency and ignore
@@ -418,8 +436,8 @@ controller. Only \jcac{} enforces the budget, and only \jcac{} can shed
 (Table~\ref{tab:arms}). Two ablations isolate coordination. They share the
 objective, forecast, budget filter and lattice of \jcac{} and change only
 the knob search: the \emph{decoupled} arm best-responds each knob with the
-other two held at the incumbent and combines the winners, repairing only
-feasibility, while the \emph{knob-wise} arm moves one knob at a time until
+other two held at the incumbent and combines the winners, keeping the best feasible subset of their moves
+when together they break a budget or cap, while the \emph{knob-wise} arm moves one knob at a time until
 no knob changes.
 
 \begin{table}[!t]
@@ -445,13 +463,16 @@ of its campaign and the 95\% bootstrap interval of the mean paired
 difference (10{,}000 resamples) lies on the registered side of zero. Two
 arms \emph{tie} when that interval spans zero; only an equivalence
 reading~\cite{lakens2017} (EQ: the interval lies inside the registered
-margin of $\pm0.025$\,$J$, about 6\% of the $J$ of \jcac{}) bounds the size
+margin of $\pm0.025$\,$J$, the smallest difference the design detects at
+$n=60$ with power 0.8, about 6\% of the $J$ of \jcac{}) bounds the size
 of a difference. Most campaigns also carry a non-inferiority guard on SLO
 excess. Each protocol fixed the arms, design, tests and predictions and was
 pushed to the repository before its first run, as commit times and, after
 an audit, server-side CI records show. Two early protocols,
 \rec{EVICTION\_PARITY} and \rec{ORDER\_PERMUTATION}, were committed after
-their first runs and are disclosed as such. The program's other 50
+their first runs and are disclosed as such. The campaigns are confirmatory
+one by one but adaptive as a sequence: each was designed after the
+exploratory re-analysis of its predecessor. The program's other 50
 protocols cover earlier matrices and their re-scorings, trace replays,
 robustness reruns, controller variants, and chaos, soak and live GPU
 runs. Across all 57 protocols, 122
@@ -487,17 +508,19 @@ replicas arriving one interval late, \jcac{} beats capped HPA.}
 \jcac{} led by 27.5\% of HPA's $J$. However, the comparators in that
 evaluation paid a $1.4581\times$ surcharge on inference cost (a model of
 LRU cache eviction) from which \jcac{} was exempt, and ran a cache pinned at
-128\,MB. Removing both defects erased the lead. With fresh shared seeds and
+128\,MB. Removing both defects (\rec{EVICTION\_PARITY}, registered after its first
+run) erased the lead. With fresh shared seeds and
 the convergent solver, the difference is $-0.9\%$, a failed superiority
-test (\rec{FJ-H1}), and an exploratory equivalence analysis (90\% interval,
+test, and an exploratory equivalence analysis (90\% interval,
 two one-sided tests) excludes any difference larger than 5.0\% of HPA's
 $J$. Because the published optimum of HPA lay on the edge of its tuning
-grid, we re-tuned it per cluster size. It then ties (\rec{RT-H1}) through a
+grid, we re-tuned it per cluster size. It then ties through a
 trade-off rather than identical behavior: \jcac{} costs 19.3\% less, yet
 its mean violation is 60.1\% higher, and every SLO guard of that campaign
 fails. Held to the cluster caps, HPA still ties, and on unseen bursty
-demand the point estimate turns against \jcac{}. KEDA loses at its fair
-setting, ties once re-tuned, and loses again when held to the caps
+demand the point estimate turns against \jcac{}. \jcac{} beats KEDA at its
+fair setting, ties it once KEDA is re-tuned, and beats it again when KEDA is
+held to the caps
 (\rec{FJ-H2}, \rec{RT-H2}, \rec{JN-B5}).
 
 \textit{Against the layered stack} (Fig.~\ref{fig:chain}(b)). The
@@ -505,11 +528,11 @@ registered stack lost to \jcac{} by 60.4\% and, after per-size re-tuning,
 by 53.1\%. Its tier rule ranks tiers by latency and ignores price, so it
 achieved the lowest violation of any arm at 3.4 times the spend of \jcac{}
 (Table~\ref{tab:arms}). With the tier
-pinned to the cheapest model, the stack ties \jcac{} (\rec{JN-B1}); a rule
+pinned to the cheapest model, the stack ties \jcac{}; a rule
 that selects the cheapest tier expected to meet the latency target loses by
 0.3208 in $J$ (\rec{JN-B2}); and a quality-aware router ties in the
 quality-priced campaign. On unseen demand, the $J$ of \jcac{} is 23.3\%
-above that of the cheapest-tier stack (\rec{HO-B1}). The 53--60\% win
+above that of the cheapest-tier stack. The 53--60\% win
 therefore measured the tier rule of one comparator, not the value of joint
 control.
 
@@ -551,31 +574,19 @@ campaign, which adds twice the answer-quality loss (derived from published
 benchmark scores of three model sizes~\cite{qwen25}) to $J$, prices tiers
 at measured GPU cost and drops the budget filter, the difference is
 $+0.0012$ $[-0.0016,+0.0043]$ (\rec{QL-C1}, EQ). On unseen demand,
-decoupled search is slightly better, though within the margin
-(\rec{HO-C1}).
+decoupled search is slightly better, though within the margin.
 
-\textit{Wins are confined to the largest cluster} (Fig.~\ref{fig:sizes},
-descriptive). Against the four comparators of Table~\ref{tab:post},
+\textit{Wins appear only on the largest cluster} (descriptive, untested;
+per-size tables of \rec{JOINTNESS} and \rec{ACTUATION}). Against the four comparators of Table~\ref{tab:post},
 \jcac{} is better only on the large cluster ($-0.0220$ to $-0.0771$ in
 $J$); on the medium cluster every difference spans zero, and on the small
 cluster the cheapest-tier stack beats it by $0.0732$. The pattern holds
 with and without actuation lag.
 
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{figures/fig_sizes.pdf}
-\caption{\jcac{} wins only on the large cluster, with or without actuation
-lag. Mean $\Delta J$ per cluster size (20 design points each) with 95\%
-bootstrap intervals, from the descriptive per-size tables of
-\rec{JOINTNESS} (a) and \rec{ACTUATION} (b).}
-\label{fig:sizes}
-\end{figure}
-
 \textit{Lag hurts the reactive rules more} (Table~\ref{tab:post}, middle
 block). When replicas start serving one interval after they are added and
 enlarged caches start half-warm, \jcac{} beats capped HPA by 4.8\% and
-capped KEDA by 6.5\%, with both SLO guards passing (\rec{AC-H3},
-\rec{AC-H4}). This is consistent with its 60\,s planning horizon, which a
+capped KEDA by 6.5\%, with both SLO guards passing. This is consistent with its 60\,s planning horizon, which a
 reactive rule lacks.
 
 \textit{Shedding drives the cost savings} (Table~\ref{tab:arms}). \jcac{}
@@ -586,9 +597,12 @@ its SLO guard fails against most baselines. Shedding does not result from
 joint search: the decoupled and knob-wise arms shed on 7.7\% and 7.3\% of
 tenant-steps. Fig.~\ref{fig:tradeoff} shows the trade-off: the tuned
 per-layer arms and the cheapest-tier stack hold violation at 0.043 to
-0.053, against 0.068 for \jcac{}, at 14 to 24\% more cost. When forbidden
-to shed, \jcac{} costs 19\% more, its $J$ rises by $0.0677$
-$[0.0432,0.0945]$, and it loses to capped HPA. On unseen demand, tested
+0.053, against 0.068 for \jcac{}, at 14 to 24\% more cost. Because $J$ prices a shed request only through
+the violation term, capped at 1 per request family, $J$ favors shedding;
+the never-shed arm prices it strictly. When forbidden to shed, \jcac{} costs
+19\% more, its $J$ rises by $0.0677$ $[0.0432,0.0945]$, it loses to capped
+HPA, and it trails the static share (0.4668 against 0.4226,
+Table~\ref{tab:arms}). On unseen demand, tested
 with instant actuation only, none of its wins survives
 (Table~\ref{tab:post}, last block), and it sheds on 11.3\% of
 tenant-steps.
@@ -601,6 +615,12 @@ tenant-steps.
 variants; violet: layered stacks.}
 \label{fig:tradeoff}
 \end{figure}
+
+\textit{A wrong plant model reverses the ranking.} When the planner keeps
+the published model while the plant follows the live-fitted one (a
+registered campaign outside Table~\ref{tab:campaigns}), the layered stack
+beats \jcac{} by $0.1052$ in $J$ (\rec{SM-H2}), more than any difference in
+Table~\ref{tab:post}.
 
 \subsection{Why Coordination Buys Little}
 \label{sec:width}
@@ -647,21 +667,7 @@ search ran on the published lattice and on a wide one
 up to $17\times6\times4=408$ candidates per tenant instead of 60, and
 decoupled search at most $17+6+4=27$ instead of 12.
 
-\begin{table}[!t]
-\caption{Coordination Gain per Plant in \rec{WIDTH} (48 AI-Carrying
-Design Points $\times$ 5 Reps per Plant). $G_n$, $G_w$: Gain
-$J(\text{Decoupled})-J(\text{Joint})$ on the Rate-Limited and Wide
-Lattices; DiD: $G_w-G_n$ With Its 95\% Bootstrap CI; $J_n-J_w$: Change in
-the Joint Controller's Own $J$ From Wide to Rate-Limited Steps (Negative:
-Wide Steps Are Worse).}
-\label{tab:width}
-\centering
-\scriptsize
-\setlength{\tabcolsep}{3.4pt}
-\input{tables/tab_width.tex}
-\end{table}
-
-All five registered predictions held (Table~\ref{tab:width}). On the
+All five registered predictions held. On the
 rate-limited lattice, the gain is small but positive (0.7--1.3\% of the
 decoupled arm's $J$, Fig.~\ref{fig:width}(a)) and lies inside the
 equivalence margin on every plant (\rec{WD-H4}); the two searches disagree
@@ -705,7 +711,8 @@ re-scorings removed them, and Table~\ref{tab:checklist} turns them into
 rules. 
 
 \begin{table}[!t]
-\caption{A Checklist for Comparing Joint and Per-Layer Control}
+\caption{Checklist for Joint vs.\ Per-Layer Comparisons (Effect: From
+the Campaign That Removed the Defect)}
 \label{tab:checklist}
 \centering
 \scriptsize
@@ -737,25 +744,30 @@ Held-out demand & Periodic workloads only & $+23.3\%$ (\rec{HO-B1}) \\
 \label{sec:threats}
 % =====================================================================
 
-\textit{Substrate.} All comparisons ran in a simulator, and the planner
-plans with the plant model on which it is scored, which favors \jcac{}. When,
-in a registered campaign outside Table~\ref{tab:campaigns}, the planner
-keeps the published model while the plant follows the live-fitted one, the
-layered stack beats it by $0.1052$ in $J$ (\rec{SM-H2}): the simulator
-flatters joint control. A two-rep live case study on one GPU host, with the
-controller calibrated on the same plant, is in the artifact, but its
-registered five-seed replication was not run, so we make no live claim. \textit{Construct.} The weights of $J$ are a choice, answer
-quality comes from published benchmark scores rather than graded answers,
-and network and storage are not priced. In an exploratory
-re-scoring, the registered lateness weight (the weight of violation in $J$)
-of 2 is exactly the crossover point against re-tuned HPA: at 4, re-tuned
-HPA is better than \jcac{}, and at 8, re-tuned KEDA is as well.
-\textit{Internal.} The coupled plant is a stress point chosen from a probe
-grid, not a measured system. \textit{External.} Workloads are synthetic
-periodic classes plus two held-out Markov-modulated ones, with eight
-tenants per mix. \textit{Statistical conclusion.} The intervals resample
-design points, so they generalize only over the sampled workloads, mixes
-and cluster sizes.
+\textit{Substrate.} All comparisons ran in a simulator whose plant model
+the planner also plans with, which flatters \jcac{}. Its replicas are serving pods, not GPU model
+servers, so batching, KV-cache memory and queueing lie outside the study. A
+two-rep live case study exists, but its registered replication was not
+run, so we make no live claim. \textit{Construct.} The
+weights of $J$ are a choice: in an exploratory re-scoring, the registered
+violation weight of 2 is exactly the crossover against re-tuned HPA (at 4,
+HPA is better, and at 8, KEDA too). $J$ prices shedding only through capped
+violation and ignores the baselines' budget overruns (3.1--10.4\% of
+tenant-steps); quality comes from benchmark scores, and network and storage are
+unpriced. \textit{Internal.} \jcac{} plans one held move
+per interval on a three-point trend forecast. A multi-step planner might
+find sequenced coordination, wide-step \jcac{} was not compared with HPA or
+the stacks, and on the real BurstGPT trace a damped Holt forecaster cut one-step
+error by 6.9--26.9\%; joint and decoupled search share the forecast, so it
+cannot explain the coordination result. Checks for defects against \jcac{}
+found one, the non-convergent solver, which every audited campaign
+replaced. \textit{External.} Workloads are synthetic periodic classes plus
+two held-out Markov-modulated ones, with eight tenants per mix, and the coupled plant comes from a probe
+grid; earlier real-trace replays ran only against pre-audit comparators.
+\textit{Statistical conclusion.} The intervals resample design points, so
+they generalize only over the sampled workloads, mixes and cluster sizes;
+the margin is the design's detectable difference, not an operational
+threshold.
 
 % =====================================================================
 \section{Conclusion}
@@ -763,8 +775,8 @@ and cluster sizes.
 % =====================================================================
 
 We set out to show that joint replica, cache and tier control beats
-per-layer control in multi-tenant LLM serving, and instead found when it
-does not. After registered adjudication across
+per-layer control in a multi-tenant LLM gateway, and for our rate-limited
+planner found instead when it does not. After registered adjudication across
 15{,}420 runs, the joint controller ties tuned HPA, does not outperform a
 cheapest-tier layered stack, and beats no tested baseline on unseen demand.
 Coordination is worth 1.6\% of the objective because bounded steps make the
@@ -772,9 +784,8 @@ joint problem locally separable; it grows only with wide steps on layers
 that share capacity, a regime that is worse for this controller anyway.
 Joint-control gains should therefore be read only after the checks of
 Table~\ref{tab:checklist}. Future work includes the registered five-seed
-live replication and coordination under tier-switch lag and backlog. The
-code, simulator, protocols, run data and regeneration scripts are publicly
-archived\ifblind; the links are withheld for double-blind review.\else{}
+live replication and coordination under tier-switch lag and backlog. Code,
+protocols, run data and regeneration scripts are publicly archived\ifblind; the links are withheld for double-blind review.\else{}
 at \url{https://github.com/mohaimin-8/polyforge},
 \url{https://doi.org/10.5281/zenodo.22801195} and
 \url{https://doi.org/10.17605/OSF.IO/DYZKV}.\fi
@@ -834,6 +845,20 @@ S.~I.~Khilji, A.~Furutanpey, and S.~Dustdar, ``Incentives and evidence in
 learned service orchestration,'' in \textit{Proc. IEEE Int. Conf.
 Service-Oriented Syst. Eng. (SOSE)}, Fukuoka, Japan, 2026, pp.~51--62.
 
+\bibitem{vllm}
+W.~Kwon \textit{et al.}, ``Efficient memory management for large language
+model serving with PagedAttention,'' in \textit{Proc. 29th Symp. Operating
+Syst. Princ. (SOSP)}, Koblenz, Germany, 2023, pp.~611--626.
+
+\bibitem{splitwise}
+P.~Patel \textit{et al.}, ``Splitwise: Efficient generative LLM inference
+using phase splitting,'' in \textit{Proc. ACM/IEEE 51st Annu. Int. Symp.
+Comput. Archit. (ISCA)}, Buenos Aires, Argentina, 2024, pp.~118--132.
+
+\bibitem{routellm}
+I.~Ong \textit{et al.}, ``RouteLLM: Learning to route LLMs with preference
+data,'' 2024, \textit{arXiv:2406.18665}.
+
 \bibitem{nopowerstruggles}
 R.~Raghavendra, P.~Ranganathan, V.~Talwar, Z.~Wang, and X.~Zhu, ``No
 `power' struggles: Coordinated multi-level power management for the data
@@ -845,6 +870,18 @@ A.~Bauer, V.~Lesch, L.~Versluis, A.~Ilyushkin, N.~Herbst, and S.~Kounev,
 ``Chamulteon: Coordinated auto-scaling of micro-services,'' in
 \textit{Proc. IEEE 39th Int. Conf. Distrib. Comput. Syst. (ICDCS)}, Dallas,
 TX, USA, 2019, pp.~2015--2025.
+
+\bibitem{sinan}
+Y.~Zhang, W.~Hua, Z.~Zhou, G.~E.~Suh, and C.~Delimitrou, ``Sinan: ML-based
+and QoS-aware resource management for cloud microservices,'' in
+\textit{Proc. 26th ACM Int. Conf. Architectural Support Program. Lang.
+Operating Syst. (ASPLOS)}, Virtual Event, 2021, pp.~167--181.
+
+\bibitem{roy2011}
+N.~Roy, A.~Dubey, and A.~Gokhale, ``Efficient autoscaling in the cloud
+using predictive models for workload forecasting,'' in \textit{Proc. IEEE
+4th Int. Conf. Cloud Comput. (CLOUD)}, Washington, DC, USA, 2011,
+pp.~500--507.
 
 \bibitem{bristol1966}
 E.~H.~Bristol, ``On a new measure of interaction for multivariable process

@@ -59,5 +59,6 @@ records, the run exports, or the gated figure scripts' own functions
 scorers). It refuses to save if any plotted number differs from the committed
 figure sheets (`FIGURE_ADJUDICATION_CHAIN.md`, `FIGURE_WIDTH.md`), and it
 writes every value it used to `figures/plotted_numbers.json`. Fig. 1 (the system
-workflow in Section III, Methodology) and Table V (checklist) are written in
-`main.tex` itself.
+workflow in Section III, Methodology) and Table IV (checklist) are written in
+`main.tex` itself; `fig_sizes.pdf` and `tab_width.tex` are generated but no
+longer included. `REVIEW_RESPONSE.md` answers the reviewer report point by point.
