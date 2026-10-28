@@ -87,6 +87,17 @@ cost, violation, excess and AI shed share.
 remaining instant-actuation difference changes sign, with J' = J + κ·s (s = AI
 shed step share), per design point with bootstrap CIs. Not a test.
 
+## Amendment 1 (2026-10-28, during the runs, before any scoring)
+
+Two scorer changes, neither touching a test: (a) the scorer reads the committed
+`metrics_reviewer_{wide,live}.csv.gz` exports when the gitignored duckdbs are
+absent (the gate's convention); (b) after code review, the exploratory κ*
+bootstrap drops resamples whose mean Δs ≤ 0 instead of flooring the
+denominator at 1e-12, and reports the count (0 of 10,000 for every comparator
+on the JOINTNESS data, so the κ* values are unchanged). The review also noted
+that RV-W4 shares the Holm family with RV-W1..W3; the family is kept as
+registered.
+
 ## Stopping rule
 
 Each campaign runs to completion once; failed runs are retried by the runner
