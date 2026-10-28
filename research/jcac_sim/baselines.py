@@ -10,6 +10,7 @@ transition (`apply_action`), so no baseline can cheat the guardrails.
 
 from __future__ import annotations
 
+import collections
 import json
 import math
 import random
@@ -70,13 +71,38 @@ class HPAController:
 
     name = "hpa"
 
+    # Kubernetes' default HPA behavior (autoscaling/v2 docs): scale-up may add
+    # max(100% of current, 4 pods) per 15 s period with no stabilization;
+    # scale-down follows the highest recommendation of the last 300 s, then
+    # may remove up to 100%. One 10 s control interval is treated as one
+    # period, which is slightly faster than the 15 s default.
+    K8S_UP_PODS = 4
+    K8S_DOWN_WINDOW_S = 300
+
     def __init__(self, configs: dict[str, TenantConfig], target_rho: float = 0.6,
-                 tier: str | None = None):
+                 tier: str | None = None, policy: str = "clamp2"):
+        if policy not in ("clamp2", "k8s_default"):
+            raise ValueError(f"unknown HPA policy {policy!r}")
         self.configs = configs
         self.target_rho = target_rho
         # Quality follow-up: serve AI on this fixed tier (a tuned parameter of
         # the quality comparators). None = carry the state's tier, as published.
         self.tier = tier
+        # "clamp2" is the published behavior (+-2 replicas per interval);
+        # "k8s_default" is the reviewer follow-up (PREREG_REVIEWER_FOLLOWUP).
+        self.policy = policy
+        window = max(1, self.K8S_DOWN_WINDOW_S // model.CONTROL_INTERVAL_S)
+        self._recent: dict[str, collections.deque] = {
+            tid: collections.deque(maxlen=window) for tid in configs}
+
+    def _delta(self, tid: str, replicas: int, desired: int) -> int:
+        if self.policy == "clamp2":
+            return max(-2, min(2, desired - replicas))
+        recent = self._recent[tid]
+        recent.append(desired)
+        if desired > replicas:
+            return min(desired - replicas, max(replicas, self.K8S_UP_PODS))
+        return min(replicas, max(recent)) - replicas
 
     def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
         out = {}
@@ -85,7 +111,7 @@ class HPAController:
             demand = demands.get(tid, Demand())
             rho = demand.work_units(state.cache_mb, state.tier) / max(1, state.replicas * model.REPLICA_CAPACITY_WU)
             desired = math.ceil(state.replicas * rho / self.target_rho) if rho > 0 else config.replica_min
-            delta = max(-2, min(2, desired - state.replicas))
+            delta = self._delta(tid, state.replicas, desired)
             tier = state.tier if self.tier is None else self.tier
             out[tid] = apply_action(config, state, delta, state.cache_mb, tier)
         return out
