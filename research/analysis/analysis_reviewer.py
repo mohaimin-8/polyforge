@@ -54,7 +54,15 @@ CAMPAIGNS = {
 SHED_COMPARATORS = ["static_share", "keda_fair_capped", "hpa_fair_capped", "layered_small_tuned"]
 
 
+def export_path(db: Path) -> Path:
+    """The committed export the gate reads when the gitignored duckdb is absent."""
+    return RESULTS / db.name.replace("raw_sim_", "metrics_").replace(".duckdb", ".csv.gz")
+
+
 def load(db: Path) -> pd.DataFrame:
+    if not db.exists():
+        keep = ["system", "workload", "tenant_mix", "cluster_size", "rep", *COLUMNS]
+        return pd.read_csv(export_path(db), float_precision="round_trip")[keep]
     import duckdb
 
     con = duckdb.connect(str(db), read_only=True)
@@ -129,16 +137,19 @@ def shed_price_section() -> list[str]:
     L = ["## Exploratory: the shed price that erases each difference (JOINTNESS data)", "",
          "J' = J + κ·s, with s the AI shed step share (only the joint controller sheds). κ* is the price at "
          "which the mean ΔJ' crosses zero; its 95% CI resamples design points. Exploratory, not a test.", "",
-         "| vs | ΔJ (κ = 0) | Δs | κ* | 95% CI of κ* |", "|---|---:|---:|---:|---|"]
+         "| vs | ΔJ (κ = 0) | Δs | κ* | 95% CI of κ* | resamples with Δs ≤ 0 (dropped) |",
+         "|---|---:|---:|---:|---|---:|"]
     rng = np.random.default_rng(BOOT_SEED)
     for comp in SHED_COMPARATORS:
         dj = design_diffs(df, "jcac_converged", comp, "J")
         ds = design_diffs(df, "jcac_converged", comp, "tier_none_step_share")
         kappa = -dj.mean() / ds.mean() if ds.mean() > 0 else float("nan")
         idx = rng.integers(0, len(dj), size=(BOOT_N, len(dj)))
-        ks = -dj[idx].mean(axis=1) / np.maximum(ds[idx].mean(axis=1), 1e-12)
-        lo, hi = np.percentile(ks, [2.5, 97.5])
-        L.append(f"| `{comp}` | {dj.mean():+.4f} | {ds.mean():+.3f} | {kappa:+.3f} | [{lo:+.3f}, {hi:+.3f}] |")
+        den = ds[idx].mean(axis=1)
+        ok = den > 0  # a resample with no extra shedding has no crossing price
+        lo, hi = np.percentile(-dj[idx].mean(axis=1)[ok] / den[ok], [2.5, 97.5])
+        L.append(f"| `{comp}` | {dj.mean():+.4f} | {ds.mean():+.3f} | {kappa:+.3f} | [{lo:+.3f}, {hi:+.3f}] | "
+                 f"{(~ok).sum()} |")
     return L + [""]
 
 
@@ -150,7 +161,8 @@ def build() -> str:
          "Negative ΔJ = arm a is better.", ""]
     for key, spec in CAMPAIGNS.items():
         db = RESULTS / spec["db"]
-        L += campaign_section(key, spec, load(db)) if db.exists() else [f"## Campaign {key}: not run", ""]
+        ran = db.exists() or export_path(db).exists()
+        L += campaign_section(key, spec, load(db)) if ran else [f"## Campaign {key}: not run", ""]
     L += shed_price_section()
     return "\n".join(L) + "\n"
 
