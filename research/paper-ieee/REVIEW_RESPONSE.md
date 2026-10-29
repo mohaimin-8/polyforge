@@ -8,15 +8,19 @@ simulator code (`research/jcac_sim/`, `eval/harness/`) and the committed records
 (`research/analysis/`). Each item below gives the **verification** (✓ correct,
 ◐ partly correct, ✗ incorrect), the **action** with its location in the revised
 paper, or the **answer** where no change was possible. Nothing new is claimed
-that a record or the code does not show; no experiment was run for this revision.
+that a record or the code does not show; no experiment was run for the text
+revision. Afterwards, two pre-registered follow-up campaigns and one
+exploratory re-scoring answered Q2, Q4 and Q5 (`PREREG_REVIEWER_FOLLOWUP.md`,
+scored in `RESULTS_REVIEWER_FOLLOWUP.md`, 3,900 runs, all valid). They are
+reported below; they are **not yet in the paper**.
 
 ## Count
 
 | Part of the report | Items | Changed in the paper | Answered, no change | Needs new experiments |
 |---|---:|---:|---:|---:|
-| Major weaknesses (1–9) | 9 (30 sub-points) | 23 | 7 | 3 of the 23 (1b, 1c, 2d: stated as limitations) |
+| Major weaknesses (1–9) | 9 (30 sub-points) | 23 | 7 | 3 of the 23 (1b, 2d stated as limitations; 1c since run, RV-W) |
 | Minor issues | 8 | 7 | 1 (m6) | 0 |
-| Questions | 6 | — | 6 answered | 3 (Q1, Q5; Q4 in part) |
+| Questions | 6 | — | 6 answered | 1 (Q1); Q4 and Q5 since run (RV-L, RV-W) |
 | "What would move me to accept" | 5 | 1 done, 2 in part | — | 2 (A2, A5) |
 
 Reviewer statements found **incorrect or only partly correct**: 1c ("no damping"),
@@ -43,7 +47,7 @@ Figures: 1 system workflow, 2 adjudication chain, 3 cost–violation trade-off,
 |---|---|---|---|
 | 1a | Without shedding JC's J (0.4668) is worse than re-tuned HPA (0.4006), capped HPA (0.4095) and the static share (0.4226). | ✓ Table II. | **Fixed.** Title, abstract and conclusion now scope the claim to *one rate-limited planner* in *a simulated gateway*. Abstract: "without [shedding] it loses to the capped autoscaler". IV-B: "trails the static share (0.4668 against 0.4226, Table II)". |
 | 1b | JC picks one lattice move per interval; the paper never says how the 6-step horizon is used; sequenced actions are ruled out. | ✓ (and the paper omitted it). `research/jcac_sim/controller.py` header: receding-horizon MPC with **move blocking** — each candidate is held fixed across the horizon, only the first move is applied, then the planner re-plans. | **Fixed (method) + limitation.** III-B now states exactly this and the forecaster. VI: "A multi-step planner might find sequenced coordination." |
-| 1c | Wide steps degrade a "myopic controller with no damping"; default HPA resembles the wide lattice; wide-step JC never compared with HPA or the stacks. | ◐ "No damping" is incorrect: Φ carries a switching penalty λ·sw (λ = 0.05 per changed knob, Eq. 1). The other two parts are correct (the HPA resemblance was already in V). | **Limitation added.** VI: "wide-step JC was not compared with HPA or the stacks." |
+| 1c | Wide steps degrade a "myopic controller with no damping"; default HPA resembles the wide lattice; wide-step JC never compared with HPA or the stacks. | ◐ "No damping" is incorrect: Φ carries a switching penalty λ·sw (λ = 0.05 per changed knob, Eq. 1). The other two parts are correct (the HPA resemblance was already in V). | **Limitation added.** VI: "wide-step JC was not compared with HPA or the stacks." **Since run (RV-W, see Q5):** wide-step JC beats neither default-behaviour HPA nor clamped HPA, and the cheapest-tier stack beats it. |
 | 1d | INFaaS [5] and Zhu et al. [6] were not re-evaluated; the paper only retracts the authors' own claim. | ✓ | **Scoped.** II now states the difference from [9]: "we adjudicate our own controller and isolate coordination with a decoupled-search ablation." The title/abstract no longer generalize to joint control at large. |
 
 ### 2. External validity
@@ -51,7 +55,7 @@ Figures: 1 system workflow, 2 adjudication chain, 3 cost–violation trade-off,
 | # | Reviewer point | Verification | Action / answer |
 |---|---|---|---|
 | 2a | Replicas are not GPU model servers; no batching, KV cache or queueing; the title over-claims "LLM serving". | ✓ (`model.py`: models run outside the plant; a replica does the per-request work of every call). | **Fixed.** Title: "…in a Simulated Multi-Tenant LLM Gateway". III-A: "Its replicas are the tenants' serving pods…; no replica is a GPU model server." VI: batching, KV-cache memory and queueing "lie outside the study". |
-| 2b | Live-fitted plant ≥ 1,123 units/s (≈ 11× the published 100) and AI never loads its replicas; the coupled plant is a probe-grid stress point. | ✓ (`research/calibration/LIVE_PLANT_FIT.md`: replica_capacity_wu 100 → 1123). | **Already disclosed (IV-C, VI); strengthened.** The mismatch result is now in the Results (see 2f). See Q4. |
+| 2b | Live-fitted plant ≥ 1,123 units/s (≈ 11× the published 100) and AI never loads its replicas; the coupled plant is a probe-grid stress point. | ✓ (`research/calibration/LIVE_PLANT_FIT.md`: replica_capacity_wu 100 → 1123). | **Already disclosed (IV-C, VI); strengthened.** The mismatch result is now in the Results (see 2f). The full comparator set has since been run on the live-fitted plant (RV-L); see Q4. |
 | 2c | Fixed cache curve, no similarity threshold or false hits, no backlog, no tier-switch lag. | ✓ | **Acknowledged** (III-C lists what is not modeled; VI). |
 | 2d | "There are no real traces." | ◐ Real-trace replays (BurstGPT, Azure LLM 2024) were run earlier in the program, but only against the **pre-audit** comparators; their cost headline was later withdrawn and they were not repeated under the audited protocols. | **Clarified.** VI (External): "earlier real-trace replays ran only against pre-audit comparators." No trace-based claim is made. |
 | 2e | No live evidence (2 reps, one GPU host; registered replication not run). | ✓ | **Already disclosed; kept** (VI; VII lists the live replication as future work). |
@@ -141,7 +145,13 @@ The strictest price is the registered never-shed arm (Table II, `jcac_tier_floor
 J = 0.4668 against 0.3991 with shedding (+0.0677 [0.0432, 0.0945]); it then
 trails re-tuned HPA (0.4006), capped HPA (0.4095), capped KEDA (0.4220), the
 static share (0.4226) and the cheapest-tier stack (0.3814), and loses to capped
-HPA. Intermediate per-request shed penalties were not re-scored. *Answered (IV-B).*
+HPA. *Answered (IV-B).*
+**Since added (exploratory, not a registered test; `RESULTS_REVIEWER_FOLLOWUP.md`):**
+pricing each shed step at κ, J′ = J + κ·s (s = AI shed step share, JOINTNESS
+data), JC's advantage over the static share vanishes at κ* = 0.33 [0.06, 0.75]
+and over capped KEDA at κ* = 0.32 [0.02, 0.79]; over capped HPA the crossing
+κ* = 0.14 [−0.10, 0.48] is not distinguishable from zero; against the
+cheapest-tier stack JC is already behind at κ = 0 (+0.0178).
 
 **Q3. Was equal effort spent on defects that disadvantage JC?**
 Yes, partly, and one was found:
@@ -165,11 +175,30 @@ The published plant's capacity (100 work units/s) is the model's design value
 deployed system (LIVE_PLANT_FIT). On the live-fitted plant, coordination does
 not grow with step width (G 0.0033 → 0.0021; WD-H3, EQ), and with the planner
 keeping the published model, the layered stack beats JC by 0.1052 (SM-H2, now in
-IV-B). A full comparator campaign on the live-fitted plant was not run. *Answered; not done.*
+IV-B). **Since run (RV-L, pre-registered, 2,100 runs; planner and plant share
+the live-fitted model; comparators keep their published-plant tuning, which is
+disclosed):** JC beats capped KEDA (ΔJ −0.0888 [−0.1102, −0.0694]; RV-L2 PASS)
+and the static share (−0.0810 [−0.0986, −0.0649]; RV-L4 PASS), both against
+FAIL predictions. It does not beat capped HPA: the mean favours JC (−0.0117
+[−0.0246, −0.0006]) but JC is better at only 35% of design points and the
+Wilcoxon test fails (p 0.564; RV-L1 FAIL). The cheapest-tier stack beats JC
+(+0.0268 [+0.0126, +0.0417]; RV-L3 FAIL). Coordination is equivalent to
+decoupled search (−0.0017 [−0.0028, −0.0008]; RV-L-EQ). JC sheds AI traffic on
+14.2% of steps here; its never-shed arm trails capped HPA (+0.0080 [+0.0010,
++0.0144], descriptive). *Answered; run.*
 
 **Q5. Wide-step JC against default-configured HPA?**
-Not run. WIDTH shows wide steps raise JC's own J by 0.0152–0.0859 (WD-H5).
-*Not done; stated as a limitation (VI).*
+**Since run (RV-W, pre-registered, 1,800 runs, published plant)** with a new arm,
+`hpa_k8s_capped`: the tuned, capped HPA with Kubernetes' default scaling
+behaviour (up by max(100%, 4 pods) per period, down to the highest
+recommendation of the last 300 s). Wide-step JC does not beat it (RV-W1, ΔJ
+−0.0079 [−0.0312, +0.0149]) or clamped HPA (RV-W2, +0.0040 [−0.0175, +0.0253]),
+and the cheapest-tier stack beats wide-step JC (RV-W3, +0.0326 [+0.0088,
++0.0585]); all three FAIL, as predicted. Rate-limited JC is better than
+wide-step JC (−0.0134 [−0.0236, −0.0035]) but misses its Holm threshold
+(p 0.0127 > 0.0125), so RV-W4 FAILS against its PASS prediction. Descriptive:
+default-behaviour HPA is worse than clamped HPA (+0.0119 [+0.0064, +0.0178]),
+and rate-limited JC beats it (−0.0212 [−0.0403, −0.0028]). *Answered; run.*
 
 **Q6. Operational basis of the ±0.025 J margin?**
 None is claimed: it is the smallest difference the registered design detects at
@@ -184,7 +213,7 @@ n = 60 with power 0.8 (PREREG_JOINTNESS), about 6% of JC's J. *Answered (III-E, 
 | A1 | Reframe to "a rate-limited, one-step joint planner gains little … in this setting". | **Done** — title, abstract, conclusion. |
 | A2 | Add a stronger (MPC or multi-step) joint controller. | **Not done** — needs a new controller and a registered campaign. |
 | A3 | Real traces, and GPU replicas or drop "LLM serving" from the title. | **Partly** — title now "Simulated Multi-Tenant LLM Gateway"; III-A says what a replica is. Real traces under the audited protocols: not done. |
-| A4 | Pareto analysis (cost, violation, shed) as the primary result, shedding priced independently. | **Partly** — Fig. 3 (cost vs violation, every arm) and the never-shed arm as the strict shed price; no three-axis front. |
+| A4 | Pareto analysis (cost, violation, shed) as the primary result, shedding priced independently. | **Partly** — Fig. 3 (cost vs violation, every arm) and the never-shed arm as the strict shed price; an exploratory shed-price re-scoring (Q2) since added; no three-axis front. |
 | A5 | Complete the registered live replication. | **Not done** — stated in VI and VII. |
 
 ---
