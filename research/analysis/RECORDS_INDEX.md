@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 94 |
-| regenerated and compared | 78 |
+| records | 95 |
+| regenerated and compared | 79 |
 | outside the gate, reason stated | 16 |
 | outside the gate, no entry | 0 |
 
@@ -78,6 +78,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_ORDER_PERMUTATION.md` | OP-H1, OP-H2, OP-H3 | yes |
 | `RESULTS_QUALITY.md` | - | yes |
 | `RESULTS_RETUNED.md` | RT-H1, RT-H2, RT-H3 | yes |
+| `RESULTS_REVIEWER_FOLLOWUP.md` | - | yes |
 | `RESULTS_RISK.md` | RQ-H1, RQ-H2 | yes |
 | `RESULTS_RISK_BUDGET.md` | RB-H1, RB-H2, RB-H3 | yes |
 | `RESULTS_SEPARATION.md` | - | yes |
