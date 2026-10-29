@@ -129,6 +129,10 @@ CAMPAIGN_RECORDS = [
     # PREREG_WIDTH (2026-10-21): coordination vs actuation width, three plants,
     # from metrics_matrix_width_{published,coupled,live}.csv.gz.
     ("analysis_width.py", [], "RESULTS_WIDTH.md"),
+    # PREREG_REVIEWER_FOLLOWUP (2026-10-28): wide-step joint control vs default
+    # HPA, and the main comparisons on the live-fitted plant, from
+    # metrics_reviewer_{wide,live}.csv.gz (+ the JOINTNESS export for kappa*).
+    ("analysis_reviewer.py", [], "RESULTS_REVIEWER_FOLLOWUP.md"),
     # fig22 / fig23 (2026-10-22): the adjudication chain and the width mechanism,
     # each drawn through the frozen scorers from the committed exports.
     ("fig_adjudication_chain.py", [], "FIGURE_ADJUDICATION_CHAIN.md"),
