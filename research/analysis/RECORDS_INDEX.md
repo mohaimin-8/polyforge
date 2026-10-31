@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 95 |
-| regenerated and compared | 79 |
+| records | 96 |
+| regenerated and compared | 80 |
 | outside the gate, reason stated | 16 |
 | outside the gate, no entry | 0 |
 
@@ -94,6 +94,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_TIER_WU.md` | TW-H1, TW-H2 | yes |
 | `RESULTS_TRACE.md` | - | yes |
 | `RESULTS_TRACE2.md` | - | yes |
+| `RESULTS_TRACE_AUDITED.md` | TA-H1, TA-H2, TA-H3, TA-H4 | yes |
 | `RESULTS_TRACE_AZURE.md` | - | yes |
 | `RESULTS_TRACE_LIVE.md` | TL-H1, TL-H2, TL-H3, TL-H4 | yes |
 | `RESULTS_TRACE_PARITY.md` | TP-H1, TP-H1a, TP-H1b, TP-H2, TP-H3a, TP-H3b | yes |

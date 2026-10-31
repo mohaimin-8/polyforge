@@ -133,6 +133,9 @@ CAMPAIGN_RECORDS = [
     # HPA, and the main comparisons on the live-fitted plant, from
     # metrics_reviewer_{wide,live}.csv.gz (+ the JOINTNESS export for kappa*).
     ("analysis_reviewer.py", [], "RESULTS_REVIEWER_FOLLOWUP.md"),
+    # PREREG_TRACE_AUDITED (2026-10-31): the 96 BurstGPT windows of TRACE2
+    # against the audited arms, from metrics_trace_audited.csv.gz.
+    ("analysis_trace_audited.py", [], "RESULTS_TRACE_AUDITED.md"),
     # fig22 / fig23 (2026-10-22): the adjudication chain and the width mechanism,
     # each drawn through the frozen scorers from the committed exports.
     ("fig_adjudication_chain.py", [], "FIGURE_ADJUDICATION_CHAIN.md"),
