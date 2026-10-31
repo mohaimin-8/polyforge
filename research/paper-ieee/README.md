@@ -11,18 +11,17 @@ Engineering (ECCE), CUET. IEEEtran conference template, A4, two columns,
 - `figures/*.pdf`, `tables/*.tex` – figures and generated tables
 - `POLYFORGE_IEEE_submission.pdf` – double-blind review copy (upload this to CMT)
 - `POLYFORGE_IEEE_camera_ready_preview.pdf` – preview of the final version with authors
-- `REVIEW_RESPONSE.md` – point-by-point response to the internal review
-- `CHANGES_vs_original.pdf` – the readability edits of 30 Oct 2026, marked
-  against the earlier text (red removed, blue added); numbers, citations,
-  test IDs, equations, tables and figures are unchanged
-- `CHANGES_IEEE_tense_voice.pdf` – the IEEE tense and voice pass (seventh
-  round, 30 Oct 2026), marked against the readability version (red removed,
-  blue added); numbers, citations, test IDs, equations, tables and figures
-  are unchanged
-- `CHANGES_style.pdf` – the style pass (eighth round, 30 Oct 2026),
-  marked against the IEEE tense and voice version; same guarantees
-- `CHANGES_round10.pdf` – the third style pass (tenth round, 30 Oct 2026),
-  marked against the ninth-round version; same guarantees
+- `REVIEW_RESPONSE.md` – point-by-point response to the internal and external reviews
+- `CHANGES_round10.pdf` – the tenth round's style edits (30 Oct 2026), marked
+  against the ninth-round version (red removed, blue added); numbers,
+  citations, test IDs, equations, tables and figures are unchanged
+- `CHANGES_round11.pdf` – the eleventh round (31 Oct 2026): the second
+  external review and three registered follow-up experiments, marked against
+  the tenth-round version. Unlike the style rounds, this round adds results:
+  the plant's latency model (Eq. 2), the live-fitted and wide-step follow-ups
+  (`RESULTS_REVIEWER_FOLLOWUP.md`), the real BurstGPT replay against the
+  audited comparators (`RESULTS_TRACE_AUDITED.md`) and the updated programme
+  counts. See "Eleventh round" in `REVIEW_RESPONSE.md`.
 
 ## Build
 

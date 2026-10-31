@@ -9,14 +9,15 @@ simulator code (`research/jcac_sim/`, `eval/harness/`) and the committed records
 ◐ partly correct, ✗ incorrect), the **action** with its location in the revised
 paper, or the **answer** where no change was possible. Nothing new is claimed
 that a record or the code does not show; no experiment was run for this revision.
+Follow-up experiments were run later; see the Eleventh round.
 
 ## Count
 
 | Part of the report | Items | Changed in the paper | Answered, no change | Needs new experiments |
 |---|---:|---:|---:|---:|
-| Major weaknesses (1–9) | 9 (30 sub-points) | 23 | 7 | 3 of the 23 (1b, 1c, 2d: stated as limitations) |
+| Major weaknesses (1–9) | 9 (30 sub-points) | 23 | 7 | 3 of the 23 (1b stated as a limitation; 1c and 2d since run, eleventh round) |
 | Minor issues | 8 | 7 | 1 (m6) | 0 |
-| Questions | 6 | — | 6 answered | 3 (Q1, Q5; Q4 in part) |
+| Questions | 6 | — | 6 answered | 1 (Q1); Q4 and Q5 since run, eleventh round |
 | "What would move me to accept" | 5 | 1 done, 2 in part | — | 2 (A2, A5) |
 
 Reviewer statements found **incorrect or only partly correct**: 1c ("no damping"),
@@ -43,7 +44,7 @@ Figures: 1 system workflow, 2 adjudication chain, 3 cost–violation trade-off,
 |---|---|---|---|
 | 1a | Without shedding JC's J (0.4668) is worse than re-tuned HPA (0.4006), capped HPA (0.4095) and the static share (0.4226). | ✓ Table II. | **Fixed.** Title, abstract and conclusion now scope the claim to *one rate-limited planner* in *a simulated gateway*. Abstract: "without [shedding] it loses to the capped autoscaler". IV-B: "trails the static share (0.4668 against 0.4226, Table II)". |
 | 1b | JC picks one lattice move per interval; the paper never says how the 6-step horizon is used; sequenced actions are ruled out. | ✓ (and the paper omitted it). `research/jcac_sim/controller.py` header: receding-horizon MPC with **move blocking** — each candidate is held fixed across the horizon, only the first move is applied, then the planner re-plans. | **Fixed (method) + limitation.** III-B now states exactly this and the forecaster. VI: "A multi-step planner might find sequenced coordination." |
-| 1c | Wide steps degrade a "myopic controller with no damping"; default HPA resembles the wide lattice; wide-step JC never compared with HPA or the stacks. | ◐ "No damping" is incorrect: Φ carries a switching penalty λ·sw (λ = 0.05 per changed knob, Eq. 1). The other two parts are correct (the HPA resemblance was already in V). | **Limitation added.** VI: "wide-step JC was not compared with HPA or the stacks." |
+| 1c | Wide steps degrade a "myopic controller with no damping"; default HPA resembles the wide lattice; wide-step JC never compared with HPA or the stacks. | ◐ "No damping" is incorrect: Φ carries a switching penalty λ·sw (λ = 0.05 per changed knob, Eq. 1). The other two parts are correct (the HPA resemblance was already in V). | **Limitation added.** VI: "wide-step JC was not compared with HPA or the stacks." **Since run (eleventh round, RV-W; see Q5):** wide-step JC beats neither default-behaviour HPA nor capped HPA, and the cheapest-tier stack is better; VI now says so. |
 | 1d | INFaaS [5] and Zhu et al. [6] were not re-evaluated; the paper only retracts the authors' own claim. | ✓ | **Scoped.** II now states the difference from [9]: "we adjudicate our own controller and isolate coordination with a decoupled-search ablation." The title/abstract no longer generalize to joint control at large. |
 
 ### 2. External validity
@@ -51,10 +52,10 @@ Figures: 1 system workflow, 2 adjudication chain, 3 cost–violation trade-off,
 | # | Reviewer point | Verification | Action / answer |
 |---|---|---|---|
 | 2a | Replicas are not GPU model servers; no batching, KV cache or queueing; the title over-claims "LLM serving". | ✓ (`model.py`: models run outside the plant; a replica does the per-request work of every call). | **Fixed.** Title: "…in a Simulated LLM Gateway". III-A: "Its replicas are the tenants' serving pods…; no replica is a GPU model server." VI: batching, KV-cache memory and queueing "lie outside the study". |
-| 2b | Live-fitted plant ≥ 1,123 units/s (≈ 11× the published 100) and AI never loads its replicas; the coupled plant is a probe-grid stress point. | ✓ (`research/calibration/LIVE_PLANT_FIT.md`: replica_capacity_wu 100 → 1123). | **Already disclosed (IV-C, VI); strengthened.** The mismatch result is now in the Results (see 2f). See Q4. |
+| 2b | Live-fitted plant ≥ 1,123 units/s (≈ 11× the published 100) and AI never loads its replicas; the coupled plant is a probe-grid stress point. | ✓ (`research/calibration/LIVE_PLANT_FIT.md`: replica_capacity_wu 100 → 1123). | **Already disclosed (IV-C, VI); strengthened.** The mismatch result is now in the Results (see 2f). The full comparator set has since been run on the live-fitted plant (eleventh round, RV-L; IV-B). See Q4. |
 | 2c | Fixed cache curve, no similarity threshold or false hits, no backlog, no tier-switch lag. | ✓ | **Acknowledged** (III-C lists what is not modeled; VI). |
-| 2d | "There are no real traces." | ◐ Real-trace replays (BurstGPT, Azure LLM 2024) were run earlier in the program, but only against the **pre-audit** comparators; their cost headline was later withdrawn and they were not repeated under the audited protocols. | **Clarified.** VI (External): "earlier real-trace replays ran only against pre-audit comparators." No trace-based claim is made. |
-| 2e | No live evidence (2 reps, one GPU host; registered replication not run). | ✓ | **Already disclosed; kept** (VI; VII lists the live replication as future work). |
+| 2d | "There are no real traces." | ◐ Real-trace replays (BurstGPT, Azure LLM 2024) were run earlier in the program, but only against the **pre-audit** comparators; their cost headline was later withdrawn and they were not repeated under the audited protocols. | **Clarified, then run (eleventh round, TA).** The 96 BurstGPT windows were replayed against the audited arms; VI (External) now gives the result instead of the pre-audit caveat. |
+| 2e | No live evidence (2 reps, one GPU host; registered replication not run). | ✓ | **Already disclosed; kept** (VI; VII lists the live replication as future work). VI now also gives the reason it was not run: the cloud GPU host could not be funded (recorded 12 Oct 2026, a3a90c9). |
 | 2f | The simulator favours the planner; SM-H2 (layered stack wins by 0.1052) is larger than any Table III effect yet sits in the threats. | ✓ (0.1052 > largest \|ΔJ\| in Table III, 0.0629). | **Fixed.** New Results paragraph IV-B, "The planner depends on its plant model … more than any difference in Table III." |
 
 ### 3. "The objective rewards dropping traffic"
@@ -141,7 +142,14 @@ The strictest price is the registered never-shed arm (Table II, `jcac_tier_floor
 J = 0.4668 against 0.3991 with shedding (+0.0677 [0.0432, 0.0945]); it then
 trails re-tuned HPA (0.4006), capped HPA (0.4095), capped KEDA (0.4220), the
 static share (0.4226) and the cheapest-tier stack (0.3814), and loses to capped
-HPA. Intermediate per-request shed penalties were not re-scored. *Answered (IV-B).*
+HPA. *Answered (IV-B).*
+**Since added (eleventh round; exploratory, not a registered test;
+`RESULTS_REVIEWER_FOLLOWUP.md`):** pricing each shed step at κ,
+J′ = J + κ·s (s = AI shed step share, JOINTNESS data), JC's advantage over
+the static share vanishes at κ* = 0.33 [0.06, 0.75] and over capped KEDA at
+κ* = 0.32 [0.02, 0.79]; over capped HPA the crossing κ* = 0.14 [−0.10, 0.48]
+is not distinguishable from zero; against the cheapest-tier stack JC is
+already behind at κ = 0 (+0.0178).
 
 **Q3. Was equal effort spent on defects that disadvantage JC?**
 Yes, partly, and one was found:
@@ -165,11 +173,32 @@ The published plant's capacity (100 work units/s) is the model's design value
 deployed system (LIVE_PLANT_FIT). On the live-fitted plant, coordination does
 not grow with step width (G 0.0033 → 0.0021; WD-H3, EQ), and with the planner
 keeping the published model, the layered stack beats JC by 0.1052 (SM-H2, now in
-IV-B). A full comparator campaign on the live-fitted plant was not run. *Answered; not done.*
+IV-B). **Since run (eleventh round; RV-L, pre-registered, 2,100 runs;
+planner and plant share the live-fitted model; the comparators keep their
+published-plant tuning, which IV-B states):** JC beats capped KEDA (ΔJ
+−0.0888 [−0.1102, −0.0694]; RV-L2 PASS) and the static share (−0.0810
+[−0.0986, −0.0649]; RV-L4 PASS), both against FAIL predictions. It does not
+beat capped HPA: the mean favours JC (−0.0117 [−0.0246, −0.0006]) but JC is
+better at only 35% of design points and the Wilcoxon test fails (p 0.564;
+RV-L1 FAIL). The cheapest-tier stack beats JC (+0.0268 [+0.0126, +0.0417];
+RV-L3 FAIL). Coordination is equivalent to decoupled search (−0.0017
+[−0.0028, −0.0008]; RV-L-EQ). JC sheds AI traffic on 14.2% of steps here; its
+never-shed arm trails capped HPA (+0.0080 [+0.0010, +0.0144], descriptive).
+*Answered; run (IV-B).*
 
 **Q5. Wide-step JC against default-configured HPA?**
-Not run. WIDTH shows wide steps raise JC's own J by 0.0152–0.0859 (WD-H5).
-*Not done; stated as a limitation (VI).*
+**Since run (eleventh round; RV-W, pre-registered, 1,800 runs, published
+plant)** with a new arm, `hpa_k8s_capped`: the tuned, capped HPA with
+Kubernetes' default scaling behaviour (up by max(100%, 4 pods) per period,
+down to the highest recommendation of the last 300 s). Wide-step JC does not
+beat it (RV-W1, ΔJ −0.0079 [−0.0312, +0.0149]) or clamped HPA (RV-W2,
++0.0040 [−0.0175, +0.0253]), and the cheapest-tier stack beats wide-step JC
+(RV-W3, +0.0326 [+0.0088, +0.0585]); all three FAIL, as predicted.
+Rate-limited JC is better than wide-step JC (−0.0134 [−0.0236, −0.0035]) but
+misses its Holm threshold (p 0.0127 > 0.0125), so RV-W4 FAILS against its
+PASS prediction. Descriptive: default-behaviour HPA is worse than clamped HPA
+(+0.0119 [+0.0064, +0.0178]), and rate-limited JC beats it (−0.0212
+[−0.0403, −0.0028]). *Answered; run (VI).*
 
 **Q6. Operational basis of the ±0.025 J margin?**
 None is claimed: it is the smallest difference the registered design detects at
@@ -183,8 +212,8 @@ n = 60 with power 0.8 (PREREG_JOINTNESS), about 6% of JC's J. *Answered (III-E, 
 |---|---|---|
 | A1 | Reframe to "a rate-limited, one-step joint planner gains little … in this setting". | **Done** — title, abstract, conclusion. |
 | A2 | Add a stronger (MPC or multi-step) joint controller. | **Not done** — needs a new controller and a registered campaign. |
-| A3 | Real traces, and GPU replicas or drop "LLM serving" from the title. | **Partly** — title now "Simulated LLM Gateway"; III-A says what a replica is. Real traces under the audited protocols: not done. |
-| A4 | Pareto analysis (cost, violation, shed) as the primary result, shedding priced independently. | **Partly** — Fig. 3 (cost vs violation, every arm) and the never-shed arm as the strict shed price; no three-axis front. |
+| A3 | Real traces, and GPU replicas or drop "LLM serving" from the title. | **Partly** — title now "Simulated LLM Gateway"; III-A says what a replica is. Real traces under the audited protocols: done in the eleventh round (TA, BurstGPT). GPU replicas: not done. |
+| A4 | Pareto analysis (cost, violation, shed) as the primary result, shedding priced independently. | **Partly** — Fig. 3 (cost vs violation, every arm) and the never-shed arm as the strict shed price; an exploratory shed-price re-scoring (Q2) since added; no three-axis front. |
 | A5 | Complete the registered live replication. | **Not done** — stated in VI and VII. |
 
 ---
@@ -243,7 +272,7 @@ All 23 references were re-checked against Crossref, arXiv or the authors' own pa
 
 ## Seventh round (IEEE tense and voice)
 
-The whole text was checked against an IEEE tense-and-voice guide, section by section. Every change is marked in `CHANGES_IEEE_tense_voice.pdf`.
+The whole text was checked against an IEEE tense-and-voice guide, section by section.
 
 | Section | Rule applied | Examples |
 |---|---|---|
@@ -264,11 +293,13 @@ The whole text was checked against an IEEE tense-and-voice guide, section by sec
 
 ## Eighth round (style pass)
 
+This round ran a style pass over all prose against 29 patterns of stiff or formulaic writing, with the IEEE rules of the seventh round kept: no contractions, no "I", "we" allowed, and tense by section.
+
 - **Pre-flight.**
   - Document type: IEEE conference paper. Language: English.
-  - Skipped as non-prose: the preamble, the Fig. 1 TikZ code, Algorithm 1, the equations, all tables, the references.
-  - No voice fingerprint, overrides file, voice guide or runbook was available. The pass was therefore calibrated to the paper's own register.
-  - Strong patterns: 0 in 4,186 words of prose (0.00 per 100 words). The default mixed pass was run.
+  - Skipped as non-prose: the preamble, the Fig. 1 TikZ code, Algorithm 1, the equations, all tables and the references.
+  - No style guide was available, so the pass was calibrated to the paper's own register.
+  - Strong patterns: none in 4,186 words of prose. The default mixed pass was run.
 - **Caught and fixed.**
   - Rule 5, vague attribution (1): the abstract's "A common assumption is that joint control recovers …" became "Joint control should recover … We test when that assumption holds."
   - Rule 13, passive voice that hid the actor (1): "Their final versions are tuned … re-tuned … held …" became "We tune … re-tune them … hold them …".
@@ -288,26 +319,26 @@ The whole text was checked against an IEEE tense-and-voice guide, section by sec
   - No em dashes, -ing tails, copula avoidance, filler, authority tropes or signposting were found.
 - **Flagged, not changed.**
   - The paper calls the system both "the planner" and "the (joint) controller". This is defensible, since the role is a planner and the name is a controller, but readers may notice. Making it uniform is a terminology decision for the authors.
-- **Unchanged.** No number, citation, test ID, cross-reference, URL, equation, inline math expression, table, figure, algorithm, reference changed. This was checked by script against both earlier versions.
+- **Unchanged.** No number, citation, test ID, cross-reference, URL, equation, inline math expression, table, figure, algorithm or reference changed. This was checked by script against both earlier versions.
 - **Length and page budget.** The abstract is 245 words. Both versions are still 6 pages, and the float placement in the camera-ready version is unchanged. The slack on the camera-ready version's last page is unchanged at about two reference lines.
 
 ## Ninth round (second style pass)
 
 - **Second style pass: pre-flight.**
   - Scope: the paper prose in `main.tex`, plus the prose of `README.md` and `REVIEW_RESPONSE.md`. Tables and code were skipped.
-  - No voice fingerprint, overrides file, voice guide or runbook was available.
-  - Tier-1 tells: 0 in 4,182 words of paper prose (0.00 per 100 words). Mixed pass.
-- **Paper: no further prose changes.** A full read found no new tells.
+  - No style guide was available.
+  - Strong patterns: none in 4,182 words of paper prose. Mixed pass.
+- **Paper: no further prose changes.** A full read found nothing new.
   - Six "X, not Y" caveats remain. They are deliberate, as in the eighth round.
   - About 20 colons remain, roughly a dozen of them introducing an explanation (for example, "the tie hid a trade-off: …"). This is the most noticeable remaining habit, but it is ordinary in technical prose, so it was left as written.
   - A full-strength pass would mainly hit IEEE conventions: the bold contribution list, title-case headings and captions, hyphenated compound modifiers, and factual lists of three. It was not run.
-- **Review log, one fix.** In the second-round change log, "removed to make room — their key values remain …" became "removed to make room (their main numbers remain …)". The Tier-1 word "key" appeared in the same sentence as an em dash. The two other em dashes in this file are in headings and were left alone (Tier 4).
+- **Review log, one fix.** In the second-round change log, "removed to make room — their key values remain …" became "removed to make room (their main numbers remain …)". The word "key" appeared in the same sentence as an em dash. The two other em dashes in this file are in headings and were left alone.
 - **Still flagged.** The planner/controller terminology noted in the eighth round is unchanged and is the authors' call.
-- **Unchanged.** No number, citation, test ID, cross-reference, URL, equation, inline math expression, table, figure, algorithm or reference changed. Both versions are 6 pages. There are about ten reference lines of slack on the camera-ready version's last page.
+- **Unchanged.** No number, citation, test ID, cross-reference, URL, equation, inline math expression, table, figure, algorithm or reference changed. Both versions are 6 pages. The camera-ready version's last page has about ten reference lines of slack.
 
 ## Tenth round (third style pass)
 
-- **Pre-flight.** Same setup as the ninth round. No voice fingerprint, overrides file, voice guide or runbook was available. Tier-1 tells: 0 in 4,182 words of paper prose. Mixed pass.
+- **Pre-flight.** Same setup as the ninth round. No style guide was available. Strong patterns: none in 4,182 words of paper prose. Mixed pass.
 - **Changed.** The ninth-round audit left one habit in place: colons that introduce an explanation. On this pass, four of them became plain connectives or a full stop. Body-prose colons, captions excluded, went from 21 to 17.
   - III-B: "leaves out an interference penalty: it is zero …" became "… penalty because it is zero …".
   - III-C: "Models run outside the plant: each tier has …" became "Models run outside the plant. Each tier has …".
@@ -317,6 +348,73 @@ The whole text was checked against an IEEE tense-and-voice guide, section by sec
   - Eleven colons that introduce lists or appositives.
   - Six explanatory colons that carry the point: the abstract's "Coordination is worth 1.6% of the objective: …", "the tie hid a trade-off: …", the first-order argument in IV-C, the live-fitted plant definition, "The weights of J are a choice: …", and "… found one: the non-convergent solver".
   - The six "X, not Y" caveats.
-- **Self-audit after the edits.** Nothing further reads as machine-written. The final text is the draft.
-- **Still open for the authors.** The planner/controller terminology (eighth round) remains.
+- **Self-audit after the edits.** Nothing further reads as formulaic.
+- **Still open for the authors.** The planner/controller terminology (eighth round).
 - **Unchanged.** No number, citation, test ID, cross-reference, URL, equation, inline math expression, table, figure, algorithm or reference changed. Both versions are 6 pages, with the same column breaks and float placement as the ninth round.
+
+## Eleventh round (second external review; follow-up experiments)
+
+A second external review (31 Oct 2026) rated the paper a weak reject for
+tier-1 systems venues and borderline for a 6-page IEEE conference. Every
+factual claim in it was checked against this paper, the simulator code and
+the records: 37 claims, 28 correct, 8 partly correct, 1 incorrect. The
+verdict, the acceptance odds and remarks such as "reviewers hate…" are
+opinions and were not scored.
+
+| # | Review point | Verification | Action |
+|---|---|---|---|
+| R1 | Toy plant: no GPU servers, batching, KV cache, backlog or tier-switch lag; 100 units/s; cache curve 0.85c/(c+256); external models with a price and base latency; on the live-fitted plant AI never loads the replicas | ✓ (III-C, IV-C, VI). The "stateless I/O proxy" reading is the reviewer's inference, but the paper's own live fit supports it. | Kept. III-C now gives the latency model (Eq. 2), so the coupling argued in IV-C can be read off the plant. That the deployed gateway's replicas carry no AI load is the paper's own finding (IV-C) and is why WIDTH saw no coordination gain there. |
+| R2 | No live evaluation; the five-seed replication is "withheld" | ✓ facts; ✗ "withheld": the replication needs the cloud GPU host and could not be funded (recorded 12 Oct 2026, a3a90c9) | VI now gives the reason. A run on a local cluster would be a different, unregistered protocol and is not offered as a substitute. |
+| R3 | "Self-inflicted strawman": the 27.5% and 60.4% leads came from comparator defects (1.4581× surcharge, 128 MB pin, grid-edge optimum, price-blind tier rule) | ✓ facts (IV-A, Table IV) | No change. The suggested reframing as a deliberate "red-team audit" is **declined**: the defects were real and were found by an audit, so presenting them as planted would misstate what happened. IV-A already says the initial evaluation had them. |
+| R4 | Shedding loophole: J caps violation at 1; only JC sheds or has a budget; JC without shedding loses to capped HPA and trails the static share | ✓, with two imprecise details: the shed rate is 7.2% (11.3% on unseen demand) of *tenant-steps*, not of AI traffic, and the budget is a filter on projected cost, not a hard limit (0.9% of tenant-steps over budget, Table II) | Already stated in IV-B and Table II. The coordination result is not affected: decoupled and knob-wise search shed as much (7.7%, 7.3%). An exploratory shed-price re-scoring is added under Q2. |
+| R5 | Synthetic workloads only; BurstGPT was not re-run against the audited comparators, although runs are cheap | ✓ (the trace and the replay code were in the repository) | **Run (TA, pre-registered).** On the 96 six-hour BurstGPT windows of TRACE2, against the audited arms built as in the main campaigns (672 runs): JC beat only the static share (TA-H4 PASS, ΔJ −0.0913 [−0.1751, −0.0290]), at an SLO excess of 0.34 against 0.02. It did not beat capped HPA (TA-H1, −0.0530 [−0.1376, +0.0095], better in 31% of windows), capped KEDA (TA-H2, against a PASS prediction) or the cheapest-tier stack (TA-H3, −0.0132 [−0.0611, +0.0239]). Coordination stayed inside the margin (TA-EQ, −0.0025 [−0.0037, −0.0013]). JC was half as expensive (cost 34.7 against 69.5 for capped HPA) but shed AI traffic on 8.3% of steps; without shedding its J was 0.6616 and it trailed capped HPA by 0.2229. VI (External) and VII now report this. |
+| R6 | Strengths: pre-registration, Holm over 122 tests, equivalence testing, decoupled and knob-wise ablations, the second-order argument with Bristol's measure [17], the checklist | ✓ (the ±0.025 test uses the 95% bootstrap interval; TOST appears in the exploratory 5% analysis) | III-E's programme counts are updated for this round's protocols. |
+| R7 | The latency formula is missing from III-C | ✓ | Added (III-C, Eq. 2), from `model.py`: congestion g(ρ) = 1/(1−ρ) below saturation, CRUD and AI p95 latency, and the SLO targets. |
+| R8 | Φ plans on log-excess with a switching penalty while J scores capped violation; the plans-on-violation arm sheds 12.5% | ✓; "proves" overstates it: that arm's J changed by +0.0047 [−0.0025, +0.0121] | Already in III-C and Table II; no change. |
+| R9 | Refs [1], [2], [8], [9] are dated 2026 | Concern unfounded. [1] and [2] give 2026 as the access date of the Kubernetes and KEDA documentation; [8] (arXiv:2605.26418, 26 May 2026) and [9] (IEEE SOSE 2026, pp. 51–62, DOI 10.1109/sose71128.2026.00015) were re-verified on 31 Oct 2026 | No change. |
+| R10 | "A 6-page IEEE conference like ICDCS, CLOUD, SOSE or IC2E" | ✗ ICDCS and IEEE CLOUD take full-length papers | Not applicable. |
+
+**Experiments of this round** (records in `research/analysis/`; each
+protocol was committed before its runs):
+
+- **RV-W** (`PREREG_REVIEWER_FOLLOWUP`, 1,800 runs, published plant): wide-step
+  JC against HPA with Kubernetes' default scaling behaviour, capped HPA and
+  the cheapest-tier stack. See Q5.
+- **RV-L** (same protocol, 2,100 runs): every comparator on the live-fitted
+  plant. See Q4.
+- **Shed price** (exploratory, JOINTNESS data). See Q2.
+- **TA** (`PREREG_TRACE_AUDITED`, 672 runs): the 96 six-hour BurstGPT windows
+  of TRACE2 against the audited arms, built exactly as in the main campaigns.
+  The harness gained trace windows as workloads; published run ids are
+  unchanged.
+
+**Changed in the paper.**
+
+- III-C: the plant's latency model (Eq. 2). Equations after it are renumbered
+  (J is now Eq. 3); every reference is symbolic.
+- III-E: programme counts (59 protocols; 134 tests with a p-value, 77 passed, 60 surviving the programme-wide Holm correction).
+- IV-B: the live-fitted comparator result (RV-L), with the comparators'
+  published-plant tuning stated.
+- VI: the reason the live replication was not run; the wide-step result (RV-W)
+  replaces "we did not compare wide-step JC with HPA or the stacks"; the
+  real-trace result (TA) replaces "Earlier real-trace replays ran only against
+  pre-audit comparators".
+- VII: the findings sentence adds "and on real BurstGPT demand beats only the
+  static share" (TA).
+- VII: "In future work, we will run the registered five-seed live
+  replication" became "Future work is the registered five-seed live
+  replication, once funded" (R2: it is no longer advertised as planned work).
+- Page budget: repetition trimmed so the additions fit (the unseen-demand clause in IV-A that IV-B repeats, the run count
+  restated in I, the search-size arithmetic in IV-C, a Fig. 4 caption clause
+  repeating the text, Table IV's caption, the two plant-model sentences of
+  IV-B merged, the GPTCache and cascade sentence in II that repeats I); three
+  figures drawn at 90% of the column width.
+
+**Declined.** The "red-team audit" reframing (R3); a live replication on an
+unfunded host (R2); re-tuning the comparators for the live-fitted plant
+(disclosed in IV-B instead).
+
+**Unchanged.** Title, abstract, contributions, the conclusion's findings,
+figure content and tables. Both versions are 6 pages; in the double-blind
+version the conclusion stays in the left column of page 6. `CHANGES_round11.pdf`
+marks this round against the tenth-round text.
