@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from controller import ClusterLimits  # research/jcac_sim via harness sys.path
 from model import Demand, TenantConfig
 
+from . import trace_workloads
+
 
 @dataclass(frozen=True)
 class WorkloadClass:
@@ -176,6 +178,8 @@ def workload_has_ai(workload: str) -> bool:
     zero AI latency measured nothing rather than measuring an idle AI path.
     Derived from the class's own base_rps, not a hand-kept list, so a new
     workload is covered the moment it is registered."""
+    if trace_workloads.is_trace(workload):
+        return True  # BurstGPT windows are chat-only
     cls = WORKLOAD_CLASSES.get(workload)
     if cls is None:
         return False
@@ -282,6 +286,8 @@ def build(workload: str, tenant_mix: str, cluster_size: str, seed: int, steps: i
     is never scored), tenant configs from the mix, and cluster limits from
     the size. Deterministic in `seed`.
     """
+    if trace_workloads.is_trace(workload):
+        return _build_trace(workload, tenant_mix, cluster_size, steps)
     cls = WORKLOAD_CLASSES[workload]
     slots = TENANT_MIXES[tenant_mix]
     size = CLUSTER_SIZES[cluster_size]
@@ -315,5 +321,31 @@ def build(workload: str, tenant_mix: str, cluster_size: str, seed: int, steps: i
             per_tenant[tid] = Demand(rps=rps, crud_base_ms=cls.crud_base_ms)
         buckets.append(per_tenant)
 
+    limits = ClusterLimits(cache_mb=size.limits_cache_mb, replicas=size.limits_replicas)
+    return tenant_ids, buckets, configs, limits
+
+
+def _build_trace(workload: str, tenant_mix: str, cluster_size: str, steps: int):
+    """A real-trace window (`trace_workloads`) as a run's world.
+
+    The trace fixes each tenant's demand, so a slot's `scale` is unused; the
+    mix still supplies SLO classes and budgets, and the size the per-tenant
+    replica cap and the cluster limits, exactly as for a synthetic class.
+    Repetitions differ only by the simulator's Poisson jitter, as above."""
+    tenant_ids, buckets = trace_workloads.window(workload, steps)
+    slots = TENANT_MIXES[tenant_mix]
+    if len(slots) != len(tenant_ids):
+        raise ValueError(f"{workload} has {len(tenant_ids)} tenants; "
+                         f"mix {tenant_mix!r} has {len(slots)}")
+    size = CLUSTER_SIZES[cluster_size]
+    configs = {
+        tid: TenantConfig(
+            tenant_id=tid,
+            slo_class=slot.slo_class,
+            hourly_budget_usd=slot.budget_usd,
+            replica_max=size.replica_max,
+        )
+        for tid, slot in zip(tenant_ids, slots)
+    }
     limits = ClusterLimits(cache_mb=size.limits_cache_mb, replicas=size.limits_replicas)
     return tenant_ids, buckets, configs, limits

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from . import SCHEMA_VERSION
+from . import SCHEMA_VERSION, trace_workloads
 from .systems import SYSTEMS
 from .workloads import CLUSTER_SIZES, TENANT_MIXES, WORKLOAD_CLASSES
 
@@ -138,7 +138,13 @@ def load(path: str | Path) -> ExperimentSpec:
     if spec.backend not in BACKENDS:
         raise ValueError(f"unknown backend {spec.backend!r} (known: {BACKENDS})")
     _check_membership(spec.systems, SYSTEMS, "system")
-    _check_membership(spec.workloads, WORKLOAD_CLASSES, "workload class")
+    # Real-trace windows (PREREG_TRACE_AUDITED) are workloads too, kept out of
+    # WORKLOAD_CLASSES so the default workload list is unchanged.
+    for name in spec.workloads:
+        if trace_workloads.is_trace(name):
+            trace_workloads.window_index(name)  # raises on a malformed window
+    _check_membership([w for w in spec.workloads if not trace_workloads.is_trace(w)],
+                      WORKLOAD_CLASSES, "workload class")
     _check_membership(spec.tenant_mixes, TENANT_MIXES, "tenant mix")
     _check_membership(spec.cluster_sizes, CLUSTER_SIZES, "cluster size")
     if spec.reps < 1 or spec.steps < 3:

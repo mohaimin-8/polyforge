@@ -21,7 +21,7 @@ from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import EVAL_DIR
+from . import EVAL_DIR, trace_workloads
 from .config import ExperimentSpec, RunSpec, expand, load
 from .workloads import workload_has_ai
 from .results import check_metrics, connect, record, valid_run_ids, validate
@@ -65,6 +65,9 @@ def _attempt(run: RunSpec, retries: int) -> tuple[str, int, dict | None, str | N
             from . import cluster_backend
 
             trace_driven = cluster_backend.TRACE_WINDOW is not None
+        # A sim cell can replay the same trace as a workload
+        # (PREREG_TRACE_AUDITED): chat-only for the same reason.
+        trace_driven = trace_driven or trace_workloads.is_trace(run.workload)
         reason = check_metrics(outcome["metrics"], run.steps,
                                expects_ai=workload_has_ai(run.workload) or trace_driven,
                                expects_crud=not trace_driven)
