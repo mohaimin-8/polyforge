@@ -139,6 +139,9 @@ CAMPAIGN_RECORDS = [
     # EXPLORATORY (2026-11-09): the registered tests re-scored with cost per
     # scored tenant-step over 120 steps (the scorers divide by 119 x 8).
     ("analysis_cost_normalisation.py", [], "COST_NORMALISATION.md"),
+    # PREREG_CACHE_SENSITIVITY (2026-11-09): coordination and the practical
+    # comparisons under three cache-hit curves, from metrics_cache_*.csv.gz.
+    ("analysis_cache_sensitivity.py", [], "RESULTS_CACHE_SENSITIVITY.md"),
     # fig22 / fig23 (2026-10-22): the adjudication chain and the width mechanism,
     # each drawn through the frozen scorers from the committed exports.
     ("fig_adjudication_chain.py", [], "FIGURE_ADJUDICATION_CHAIN.md"),
