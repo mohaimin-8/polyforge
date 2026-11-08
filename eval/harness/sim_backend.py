@@ -203,6 +203,10 @@ def execute(run: RunSpec) -> dict:
             "capped_cycle_share": result.capped_cycle_share,
             "mean_quality_loss": result.mean_quality_loss,
             "coordination_disagreement_share": result.coordination_disagreement_share,
+            # Request accounting (shed audit): reporting-only, nullable.
+            "ai_shed_request_share": result.ai_shed_request_share,
+            "shed_request_share": result.shed_request_share,
+            "cost_per_served_request": result.cost_per_served_request,
             "steps": result.steps,
         },
         "timeseries": result.rows,

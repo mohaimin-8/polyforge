@@ -43,6 +43,10 @@ GUARD_COLUMNS = (
     # Not a guard: the answer-quality loss (quality follow-up), same rules.
     "mean_quality_loss",
     "coordination_disagreement_share",
+    # Request accounting (shed audit, 2026-11-09), same rules.
+    "ai_shed_request_share",
+    "shed_request_share",
+    "cost_per_served_request",
 )
 
 _SCHEMA = """

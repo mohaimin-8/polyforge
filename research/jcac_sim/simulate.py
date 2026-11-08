@@ -171,6 +171,13 @@ class RunResult:
     # Share of joint best responses the decoupled search would have chosen
     # differently (controller `track_coordination`); None when not tracked.
     coordination_disagreement_share: float | None = None
+    # Request accounting (shed audit, 2026-11-09), reporting-only and absent
+    # from `summary()` (R4): AI requests answered by no model over AI requests
+    # offered, the same over all requests offered, and total cost per request
+    # actually served (offered minus shed).
+    ai_shed_request_share: float = 0.0
+    shed_request_share: float = 0.0
+    cost_per_served_request: float = 0.0
     steps: int = 0
     rows: list = field(default_factory=list)
 
@@ -358,6 +365,7 @@ def run(
     viol_steps = tenant_steps = tier_none_steps = 0
     overrun_steps = clamp_steps = 0
     quality_sum = 0.0
+    requests_offered = ai_requests_offered = ai_requests_shed = 0.0
     crud_p95s: list[float] = []
     ai_p95s: list[float] = []
     ai_hit_rps = ai_total_rps = 0.0
@@ -432,6 +440,9 @@ def run(
             viol_steps += 1 if m.violation > 0.0 else 0
             excess_sum += m.excess
             tier_none_steps += 1 if serving.tier == "none" else 0
+            requests_offered += m.requests
+            ai_requests_offered += m.ai_requests
+            ai_requests_shed += m.ai_shed_requests
             tenant_steps += 1
             satisfactions.append(1.0 - m.violation)
             realized[tid] = m.violation
@@ -478,6 +489,12 @@ def run(
         result.budget_overrun_step_share = overrun_steps / tenant_steps
         result.clamp_violation_step_share = clamp_steps / tenant_steps
         result.mean_quality_loss = quality_sum / tenant_steps
+    if ai_requests_offered > 0.0:
+        result.ai_shed_request_share = ai_requests_shed / ai_requests_offered
+    if requests_offered > 0.0:
+        result.shed_request_share = ai_requests_shed / requests_offered
+        served = requests_offered - ai_requests_shed
+        result.cost_per_served_request = result.total_cost_usd / served if served > 0.0 else 0.0
     guards = getattr(ctl, "guard_counts", None)
     if guards and guards["tenant_plans"]:
         result.plan_fallback_share = guards["fallback_plans"] / guards["tenant_plans"]
