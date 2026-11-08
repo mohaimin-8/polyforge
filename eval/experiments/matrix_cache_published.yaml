@@ -1,0 +1,17 @@
+# PREREG_CACHE_SENSITIVITY.md (2026-11-09), curve `published`: h(c) = 0.85 c / (c + 256).
+# Planner and plant share the curve (economy override). Committed before any run.
+name: matrix_cache_published
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_converged, jcac_decoupled, hpa_fair_capped, layered_small_tuned]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_cache_published.duckdb
+retries: 2
+timeseries_reps: 0
+economy:
+  cache_hit_max: 0.85
+  cache_half_mb: 256
