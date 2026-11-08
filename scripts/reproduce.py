@@ -136,6 +136,9 @@ CAMPAIGN_RECORDS = [
     # PREREG_TRACE_AUDITED (2026-10-31): the 96 BurstGPT windows of TRACE2
     # against the audited arms, from metrics_trace_audited.csv.gz.
     ("analysis_trace_audited.py", [], "RESULTS_TRACE_AUDITED.md"),
+    # EXPLORATORY (2026-11-09): the registered tests re-scored with cost per
+    # scored tenant-step over 120 steps (the scorers divide by 119 x 8).
+    ("analysis_cost_normalisation.py", [], "COST_NORMALISATION.md"),
     # fig22 / fig23 (2026-10-22): the adjudication chain and the width mechanism,
     # each drawn through the frozen scorers from the committed exports.
     ("fig_adjudication_chain.py", [], "FIGURE_ADJUDICATION_CHAIN.md"),
