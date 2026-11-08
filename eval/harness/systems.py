@@ -351,6 +351,27 @@ SYSTEMS: dict[str, SystemSpec] = {
         description="keda_fair inside the cluster caps (baselines.CapEnforced), "
                     "rps_per_replica re-tuned per size under those caps",
     ),
+    # Budget-matched comparators (PREREG_BUDGET_MATCHED, 2026-11-09): the
+    # audited arms above under the per-tenant budget filter the joint
+    # controller obeys (baselines.BudgetFiltered, the controller's own per-step
+    # cap), at their registered tuning -- not re-tuned under the filter. The
+    # capped pair filters first, then caps (CapEnforced(BudgetFiltered(...))),
+    # so the caps can only lower an affordable plan's bill.
+    "hpa_budget_capped": SystemSpec(
+        "hpa_budget_capped", static_cache_mb=512, tuned_from="hpa", tuned_arm="hpa_fair_capped",
+        description="hpa_fair_capped under the joint controller's per-tenant "
+                    "budget filter (hpa_fair_capped's tuned target_rho)",
+    ),
+    "keda_budget_capped": SystemSpec(
+        "keda_budget_capped", static_cache_mb=512, tuned_from="keda", tuned_arm="keda_fair_capped",
+        description="keda_fair_capped under the joint controller's per-tenant "
+                    "budget filter (keda_fair_capped's tuned rps_per_replica)",
+    ),
+    "layered_small_budget": SystemSpec(
+        "layered_small_budget", tuned_from="hpa", tuned_arm="layered_small_tuned",
+        description="layered_small_tuned under the joint controller's per-tenant "
+                    "budget filter (layered_small_tuned's tuned replica layer)",
+    ),
     # --- Quality follow-up (PREREG_QUALITY, 2026-10-16) ---------------------
     # J priced with the answer-quality loss at 2.0 (model.TIER_QUALITY), under
     # the measured GPU price ladder the experiment sets, at EQUAL constraints:
