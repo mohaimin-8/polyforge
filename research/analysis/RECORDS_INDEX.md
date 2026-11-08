@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 97 |
-| regenerated and compared | 81 |
+| records | 98 |
+| regenerated and compared | 82 |
 | outside the gate, reason stated | 16 |
 | outside the gate, no entry | 0 |
 
@@ -53,6 +53,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_ACTUATION.md` | AC-H1, AC-H2, AC-H3, AC-H4 | yes |
 | `RESULTS_BUDGET_PARITY.md` | BP-H1, BP-H1a, BP-H1b, BP-H2, BP-H2a, BP-H2b, BP-H3 | yes |
 | `RESULTS_CACHE_CEILING.md` | - | no, reason stated |
+| `RESULTS_CACHE_SENSITIVITY.md` | CS-H1, CS-H2 | yes |
 | `RESULTS_CHAOS_SIM.md` | CH-H1, CH-H2, CH-H3, CH-H4 | yes |
 | `RESULTS_CONCURRENCY.md` | CQ-H1, CQ-H2 | yes |
 | `RESULTS_DOMINANCE.md` | - | yes |
