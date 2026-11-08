@@ -82,7 +82,7 @@ def host_offset_hours(harness_version: str | None, evidence_dir: Path) -> tuple[
     # Read as UTC only when EVERY host this campaign's evidence names is a
     # cloud host. One cloud sitting among laptop ones must not make a
     # laptop-recorded first run read six hours late -- that would hide a run
-    # that preceded its protocol (review of fe23712). Unreadable facts count
+    # that preceded its protocol (review of 8a697b8). Unreadable facts count
     # as unknown, which keeps the conservative reading.
     oses = []
     for facts in sorted(evidence_dir.glob("**/host_facts.json")) if evidence_dir.exists() else []:

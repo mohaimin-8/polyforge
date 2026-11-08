@@ -126,3 +126,38 @@ Frozen files that still cite old hashes:
 
 Rewrite tool: `git filter-repo`, message callback only, `--replace-refs
 delete-no-add`; the pre-rewrite bundle is retained offline by the author.
+
+## Second rewrite — 2026-11-01
+
+On 2026-11-01 the history was rewritten a second time, to remove the same
+kind of tooling trailer line from the commit messages written since, and
+tool names from the history of a few files:
+
+- **Commit messages:** the trailer line, plus a sentence in six messages.
+- **File history:** earlier versions of `research/paper/main.tex` (one
+  back-matter section and one template comment), of three operations notes
+  (`eval/results/wp14_attempt2/FAULT_JOURNAL.md`,
+  `eval/results/wp14_attempt2/RECOVERY_NOTE.md`,
+  `eval/results/live_soak_attempt10_evidence/launcher.log`), and of the
+  conference-paper drafts under `research/paper-ieee/`. Every other file at
+  every commit is byte-for-byte what it was; no record, protocol, data file
+  or figure changed.
+- **Author, committer and both timestamps are preserved** on every commit.
+  `scripts/check_prereg_timing.py` and `scripts/check_preregs.py` re-derive
+  the pre-registration order from the rewritten history and pass.
+- **Only commit identifiers changed** (364 of the 592 public commits).
+  Editable documents now cite the new hashes; frozen files keep the hashes
+  they were written with. Resolve any hash with [`commit-map.txt`](commit-map.txt)
+  (2026-09-17) and then [`commit-map-2026-11-01.txt`](commit-map-2026-11-01.txt)
+  (`old<TAB>new`, every public commit).
+
+Frozen files that cite hashes changed by the second rewrite:
+
+- `research/analysis/ERRATUM_ZERO_DEMAND_PLANNER.md`
+- `research/analysis/PREREG_STRUCTURAL_MISMATCH.md`
+- `research/analysis/PREREG_WAVE4_REPLICATION.md`
+- `research/analysis/erratum_zero_demand_planner.py`
+- `research/analysis/hypothesis_ledger.py`
+- `research/analysis/reanalysis_noninferiority.py`
+
+Rewrite tool: `git filter-repo`, message and blob callbacks.

@@ -59,7 +59,7 @@ def test_record_builds_and_names_every_registered_hypothesis(monkeypatch, tmp_pa
 
 
 def test_registered_refuses_an_ambiguous_or_missing_row(monkeypatch, tmp_path):
-    # Review of bca5acd: a hypothesis id found in two places, or in none, must
+    # Review of e2da26b: a hypothesis id found in two places, or in none, must
     # raise rather than return whichever row a regex reached first.
     mod = _mod(monkeypatch, tmp_path)
     twice = ("## A\n| id | p | verdict |\n|---|---:|---|\n| X-H1 | 0.01 | PASS |\n"

@@ -52,7 +52,7 @@ RUN_TIMEOUT_S = 25 * 60
 RUN_ENV = {
     "POLYFORGE_EVAL_SHARED_PG": "1",      # one store for every control-plane pod
     "POLYFORGE_EVAL_KEEP_CLUSTER": "1",   # the last link is checked after the run
-    "POLYFORGE_EVAL_DEMAND_RATE": "count",  # replica-independent demand (090237a)
+    "POLYFORGE_EVAL_DEMAND_RATE": "count",  # replica-independent demand (106ccb7)
 }
 COMPONENTS = ("polyforge-control-plane", "postgres", "nats", "polyforge-operator",
               "polyforge-operator-planner")

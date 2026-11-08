@@ -62,7 +62,7 @@ def test_record_builds_and_names_the_marginal_passes(monkeypatch, tmp_path):
 
 
 def test_a_table_with_verdicts_but_no_verdict_column_is_reported_not_dropped(monkeypatch, tmp_path):
-    # Review of bca5acd: RESULTS_LIVE_SOAK_V8's per-injection table carries
+    # Review of e2da26b: RESULTS_LIVE_SOAK_V8's per-injection table carries
     # PASS/FAIL in a blank-headed column and was silently skipped.
     mod = _mod(monkeypatch, tmp_path)
     text = "## SK\n| fault | deviation | |\n|---|---:|---|\n| cpu #1 | +66% | **FAIL** |\n"

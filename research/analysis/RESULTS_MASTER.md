@@ -630,10 +630,10 @@ against by-construction winners; framing documented in `RESULTS.md`), **cache hi
    2026-09-15 and scored **WL-H1 FAIL as registered** (RESULTS_WAVE4_LIVE_PLANE.md:
    the joint controller cost 23.3% more than its own tier-only ablation at equal
    fairness); the diagnosis — an open-loop plant model and a hysteresis ratchet —
-   became a 27th protocol, PREREG_WAVE4_CALIBRATED (`dd16920`), one changed factor,
+   became a 27th protocol, PREREG_WAVE4_CALIBRATED (`054090e`), one changed factor,
    whose sitting the same day scored **WL-H1′ PASS** (RESULTS_WAVE4_CALIBRATED.md:
    the corrected controller beats every arm in joint_stress with paired-bootstrap
-   CIs below zero; four dated amendments sit after its registered text). Its evidence then fitted the simulator's plant under a 28th, frozen rule — PREREG_WAVE4_SIM_TRANSFER (`fe2d774`) — and the fitted simulator's cost winner matched live in 3 of 4 cells where the published plant matched 1 (RESULTS_WAVE4_SIM_TRANSFER.md: WL-H3′ PASS; in `joint_stress` the ranking is live's, arm for arm). A 29th, PREREG_WAVE4_DWELL (`0000cbe`), tested a three-cycle replica dwell as the damper for the corrected controller's replica oscillation and scored **WL-H6 FAIL, WL-H7 FAIL** (RESULTS_WAVE4_DWELL.md): the cycle is a long swing, not chatter, and a reversal ban does not damp it — a negative result, reported as scored. The two
+   CIs below zero; four dated amendments sit after its registered text). Its evidence then fitted the simulator's plant under a 28th, frozen rule — PREREG_WAVE4_SIM_TRANSFER (`24ea1e9`) — and the fitted simulator's cost winner matched live in 3 of 4 cells where the published plant matched 1 (RESULTS_WAVE4_SIM_TRANSFER.md: WL-H3′ PASS; in `joint_stress` the ranking is live's, arm for arm). A 29th, PREREG_WAVE4_DWELL (`dae1eb8`), tested a three-cycle replica dwell as the damper for the corrected controller's replica oscillation and scored **WL-H6 FAIL, WL-H7 FAIL** (RESULTS_WAVE4_DWELL.md): the cycle is a long swing, not chatter, and a reversal ban does not damp it — a negative result, reported as scored. The two
    live protocols PREREG_WIRE_ATTACK and PREREG_LIVE_CHAOS_P99 were pushed before
    any live number existed and have since been executed. The v1 gate and Phase 4 acceptance are
    frozen separately in the roadmap/V2_README.

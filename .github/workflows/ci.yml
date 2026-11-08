@@ -205,7 +205,7 @@ jobs:
           # commit that only deletes or renames has no patch lines for
           # gitleaks to read, and cannot introduce a secret. Comparing with
           # the raw commit count failed on 2026-09-21 ("494 of 495") the
-          # moment a delete-only commit (989894e) landed.
+          # moment a delete-only commit (2aec280) landed.
           floor=$(git log --format='format:@%h' --numstat | awk '/^@/{if(seen) n+=(add>0); seen=1; add=0; next} NF>=3 && $1!="-" {add+=$1} END{if(seen) n+=(add>0); print n}')
           echo "gitleaks scanned ${scanned:-0} commits; $floor of $total add text"
           if [ "${scanned:-0}" -lt "$floor" ]; then

@@ -69,7 +69,7 @@ def test_the_gate_passes_on_the_real_history():
 
 
 def test_mixed_laptop_and_cloud_evidence_takes_the_conservative_reading(tmp_path):
-    # Review of fe23712: one cloud host_facts among laptop sittings must not
+    # Review of 8a697b8: one cloud host_facts among laptop sittings must not
     # make a laptop-recorded first run read as UTC -- that would place it six
     # hours LATER and could hide a run that preceded its protocol.
     _host_facts(tmp_path / "ev", "Linux 6.8.0-1063-aws")
@@ -80,7 +80,7 @@ def test_mixed_laptop_and_cloud_evidence_takes_the_conservative_reading(tmp_path
 
 
 def test_a_shallow_clone_is_refused_not_misjudged(monkeypatch, capsys):
-    # Review of fe23712: on a depth-1 clone every prereg's "first commit" is
+    # Review of 8a697b8: on a depth-1 clone every prereg's "first commit" is
     # the checkout commit, so every campaign would look like it ran first.
     real = ct.git
     monkeypatch.setattr(ct, "git", lambda *a: "true" if a == ("rev-parse", "--is-shallow-repository")

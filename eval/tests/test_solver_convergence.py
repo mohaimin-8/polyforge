@@ -33,7 +33,7 @@ GOLDEN_CELLS = [("crud_bursty", "uniform", "small", 11), ("ai_cacheable", "whale
                 ("tier_mixed", "besteffort_heavy", "small", 15), ("flash_ai", "uniform", "large", 16)]
 # sha256 over (cost, violation, jain, hit rate) of jcac and jcac_anchored on
 # GOLDEN_CELLS, 40 steps, recorded from the solver BEFORE converge_sweeps
-# existed (2026-09-26, commit f5f66cd). Any change to the published path fails.
+# existed (2026-09-26, commit e97f8ab). Any change to the published path fails.
 GOLDEN = "086e22e8ea434feceb9b2916b70d1a85547a3c816384d8a1bbf95e4963369919"
 
 CHECK_CELLS = [(wl, mix, size) for wl in ("crud_bursty", "ai_cacheable", "agentic",
@@ -56,7 +56,7 @@ def test_published_solver_is_bit_identical_to_before_the_flag():
 
 
 # The same digest for the jcac_converged TREATMENT (anchor_moves +
-# converge_sweeps), recorded at 7d21086 before the separation arms (knob_search,
+# converge_sweeps), recorded at 37b5229 before the separation arms (knob_search,
 # guard counters, the shared _fallback) touched controller.py (2026-10-16).
 GOLDEN_CONVERGED = "4d8352a5a4768d3e1c098681cb45cb580bfc21f2a071ee7a4fe00ee97e45db70"
 

@@ -76,7 +76,7 @@ fresh, shared seeds. What the evidence now supports:
 Across the programme, 122 registered tests carry a p-value; 74 passed as registered,
 and 57 of those survive a programme-wide Holm correction
 (`research/analysis/HYPOTHESIS_LEDGER.md`). The audit report is outside the
-repository; the fixes and re-runs are commits `fe23712` onward on this branch.
+repository; the fixes and re-runs are commits `8a697b8` onward on this branch.
 
 ## Install the operator (Helm)
 

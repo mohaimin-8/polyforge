@@ -222,7 +222,7 @@ unchanged; `go test -race` is clean.
 ## 2026-10-12 finding: thirteen reachable advisories after Go 1.25 left support (FIXED)
 
 **Severity: high; this time the gate did its job.** The first CI run after the
-advisories were published (a3a90c9) went red in `vulncheck`: **13 reachable**
+advisories were published (23e2f3b) went red in `vulncheck`: **13 reachable**
 vulnerabilities. Eleven are in the standard library of the pinned 1.25.14
 (`net/http`, `crypto/tls`, `mime/multipart`, `html/template`; GO-2026-6599,
 6600, 6603, 6605, 6607, 6608, 6610-6613, 6617), several also in
