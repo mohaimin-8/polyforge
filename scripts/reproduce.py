@@ -142,6 +142,10 @@ CAMPAIGN_RECORDS = [
     # PREREG_CACHE_SENSITIVITY (2026-11-09): coordination and the practical
     # comparisons under three cache-hit curves, from metrics_cache_*.csv.gz.
     ("analysis_cache_sensitivity.py", [], "RESULTS_CACHE_SENSITIVITY.md"),
+    # PREREG_BUDGET_MATCHED (2026-11-09): the audited comparators under the
+    # joint controller's budget filter, from metrics_budget_*.csv.gz paired
+    # with the committed JOINTNESS and TRACE_AUDITED exports.
+    ("analysis_budget_matched.py", [], "RESULTS_BUDGET_MATCHED.md"),
     # fig22 / fig23 (2026-10-22): the adjudication chain and the width mechanism,
     # each drawn through the frozen scorers from the committed exports.
     ("fig_adjudication_chain.py", [], "FIGURE_ADJUDICATION_CHAIN.md"),
