@@ -1,0 +1,16 @@
+# PREREG_BUDGET_MATCHED.md (2026-11-09): the audited comparators under the
+# joint controller's per-tenant budget filter, run under the registered
+# experiment name of matrix_jointness.yaml so shared seeds give them the registered
+# runs' demand; new DB. Committed before any run.
+name: matrix_jointness
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [hpa_budget_capped, keda_budget_capped, layered_small_budget]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_budget_jointness.duckdb
+retries: 2
+timeseries_reps: 0
