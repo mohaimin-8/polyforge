@@ -1,0 +1,16 @@
+# PREREG_SHED_ACCOUNTING.md (2026-11-09): request-level shed accounting on
+# the registered runs of matrix_jointness.yaml. Same experiment name, so run ids and
+# seeds are the registered ones; new DB. Reporting-only counters; every
+# registered metric must replay bit-identically (SA-V). Committed before any run.
+name: matrix_jointness
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_converged, jcac_decoupled, jcac_tier_floor, layered_small_tuned, static_share, hpa_fair_capped, keda_fair_capped]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_shed_jointness.duckdb
+retries: 2
+timeseries_reps: 0
