@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 96 |
-| regenerated and compared | 80 |
+| records | 97 |
+| regenerated and compared | 81 |
 | outside the gate, reason stated | 16 |
 | outside the gate, no entry | 0 |
 
@@ -25,6 +25,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `CHURN_WAVE4_CALIBRATED.md` | WL-H2 | yes |
 | `COORD_GAP.md` | CG-H1 | no, reason stated |
 | `COORD_GAP_ANCHORED.md` | CG-H1 | yes |
+| `COST_NORMALISATION.md` | - | yes |
 | `DEGRADE_PROBE.md` | DG-H1, DG-H2 | yes |
 | `EFFECT_SIZES.md` | - | yes |
 | `EQUIVALENCE_FAIR.md` | FJ-H1, FJ-H2, FJ-H3, RT-H1, RT-H2, RT-H3 | yes |
