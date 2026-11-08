@@ -545,6 +545,13 @@ class StepMetrics:
     # cache at its relative precision), weighted like `violation` by the AI
     # share of traffic. Reporting-only unless an arm opts in to pricing it.
     quality_loss: float = 0.0
+    # Request accounting (shed audit, 2026-11-09). Requests offered in this
+    # tenant-step, AI requests among them, and AI requests answered by no
+    # model: the cache misses of a step whose tier is "none". Reporting-only;
+    # they enter no objective and change no other field.
+    requests: float = 0.0
+    ai_requests: float = 0.0
+    ai_shed_requests: float = 0.0
 
 
 def _mixture_p95_ms(branches: list[tuple[float, float, bool]], tail: float) -> float:
@@ -710,6 +717,9 @@ def evaluate_step(
         energy_kwh=energy_kwh,
         carbon_g=energy_kwh * CARBON_INTENSITY_G_PER_KWH,
         quality_loss=quality_lost / total_rps if total_rps > 0.0 else 0.0,
+        requests=total_rps * CONTROL_INTERVAL_S,
+        ai_requests=ai_rps * CONTROL_INTERVAL_S,
+        ai_shed_requests=(miss_rps * CONTROL_INTERVAL_S) if state.tier == "none" else 0.0,
     )
 
 
