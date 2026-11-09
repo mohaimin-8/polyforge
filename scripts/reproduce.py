@@ -146,6 +146,12 @@ CAMPAIGN_RECORDS = [
     # joint controller's budget filter, from metrics_budget_*.csv.gz paired
     # with the committed JOINTNESS and TRACE_AUDITED exports.
     ("analysis_budget_matched.py", [], "RESULTS_BUDGET_MATCHED.md"),
+    # PREREG_SHED_ACCOUNTING (2026-11-09, descriptive): request-level shed
+    # accounting on the JN and TA runs, from metrics_shed_*.csv.gz, after the
+    # bit-identity gate against the registered exports.
+    ("analysis_shed_accounting.py", [], "RESULTS_SHED_ACCOUNTING.md"),
+    # EXPLORATORY (2026-11-09): the same counts pooled over requests.
+    ("analysis_shed_pooled.py", [], "SHED_POOLED.md"),
     # fig22 / fig23 (2026-10-22): the adjudication chain and the width mechanism,
     # each drawn through the frozen scorers from the committed exports.
     ("fig_adjudication_chain.py", [], "FIGURE_ADJUDICATION_CHAIN.md"),
