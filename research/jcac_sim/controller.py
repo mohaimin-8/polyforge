@@ -413,8 +413,19 @@ class JCACController:
         quality_weight: float = 0.0,
         lattice: str = "published",
         track_coordination: bool = False,
+        shed_price_tier: str | None = None,
     ):
         self.configs = configs
+        # PREREG_LEVEL (final audit 2026-11-09): tier "none" costs $0, so the
+        # objective could save money by refusing AI requests. With this set,
+        # a "none" candidate is charged, IN THE OBJECTIVE ONLY, the price of
+        # serving its cache misses on `shed_price_tier` -- refusing service
+        # then never saves money relative to that tier. The budget filter
+        # still tests real spend. None (default) = the published objective,
+        # bit-identical (R4).
+        if shed_price_tier not in (None, "small", "mid", "large"):
+            raise ValueError(f"shed_price_tier must be None, small, mid or large, not {shed_price_tier!r}")
+        self.shed_price_tier = shed_price_tier
         # Audit 2026-09-26 (simulator CRITICAL): `_project` calls the very
         # evaluate_step the engine scores with, so the planner sees 100% of
         # the plant's structural form -- a model-match advantage no reactive
@@ -1441,7 +1452,22 @@ class JCACController:
             score += self.carbon_weight * (
                 other_carbon + self._project_carbon(tid, candidate, horizons[tid])
             ) / CARBON_SCALE_G
+        # PREREG_LEVEL: guarded like carbon, so the default score is the
+        # published expression to the last bit.
+        if self.shed_price_tier and candidate.tier == "none":
+            score += self.weights.alpha * self._shed_charge(tid, candidate, horizons[tid]) / COST_SCALE_USD
         return score
+
+    def _shed_charge(self, tid: str, candidate: TenantState, horizon: list[Demand]) -> float:
+        """Objective-only charge for a tier-"none" candidate: its projected
+        cache misses priced at `shed_price_tier`. Same replicas and cache on
+        the small tier differ from the shed candidate only by the tier spend
+        on those misses (work units do not depend on the tier), so the
+        difference of the two projections is misses x small price."""
+        on_small = self._project(tid, replace(candidate, tier="small"), horizon)[0]
+        shed = self._project(tid, candidate, horizon)[0]
+        prices = model.TIER_COST_USD_PER_REQ
+        return max(0.0, on_small - shed) * prices[self.shed_price_tier] / prices["small"]
 
     def best_response_gaps(self) -> dict[str, float]:
         """See `_best_response_gaps`; scored under the believed form, as the

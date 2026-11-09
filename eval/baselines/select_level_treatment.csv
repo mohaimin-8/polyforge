@@ -1,0 +1,13 @@
+variant,size,mean_objective,cost_norm,violation,unfair,shed_norm
+V0_published,small,0.60127,0.27131,0.11541,0.07102,0.06364
+V0_published,medium,0.48459,0.2899,0.06782,0.02653,0.04579
+V0_published,large,0.44344,0.29742,0.04811,0.01521,0.04219
+V1_priced_degrade,small,0.58991,0.28473,0.11072,0.06843,0.04952
+V1_priced_degrade,medium,0.47488,0.30631,0.06347,0.0241,0.02957
+V1_priced_degrade,large,0.42813,0.32091,0.04115,0.01229,0.01877
+V2_plus_half_penalty,small,0.5928,0.29053,0.11605,0.06543,0.03746
+V2_plus_half_penalty,medium,0.5107,0.2768,0.09025,0.04746,0.02968
+V2_plus_half_penalty,large,0.47537,0.27105,0.08041,0.04221,0.0224
+V3_plus_holt,small,0.57305,0.29831,0.10669,0.06455,0.02909
+V3_plus_holt,medium,0.47212,0.29136,0.07299,0.0361,0.01672
+V3_plus_holt,large,0.43114,0.28949,0.06004,0.02893,0.00711

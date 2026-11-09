@@ -372,6 +372,54 @@ SYSTEMS: dict[str, SystemSpec] = {
         description="layered_small_tuned under the joint controller's per-tenant "
                     "budget filter (layered_small_tuned's tuned replica layer)",
     ),
+    # --- Level-playing-field campaign (PREREG_LEVEL, 2026-11-09) -------------
+    # The final audit's leaks, removed on both sides. Every comparator obeys
+    # the cluster caps and is re-tuned per size AS RUN under the LEVEL
+    # objective (J plus an outage price; tune_arms.py --level); the gated
+    # stack may refuse AI calls when over budget, as the joint controller
+    # may; the treatment pays the same outage price in its own objective and
+    # degrades to the cheapest affordable tier before it sheds.
+    # Treatment = variant V3 of select_level_treatment.py, chosen on the
+    # tuning slice by the pre-declared rule (lowest mean LEVEL objective over
+    # the three sizes). switch_penalty is controller.SWITCH_PENALTY_HALF_REPLICA
+    # (asserted equal in eval/tests/test_level.py).
+    "jcac_level": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True,
+                        "shed_price_tier": "small", "degrade_gracefully": True,
+                        "switch_penalty": 0.006666666666666667, "forecast_method": "holt"},
+        description="jcac_converged that pays, in its objective, the small-tier "
+                    "price for every request it would refuse (tier none); whose "
+                    "infeasible-lattice fallback serves on the cheapest affordable "
+                    "tier before it sheds; with the corrected half-replica "
+                    "hysteresis and the damped-Holt forecaster",
+    ),
+    "jcac_level_decoupled": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True,
+                        "shed_price_tier": "small", "degrade_gracefully": True,
+                        "switch_penalty": 0.006666666666666667, "forecast_method": "holt",
+                        "knob_search": "decoupled"},
+        description="jcac_level searching each knob on its own (the RQ2 ablation)",
+    ),
+    "layered_small_level_capped": SystemSpec(
+        "layered_small_capped", tuned_from="hpa", tuned_arm="layered_small_level_capped",
+        description="the cheapest-tier stack inside the cluster caps, replica "
+                    "layer re-tuned per size under the caps and the LEVEL objective",
+    ),
+    "layered_small_level_gated": SystemSpec(
+        "layered_small_gated_capped", tuned_from="hpa", tuned_arm="layered_small_level_gated",
+        description="the cheapest-tier stack inside the cluster caps whose gateway "
+                    "refuses AI model calls in any interval the tenant's budget "
+                    "cannot pay for (baselines.BudgetGated); re-tuned per size "
+                    "under the caps and the LEVEL objective",
+    ),
+    "hpa_level_capped": SystemSpec(
+        "hpa_capped", static_cache_mb=512, tuned_from="hpa", tuned_arm="hpa_level_capped",
+        description="hpa_fair_capped re-tuned per size under the LEVEL objective",
+    ),
+    "keda_level_capped": SystemSpec(
+        "keda_capped", static_cache_mb=512, tuned_from="keda", tuned_arm="keda_level_capped",
+        description="keda_fair_capped re-tuned per size under the LEVEL objective",
+    ),
     # --- Quality follow-up (PREREG_QUALITY, 2026-10-16) ---------------------
     # J priced with the answer-quality loss at 2.0 (model.TIER_QUALITY), under
     # the measured GPU price ladder the experiment sets, at EQUAL constraints:

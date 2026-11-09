@@ -249,6 +249,12 @@ CACHEABLE_UNIFORM = False  # True: every AI kind is fully cacheable; the ceiling
 # the B1' knob preflight), where the published table makes `agent` degrade
 # on `small` (6000 ms) so that tier choice is non-trivial.
 TIER_LATENCY_FLAT: dict | None = None
+# Per-tier base latency of `agent` requests only (ms), None = the published
+# row. The published row (small 6000 > large 3500 > mid 2500) is an
+# unmeasured assumption -- tool-loop retries on a weak model -- on which the
+# final audit (2026-11-09) found the directional coordination gain to depend.
+# PREREG_LEVEL runs a monotone row beside it as a robustness plant.
+AGENT_LATENCY: dict | None = None
 
 _Z95 = 1.6448536269514722  # standard-normal 95th-percentile z
 
@@ -266,6 +272,7 @@ def set_model_form(
     crud_base_scale: float | None = None,
     cacheable_uniform: bool | None = None,
     tier_latency_ms: dict | None = None,
+    agent_latency_ms: dict | None = None,
 ) -> None:
     """Reset the model form to the published defaults, then apply overrides.
 
@@ -276,7 +283,17 @@ def set_model_form(
     """
     global CONGESTION_EXPONENT, P95_TAIL, MIXTURE_P95
     global REPLICA_CAPACITY_WU, WU_AI_SCALE, CRUD_BASE_SCALE, CACHEABLE_UNIFORM, TIER_LATENCY_FLAT
+    global AGENT_LATENCY
     TIER_LATENCY_FLAT = None
+    AGENT_LATENCY = None
+    if agent_latency_ms:
+        if set(agent_latency_ms) != {"small", "mid", "large"}:
+            raise ValueError("agent_latency_ms needs exactly small, mid and large")
+        if any(float(v) <= 0.0 for v in agent_latency_ms.values()):
+            raise ValueError("agent latencies must be positive")
+        if tier_latency_ms:
+            raise ValueError("agent_latency_ms and tier_latency_ms are exclusive")
+        AGENT_LATENCY = {k: float(v) for k, v in agent_latency_ms.items()}
     if tier_latency_ms:
         unknown = set(tier_latency_ms) - {"small", "mid", "large"}
         if unknown or set(tier_latency_ms) != {"small", "mid", "large"}:
@@ -332,7 +349,8 @@ def set_model_form(
 # Every global set_model_form controls. A snapshot of these is a complete
 # description of the structural form evaluate_step computes with.
 _FORM_GLOBALS = ("CONGESTION_EXPONENT", "P95_TAIL", "MIXTURE_P95", "REPLICA_CAPACITY_WU",
-                 "WU_AI_SCALE", "CRUD_BASE_SCALE", "CACHEABLE_UNIFORM", "TIER_LATENCY_FLAT")
+                 "WU_AI_SCALE", "CRUD_BASE_SCALE", "CACHEABLE_UNIFORM", "TIER_LATENCY_FLAT",
+                 "AGENT_LATENCY")
 
 
 def form_snapshot() -> tuple:
@@ -489,6 +507,8 @@ def tier_base_latency_ms(kind: str, tier: str) -> float:
     table, or the flat live table when a pre-registered rerun set one."""
     if TIER_LATENCY_FLAT is not None and tier in TIER_LATENCY_FLAT:
         return TIER_LATENCY_FLAT[tier]
+    if AGENT_LATENCY is not None and kind == "agent" and tier in AGENT_LATENCY:
+        return AGENT_LATENCY[tier]
     return TIER_BASE_LATENCY_MS[kind][tier]
 
 

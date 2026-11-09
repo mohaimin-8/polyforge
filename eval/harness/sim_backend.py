@@ -118,6 +118,8 @@ def _apply_model_form(form: tuple) -> None:
         cacheable_uniform=bool(f.get("cacheable_uniform", 0)),
         tier_latency_ms=({t: f[f"tier_latency_{t}"] for t in ("small", "mid", "large")}
                          if "tier_latency_small" in f else None),
+        agent_latency_ms=({t: f[f"agent_latency_{t}"] for t in ("small", "mid", "large")}
+                          if "agent_latency_small" in f else None),
     )
 
 
