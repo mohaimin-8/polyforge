@@ -178,3 +178,16 @@ def test_the_lag_follow_up_arm_changes_only_the_switching_penalty():
     for name in ("matrix_level_lag2", "matrix_level_inst2"):
         spec = config.load(EVAL_DIR / "experiments" / f"{name}.yaml")
         assert spec.shared_seeds and all(s in SYSTEMS for s in spec.systems)
+
+
+def test_level2_arms_and_experiments():
+    dec = dict(SYSTEMS["jcac_level_ratchet_decoupled"].params)
+    assert dec.pop("knob_search") == "decoupled" and dec == dict(SYSTEMS["jcac_level_ratchet"].params)
+    for arm in ("layered_costaware_gpu_gated", "layered_costaware_gpu_capped", "layered_small_gpu_gated",
+                "hpa_gpu_capped"):
+        for size in ("small", "medium", "large"):
+            assert "target_rho" in sim_backend.base_params(SYSTEMS[arm], size)
+    for name in ("matrix_level2", "matrix_level2_mono", "matrix_level2_lag", "matrix_level2_heldout",
+                 "matrix_level2_trace", "matrix_level2_gpu"):
+        spec = config.load(EVAL_DIR / "experiments" / f"{name}.yaml")
+        assert spec.shared_seeds and all(s in SYSTEMS for s in spec.systems), name

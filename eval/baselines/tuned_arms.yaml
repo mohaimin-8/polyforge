@@ -15,6 +15,13 @@ hpa_fair_capped:
     target_rho: 0.05
   small:
     target_rho: 0.1
+hpa_gpu_capped:
+  large:
+    target_rho: 0.075
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.1
 hpa_level_capped:
   large:
     target_rho: 0.075
@@ -60,6 +67,20 @@ keda_level_capped:
     rps_per_replica: 0.25
   small:
     rps_per_replica: 0.5
+layered_costaware_gpu_capped:
+  large:
+    target_rho: 0.1
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.4
+layered_costaware_gpu_gated:
+  large:
+    target_rho: 0.4
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.4
 layered_costaware_tuned:
   large:
     target_rho: 0.8
@@ -81,6 +102,13 @@ layered_quality_tuned:
     target_rho: 0.075
   small:
     target_rho: 0.05
+layered_small_gpu_gated:
+  large:
+    target_rho: 0.1
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.1
 layered_small_level_capped:
   large:
     target_rho: 0.1

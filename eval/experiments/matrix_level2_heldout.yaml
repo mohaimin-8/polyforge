@@ -1,0 +1,20 @@
+# PREREG_LEVEL2.md (2026-11-10) -- the best joint controller found
+# (jcac_level_ratchet, LEVEL_LAG) re-tested on fresh seeds against every LEVEL
+# comparator on every substrate, plus the measured GPU price ladder. Frozen and
+# pushed before any run. Arms and tuning are LEVEL's (GPU arms: tune_arms.py
+# --level-gpu, frozen with the protocol).
+# The two held-out MMPP workloads.
+name: matrix_level2_heldout
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_level_ratchet, jcac_level_ratchet_decoupled, layered_small_level_gated,
+          layered_small_level_capped, hpa_level_capped, keda_level_capped,
+          static_share]
+workloads: [mmpp_crud, mmpp_mixed]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_level2_heldout.duckdb
+retries: 2
+timeseries_reps: 0
