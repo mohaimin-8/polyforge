@@ -152,6 +152,10 @@ CAMPAIGN_RECORDS = [
     ("analysis_shed_accounting.py", [], "RESULTS_SHED_ACCOUNTING.md"),
     # EXPLORATORY (2026-11-09): the same counts pooled over requests.
     ("analysis_shed_pooled.py", [], "SHED_POOLED.md"),
+    # PREREG_LEVEL (2026-11-09): the joint controller against comparators with
+    # every audited leak removed, five experiments, from
+    # metrics_matrix_level{,_mono,_lag,_heldout,_trace}.csv.gz.
+    ("analysis_level.py", [], "RESULTS_LEVEL.md"),
     # fig22 / fig23 (2026-10-22): the adjudication chain and the width mechanism,
     # each drawn through the frozen scorers from the committed exports.
     ("fig_adjudication_chain.py", [], "FIGURE_ADJUDICATION_CHAIN.md"),

@@ -89,7 +89,11 @@ def load(experiment: str) -> pd.DataFrame | None:
         finally:
             con.close()
     if csv.exists():
-        return pd.read_csv(csv, float_precision="round_trip")[KEYS + COLUMNS]
+        # reindex, not [...]: the exporter omits an all-empty reporting column
+        # (coordination_disagreement_share is not tracked in LEVEL), which the
+        # DuckDB path reads as NULL; NaN here gives the identical record.
+        # Post-run loader fix, disclosed in PREREG_LEVEL's post-run note.
+        return pd.read_csv(csv, float_precision="round_trip").reindex(columns=KEYS + COLUMNS)
     return None
 
 
