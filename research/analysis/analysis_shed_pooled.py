@@ -37,6 +37,10 @@ TREATMENT = "jcac_converged"
 
 
 def recover(df: pd.DataFrame) -> pd.DataFrame:
+    # The inversion needs a served request and an unshed one in every run;
+    # fail loudly rather than let a zero turn a pooled ratio into NaN.
+    if not ((df.cost_per_served_request > 0).all() and (df.shed_request_share < 1).all()):
+        raise ValueError("a run served nothing or shed everything: counts cannot be recovered")
     served = df.total_cost_usd / df.cost_per_served_request
     offered = served / (1.0 - df.shed_request_share)
     return df.assign(served=served, offered=offered, shed=offered * df.shed_request_share)
