@@ -54,7 +54,12 @@ def main() -> None:
     # change.
     for c in ("budget_overrun_step_share", "clamp_violation_step_share",
               "plan_fallback_share", "plan_repaired_share", "capped_cycle_share",
-              "mean_quality_loss", "coordination_disagreement_share"):
+              "mean_quality_loss", "coordination_disagreement_share",
+              # Request accounting (shed audit, 2026-11-09): PREREG_LEVEL's
+              # objective prices refused requests from these, so its exports
+              # must carry them; the same non-empty rule keeps every older
+              # export byte-identical.
+              "ai_shed_request_share", "shed_request_share", "cost_per_served_request"):
         if c in have and con.execute(f"SELECT count({c}) FROM metrics").fetchone()[0]:
             extra.append(c)
     extra_sql = "".join(f", m.{c}" for c in extra)

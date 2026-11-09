@@ -151,3 +151,23 @@ and AI-only cuts on LV and LG.
 - Every verdict is reported as scored, PASS or FAIL, in the direction it lands.
 - No campaign is re-run, widened or re-scored under another rule. A defect
   found after the run is answered by a new registration beside this record.
+
+## Post-run note (2026-11-10, after the runs, before the record was committed)
+
+Appended after the registered text, which is unchanged.
+
+- **Timing.** Protocol and scorer committed as 039a153 (2026-11-09 16:50:00 UTC)
+  and pushed to the public branch `level-campaign` at 16:50:45 UTC (GitHub
+  Actions run 42658844968 created 16:50:48 UTC). The runner started at
+  16:51:00 UTC; the first run completed at 16:51:06 UTC. All five experiments
+  completed (8,832 of 8,832 runs valid; every harness audit `ok`).
+- **Two loader/exporter fixes, no number changed.** (1) `eval/scripts/export_metrics_csv.py`
+  did not export the three request-accounting columns the frozen objective
+  J_L needs; it now exports them under its existing rule (only a column that
+  holds data), so every older export stays byte-identical. (2) The frozen
+  scorer's CSV loader selected an all-empty reporting column
+  (`coordination_disagreement_share`, not tracked in LEVEL) that the exporter
+  omits; it now reindexes, giving NaN exactly as the DuckDB path does. The
+  record built from the DuckDBs and the record rebuilt from the committed
+  CSV exports alone are byte-identical (sha256 4cdb9c23...0253). No test,
+  threshold, objective, arm or computed number changed.
