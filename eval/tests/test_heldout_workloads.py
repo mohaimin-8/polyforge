@@ -44,8 +44,12 @@ def test_mmpp_bursts_are_not_periodic():
 
 
 def test_held_out_classes_are_unseen_by_every_other_experiment():
+    # PREREG_LEVEL's held-out campaign re-runs these workloads as a scored,
+    # never-tuned substrate (its comparators are tuned on tune.py's slice,
+    # checked below); every other experiment must not touch them.
+    scored_on_held_out = {"matrix_heldout.yaml", "matrix_level_heldout.yaml"}
     for path in (EVAL_DIR / "experiments").glob("*.yaml"):
-        if path.name == "matrix_heldout.yaml":
+        if path.name in scored_on_held_out:
             continue
         spec = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         assert not set(spec.get("workloads") or []) & set(HELD_OUT), path.name

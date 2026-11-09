@@ -75,9 +75,33 @@ QUALITY_ARMS: dict[str, list[dict]] = {
 }
 
 
+# Level-playing-field campaign (PREREG_LEVEL, 2026-11-09). Its comparators are
+# tuned per size AS RUN under the campaign's objective: J plus an outage price,
+# every refused AI request charged the small tier's price (the treatment pays
+# the same in its own objective). Published plant, tune.py's slice and seeds.
+LEVEL_ARMS: dict[str, tuple[str, list]] = {
+    "layered_small_level_capped": ("target_rho", RHO_WIDE),
+    "layered_small_level_gated": ("target_rho", RHO_WIDE),
+    "hpa_level_capped": ("target_rho", RHO_WIDE),
+    "keda_level_capped": ("rps_per_replica", RPS_WIDE),
+}
+LEVEL_SHED_TIER = "small"
+
+
+def shed_requests(total_cost_usd: float, shed_share: float, cost_per_served: float) -> float:
+    """Requests refused in a run, recovered exactly from the stored metrics:
+    served = cost / cost-per-served, shed = served x s / (1 - s), with s the
+    share of all offered requests that were shed (SHED_POOLED's identity)."""
+    if shed_share <= 0.0 or cost_per_served <= 0.0:
+        return 0.0
+    served = total_cost_usd / cost_per_served
+    return served * shed_share / (1.0 - shed_share)
+
+
 def score_controller(controller: str, params: dict, cluster: str, *,
                      miss_cost_factor: float = 1.0, initial_cache_mb: int | None = None,
-                     quality_weight: float = 0.0, economy: dict | None = None) -> dict:
+                     quality_weight: float = 0.0, economy: dict | None = None,
+                     level: bool = False) -> dict:
     """One setting on the tuning slice: J and its three terms. With
     `quality_weight`, J also prices the answer-quality loss (a fourth term,
     reported only then); `economy` sets the tier prices for these runs and is
@@ -87,14 +111,14 @@ def score_controller(controller: str, params: dict, cluster: str, *,
     tune.simulate.model.set_economy(tier_cost_usd_per_req=economy)
     try:
         return _score_slice(controller, params, cluster, miss_cost_factor, initial_cache_mb,
-                            quality_weight)
+                            quality_weight, level)
     finally:
         tune.simulate.model.set_economy()
 
 
 def _score_slice(controller: str, params: dict, cluster: str, miss_cost_factor: float,
-                 initial_cache_mb: int | None, quality_weight: float) -> dict:
-    terms = {"cost_norm": 0.0, "violation": 0.0, "unfair": 0.0, "quality": 0.0}
+                 initial_cache_mb: int | None, quality_weight: float, level: bool = False) -> dict:
+    terms = {"cost_norm": 0.0, "violation": 0.0, "unfair": 0.0, "quality": 0.0, "shed_norm": 0.0}
     n = len(tune.TUNING_CELLS) * tune.TUNING_REPS
     for wl, mix in tune.TUNING_CELLS:
         for rep in range(tune.TUNING_REPS):
@@ -113,7 +137,17 @@ def _score_slice(controller: str, params: dict, cluster: str, miss_cost_factor: 
             terms["violation"] += result.mean_violation / n
             terms["unfair"] += (1.0 - result.mean_jain) / n
             terms["quality"] += result.mean_quality_loss / n
+            if level:
+                shed = shed_requests(result.total_cost_usd, result.shed_request_share,
+                                     result.cost_per_served_request)
+                price = tune.simulate.model.TIER_COST_USD_PER_REQ[LEVEL_SHED_TIER]
+                terms["shed_norm"] += (shed * price / max(1, result.steps * tenants)
+                                       / tune.COST_SCALE_USD) / n
     j = tune.ALPHA * terms["cost_norm"] + tune.BETA * terms["violation"] + tune.GAMMA * terms["unfair"]
+    if level:
+        j += tune.ALPHA * terms["shed_norm"]
+    else:
+        terms.pop("shed_norm")
     if quality_weight:
         j += quality_weight * terms["quality"]
     else:
@@ -121,7 +155,8 @@ def _score_slice(controller: str, params: dict, cluster: str, miss_cost_factor: 
     return {"mean_objective": round(j, 5), **{k: round(v, 5) for k, v in terms.items()}}
 
 
-def score_arm(arm: str, overrides: dict, cluster: str, quality: bool = False) -> dict:
+def score_arm(arm: str, overrides: dict, cluster: str, quality: bool = False,
+              level: bool = False) -> dict:
     """The arm as sim_backend.execute runs it, with `overrides` on its params.
     Refuses arms whose execution adds anything this replay omits."""
     spec = SYSTEMS[arm]
@@ -148,7 +183,8 @@ def score_arm(arm: str, overrides: dict, cluster: str, quality: bool = False) ->
         miss_cost_factor=lru_miss_cost_factor() if spec.lru_eviction else 1.0,
         initial_cache_mb=spec.static_cache_mb,
         quality_weight=QUALITY_WEIGHT if quality else 0.0,
-        economy=GPU_ECONOMY if quality else None)
+        economy=GPU_ECONOMY if quality else None,
+        level=level)
 
 
 def write(path: Path, rows: list[dict]) -> None:
@@ -167,6 +203,35 @@ def _score_one(job: tuple) -> dict:
 def _score_quality(job: tuple) -> dict:
     arm, params, size = job
     return {**params, **score_arm(arm, dict(params), size, quality=True)}
+
+
+def _score_level(job: tuple) -> dict:
+    arm, knob, value, size = job
+    return {knob: value, **score_arm(arm, {knob: value}, size, level=True)}
+
+
+def tune_level(workers: int, arms: list[str] | None = None) -> dict[str, dict[str, dict]]:
+    """Per arm and size, the best-of-grid value under the LEVEL objective
+    (PREREG_LEVEL). Refuses an optimum on a grid edge, like the others."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    tuned: dict[str, dict[str, dict]] = {}
+    for arm, (knob, values) in LEVEL_ARMS.items():
+        if arms and arm not in arms:
+            continue
+        tuned[arm] = {}
+        for size in SIZES:
+            jobs = [(arm, knob, value, size) for value in values]
+            with ProcessPoolExecutor(max_workers=max(1, workers)) as ex:
+                rows = list(ex.map(_score_level, jobs))
+            for row in rows:
+                print(f"  {arm}@{size} {row}", flush=True)
+            write(OUT / "grids_arms" / f"{arm}_{size}.csv", rows)
+            best = min(rows, key=lambda r: r["mean_objective"])
+            if best[knob] in (values[0], values[-1]):
+                raise SystemExit(f"{arm}@{size}: optimum {knob}={best[knob]} is a grid edge; widen the grid")
+            tuned[arm][size] = {knob: best[knob]}
+    return tuned
 
 
 def tune_quality(workers: int, arms: list[str] | None = None) -> dict[str, dict[str, dict]]:
@@ -210,7 +275,17 @@ def main(argv: list[str] | None = None) -> None:
                          "and MERGE them into tuned_arms.yaml")
     ap.add_argument("--quality-arms", nargs="+", choices=list(QUALITY_ARMS),
                     help="with --quality: only these arms")
+    ap.add_argument("--level", action="store_true",
+                    help="tune the PREREG_LEVEL comparators (J plus the outage price) "
+                         "and MERGE them into tuned_arms.yaml")
+    ap.add_argument("--level-arms", nargs="+", choices=list(LEVEL_ARMS),
+                    help="with --level: only these arms")
     args = ap.parse_args(argv)
+    if args.level:
+        tuned = yaml.safe_load((OUT / "tuned_arms.yaml").read_text(encoding="utf-8")) or {}
+        tuned.update(tune_level(args.workers, args.level_arms))
+        _write_tuned(tuned)
+        return
     if args.quality:
         tuned = yaml.safe_load((OUT / "tuned_arms.yaml").read_text(encoding="utf-8")) or {}
         tuned.update(tune_quality(args.workers, args.quality_arms))

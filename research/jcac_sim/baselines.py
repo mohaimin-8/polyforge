@@ -1090,9 +1090,71 @@ class BudgetFiltered:
         return out
 
 
+class BudgetGated:
+    """Wrap a baseline with a gateway budget gate (PREREG_LEVEL, final audit
+    2026-11-09).
+
+    BudgetFiltered can only trim replicas, so a comparator whose bill is
+    model spend stays over budget (the BM campaign: 3.0% of tenant-steps
+    against the joint controller's 0.9%), and only the joint controller
+    could refuse AI calls. This gate gives a per-layer stack the joint
+    controller's lever, the way a gateway budget does: when the step the
+    inner baseline wants would bill more than the tenant's per-step budget
+    (the controller's own cap, on the observed demand), the gateway makes
+    no model call that step -- tier "none", cache hits still answered --
+    and the replica layer keeps its choice. Only if replicas and cache alone
+    still exceed the budget are replicas trimmed, as BudgetFiltered does.
+
+    Reachable only through the `*_gated` registry names; every published
+    arm runs the code it was measured with (R4).
+    """
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.configs = inner.configs
+        self.name = f"{inner.name}_gated"
+
+    def set_limits(self, limits) -> None:
+        if hasattr(self.inner, "set_limits"):
+            self.inner.set_limits(limits)
+
+    def observe_feedback(self, realized_violation: dict[str, float]) -> None:
+        observe = getattr(self.inner, "observe_feedback", None)
+        if observe is not None:
+            observe(realized_violation)
+
+    def plan(self, states: dict[str, TenantState], demands: dict[str, Demand]):
+        proposed = self.inner.plan(states, demands)
+        out = {}
+        for tid, want in proposed.items():
+            config = self.configs[tid]
+            demand = demands.get(tid, Demand())
+            cap = config.hourly_budget_usd * model.CONTROL_INTERVAL_S / 3600.0
+
+            def billed(candidate):
+                return model.evaluate_step(config, candidate, demand).cost_usd
+
+            if billed(want) <= cap:
+                out[tid] = want
+                continue
+            gated = replace(want, tier="none")
+            if billed(gated) <= cap:
+                out[tid] = gated
+                continue
+            state = states[tid]
+            reach = [apply_action(config, state, delta, gated.cache_mb, "none")
+                     for delta in (-2, -1, 0, 1, 2)]
+            affordable = [c for c in reach if billed(c) <= cap]
+            out[tid] = (min(affordable, key=lambda c: abs(c.replicas - gated.replicas))
+                        if affordable else min(reach, key=billed))
+        return out
+
+
 def make_baseline(name: str, configs: dict[str, TenantConfig], **params):
     """Instantiate a baseline by name. `params` are the controller's tuning
     knobs (W34 grid search sweeps them); unknown names fail loudly."""
+    if name.endswith("_gated"):
+        return BudgetGated(make_baseline(name[: -len("_gated")], configs, **params))
     if name.endswith("_budget"):
         return BudgetFiltered(make_baseline(name[: -len("_budget")], configs, **params))
     if name.endswith("_capped"):

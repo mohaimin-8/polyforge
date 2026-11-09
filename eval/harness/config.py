@@ -43,6 +43,8 @@ MODEL_FORM_KEYS = {
     # (every AI kind cacheable; the ceiling is economy.cache_hit_max).
     "replica_capacity_wu", "wu_ai_scale", "crud_base_scale", "cacheable_uniform",
     "tier_latency_small", "tier_latency_mid", "tier_latency_large",  # flat ms, all three together
+    # PREREG_LEVEL robustness plant: the agent row only, all three together.
+    "agent_latency_small", "agent_latency_mid", "agent_latency_large",
 }
 
 
@@ -178,6 +180,11 @@ def load(path: str | Path) -> ExperimentSpec:
         tiers = {k for k in spec.model_form if k.startswith("tier_latency_")}
         if tiers and tiers != {"tier_latency_small", "tier_latency_mid", "tier_latency_large"}:
             raise ValueError("tier_latency_small, tier_latency_mid and tier_latency_large must be set together")
+        agent = {k for k in spec.model_form if k.startswith("agent_latency_")}
+        if agent and agent != {"agent_latency_small", "agent_latency_mid", "agent_latency_large"}:
+            raise ValueError("agent_latency_small, agent_latency_mid and agent_latency_large must be set together")
+        if agent and tiers:
+            raise ValueError("agent_latency_* and tier_latency_* are exclusive")
     return spec
 
 
