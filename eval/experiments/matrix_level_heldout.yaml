@@ -1,0 +1,29 @@
+# PREREG_LEVEL.md (2026-11-09) -- the level-playing-field campaign: every
+# leak the final audit found, removed on both sides. Frozen and pushed before
+# any run; arms, tuning and scorer in PREREG_LEVEL.md.
+#
+#   jcac_level                 treatment (outage-priced objective, graceful
+#                              degradation, half-replica hysteresis, Holt)
+#   jcac_level_decoupled       RQ2 ablation: the treatment, knobs searched apart
+#   jcac_converged             the published controller (reference)
+#   layered_small_level_gated  cheapest-tier stack, capped, budget gate (sheds
+#                              AI when over budget), re-tuned under LEVEL
+#   layered_small_level_capped cheapest-tier stack, capped, re-tuned under LEVEL
+#   hpa_level_capped           capped HPA, re-tuned under LEVEL
+#   keda_level_capped          capped KEDA, re-tuned under LEVEL
+#   static_share               equal cluster share, cheapest tier, never adapts
+# The two held-out Markov-modulated workloads (as HELDOUT), published plant.
+name: matrix_level_heldout
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_level, jcac_level_decoupled, jcac_converged,
+          layered_small_level_gated, layered_small_level_capped, hpa_level_capped,
+          keda_level_capped, static_share]
+workloads: [mmpp_crud, mmpp_mixed]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_level_heldout.duckdb
+retries: 2
+timeseries_reps: 0
