@@ -33,8 +33,9 @@ paper was also prepared for ECCE 2027; it must not be under review at ECCE
 
 ## CMT fields (paste as plain text)
 
-**Title** (must match the PDF): Joint versus Per-Layer Autoscaling, Caching,
-and Model Routing in a Simulated LLM Gateway: A Pre-Registered Study
+**Title** (must match the PDF): The Value of Joint Search in LLM Gateway
+Control: A Pre-Registered Simulation Study of Autoscaling, Caching, and Model
+Routing
 
 **Subject area / track:** Track 1, Artificial Intelligence and Data Analytics
 (topic "Distributed and Cloud Computing").
