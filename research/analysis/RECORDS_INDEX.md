@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 99 |
-| regenerated and compared | 83 |
+| records | 101 |
+| regenerated and compared | 85 |
 | outside the gate, reason stated | 16 |
 | outside the gate, no entry | 0 |
 
@@ -38,7 +38,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `FORECAST_MR.md` | - | no, reason stated |
 | `FORECAST_TRACE.md` | - | no, reason stated |
 | `FORECAST_TRACE_REAL.md` | - | no, reason stated |
-| `HYPOTHESIS_LEDGER.md` | AC-H1, AC-H2, AC-H3, AC-H4, BP-H1a, BP-H1b, BP-H2a, BP-H2b, CQ-H1, CQ-H2, CS-H1, CS-H2, EP-H1a, EP-H1b, EP-H3, EP-H4, FJ-H1, FJ-H2, FJ-H3, LF-H1, LF-H2, LR-H1, LR-H2, MM-H1, MM-H2, RB-H1, RB-H3, RQ-H2, RT-H1, RT-H2, RT-H3, SK-H1, SM-H1, SM-H2, TA-H1, TA-H2, TA-H3, TA-H4, TP-H1a, TP-H1b, TP-H3a, TP-H3b, TS-H1a, TS-H1b, WD-H1, WD-H2, WD-H5 | yes |
+| `HYPOTHESIS_LEDGER.md` | AC-H1, AC-H2, AC-H3, AC-H4, BM-H1, BM-H2, BM-H3, BP-H1a, BP-H1b, BP-H2a, BP-H2b, CQ-H1, CQ-H2, CS-H1, CS-H2, EP-H1a, EP-H1b, EP-H3, EP-H4, FJ-H1, FJ-H2, FJ-H3, LF-H1, LF-H2, LR-H1, LR-H2, MM-H1, MM-H2, RB-H1, RB-H3, RQ-H2, RT-H1, RT-H2, RT-H3, SK-H1, SM-H1, SM-H2, TA-H1, TA-H2, TA-H3, TA-H4, TP-H1a, TP-H1b, TP-H3a, TP-H3b, TS-H1a, TS-H1b, WD-H1, WD-H2, WD-H5 | yes |
 | `OBJECTIVE_FORM.md` | - | yes |
 | `PHASE7_ORDINAL.md` | - | yes |
 | `PLANNER_CELLS.md` | PS-H1, PS-H2, PS-H3 | no, reason stated |
@@ -88,6 +88,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_SEPARATION_MT.md` | - | yes |
 | `RESULTS_SEPARATION_MT_V2.md` | - | yes |
 | `RESULTS_SEPARATION_MT_V3.md` | - | yes |
+| `RESULTS_SHED_ACCOUNTING.md` | - | yes |
 | `RESULTS_SKH1_DISCRIMINABILITY.md` | SK-H1 | yes |
 | `RESULTS_STRUCTREAL.md` | - | no, reason stated |
 | `RESULTS_STRUCTURAL_MISMATCH.md` | SM-H1, SM-H2 | yes |
@@ -113,6 +114,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `SENSITIVITY_FAIR.md` | FJ-H1, FJ-H2, FJ-H3, RT-H1, RT-H2, RT-H3 | yes |
 | `SENSITIVITY_J.md` | - | yes |
 | `SENSITIVITY_WAVE4_CALIBRATED.md` | WL-H1, WL-H4, WL-H5 | yes |
+| `SHED_POOLED.md` | - | yes |
 | `TUNING_EXTENDED.md` | - | yes |
 | `VTC_FAIRNESS.md` | - | yes |
 | `RESULTS_WIRE_ATTACK.md` | WA-H1, WA-H2, WA-H3 | no, reason stated |
