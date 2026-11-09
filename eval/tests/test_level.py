@@ -168,3 +168,13 @@ def test_shed_count_identity():
     s = shed / offered
     assert tune_arms.shed_requests(cost, s, cost / served) == pytest.approx(shed)
     assert tune_arms.shed_requests(cost, 0.0, cost / offered) == 0.0
+
+
+def test_the_lag_follow_up_arm_changes_only_the_switching_penalty():
+    ratchet = dict(SYSTEMS["jcac_level_ratchet"].params)
+    level = dict(SYSTEMS["jcac_level"].params)
+    assert level.pop("switch_penalty") == controller.SWITCH_PENALTY_HALF_REPLICA
+    assert "switch_penalty" not in ratchet and ratchet == level
+    for name in ("matrix_level_lag2", "matrix_level_inst2"):
+        spec = config.load(EVAL_DIR / "experiments" / f"{name}.yaml")
+        assert spec.shared_seeds and all(s in SYSTEMS for s in spec.systems)
