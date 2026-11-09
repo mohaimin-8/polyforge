@@ -69,8 +69,8 @@ def main() -> int:
     lines += ["", "## Programme", "",
               f"- Campaigns with a registered protocol: {len(rows)}; judged (run timestamps available): "
               f"{len(judged)}.",
-              f"- Runs before their protocol: {sum(1 for r in judged if r['gap_s'] < 0)}, every one disclosed "
-              "in its protocol:"]
+              f"- Runs before their protocol: {sum(1 for r in judged if r['gap_s'] < 0)}, each disclosed by "
+              "the timing gate (`DISCLOSED` in `check_prereg_timing.py`) and in the paper:"]
     for r in disclosed:
         lines.append(f"  - `{r['name']}` (`{r['prereg']}`): {fmt_gap(r['gap_s'])} — {cpt.DISCLOSED.get(r['name'], '')}")
     lines.append("")
