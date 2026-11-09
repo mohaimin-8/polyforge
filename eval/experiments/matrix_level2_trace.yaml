@@ -1,0 +1,35 @@
+# PREREG_LEVEL2.md (2026-11-10) -- the best joint controller found
+# (jcac_level_ratchet, LEVEL_LAG) re-tested on fresh seeds against every LEVEL
+# comparator on every substrate, plus the measured GPU price ladder. Frozen and
+# pushed before any run. Arms and tuning are LEVEL's (GPU arms: tune_arms.py
+# --level-gpu, frozen with the protocol).
+# TA's 96 real BurstGPT windows.
+name: matrix_level2_trace
+backend: sim
+steps: 2159
+reps: 1
+shared_seeds: true
+systems: [jcac_level_ratchet, jcac_level_ratchet_decoupled, layered_small_level_gated,
+          layered_small_level_capped, hpa_level_capped, keda_level_capped,
+          static_share]
+workloads: [burstgpt96_w00, burstgpt96_w01, burstgpt96_w02, burstgpt96_w03, burstgpt96_w04, burstgpt96_w05,
+            burstgpt96_w06, burstgpt96_w07, burstgpt96_w08, burstgpt96_w09, burstgpt96_w10, burstgpt96_w11,
+            burstgpt96_w12, burstgpt96_w13, burstgpt96_w14, burstgpt96_w15, burstgpt96_w16, burstgpt96_w17,
+            burstgpt96_w18, burstgpt96_w19, burstgpt96_w20, burstgpt96_w21, burstgpt96_w22, burstgpt96_w23,
+            burstgpt96_w24, burstgpt96_w25, burstgpt96_w26, burstgpt96_w27, burstgpt96_w28, burstgpt96_w29,
+            burstgpt96_w30, burstgpt96_w31, burstgpt96_w32, burstgpt96_w33, burstgpt96_w34, burstgpt96_w35,
+            burstgpt96_w36, burstgpt96_w37, burstgpt96_w38, burstgpt96_w39, burstgpt96_w40, burstgpt96_w41,
+            burstgpt96_w42, burstgpt96_w43, burstgpt96_w44, burstgpt96_w45, burstgpt96_w46, burstgpt96_w47,
+            burstgpt96_w48, burstgpt96_w49, burstgpt96_w50, burstgpt96_w51, burstgpt96_w52, burstgpt96_w53,
+            burstgpt96_w54, burstgpt96_w55, burstgpt96_w56, burstgpt96_w57, burstgpt96_w58, burstgpt96_w59,
+            burstgpt96_w60, burstgpt96_w61, burstgpt96_w62, burstgpt96_w63, burstgpt96_w64, burstgpt96_w65,
+            burstgpt96_w66, burstgpt96_w67, burstgpt96_w68, burstgpt96_w69, burstgpt96_w70, burstgpt96_w71,
+            burstgpt96_w72, burstgpt96_w73, burstgpt96_w74, burstgpt96_w75, burstgpt96_w76, burstgpt96_w77,
+            burstgpt96_w78, burstgpt96_w79, burstgpt96_w80, burstgpt96_w81, burstgpt96_w82, burstgpt96_w83,
+            burstgpt96_w84, burstgpt96_w85, burstgpt96_w86, burstgpt96_w87, burstgpt96_w88, burstgpt96_w89,
+            burstgpt96_w90, burstgpt96_w91, burstgpt96_w92, burstgpt96_w93, burstgpt96_w94, burstgpt96_w95]
+tenant_mixes: [uniform]
+cluster_sizes: [medium]
+output: eval/results/raw_sim_level2_trace.duckdb
+retries: 2
+timeseries_reps: 0

@@ -86,6 +86,14 @@ LEVEL_ARMS: dict[str, tuple[str, list]] = {
     "keda_level_capped": ("rps_per_replica", RPS_WIDE),
 }
 LEVEL_SHED_TIER = "small"
+# PREREG_LEVEL_GPU (2026-11-10): the same objective at the measured GPU price
+# ladder (GPU_ECONOMY), comparators re-tuned there.
+LEVEL_GPU_ARMS: dict[str, tuple[str, list]] = {
+    "layered_costaware_gpu_gated": ("target_rho", RHO_WIDE),
+    "layered_costaware_gpu_capped": ("target_rho", RHO_WIDE),
+    "layered_small_gpu_gated": ("target_rho", RHO_WIDE),
+    "hpa_gpu_capped": ("target_rho", RHO_WIDE),
+}
 
 
 def shed_requests(total_cost_usd: float, shed_share: float, cost_per_served: float) -> float:
@@ -156,7 +164,7 @@ def _score_slice(controller: str, params: dict, cluster: str, miss_cost_factor: 
 
 
 def score_arm(arm: str, overrides: dict, cluster: str, quality: bool = False,
-              level: bool = False) -> dict:
+              level: bool = False, gpu: bool = False) -> dict:
     """The arm as sim_backend.execute runs it, with `overrides` on its params.
     Refuses arms whose execution adds anything this replay omits."""
     spec = SYSTEMS[arm]
@@ -183,7 +191,7 @@ def score_arm(arm: str, overrides: dict, cluster: str, quality: bool = False,
         miss_cost_factor=lru_miss_cost_factor() if spec.lru_eviction else 1.0,
         initial_cache_mb=spec.static_cache_mb,
         quality_weight=QUALITY_WEIGHT if quality else 0.0,
-        economy=GPU_ECONOMY if quality else None,
+        economy=GPU_ECONOMY if (quality or gpu) else None,
         level=level)
 
 
@@ -210,20 +218,26 @@ def _score_level(job: tuple) -> dict:
     return {knob: value, **score_arm(arm, {knob: value}, size, level=True)}
 
 
-def tune_level(workers: int, arms: list[str] | None = None) -> dict[str, dict[str, dict]]:
+def _score_level_gpu(job: tuple) -> dict:
+    arm, knob, value, size = job
+    return {knob: value, **score_arm(arm, {knob: value}, size, level=True, gpu=True)}
+
+
+def tune_level(workers: int, arms: list[str] | None = None, gpu: bool = False) -> dict[str, dict[str, dict]]:
     """Per arm and size, the best-of-grid value under the LEVEL objective
-    (PREREG_LEVEL). Refuses an optimum on a grid edge, like the others."""
+    (PREREG_LEVEL; with `gpu`, PREREG_LEVEL_GPU's economy). Refuses an
+    optimum on a grid edge, like the others."""
     from concurrent.futures import ProcessPoolExecutor
 
     tuned: dict[str, dict[str, dict]] = {}
-    for arm, (knob, values) in LEVEL_ARMS.items():
+    for arm, (knob, values) in (LEVEL_GPU_ARMS if gpu else LEVEL_ARMS).items():
         if arms and arm not in arms:
             continue
         tuned[arm] = {}
         for size in SIZES:
             jobs = [(arm, knob, value, size) for value in values]
             with ProcessPoolExecutor(max_workers=max(1, workers)) as ex:
-                rows = list(ex.map(_score_level, jobs))
+                rows = list(ex.map(_score_level_gpu if gpu else _score_level, jobs))
             for row in rows:
                 print(f"  {arm}@{size} {row}", flush=True)
             write(OUT / "grids_arms" / f"{arm}_{size}.csv", rows)
@@ -280,7 +294,15 @@ def main(argv: list[str] | None = None) -> None:
                          "and MERGE them into tuned_arms.yaml")
     ap.add_argument("--level-arms", nargs="+", choices=list(LEVEL_ARMS),
                     help="with --level: only these arms")
+    ap.add_argument("--level-gpu", action="store_true",
+                    help="tune the PREREG_LEVEL_GPU comparators (J_L at the GPU price "
+                         "ladder) and MERGE them into tuned_arms.yaml")
     args = ap.parse_args(argv)
+    if args.level_gpu:
+        tuned = yaml.safe_load((OUT / "tuned_arms.yaml").read_text(encoding="utf-8")) or {}
+        tuned.update(tune_level(args.workers, gpu=True))
+        _write_tuned(tuned)
+        return
     if args.level:
         tuned = yaml.safe_load((OUT / "tuned_arms.yaml").read_text(encoding="utf-8")) or {}
         tuned.update(tune_level(args.workers, args.level_arms))

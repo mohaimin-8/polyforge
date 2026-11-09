@@ -400,6 +400,32 @@ SYSTEMS: dict[str, SystemSpec] = {
                         "knob_search": "decoupled"},
         description="jcac_level searching each knob on its own (the RQ2 ablation)",
     ),
+    # PREREG_LEVEL_GPU (2026-11-10): LEVEL under the measured GPU price ladder
+    # (1 : 1.475 : 1.518), the one construct assumption LEVEL did not vary.
+    # With nearly flat prices a stack pinned to the cheapest tier is a straw
+    # man, so the main comparators carry the cost-aware tier rule (the cheapest
+    # tier whose projected AI p95 meets the target); all capped, the gated ones
+    # with LEVEL's gateway budget gate, every one re-tuned per size under J_L
+    # at that economy (tune_arms.py --level-gpu).
+    "layered_costaware_gpu_gated": SystemSpec(
+        "layered_costaware_gated_capped", tuned_from="hpa", tuned_arm="layered_costaware_gpu_gated",
+        description="cost-aware layered stack inside the caps with the gateway budget "
+                    "gate, re-tuned under J_L at the GPU price ladder",
+    ),
+    "layered_costaware_gpu_capped": SystemSpec(
+        "layered_costaware_capped", tuned_from="hpa", tuned_arm="layered_costaware_gpu_capped",
+        description="cost-aware layered stack inside the caps, re-tuned under J_L at "
+                    "the GPU price ladder",
+    ),
+    "layered_small_gpu_gated": SystemSpec(
+        "layered_small_gated_capped", tuned_from="hpa", tuned_arm="layered_small_gpu_gated",
+        description="LEVEL's gated cheapest-tier stack re-tuned under J_L at the GPU "
+                    "price ladder",
+    ),
+    "hpa_gpu_capped": SystemSpec(
+        "hpa_capped", static_cache_mb=512, tuned_from="hpa", tuned_arm="hpa_gpu_capped",
+        description="capped HPA re-tuned under J_L at the GPU price ladder",
+    ),
     # PREREG_LEVEL_LAG (2026-11-10): one changed factor. LEVEL's treatment lost
     # under one-interval lag (LV-L1/L2) while the published controller barely
     # moved; the diagnosis is the corrected half-replica hysteresis. This arm is
@@ -410,6 +436,12 @@ SYSTEMS: dict[str, SystemSpec] = {
                         "forecast_method": "holt"},
         description="jcac_level with the published switching penalty (0.05 per "
                     "changed knob) instead of the half-replica one",
+    ),
+    "jcac_level_ratchet_decoupled": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True,
+                        "shed_price_tier": "small", "degrade_gracefully": True,
+                        "forecast_method": "holt", "knob_search": "decoupled"},
+        description="jcac_level_ratchet searching each knob on its own (RQ2 ablation, PREREG_LEVEL2)",
     ),
     "layered_small_level_capped": SystemSpec(
         "layered_small_capped", tuned_from="hpa", tuned_arm="layered_small_level_capped",

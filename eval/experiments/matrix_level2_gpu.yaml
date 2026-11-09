@@ -1,0 +1,24 @@
+# PREREG_LEVEL2.md (2026-11-10) -- the best joint controller found
+# (jcac_level_ratchet, LEVEL_LAG) re-tested on fresh seeds against every LEVEL
+# comparator on every substrate, plus the measured GPU price ladder. Frozen and
+# pushed before any run. Arms and tuning are LEVEL's (GPU arms: tune_arms.py
+# --level-gpu, frozen with the protocol).
+# Main matrix under the measured GPU price ladder; GPU-tuned comparators.
+name: matrix_level2_gpu
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+economy:
+  tier_cost_small: 1.0e-4
+  tier_cost_mid: 1.475e-4
+  tier_cost_large: 1.518e-4
+systems: [jcac_level_ratchet, jcac_level_ratchet_decoupled, layered_costaware_gpu_gated,
+          layered_costaware_gpu_capped, layered_small_gpu_gated, hpa_gpu_capped,
+          static_share]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_level2_gpu.duckdb
+retries: 2
+timeseries_reps: 0
