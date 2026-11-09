@@ -319,6 +319,42 @@ def ledger_counts() -> dict[str, tuple[int, int]]:
     return {rec: (len(p), len(t)) for rec, (t, p) in out.items()}
 
 
+# Registered follow-ups to reviews: (name, tag, exports metrics_<e>.csv.gz,
+# question, record). BM's exports hold only its three new arms; its tests pair
+# them with the registered JOINTNESS and TRACE_AUDITED rows.
+FOLLOWUPS = [
+    ("REVIEWER", "RV", ["reviewer_wide", "reviewer_live"], "Wide steps, live plant",
+     "RESULTS_REVIEWER_FOLLOWUP.md"),
+    ("TRACE\\_AUD.", "TA", ["trace_audited"], "Real BurstGPT demand", "RESULTS_TRACE_AUDITED.md"),
+    ("CACHE\\_SENS.", "CS", ["cache_measured", "cache_published", "cache_high"], "Three cache-hit curves",
+     "RESULTS_CACHE_SENSITIVITY.md"),
+    ("BUDGET\\_MAT.", "BM", ["budget_jointness", "budget_trace"], "Comparators on the budget",
+     "RESULTS_BUDGET_MATCHED.md"),
+]
+
+
+def _joined(counts: list[int], sep: str) -> str:
+    if len(set(counts)) == 1:
+        return f"{len(counts)}$\\times${counts[0]}" if len(counts) > 1 and sep == "x" else str(counts[0])
+    return "+".join(str(c) for c in counts)
+
+
+def followup_rows(ledger: dict) -> tuple[list[str], list[dict]]:
+    lines, data = [], []
+    for name, tag, exps, question, record in FOLLOWUPS:
+        frames = [pd.read_csv(RESULTS / f"metrics_{e}.csv.gz",
+                              usecols=["system", "workload", "tenant_mix", "cluster_size", "rep"]) for e in exps]
+        runs = sum(len(f) for f in frames)
+        arms = [f.system.nunique() for f in frames]
+        points = [f.groupby(["workload", "tenant_mix", "cluster_size"]).ngroups for f in frames]
+        passed, total = ledger[record]
+        data.append({"campaign": name, "tag": tag, "runs": runs, "arms": arms, "points": points,
+                     "pass": passed, "tests": total})
+        lines.append(f"{name} & {tag} & {question} & {_joined(arms, '+')} & {_joined(points, 'x')} & "
+                     f"{runs:,} & {passed}/{total} \\\\")
+    return lines, data
+
+
 def table_campaigns() -> tuple[str, dict]:
     ledger = ledger_counts()
     lines, data = [], []
@@ -343,11 +379,56 @@ def table_campaigns() -> tuple[str, dict]:
         lines.append(f"{name} & {tag} & {question} & {data[-1]['arms']} & {npoints} & {runs:,} & "
                      f"{passed}/{total} \\\\")
     body = "\n".join(lines)
+    f_lines, f_data = followup_rows(ledger)
+    f_runs = sum(r["runs"] for r in f_data)
+    f_pass = sum(r["pass"] for r in f_data)
+    f_tests = sum(r["tests"] for r in f_data)
+    all_runs, all_pass, all_tests = tot_runs + f_runs, tot_pass + f_pass, tot_tests + f_tests
     tex = ("\\begin{tabular}{@{}l l l r r r r@{}}\n\\toprule\n"
            "Campaign & Tag & Question & Arms & Points & Runs & PASS \\\\\n\\midrule\n"
-           f"{body}\n\\midrule\nTotal & & & & & {tot_runs:,} & {tot_pass}/{tot_tests} \\\\\n"
+           f"{body}\n\\midrule\nSubtotal & & & & & {tot_runs:,} & {tot_pass}/{tot_tests} \\\\\n"
+           "\\midrule\n" + "\n".join(f_lines) + "\n\\midrule\n"
+           f"Total & & & & & {all_runs:,} & {all_pass}/{all_tests} \\\\\n"
            "\\bottomrule\n\\end{tabular}\n")
-    return tex, {"rows": data, "runs": tot_runs, "pass": tot_pass, "tests": tot_tests}
+    return tex, {"rows": data, "runs": tot_runs, "pass": tot_pass, "tests": tot_tests,
+                 "followups": f_data, "all_runs": all_runs, "all_pass": all_pass, "all_tests": all_tests}
+
+
+TIER_MODELS = {"small": "0.5B", "mid": "3B", "large": "7B"}
+
+
+def table_tiers() -> tuple[str, list[dict]]:
+    """The plant's model tiers, read from the simulator's own constants."""
+    import math
+
+    sys.path.insert(0, str(HERE.parent / "jcac_sim"))
+    import model as M  # noqa: E402
+
+    kinds = ("chat", "embed", "agent")
+    lines, data = [], []
+    for tier, price in M.TIER_COST_USD_PER_REQ.items():
+        if price:
+            exp = round(math.log10(price))
+            assert math.isclose(price, 10.0 ** exp), (tier, price)
+            price_tex = f"$10^{{{exp}}}$"
+        else:
+            price_tex = "0"
+        if tier == "none":
+            label = "none"
+            lat = f"\\multicolumn{{3}}{{c}}{{{M.NO_TIER_LATENCY_MS:,.0f}, no model call}}"
+            lat_ms = {k: M.NO_TIER_LATENCY_MS for k in kinds}
+        else:
+            label = f"{tier} ({TIER_MODELS[tier]})"
+            lat_ms = {k: M.TIER_BASE_LATENCY_MS[k][tier] for k in kinds}
+            lat = " & ".join(f"{lat_ms[k]:,.0f}" for k in kinds)
+        quality = M.TIER_QUALITY[tier]
+        data.append({"tier": tier, "price": price, "latency_ms": lat_ms, "quality": quality})
+        lines.append(f"{label} & {price_tex} & {lat} & {quality:.3f} \\\\")
+    tex = ("\\begin{tabular}{@{}l c r r r c@{}}\n\\toprule\n"
+           " & Price & \\multicolumn{3}{c}{Base latency (ms)} & \\\\\n\\cmidrule(lr){3-5}\n"
+           "Tier (model) & (\\$/miss) & Chat & Embed & Agent & Quality \\\\\n\\midrule\n" + "\n".join(lines) +
+           "\n\\bottomrule\n\\end{tabular}\n")
+    return tex, data
 
 
 ARMS = [("jcac_converged", "\\jcac{}, joint search"),
@@ -477,7 +558,7 @@ def main() -> int:
                       for r in rs if (r["frame"], r["a"], r["b"]) in LABELS],
             "width": wrows, "sizes": sizes}
     for name, builder in (("tab_campaigns", table_campaigns), ("tab_arms", table_arms),
-                          ("tab_post", table_post), ("tab_width", table_width)):
+                          ("tab_post", table_post), ("tab_width", table_width), ("tab_tiers", table_tiers)):
         tex, data = builder()
         (TABS / f"{name}.tex").write_text(f"% generated by make_assets.py -- do not edit\n{tex}",
                                           encoding="utf-8", newline="\n")

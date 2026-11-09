@@ -454,6 +454,71 @@
   }
  ],
  "tab_campaigns": {
+  "all_pass": 26,
+  "all_runs": 24780,
+  "all_tests": 58,
+  "followups": [
+   {
+    "arms": [
+     6,
+     7
+    ],
+    "campaign": "REVIEWER",
+    "pass": 2,
+    "points": [
+     60,
+     60
+    ],
+    "runs": 3900,
+    "tag": "RV",
+    "tests": 8
+   },
+   {
+    "arms": [
+     7
+    ],
+    "campaign": "TRACE\\_AUD.",
+    "pass": 1,
+    "points": [
+     96
+    ],
+    "runs": 672,
+    "tag": "TA",
+    "tests": 4
+   },
+   {
+    "arms": [
+     4,
+     4,
+     4
+    ],
+    "campaign": "CACHE\\_SENS.",
+    "pass": 0,
+    "points": [
+     60,
+     60,
+     60
+    ],
+    "runs": 3600,
+    "tag": "CS",
+    "tests": 6
+   },
+   {
+    "arms": [
+     3,
+     3
+    ],
+    "campaign": "BUDGET\\_MAT.",
+    "pass": 4,
+    "points": [
+     60,
+     96
+    ],
+    "runs": 1188,
+    "tag": "BM",
+    "tests": 6
+   }
+  ],
   "pass": 19,
   "rows": [
    {
@@ -679,6 +744,48 @@
    "mark": "T",
    "test": "HO-B5",
    "vs": "keda_fair_capped"
+  }
+ ],
+ "tab_tiers": [
+  {
+   "latency_ms": {
+    "agent": 30000.0,
+    "chat": 30000.0,
+    "embed": 30000.0
+   },
+   "price": 0.0,
+   "quality": 0.0,
+   "tier": "none"
+  },
+  {
+   "latency_ms": {
+    "agent": 6000.0,
+    "chat": 300.0,
+    "embed": 80.0
+   },
+   "price": 0.0001,
+   "quality": 0.28363636363636363,
+   "tier": "small"
+  },
+  {
+   "latency_ms": {
+    "agent": 2500.0,
+    "chat": 800.0,
+    "embed": 150.0
+   },
+   "price": 0.001,
+   "quality": 0.5483636363636364,
+   "tier": "mid"
+  },
+  {
+   "latency_ms": {
+    "agent": 3500.0,
+    "chat": 2000.0,
+    "embed": 400.0
+   },
+   "price": 0.01,
+   "quality": 0.6412727272727272,
+   "tier": "large"
   }
  ],
  "tab_width": [

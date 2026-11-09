@@ -3,13 +3,20 @@
 Venue: 7th International Conference on Electrical Engineering and Information &
 Communication Technology (ICEEICT 2027), MIST, Dhaka, 28–30 January 2027.
 Rules read on 2026-10-23, re-checked on 2026-10-24 (unchanged), from https://iceeict.mist.ac.bd/authors/paper-submission/,
-/authors/camera-ready/, /authors/important-dates/ and the CFP PDF.
+/authors/camera-ready/, /authors/important-dates/ and the CFP PDF. Dates
+re-checked on 2026-11-09.
 
 ## Deadline
 
-**25 October 2026, 23:59:59 Dhaka time (17:59:59 UTC)**, final extension (from the
-site's countdown, `data-deadline="2026-10-25T17:59:59+00:00"`). Notification
-5 December 2026; camera-ready and registration 20 December 2026.
+**10 November 2026, "Last Date of Paper Submission (Strictly Final)"**
+(important-dates page, read 2026-11-09; the page gives no time of day, so
+submit well before the end of 10 November, Dhaka time). Notification
+20 December 2026; camera-ready and registration 27 December 2026. (The
+25 October deadline recorded here earlier was extended.)
+
+**Before submitting:** the IEEE multiple-submission rule below applies. This
+paper was also prepared for ECCE 2027; it must not be under review at ECCE
+(or anywhere else) while it is submitted here.
 
 ## What the rules require, and where the paper stands
 
@@ -26,8 +33,8 @@ site's countdown, `data-deadline="2026-10-25T17:59:59+00:00"`). Notification
 
 ## CMT fields (paste as plain text)
 
-**Title:** Joint versus Per-Layer Control of Replicas, Caches, and Model Tiers in
-Multi-Tenant LLM Serving: A Pre-Registered Simulation Study
+**Title** (must match the PDF): Joint versus Per-Layer Autoscaling, Caching,
+and Model Routing in a Simulated LLM Gateway: A Pre-Registered Study
 
 **Subject area / track:** Track 1, Artificial Intelligence and Data Analytics
 (topic "Distributed and Cloud Computing").
@@ -44,7 +51,7 @@ account, and all authors confirm the author order, so fix it before submitting.
 **File:** upload `ICEEICT2027_submission.pdf`, built with `\blindtrue` (the
 default in `main.tex`). Do not put author names in the file name.
 
-## Camera-ready (if accepted), 20 December 2026
+## Camera-ready (if accepted), 27 December 2026
 
 - Set `\blindfalse` and `\camerareadytrue`: this prints the authors, the real
   system names, the data links, the conference header and the copyright line

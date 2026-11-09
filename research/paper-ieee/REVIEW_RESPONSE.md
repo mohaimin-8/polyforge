@@ -418,3 +418,68 @@ unfunded host (R2); re-tuning the comparators for the live-fitted plant
 figure content and tables. Both versions are 6 pages; in the double-blind
 version the conclusion stays in the left column of page 6. `CHANGES_round11.pdf`
 marks this round against the tenth-round text.
+
+## Twelfth round (ICEEICT 2027 audit, 9 Nov 2026): experiments first, then text
+
+The audit ("ICEEICT 2027 — Manuscript Audit & Correction Plan", points A1–A10,
+references, abstract, artifact) read an earlier version of the paper (its
+counts, 74/122 tests across 57 protocols, are from that version). Every point
+was answered first in the project — a registered experiment, a re-measurement
+or a generated document — and only then in the text. Nothing in the paper
+claims a fix that was not made; what could not be done is listed below.
+
+| # | Audit point | Verified | Done in the project | Changed in the paper |
+|---|---|---|---|---|
+| A1 | Cost normalisation undefined; J implies cost per tenant-step | ✓, and sharper: the scorers of the seven campaigns and of RV divide a run's cost by 8 × **119** tenant-steps, while the simulator scores 120 | `COST_NORMALISATION.md` (exploratory, gated): all 79 registered verdicts re-scored with 120: one changes (RV-W4, FAIL → PASS, p 0.0123 at threshold 0.0125); no number the paper quotes changes | Eq. (3) states C̄ = C_run/(8×119), which campaigns use it (HELDOUT and WIDTH included), the 0.84% bias and the one changed verdict; TA, CS and BM divide by each run's own steps |
+| A2 | Shedding not accounted for: request-level drop rate, number of requests, cost vs service | ✓ | Request counters added to the simulator, reporting-only (golden digests pass; all 27,720 registered metric values of the JN and TA runs replay bit-identically). **SA** registered and run (2,772 re-runs). **SHED_POOLED** (exploratory): the same counts pooled over requests | III-C defines a shed request (an AI cache miss on a tier-"none" step: no model call, a flat 30 s, the step's AI violation at its cap) and says CRUD and cache hits are served. IV-B: JC leaves 10.1% of AI requests unserved on the mean design point (5.7% of all; 35.3% on the agentic class), 14.7% on the mean BurstGPT window and **42.8% of all BurstGPT requests pooled** (344,808 of 804,710 per six-hour run; 3,798 of 180,773 per main-matrix run); the savings are attributed to shedding through the never-shedding arm, which costs more than capped HPA in total and per request served. Table III's caption now says its Shed column counts tenant-steps |
+| A3 | Cache is an abstract model; test other curves | ✓ | **CS** registered and run (3,600 runs): the LMSYS-fitted curve 0.285c/(c+19) (`SEMANTIC_CACHE.md`), the published one and a high one. CS-EQ EQUIVALENT on all three (joint − decoupled −0.0064, −0.0053, −0.0042; gains 1.4%, 1.3%, 1.1%); CS-H1/H2 FAIL ×6; all as predicted | III-C calls the cache a synthetic curve and gives the LMSYS fit; IV-B reports CS |
+| A4 | Tier prices, latencies and quality not documented | ✓ | `docs/SIMULATION_SPEC.md` generated from the code; the tier table generated from `model.py` by `make_assets.py` | New Table I: price per miss, base latency per AI kind, quality index (mean of 11 Qwen2.5 instruction-tuned benchmark scores / 100; 0.5B, 3B, 7B) and the "none" tier |
+| A5 | Counts not reconciled; registration dates and commits; ORDER_PERMUTATION outcome; directional vs equivalent | ✓ | `docs/REGISTRATION_LEDGER.md` generated from git and the timing gate: each protocol's commit, UTC time and lead over its first run (66 campaigns, 64 judged, 2 runs before their protocol, both disclosed). Hypothesis ledger regenerated | Table II lists the seven core campaigns and the four follow-ups (RV, TA, CS, BM) with their p-valued tests (19/34; 26/58 in all); III-E reconciles them with the programme-wide ledger (62 protocols; 146 tests with a p-value, 81 PASS, 63 surviving programme-wide Holm; 88 interval- or rule-based readings without one), says how registration is evidenced, and reads a passing difference inside the margin as directional yet equivalent; III-B gives ORDER_PERMUTATION's outcome |
+| A6 | Two research questions; title | ✓ | — | I states RQ1 (complete policies) and RQ2 (joint search, all else fixed); IV-B and VII answer them; the abstract leads with the 1.6% and its equivalence qualifier and moves the 27.5–60% to its last clause. **Title unchanged:** the suggested title is a question, which the authors' rule excludes; non-question alternatives are offered to the authors |
+| A7 | Only JC enforces the budget; budget-matched baselines | ✓ | **BM** registered and run (1,188 runs): capped HPA, capped KEDA and the cheapest-tier stack under JC's budget filter, on the registered seeds. JN: BM-H1 PASS (−0.0316 [−0.0495, −0.0154]), BM-H2 PASS (−0.0416), BM-H3 FAIL (−0.0011 [−0.0221, +0.0212]). TA: H1 PASS (−0.1680), H2 PASS (−0.1703), H3 FAIL (rank test). Two of six predictions missed (TA H1/H2, predicted FAIL) | III-D states the asymmetry, and that the stacks are complete policies (RQ1) while only the ablations isolate joint search (RQ2); IV-B reports BM; checklist rule 3 now covers budgets; VI lists the missing budget as a defect that hurt JC. The 1.6% is never presented as JC versus all layered controllers |
+| A8 | Workload parameters | ✓ | `docs/SIMULATION_SPEC.md` (rates, demand shapes, the Markov-modulated generator, mixes, budgets, SLO targets, cluster caps, arms, tuned parameters), generated from the code | III-C gives the held-out generator (0.4×/2.5×, switching probabilities 0.08 and 0.25, lognormal σ 0.15), the budgets ($2/$5/$8; $12 for the whale tenant) and points to the specification |
+| A9 | Simulation-only validation | ✓ (cannot be fixed before the deadline) | No new live run: the registered live replication was not funded | VI separates the live-fitted plant (a parameter scenario) from a live experiment, says why the absence of measured congestion matters (no coupling), and makes the conclusions conditional on the simulated workloads and coupling |
+| A10 | Tenant order; convergence | ✓ | — (ORDER_PERMUTATION exists: 540 runs) | III-B: strict improvements over a finite lattice terminate; the result is a coordinate-wise equilibrium, not a global optimum; six tenant orders moved Jain by at most 0.0076 (registered threshold 0.01) and cost by 0.91%, on the earlier solver |
+| Ref [8] | "Remove X. Chu" | ✗ The arXiv record (re-checked 9 Nov 2026) lists six authors, Xu Chu fourth, in v1–v3 | — | Unchanged |
+| Refs [1], [2] | URL visibly broken | ✓ (a line break inside the citation printed as a space) | — | One `\url` each |
+| Artifact | Anonymized link, or remove the claim | ✓ | **Not done**: hosting an anonymized copy needs the authors' account | The blind copy keeps "links withheld for double-blind review" |
+
+**Experiments of this round** (records in `research/analysis/`; each protocol
+committed before its runs, as `docs/REGISTRATION_LEDGER.md` shows; commits
+local, like the paper's):
+
+- **CS** (`PREREG_CACHE_SENSITIVITY`, 3,600 runs): A3.
+- **BM** (`PREREG_BUDGET_MATCHED`, 1,188 runs): A7.
+- **SA** (`PREREG_SHED_ACCOUNTING`, descriptive, 2,772 re-runs) and
+  **SHED_POOLED** (exploratory): A2.
+- **COST_NORMALISATION** (exploratory re-scoring): A1.
+- Generated documents: `docs/SIMULATION_SPEC.md` (A4, A8) and
+  `docs/REGISTRATION_LEDGER.md` (A5).
+
+**Disclosures.** CS's protocol listed the disagreement share as a descriptive
+output, but that counter is opt-in and the registered arms do not set it, so
+the record's column is empty; nothing uses it. The CS, SA and BM protocols
+were committed 7 s, 13 s and 57 s before their first runs ("tight" in the
+ledger). SA's registered ratios are means over design points or windows;
+pooled over requests they differ (on BurstGPT, 14.7% against 42.8% shed; on
+cost per request served, the pooled reading puts JC below capped HPA and the
+unit means do not), so the paper quotes both shed figures and no per-served
+cost for JC.
+
+**Changed in the paper.** Abstract restructured (A6); I: RQ1/RQ2; II merged
+and tightened; III-B: termination, equilibrium and tenant order, Algorithm 1
+removed for space (every step is in the text); III-C: synthetic cache,
+Table I, shed definition, budgets, held-out generator, Eq. (3)
+normalisation; III-D: budget asymmetry and BM; III-E: registration evidence
+and count reconciliation; Table II: follow-up block; IV-A compressed (the
+exploratory 5% equivalence aside removed); IV-B: CS, request-level shedding,
+BM; the cost–violation scatter (former Fig. 3) removed as a duplicate of
+Table III; IV-C and V compressed; checklist rule 3; VI and VII rewritten for
+A2, A7, A9 and the RQs; references [1], [2]; camera-ready header now ICEEICT
+2027 (MIST). Both versions are 6 pages, with the conclusion in the left
+column of page 6. `CHANGES_round12.pdf` marks this round against the
+eleventh-round text.
+
+**Not possible before the deadline.** GPU serving and models of batching,
+KV-cache memory, backlog or tier-switch lag; a live replication of the
+audited comparators; an anonymized artifact (needs the authors).
