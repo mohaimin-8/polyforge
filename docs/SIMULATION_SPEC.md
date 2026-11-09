@@ -432,6 +432,9 @@ def evaluate_step(
         energy_kwh=energy_kwh,
         carbon_g=energy_kwh * CARBON_INTENSITY_G_PER_KWH,
         quality_loss=quality_lost / total_rps if total_rps > 0.0 else 0.0,
+        requests=total_rps * CONTROL_INTERVAL_S,
+        ai_requests=ai_rps * CONTROL_INTERVAL_S,
+        ai_shed_requests=(miss_rps * CONTROL_INTERVAL_S) if state.tier == "none" else 0.0,
     )
 ```
 
@@ -566,6 +569,13 @@ hpa_fair_capped:
     target_rho: 0.05
   small:
     target_rho: 0.1
+hpa_level_capped:
+  large:
+    target_rho: 0.075
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.1
 hpa_quality_capped:
   large:
     target_rho: 0.1
@@ -597,6 +607,13 @@ keda_fair_capped:
     rps_per_replica: 0.25
   small:
     rps_per_replica: 0.5
+keda_level_capped:
+  large:
+    rps_per_replica: 0.15
+  medium:
+    rps_per_replica: 0.25
+  small:
+    rps_per_replica: 0.5
 layered_costaware_tuned:
   large:
     target_rho: 0.8
@@ -618,6 +635,20 @@ layered_quality_tuned:
     target_rho: 0.075
   small:
     target_rho: 0.05
+layered_small_level_capped:
+  large:
+    target_rho: 0.1
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.1
+layered_small_level_gated:
+  large:
+    target_rho: 0.1
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.1
 layered_small_tuned:
   large:
     target_rho: 0.1
