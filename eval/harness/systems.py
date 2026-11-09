@@ -400,6 +400,17 @@ SYSTEMS: dict[str, SystemSpec] = {
                         "knob_search": "decoupled"},
         description="jcac_level searching each knob on its own (the RQ2 ablation)",
     ),
+    # PREREG_LEVEL_LAG (2026-11-10): one changed factor. LEVEL's treatment lost
+    # under one-interval lag (LV-L1/L2) while the published controller barely
+    # moved; the diagnosis is the corrected half-replica hysteresis. This arm is
+    # jcac_level with the published switching penalty (0.05) and nothing else.
+    "jcac_level_ratchet": SystemSpec(
+        "jcac", params={"anchor_moves": True, "converge_sweeps": True,
+                        "shed_price_tier": "small", "degrade_gracefully": True,
+                        "forecast_method": "holt"},
+        description="jcac_level with the published switching penalty (0.05 per "
+                    "changed knob) instead of the half-replica one",
+    ),
     "layered_small_level_capped": SystemSpec(
         "layered_small_capped", tuned_from="hpa", tuned_arm="layered_small_level_capped",
         description="the cheapest-tier stack inside the cluster caps, replica "

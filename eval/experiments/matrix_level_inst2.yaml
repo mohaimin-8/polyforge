@@ -1,0 +1,17 @@
+# PREREG_LEVEL_LAG.md (2026-11-10) -- one changed factor after LEVEL's lag
+# failure (LV-L1/L2): jcac_level with the published switching penalty
+# (jcac_level_ratchet) against jcac_level and LEVEL's two strongest
+# comparators. Frozen and pushed before any run; arms and tuning are LEVEL's.
+# Instant actuation (control).
+name: matrix_level_inst2
+backend: sim
+steps: 120
+reps: 5
+shared_seeds: true
+systems: [jcac_level_ratchet, jcac_level, layered_small_level_gated, hpa_level_capped]
+workloads: [crud_bursty, crud_steady, ai_cacheable, ai_uncacheable, agentic]
+tenant_mixes: [uniform, premium_heavy, besteffort_heavy, whale]
+cluster_sizes: [small, medium, large]
+output: eval/results/raw_sim_level_inst2.duckdb
+retries: 2
+timeseries_reps: 0
