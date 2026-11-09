@@ -156,6 +156,9 @@ CAMPAIGN_RECORDS = [
     # every audited leak removed, five experiments, from
     # metrics_matrix_level{,_mono,_lag,_heldout,_trace}.csv.gz.
     ("analysis_level.py", [], "RESULTS_LEVEL.md"),
+    # PREREG_LEVEL_LAG (2026-11-10): one changed factor after LEVEL's lag failure,
+    # from metrics_matrix_level_{lag2,inst2}.csv.gz.
+    ("analysis_level_lag.py", [], "RESULTS_LEVEL_LAG.md"),
     # fig22 / fig23 (2026-10-22): the adjudication chain and the width mechanism,
     # each drawn through the frozen scorers from the committed exports.
     ("fig_adjudication_chain.py", [], "FIGURE_ADJUDICATION_CHAIN.md"),
