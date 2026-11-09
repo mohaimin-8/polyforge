@@ -1,0 +1,8 @@
+Highlights (3 to 5 bullets, at most 85 characters each including spaces;
+upload as a separate file named "Highlights")
+
+- Joint search beat decoupled search by at most 4.5% of the objective
+- Rate-limited steps make replica, cache and model-tier control locally separable
+- With every audited leak removed, it beat no per-layer stack on synthetic demand
+- Its one registered win: keeping budgets on real BurstGPT demand, by 2.7%
+- Initial 27.5-60% gains were comparator defects; seven evaluation rules follow

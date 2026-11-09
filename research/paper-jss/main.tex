@@ -1,0 +1,351 @@
+% =============================================================================
+% Journal manuscript (Elsevier, elsarticle) -- target: Journal of Systems and
+% Software (Q1); the same sources build for Future Generation Computer Systems
+% by changing \journal{}. Re-check the live Guide for Authors on the day of
+% submission (abstract <= 250 words, 1--7 keywords, highlights file, review
+% model, data statement).
+%
+% Build (from research/paper-jss/):  .\build.ps1
+%   review copy   : \blindtrue  -> main.pdf without authors, links or names
+%   author copy   : \blindfalse -> authors, PolyForge, repository and DOIs
+%
+% Every number traces to a committed record under research/analysis/; tables
+% under tables/ are generated (make_tables.py here, make_assets.py in
+% research/paper-ieee/), figures are copied from research/paper-ieee/figures/.
+% =============================================================================
+\documentclass[preprint,12pt]{elsarticle}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{amsmath,amssymb}
+\usepackage{tikz}
+\usetikzlibrary{positioning,calc,arrows.meta}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+\usepackage{lineno}
+
+\newif\ifblind
+\blindtrue
+
+\ifblind
+\newcommand{\polyforge}{SysX}
+\else
+\newcommand{\polyforge}{PolyForge}
+\fi
+\newcommand{\jcac}{JC}
+\newcommand{\jcacintro}{JC (the joint controller)}
+\newcommand{\tablefont}{\small}
+\emergencystretch=1.5em
+
+\journal{Journal of Systems and Software}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{The value of joint search in LLM gateway control: a pre-registered
+simulation study of autoscaling, semantic caching and model routing}
+
+\ifblind
+\author{Anonymous authors}
+\else
+\author[ete]{Md.\ Mohaiminul Islam\corref{cor1}}
+\ead{AUTHOR-EMAIL@example.com}
+\author[ete]{Farzana Akter}
+\cortext[cor1]{Corresponding author.}
+\affiliation[ete]{organization={Department of Electronics \& Telecommunication
+  Engineering, Rajshahi University of Engineering \& Technology},
+  city={Rajshahi}, postcode={6204}, country={Bangladesh}}
+\fi
+
+\begin{abstract}
+Multi-tenant gateways for large language models (LLMs) usually run replica
+autoscaling, semantic caching and model routing as independent controllers.
+Whether one controller of all three does better, all else held fixed, is
+rarely measured. We built such a joint controller and evaluated it in twelve
+pre-registered simulation campaigns (33,612 runs). With steps of at most two
+replicas and one cache level per interval, joint search lowered the
+objective (cost, SLO violation and unfairness) by 1.6\% relative to
+decoupled search, inside the registered equivalence margin; a registered
+width experiment traces this to local separability under rate-limited
+steps. Our initial 27.5--60\% gains over per-layer baselines came from
+comparator defects, and an audit then found leaks on both sides: free
+outages and a budget only the joint controller could keep, a comparator
+above the cluster caps, and an unmeasured latency assumption. A final
+campaign removed them together: it charged every refused request, gave a
+per-layer stack a gateway budget gate, and gave the joint controller its
+documented fixes. The controller beat no comparator on synthetic, held-out
+or lagged demand, lost to an ungated stack and, under actuation lag, to
+capped HPA, and won once: on real BurstGPT demand, among arms that keep the
+budget, it beat the gated stack by 2.7\%. With outages priced, coordination
+rose to 1.3--4.5\% of the objective but bought no win. Tuned, capped and
+budgeted per-layer controllers are the stronger default; we give seven
+evaluation rules that would have caught our errors.
+\end{abstract}
+
+\begin{keyword}
+self-adaptive systems \sep autoscaling \sep LLM serving \sep semantic
+caching \sep model routing \sep pre-registration \sep negative results
+\end{keyword}
+
+\end{frontmatter}
+
+\linenumbers
+
+\input{sec-intro}
+\input{sec-related}
+\input{sec-system}
+\input{sec-method}
+\input{sec-results}
+\input{sec-discussion}
+\input{sec-threats}
+\input{sec-conclusion}
+
+\ifblind\else
+\section*{CRediT authorship contribution statement}
+\textbf{Md.\ Mohaiminul Islam:} Conceptualization, Methodology, Software,
+Validation, Formal analysis, Investigation, Data curation, Writing --
+original draft, Writing -- review \& editing, Visualization.
+\textbf{Farzana Akter:} Supervision, Writing -- review \& editing.
+\fi
+
+\section*{Declaration of competing interest}
+The authors declare that they have no known competing financial interests
+or personal relationships that could have appeared to influence the work
+reported in this paper.
+
+\section*{Funding}
+This research did not receive any specific grant from funding agencies in
+the public, commercial, or not-for-profit sectors.
+
+\section*{Data availability}
+\ifblind
+All code, protocols, run-level exports, run databases and the scripts that
+regenerate every table and figure are publicly archived; the repository and
+the archive DOIs are withheld for review and are given in the cover letter.
+\else
+Code, protocols and analysis scripts are at
+\url{https://github.com/mohaimin-8/polyforge}; run databases, run-level
+exports, scored records and live evidence are archived at Zenodo,
+\url{https://doi.org/10.5281/zenodo.22801195} (concept DOI; cite the
+version that contains the HELDOUT, WIDTH and follow-up campaigns). A
+post-run mirror of the first 48 protocols is registered at
+\url{https://doi.org/10.17605/OSF.IO/DYZKV}. \texttt{python
+scripts/reproduce.py} re-derives every gated record from the committed
+exports; it shows that the analysis is a deterministic function of the
+exported data, not that the data are free of the threats in
+Section~\ref{sec:threats}.
+\fi
+
+\appendix
+\section{Every registered test of the twelve campaigns}
+\label{app:tests}
+
+Every $p$-valued test registered for the twelve campaigns, in the order of
+Table~\ref{tab:campaigns}, as its record scored it. Effect: the registered
+contrast (treatment minus comparator on $J$; for WD-H1 and WD-H2 the
+difference-in-differences of the coordination gain, positive when
+coordination grows; for WD-H5 the joint controller's $J$ on the rate-limited
+minus the wide lattice). PASS requires the one-sided Wilcoxon test at its
+Holm threshold within the campaign's family \emph{and} a bootstrap interval on
+the registered side of zero, so a test can fail with $p$ below its
+threshold or with an interval that excludes zero. Survives: whether a PASS
+also survives a correction across all 157 $p$-valued tests of the programme
+(Holm, family-wise; BY, Benjamini--Yekutieli false-discovery rate) or only
+its campaign's family. For LEVEL the effect is the treatment minus the
+comparator on $J_L$. 27 of the 69 tests passed.
+
+{\scriptsize\setlength{\tabcolsep}{3pt}
+\input{tables/tab_alltests.tex}}
+
+\begin{thebibliography}{99}
+
+\bibitem{k8shpa}
+The Kubernetes Authors, Horizontal Pod Autoscaling, Kubernetes
+documentation, \url{https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/}
+(accessed 9 November 2026).
+
+\bibitem{keda}
+The KEDA Authors, KEDA: Kubernetes event-driven autoscaling,
+\url{https://keda.sh/docs/} (accessed 9 November 2026).
+
+\bibitem{gptcache}
+F.~Bang, GPTCache: an open-source semantic cache for LLM applications
+enabling faster answers and cost savings, in: Proc.\ 3rd Workshop for
+Natural Language Processing Open Source Software (NLP-OSS), 2023,
+pp.~212--218.
+
+\bibitem{frugalgpt}
+L.~Chen, M.~Zaharia, J.~Zou, FrugalGPT: how to use large language models
+while reducing cost and improving performance, arXiv:2305.05176 (2023).
+
+\bibitem{routellm}
+I.~Ong, A.~Almahairi, V.~Wu, W.-L. Chiang, T.~Wu, J.~E. Gonzalez, M.~W.
+Kadous, I.~Stoica, RouteLLM: learning to route LLMs with preference data,
+arXiv:2406.18665 (2024).
+
+\bibitem{kephart2003}
+J.~O. Kephart, D.~M. Chess, The vision of autonomic computing, Computer
+36~(1) (2003) 41--50.
+
+\bibitem{weyns2013}
+D.~Weyns, B.~Schmerl, V.~Grassi, S.~Malek, R.~Mirandola, C.~Prehofer,
+J.~Wuttke, J.~Andersson, H.~Giese, K.~M. G\"oschka, On patterns for
+decentralized control in self-adaptive systems, in: Software Engineering
+for Self-Adaptive Systems II, Vol.\ 7475 of LNCS, Springer, 2013,
+pp.~76--107.
+
+\bibitem{kephart2007}
+J.~O. Kephart, H.~Chan, R.~Das, D.~W. Levine, G.~Tesauro, F.~Rawson,
+C.~Lefurgy, Coordinating multiple autonomic managers to achieve specified
+power-performance tradeoffs, in: Proc.\ 4th IEEE International Conference
+on Autonomic Computing (ICAC), 2007.
+
+\bibitem{nopowerstruggles}
+R.~Raghavendra, P.~Ranganathan, V.~Talwar, Z.~Wang, X.~Zhu, No ``power''
+struggles: coordinated multi-level power management for the data center,
+in: Proc.\ 13th International Conference on Architectural Support for
+Programming Languages and Operating Systems (ASPLOS), 2008, pp.~48--59.
+
+\bibitem{chamulteon}
+A.~Bauer, V.~Lesch, L.~Versluis, A.~Ilyushkin, N.~Herbst, S.~Kounev,
+Chamulteon: coordinated auto-scaling of micro-services, in: Proc.\ 39th
+IEEE International Conference on Distributed Computing Systems (ICDCS),
+2019, pp.~2015--2025.
+
+\bibitem{bristol1966}
+E.~H. Bristol, On a new measure of interaction for multivariable process
+control, IEEE Transactions on Automatic Control 11~(1) (1966) 133--134.
+
+\bibitem{vllm}
+W.~Kwon, Z.~Li, S.~Zhuang, Y.~Sheng, L.~Zheng, C.~H. Yu, J.~E. Gonzalez,
+H.~Zhang, I.~Stoica, Efficient memory management for large language model
+serving with PagedAttention, in: Proc.\ 29th Symposium on Operating
+Systems Principles (SOSP), 2023, pp.~611--626.
+
+\bibitem{splitwise}
+P.~Patel, E.~Choukse, C.~Zhang, A.~Shah, \'I.~Goiri, S.~Maleki,
+R.~Bianchini, Splitwise: efficient generative LLM inference using phase
+splitting, in: Proc.\ ACM/IEEE 51st Annual International Symposium on
+Computer Architecture (ISCA), 2024, pp.~118--132.
+
+\bibitem{earlybird}
+L.~Song, Z.~Pang, W.~Wang, Z.~Wang, X.~Wang, H.~Chen, W.~Song, Y.~Jin,
+D.~Meng, R.~Hou, The early bird catches the leak: unveiling timing side
+channels in LLM serving systems, IEEE Transactions on Information Forensics
+and Security (accepted); arXiv:2409.20002.
+
+\bibitem{clipper}
+D.~Crankshaw, X.~Wang, G.~Zhou, M.~J. Franklin, J.~E. Gonzalez, I.~Stoica,
+Clipper: a low-latency online prediction serving system, in: Proc.\ 14th
+USENIX Symposium on Networked Systems Design and Implementation (NSDI),
+2017, pp.~613--627.
+
+\bibitem{infaas}
+F.~Romero, Q.~Li, N.~J. Yadwadkar, C.~Kozyrakis, INFaaS: automated
+model-less inference serving, in: Proc.\ USENIX Annual Technical
+Conference (ATC), 2021, pp.~397--411.
+
+\bibitem{ipa}
+S.~Ghafouri, K.~Razavi, M.~Salmani, A.~Sanaee, T.~Lorido-Botran, L.~Wang,
+J.~Doyle, P.~Jamshidi, IPA: inference pipeline adaptation to achieve high
+accuracy and cost-efficiency, Journal of Systems Research 4~(1) (2024).
+
+\bibitem{proteus}
+S.~Ahmad, H.~Guan, B.~D. Friedman, T.~Williams, R.~K. Sitaraman, T.~Woo,
+Proteus: a high-throughput inference-serving system with accuracy scaling,
+in: Proc.\ 29th ACM International Conference on Architectural Support for
+Programming Languages and Operating Systems (ASPLOS), 2024, pp.~318--334.
+
+\bibitem{cascadia}
+Y.~Jiang, F.~Fu, W.~Zhao, S.~Rabanser, J.~Zhang, N.~D. Lane, B.~Yuan,
+Cascadia: an efficient cascade serving system for large language models,
+in: Proc.\ International Conference on Learning Representations (ICLR),
+2026.
+
+\bibitem{chengnguyen}
+J.~Cheng, D.~T. Nguyen, Scalable joint resource allocation for
+SLO-constrained LLM inference in heterogeneous GPU clouds,
+arXiv:2604.07472 (2026).
+
+\bibitem{zhu2023}
+B.~Zhu, Y.~Sheng, L.~Zheng, C.~Barrett, M.~I. Jordan, J.~Jiao, Towards
+optimal caching and model selection for large model inference, in:
+Advances in Neural Information Processing Systems 36 (NeurIPS), 2023,
+pp.~59062--59094.
+
+\bibitem{chameleon}
+A.~Bauer, N.~Herbst, S.~Spinner, A.~Ali-Eldin, S.~Kounev, Chameleon: a
+hybrid, proactive auto-scaling mechanism on a level-playing field, IEEE
+Transactions on Parallel and Distributed Systems 30~(4) (2019) 800--813.
+
+\bibitem{zhang2026drl}
+G.~Zhang, C.~Sun, K.~Zhao, X.~Chu, S.~Sarkani, J.~Fossaceca, When does deep
+RL beat calibrated baselines? A benchmark study on adaptive resource
+control, arXiv:2605.26418 (2026).
+
+\bibitem{khilji2026}
+S.~I. Khilji, A.~Furutanpey, S.~Dustdar, Incentives and evidence in learned
+service orchestration, in: Proc.\ IEEE International Conference on
+Service-Oriented System Engineering (SOSE), 2026, pp.~51--62.
+
+\bibitem{melis2018}
+G.~Melis, C.~Dyer, P.~Blunsom, On the state of the art of evaluation in
+neural language models, in: Proc.\ International Conference on Learning
+Representations (ICLR), 2018.
+
+\bibitem{lucic2018}
+M.~Lucic, K.~Kurach, M.~Michalski, S.~Gelly, O.~Bousquet, Are GANs created
+equal? A large-scale study, in: Advances in Neural Information Processing
+Systems 31 (NeurIPS), 2018.
+
+\bibitem{henderson2018}
+P.~Henderson, R.~Islam, P.~Bachman, J.~Pineau, D.~Precup, D.~Meger, Deep
+reinforcement learning that matters, in: Proc.\ 32nd AAAI Conference on
+Artificial Intelligence, 2018.
+
+\bibitem{hoefler2015}
+T.~Hoefler, R.~Belli, Scientific benchmarking of parallel computing
+systems: twelve ways to tell the masses when reporting performance
+results, in: Proc.\ International Conference for High Performance
+Computing, Networking, Storage and Analysis (SC), 2015.
+
+\bibitem{nosek2018}
+B.~A. Nosek, C.~R. Ebersole, A.~C. DeHaven, D.~T. Mellor, The
+preregistration revolution, Proceedings of the National Academy of
+Sciences 115~(11) (2018) 2600--2606.
+
+\bibitem{jain1984}
+R.~Jain, D.-M. Chiu, W.~R. Hawe, A quantitative measure of fairness and
+discrimination for resource allocation in shared computer systems,
+Technical Report TR-301, Digital Equipment Corporation, 1984.
+
+\bibitem{monderer1996}
+D.~Monderer, L.~S. Shapley, Potential games, Games and Economic Behavior
+14~(1) (1996) 124--143.
+
+\bibitem{holm1979}
+S.~Holm, A simple sequentially rejective multiple test procedure,
+Scandinavian Journal of Statistics 6~(2) (1979) 65--70.
+
+\bibitem{lakens2017}
+D.~Lakens, Equivalence tests: a practical primer for $t$ tests,
+correlations, and meta-analyses, Social Psychological and Personality
+Science 8~(4) (2017) 355--362.
+
+\bibitem{qwen25}
+Qwen Team, Qwen2.5 technical report, arXiv:2412.15115 (2024).
+
+\bibitem{burstgpt}
+Y.~Wang, Y.~Chen, Z.~Li, X.~Kang, Y.~Fang, Y.~Zhou, Y.~Zheng, Z.~Tang,
+X.~He, R.~Guo, X.~Wang, Q.~Wang, A.~C. Zhou, X.~Chu, BurstGPT: a real-world workload dataset to optimize LLM
+serving systems, arXiv:2401.17644 (2024).
+
+\end{thebibliography}
+
+\end{document}

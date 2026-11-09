@@ -1,0 +1,74 @@
+% =====================================================================
+\section{Background and related work}
+\label{sec:related}
+% =====================================================================
+
+\paragraph{Multiple adaptation loops}
+Self-adaptive systems are commonly built from feedback loops of the
+monitor--analyse--plan--execute kind~\cite{kephart2003}, and a system with
+several adaptation concerns may run one loop per concern. Weyns
+et~al.\ catalogue patterns for organising such loops, from fully
+decentralised to hierarchical control~\cite{weyns2013}. That uncoordinated
+loops can interfere is well established: independent data-centre power
+managers fight one another~\cite{nopowerstruggles}, independent
+per-service autoscalers oscillate where a coordinated one does
+not~\cite{chamulteon}, and Kephart et~al.\ coordinated a performance
+manager and a power manager through one shared signal~\cite{kephart2007}.
+In process control, Bristol's relative gain array measures when
+decentralised single-loop control suffices for a multivariable
+plant~\cite{bristol1966}. Our width result (Section~\ref{sec:width}) is a
+discrete analogue of that question for one gateway: we do not ask whether
+loops can interfere, which they can, but how much a joint search recovers
+when every loop is rate-limited, and we measure it with the loops' other
+ingredients held fixed.
+
+\paragraph{Serving, caching and routing for LLMs}
+Inference engines such as vLLM~\cite{vllm} and Splitwise~\cite{splitwise}
+manage GPU memory and execution phases inside a model server. Semantic
+caches return a stored answer for a sufficiently similar
+prompt~\cite{gptcache}, and their timing has been shown to leak other
+users' prompts~\cite{earlybird}. Routers and cascades trade answer quality
+for price per query~\cite{frugalgpt,routellm}. \polyforge{} sits above all
+of these: it treats model servers as external endpoints with a price and a
+latency, and decides per tenant and per interval how many gateway replicas
+to run, how much cache to grant and which tier to call, under a per-tenant
+dollar budget.
+
+\paragraph{Joint configuration of serving knobs}
+Several systems choose two of these knobs together. Clipper combined a
+prediction cache with adaptive model selection~\cite{clipper}. INFaaS
+selects model variants together with VM- and model-level
+autoscaling~\cite{infaas}; IPA solves an integer program over model
+variants, replicas and batch sizes for inference pipelines on
+Kubernetes~\cite{ipa}; Proteus scales accuracy, choosing variants and
+placement under load~\cite{proteus}. For LLMs, Cascadia co-optimises the
+deployment of a model cascade with its routing policy~\cite{cascadia},
+Cheng and Nguyen jointly choose models, GPU provisioning, parallelism and
+routing under latency, accuracy and budget constraints~\cite{chengnguyen},
+and Zhu et~al.\ design a cache jointly with a model selector~\cite{zhu2023}.
+Each reports a gain over separately configured or fixed alternatives. None
+of them, to our knowledge, separates coordination from the rest of the
+joint design by an ablation that keeps the objective, forecaster, budgets
+and move limits while searching the knobs separately, and none controls the
+replica, semantic-cache and tier triple of a multi-tenant gateway. Our
+contribution is not a better joint controller; it is a measurement of how
+much the jointness of one is worth, and of what else its apparent wins
+were made of.
+
+\paragraph{Evaluation methodology}
+Autoscaler comparisons need a level playing field~\cite{chameleon}.
+Recent work makes the same point in our setting: a calibrated rule-based
+scaler beat six deep reinforcement learning methods on
+cost~\cite{zhang2026drl}, and a pre-registered re-evaluation of learned
+orchestrators traced apparent robustness to comparator collapse and
+evaluation choices~\cite{khilji2026}. In machine learning, re-evaluations
+under equal tuning budgets erased claimed gains in language
+modelling~\cite{melis2018}, generative adversarial networks~\cite{lucic2018}
+and deep reinforcement learning~\cite{henderson2018}, and Hoefler and Belli
+set out reporting rules for performance measurements~\cite{hoefler2015}.
+Pre-registration, committing hypotheses, design and analysis before data
+exist, separates confirmatory from exploratory claims~\cite{nosek2018}.
+We apply these practices to our own controller: every campaign reported
+here has a protocol committed before its first run, and every correction
+of a comparator is a new protocol beside the old record, never an edit of
+it.

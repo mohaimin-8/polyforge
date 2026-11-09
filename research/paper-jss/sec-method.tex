@@ -1,0 +1,310 @@
+% =====================================================================
+\section{Evaluation method}
+\label{sec:method}
+% =====================================================================
+
+Every comparison in Sections~\ref{sec:chain}--\ref{sec:width} ran in a
+discrete-time simulator of the gateway (the \emph{plant}), with one
+controller configuration (an \emph{arm}) per run. A generated
+specification in the artifact lists every rate, shape, mix, budget,
+target and constant; this section gives what is needed to read the
+results.
+
+\subsection{Plant}
+\label{sec:plant}
+
+\begin{table}[t]
+\caption{Model tiers of the plant: price per cache miss, base latency per
+AI request kind, and answer quality (mean of 11 benchmark scores of the
+Qwen2.5 instruction-tuned models~\cite{qwen25}, divided by 100; priced only
+in the QUALITY campaign). The prices form a synthetic 1:10:100 ladder;
+our own GPU bench measured 1:1.475:1.518 for the three models.}
+\label{tab:tiers}
+\centering\tablefont
+\input{tables/tab_tiers.tex}
+\end{table}
+
+A replica serves 100 work units per second; a CRUD read costs 1 unit, a
+write 2, an embedding 5, a chat request 20 and an agent step 40, so AI
+traffic loads the replicas too. The semantic cache is a synthetic hit
+curve: $c$\,MB answer a fraction $h(c)=0.85\,c/(c+256)$ of a request kind's
+cacheable share (40\% of chat, 70\% of embedding and 10\% of agent
+requests), with no model of prompt similarity, eviction or drift. Fitted to
+200{,}000 real LMSYS-Chat-1M turns, the same form gives the much lower
+$0.285\,c/(c+19)$, which Section~\ref{sec:coordination} tests. Models run
+outside the plant; Table~\ref{tab:tiers} gives each tier's price per cache
+miss, base latency and quality. An agent request on the small tier takes
+6\,s at base, longer than on the mid (2.5\,s) or the large tier (3.5\,s);
+this non-monotone ladder is a modelling assumption (tool-loop retries on a
+weak model) that we did not measure, and it makes the cheapest tier miss
+the agent targets of premium and standard tenants.
+Congestion multiplies latency by $g(\rho)=1/(1-\rho)$, where $\rho$ is the
+work left after cache hits over the replicas' capacity; past $\rho=0.95$ the
+factor grows quadratically and is capped at 50. CRUD p95 latency is
+$1.4\,\ell_0\,g(\rho)$ for a class base latency $\ell_0$; with $q_k$ the
+traffic share and $h_k$ the hit rate of AI kind $k$, AI p95 latency (ms) is
+\begin{equation}
+\label{eq:lat}
+\ell^{\mathrm{AI}}=1.4\sum_k q_k\bigl[20\,h_k+(1-h_k)\,L_{\tau,k}\,g(\rho)\bigr],
+\end{equation}
+with $L_{\tau,k}$ the tier's base latency. SLO targets of 150\,ms (CRUD) and
+2.5\,s (AI) are scaled by the tenant's class: 1 for premium, 2.5 for
+standard and 8 for best-effort. On a shed step, CRUD and cache hits are
+served as usual, but each AI cache miss gets no model call and enters
+(\ref{eq:lat}) at a flat 30\,s; we count these misses as \emph{shed
+requests}. Replicas cost \$0.048 per replica-hour and cache memory \$0.005
+per GB-hour. Actuation is instantaneous except in the ACTUATION campaign,
+where replica changes take effect one interval late and enlarged caches
+start half-warm; tier switches never lag.
+
+\emph{What dominates the bill.} One replica-step costs
+$\$1.3\times10^{-4}$, about the price of one small-tier cache miss; a
+large-tier miss costs $\$10^{-2}$. A standard tenant's hourly budget of \$5
+allows \$0.0139 per step, while a cacheable-AI tenant at its base rate sends
+about 50 cache misses per step: \$0.005 on the small tier, \$0.05 on the
+mid tier. Across the main matrix, model spend was 77\% of \jcac{}'s bill,
+replica time 23\% and cache memory 0.2\%. A per-tenant budget can therefore
+be kept only through the cache and tier knobs or by shedding; the replica
+knob moves mostly latency. Agentic tenants meet their premium and standard
+targets only on the mid tier or above, which no budget class pays for during
+their bursts (about 50 mid-tier misses, or \$0.05, per step); best-effort
+tenants meet theirs on the small tier.
+
+\emph{What is synthetic.} The price ladder of Table~\ref{tab:tiers}
+(1:10:100) is an assumption modelled on market per-request prices; every
+campaign here uses it except QUALITY, which uses the measured 1:1.475:1.518.
+The non-monotone agent latencies are an assumption too, and our own
+measurements contradict them: a GPU bench measured the three models at
+2.1, 3.1 and 3.2\,s per request, and the live-fitted plant is fastest on the
+small tier for every request kind. Congestion multiplies the external
+model's latency, although a gateway pod's queue would add to it, so
+replicas affect AI latency more than a pod's service time warrants. A cache
+hit costs 20\,ms and nothing else, and AI p95 latency is 1.4 times a
+traffic-weighted mean, so hits are credited linearly.
+
+\subsection{Workloads and design matrix}
+\label{sec:workloads}
+
+The main matrix crosses five workload classes (steady and bursty CRUD,
+cacheable and uncacheable AI, and agentic) with four eight-tenant mixes
+(uniform; premium-heavy; best-effort-heavy; and a whale mix in which one
+tenant sends four times the base demand) and three cluster sizes. The sizes cap each
+tenant at 6, 10 or 16 replicas and the tenants together at 24, 48 or 96
+replicas and 2, 4 or 8\,GB of cache, below the sum of the individual caps,
+so tenants contend for one pool. Hourly budgets are \$2, \$5 and \$8 for
+best-effort, standard and premium tenants (\$12 for the whale). This gives 60 \emph{design points}, each run for 120
+ten-second steps (20 simulated minutes); every arm runs five
+\emph{replications} per design point, one per seed. In the campaigns
+reported here all arms share seeds and therefore see identical demand; the
+pre-audit campaigns of Section~\ref{sec:chain} did not, because their seeds
+included the arm's name. Demand shapes are periodic (sine, sawtooth and
+square-wave bursts with per-tenant phases).
+
+Four other substrates test generalisation. HELDOUT runs two
+Markov-modulated workloads that appear in no tuning step or earlier
+campaign: demand switches between 0.4 and 2.5 times its base rate, upward
+with probability 0.08 and downward with 0.25 per step, under lognormal
+noise ($\sigma=0.15$), on 24 design points. TRACE\_AUDITED (TA) replays 96
+six-hour windows of the real BurstGPT trace~\cite{burstgpt} as chat demand
+for the uniform mix of eight standard tenants on the medium cluster, one
+replication per window. A \emph{live-fitted} plant
+follows measurements of the deployed gateway: a replica serves at least
+1{,}123 units per second (no measured run reached congestion) and AI
+requests never load it. WIDTH adds a \emph{coupled} plant in which AI work
+loads the replicas three times as heavily and the mid and large tiers cost
+two and four times the small tier's replica work.
+
+\subsection{Comparators}
+\label{sec:comparators}
+
+An HPA arm sets $\lceil r\rho/\rho^\ast\rceil$ replicas for utilisation
+$\rho$ and target $\rho^\ast$, following the Kubernetes rule~\cite{k8shpa};
+a KEDA arm sets $\lceil q/q^\ast\rceil$ for request rate $q$ and
+per-replica target $q^\ast$~\cite{keda}. Both clamp replica changes to
+$\pm2$ per interval, as \jcac{} does, and keep a fixed cache and tier. Their
+targets were tuned on a separate slice (three of the five workloads, two
+of the four mixes, two replications) over grids whose optima are interior,
+then re-tuned per cluster size; the \emph{capped} variants also obey the
+cluster caps that bind \jcac{}. The tuned utilisation targets settled at
+5--10\% (the Kubernetes default is 80\%), because replicas are cheap in
+this plant and $J$ is nearly flat across low targets (about 1\% from 0.01
+to 0.1); one target per cluster size, pooled over workloads, therefore
+over-provisions the CRUD classes. A \emph{layered stack} runs an HPA rule, a
+cache policy and a tier rule independently. We test four tier rules: the
+registered rule (rank tiers by latency, ignore price); a cost-aware rule
+(the cheapest tier expected to meet the latency target); a pin to the
+cheapest model for all traffic (the \emph{cheapest-tier stack}); and, in QUALITY, a quality-aware router. A static equal share of
+the cluster on the cheapest tier is the null controller.
+
+The capped HPA and KEDA arms and the quality-aware stack obey the cluster
+caps; the other layered stacks were registered without them. Auditing the
+runs for this paper, we found that the cheapest-tier stack used up to twice
+the small cluster's replica cap (about 48 replicas against 24, on every
+step) and exceeded the cache cap on most steps of the small and medium
+clusters, while \jcac{} never exceeded either cap. We report its registered
+comparisons as scored and, beside them, an exploratory re-run of the same
+stack held to the caps by the wrapper that caps HPA and KEDA, with its
+registered tuning (it was not re-tuned under the caps).
+
+Two asymmetries remain by design and are measured rather than removed.
+Only \jcac{} can shed, and only \jcac{} enforces the per-tenant budget. The
+BUDGET\_MATCHED campaign (BM) re-ran capped HPA, capped KEDA and the
+cheapest-tier stack under \jcac{}'s budget filter on the registered seeds.
+The filter can only trim their replicas, because their cache and tier rules
+stay their own; since replicas are a small part of the bill
+(Section~\ref{sec:plant}), these arms remained over budget on 2.2--3.2\%
+of tenant-steps (\jcac{}: 0.9\%), and BM measures what the filter does to
+their latency, not a budget-compliant comparator. No arm in this study can
+both serve every request and keep every budget.
+
+\subsection{Objective}
+\label{sec:objective}
+
+Arms are scored on
+\begin{equation}
+\label{eq:J}
+J=\bar C/c_0+2\,\bar v+0.5\,\bigl(1-\overline{\mathrm{Jain}}\bigr),\qquad
+\bar C=C_{\mathrm{run}}/(8\times119),
+\end{equation}
+with $C_{\mathrm{run}}$ a run's total cost and $\bar v$ and
+$\overline{\mathrm{Jain}}$ its means over tenant-steps and steps. $J$ uses
+the planner's own weights. It prices violation, whereas (\ref{eq:plan})
+plans on the logarithm of excess; a planner variant that plans on
+violation instead changed $J$ by $+0.0047$ $[-0.0025,+0.0121]$. The
+registered scorers of the seven core campaigns and of RV divide cost by 119
+steps, one fewer than the 120 the simulator scores, so $\bar C$ is 0.84\%
+above the cost per scored tenant-step; re-scoring with 120 changes one of
+79 verdicts (RV-W4, from FAIL to PASS), on which no conclusion rests. TA, CS
+and BM divide by each run's own scored steps.
+
+Three properties of $J$ bear on every result below. First, it ignores
+budget overruns, which only the comparators incur (3.1--10.4\% of their
+tenant-steps). Second, it prices a shed only through violation, which is
+traffic-weighted and capped at 1 per request family: shedding all AI
+traffic of one tenant for one step raises that step's $v$ by at most the
+AI share $q_{\mathrm{AI}}$ of its requests, so it adds at most
+$2q_{\mathrm{AI}}$ to the per-step term whose cost part is
+$\mathrm{cost}/c_0$. An outage is therefore worth it to $J$ whenever the
+step's model spend exceeds $2q_{\mathrm{AI}}c_0=\$0.02\,q_{\mathrm{AI}}$,
+about twenty mid-tier misses; for an agentic tenant at the mid tier during
+a burst it always is. The bound is often loose: because AI p95 is a scaled
+mean, the cache hits a shed tenant still answers pull its latency down, and
+where the small tier already misses the target (premium agent traffic) a
+shed adds no violation at all. Third, the registered weights are a choice,
+and the switching penalty $\lambda=0.05$ per changed knob is a hand-set
+constant. With it, \jcac{}'s replicas ratchet upward (11.3 increases and 0.9
+decreases per run); with the smaller penalty the code documents as the
+corrected value (half a replica-step, 0.0067), replicas move both ways but
+\jcac{}'s $J$ worsens by 0.031, more than the equivalence margin
+(exploratory). Section~\ref{sec:threats} reports how verdicts move with the
+weights.
+
+\subsection{Statistics}
+\label{sec:stats}
+
+The unit of analysis is the design point (replications averaged) or the
+trace window, and every comparison pairs two arms on the same units and
+seeds. A directional claim passes only if a one-sided Wilcoxon signed-rank
+test clears its Holm threshold~\cite{holm1979} within its campaign's
+registered family \emph{and} the 95\% bootstrap interval of the mean paired
+difference (10{,}000 resamples) lies on the registered side of zero. Two
+arms \emph{tie} when that interval spans zero; only an equivalence
+reading~\cite{lakens2017} bounds a difference: equivalent (EQ) when the
+interval lies inside the registered margin of $\pm0.025$ in $J$, the
+smallest difference the design detects at $n=60$ with power 0.8 (about 6\%
+of \jcac{}'s $J$; HELDOUT, with $n=24$, uses the same margin). A difference
+can therefore pass its test and still be practically equivalent. Most
+campaigns also carry a non-inferiority guard on the uncapped SLO excess
+(one-sided 95\% bound below $+0.05$). Replications within a design point
+are strongly correlated (intraclass correlation of paired differences
+0.97--0.99 where we computed it), so five replications carry little more
+information than one, and the intervals resample design points: they
+generalise only over the sampled workloads, mixes and sizes.
+
+\subsection{The level-playing-field campaign}
+\label{sec:levelmethod}
+
+A final audit of the eleven campaigns (Sections~\ref{sec:shed}
+and~\ref{sec:threats}) found leaks on both sides: a free outage and a budget
+filter that only \jcac{} could use, which flattered it; a comparator above
+the cluster caps and an over-punitive never-shed fallback, which flattered
+the comparators; an unmeasured agent latency row; and a switching penalty
+that ratchets \jcac{}'s replicas upward. The twelfth campaign, LEVEL, removes
+them together, with every change opt-in so that published arms replay
+bit-identically.
+
+\emph{Objective.} $J_L$ is $J$ plus an outage price: every refused AI
+request is charged the small tier's price,
+\begin{equation}
+\label{eq:JL}
+J_L = \frac{C_{\mathrm{run}} + n_{\mathrm{shed}}\,p_{\mathrm{small}}}{8\,T\,c_0}
+      + 2\bar v + 0.5\bigl(1-\overline{\mathrm{Jain}}\bigr),
+\end{equation}
+with $T$ the run's scored steps and $n_{\mathrm{shed}}$ recovered exactly
+from the stored request counters, so refusing service never saves money
+relative to the cheapest tier.
+
+\emph{Comparators.} Every arm obeys the cluster caps. A new
+\emph{budget-gated} stack is the cheapest-tier stack whose gateway refuses AI
+model calls in any interval the tenant's budget cannot pay for (tier
+``none'', cache hits still answered), the way a gateway budget does; it can
+shed exactly when \jcac{}'s budget filter would force it to. The gated and
+ungated cheapest-tier stacks, capped HPA and capped KEDA were re-tuned per
+cluster size under $J_L$ on the tuning slice (no optimum on a grid edge).
+
+\emph{Treatment.} Four variants of \jcac{}, each a documented fix of an
+audited defect, were declared before scoring and evaluated under $J_L$ on the
+same tuning slice; the declared rule (lowest mean over the three sizes)
+chose the variant that pays the outage price in its own objective (the
+budget filter still tests real spend), serves on the cheapest affordable
+tier before it sheds, uses a switching penalty of half a replica-step, and
+forecasts with damped Holt. On that slice the chosen variant still scored
+worse than every comparator on the small and medium clusters, and the
+protocol predicted failures accordingly.
+
+\emph{Substrates.} Five experiments on fresh seeds (8,832 runs): the main
+matrix (primary); the main matrix under a monotone agent latency row (agent
+latency 3.125 times chat latency per tier: 0.94, 2.5 and 6.25\,s); the main
+matrix with replicas one interval late; the two held-out workloads; and the
+96 BurstGPT windows. One Holm family holds eleven tests; coordination is read
+against a tighter margin of $\pm0.01$, with the earlier $\pm0.025$ beside it.
+The protocol and scorer were pushed to the public repository 15\,s before
+the runner started, with the push recorded by a CI run; the predictions
+were written after seeing the treatment and the comparators on the tuning
+slice, and they are mostly failures.
+
+\subsection{Registration}
+\label{sec:prereg}
+
+Each campaign's protocol fixes its arms, design, tests, predictions and
+scorer before its first run. Table~\ref{tab:campaigns} lists the twelve
+campaigns reported here. The protocols of the seven core campaigns and of
+LEVEL were pushed to the public repository before their first runs, 0.2\,min
+to 14.9\,h ahead. The protocols of the four follow-ups (RV, TA, CS and BM) and
+of the request-counting re-run SA were committed to the authors' local
+repository before their runs (0.1\,min to 25.3\,h ahead) and published only
+afterwards, so their order rests on commit times we control. Six
+protocol--campaign pairs started within two minutes of their protocol's
+commit. The campaigns are confirmatory one by one but adaptive as a
+sequence: each was designed after an exploratory re-analysis of its
+predecessor, mostly on the same 60 design points, and with replications so
+strongly correlated a fresh seed adds little independent evidence. Only
+HELDOUT ran on design points that no earlier analysis had seen. Two earlier
+campaigns cited in Section~\ref{sec:chain} (EVICTION\_PARITY and
+ORDER\_PERMUTATION) were committed after their first runs and are disclosed
+as such. The 69 $p$-valued tests of the twelve campaigns are listed with
+their verdicts in~\ref{app:tests}; the programme-wide ledger of all 63
+protocols counts 157 such tests, of which 82 passed and 64 survive a
+programme-wide Holm correction, plus 88 interval- or rule-based readings
+without a $p$-value.
+
+\begin{table}[t]
+\caption{The twelve registered campaigns: seven core campaigns, four
+follow-ups and the final level-field campaign (LEVEL, five experiments). Points: design points or BurstGPT windows. PASS: $p$-valued
+tests passed, out of those registered (equivalence readings excluded).
+BM runs three new arms against registered rows; the SA re-run of the JN
+and TA runs (request counters only) is descriptive and not counted.}
+\label{tab:campaigns}
+\centering\footnotesize\setlength{\tabcolsep}{3.5pt}
+\input{tables/tab_campaigns.tex}
+\end{table}

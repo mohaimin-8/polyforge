@@ -1,0 +1,95 @@
+% =====================================================================
+\section{The system and the joint controller}
+\label{sec:system}
+% =====================================================================
+
+\subsection{What was built}
+\label{sec:built}
+
+\polyforge{} comprises a Go control plane and gateway with a per-tenant
+semantic cache, a Python planner service, and a Kubernetes operator that
+applies the planner's decisions under guardrails (move clamps, a plan
+deadline, and a hold-last-good-plan fallback). The gateway's replicas are
+the tenants' serving pods: they authenticate, cache, meter and forward each
+request; the models run outside the cluster as endpoints with a price and a
+latency, so no replica is a GPU model server. The planner service runs the
+same controller code as the simulator in which every campaign of this
+paper ran (Section~\ref{sec:method}); the operator path was exercised on a
+local Kubernetes-in-Docker cluster and on one rented GPU host
+(Section~\ref{sec:live}), but none of the comparisons reported in
+Sections~\ref{sec:chain}--\ref{sec:width} ran on a cluster. Several
+components in the repository (an analytics sink, OIDC and secret-store
+integrations, a service-mesh configuration and a network policy) were
+never part of a measured run, and we make no claim about them.
+
+\subsection{The planner}
+\label{sec:jcac}
+
+Every 10\,s, \jcac{} chooses a configuration $x_i=(r_i,c_i,\tau_i)$ for
+each tenant $i$: a replica count, a cache budget and a model tier. The
+choice is restricted to a \emph{lattice} of moves anchored at the
+interval-start state: $\Delta r\in\{-2,\dots,2\}$, a move of at most one
+cache level among $\{0,64,128,256,512,1024\}$\,MB, and
+$\tau\in\{\text{none},\text{small},\text{mid},\text{large}\}$, where
+``none'' makes no model call. That gives at most 60 candidates per tenant.
+Over a six-step (60\,s) horizon the planner minimises
+\begin{equation}
+\label{eq:plan}
+\Phi(x)=\frac{\alpha}{c_0}\sum_i \mathrm{cost}_i
+ +\beta\sum_i\log\bigl(1+\mathrm{exc}_i\bigr)
+ +\gamma\bigl(1-\mathrm{Jain}(s)\bigr)
+ +\lambda\sum_i \mathrm{sw}_i ,
+\end{equation}
+where $\mathrm{cost}_i$ is the projected spend of tenant $i$ (replica time,
+cache memory and the tier's price per cache miss), $\mathrm{exc}_i$ is the
+traffic-weighted relative overshoot of its p95 latency over its service
+level objectives (SLOs), $s_i=1-v_i$ with $v_i\in[0,1]$ the violation (the
+overshoot capped at 1 per request family) enters Jain's fairness
+index~\cite{jain1984}, and $\mathrm{sw}_i$ counts changed knobs. The weights
+are $\alpha=1$, $\beta=2$, $\gamma=0.5$, $\lambda=0.05$, and
+$c_0=\$0.01$ per tenant-step. An interference penalty, zero unless a tenant
+is flagged as a noisy neighbour, is omitted because no campaign here flags
+one.
+
+Two hard filters precede the objective. A candidate whose projected spend
+exceeds the tenant's hourly dollar budget, pro-rated to the interval, is
+discarded, and the tenants' combined replicas and cache may not exceed the
+cluster's caps. If no candidate survives, the tenant falls back to its
+minimum replicas, no cache and tier ``none''. We call a tenant
+\emph{shed} on a step whose tier is ``none'', whether the objective chose it
+or the budget forced it. Shedding is the controller's designed response to
+an unaffordable interval; no comparator in this study can shed, and the
+objective prices a shed only through its SLO terms
+(Section~\ref{sec:objective}).
+
+The planner holds each candidate fixed over the horizon, on a forecast that
+extends each tenant's linear trend over its last three intervals, applies
+only the first move, and re-plans every interval: receding-horizon control
+with move blocking. The solver runs block-coordinate descent over tenants.
+Each tenant best-responds exactly over its own lattice, within the cluster
+caps that tenants earlier in the sweep leave free; sweeps accept only
+strict improvements of $\Phi$ and repeat until no tenant changes, which
+terminates because the lattice is finite. With uniform fairness weights,
+$\Phi$ is an exact potential~\cite{monderer1996} of the game in which each
+tenant chooses its own configuration, so the sweeps end at a
+coordinate-wise equilibrium: no tenant can lower $\Phi$ by changing only its
+own configuration. This is joint search \emph{within} a tenant, not a
+global optimum across tenants, and the result can depend on the sweep
+order. An earlier, two-sweep version of the solver could move a tenant past
+its clamps on the second sweep (up to $\pm4$ replicas); every campaign
+reported here uses the anchored, convergent solver, which never reached its
+50-sweep safety cap where tracked. Planning 8 tenants takes a median of
+31\,ms (p95 44\,ms) per cycle on one laptop core.
+
+\subsection{The ablations that isolate coordination}
+\label{sec:ablations}
+
+Two ablations share everything with \jcac{}---objective, forecast, budget
+filter, cluster caps and lattice---and change only the search over one
+tenant's knobs. The \emph{decoupled} arm best-responds each knob with the
+other two held at the incumbent and combines the three winners; if the
+combined move breaks a budget or a cap, it keeps the best feasible subset of
+the individual moves. The \emph{knob-wise} arm takes one-knob best responses in turn
+until no knob changes. The difference between \jcac{} and
+the decoupled arm is therefore the value of searching the knobs jointly,
+with nothing else changed.

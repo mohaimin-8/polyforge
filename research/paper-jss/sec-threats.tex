@@ -1,0 +1,121 @@
+% =====================================================================
+\section{Threats to validity}
+\label{sec:threats}
+% =====================================================================
+
+\paragraph{Construct validity}
+The plant is our own model, and the planner plans with that same model:
+it is an oracle of the system it controls, which flatters \jcac{} against
+comparators that see only utilisation or request rates. On a plant
+re-fitted to the deployed gateway's measurements, a planner that kept the
+published model lost to the layered stack by $0.1052$ in $J$. The plant's
+replicas are gateway pods, not GPU model servers: batching, KV-cache
+memory, request backlog and tier-switch lag lie outside the study, and
+pod congestion multiplies the external model's latency instead of adding a
+queueing delay. A replica-step costs about one small-tier cache miss while
+a tenant sends tens of misses per step, so the bill is mostly model spend,
+set by a synthetic price ladder of 1:10:100 per miss in ten of the eleven
+campaigns; our own GPU bench measured 1:1.475:1.518. Under the measured
+ladder coordination was worth nothing (QUALITY), and the complete-policy
+verdicts move: in an exploratory re-run of JOINTNESS under that ladder,
+\jcac{} beat every comparator, the cheapest-tier stack by $0.0276$
+$[0.0045,0.0531]$, but only because the comparators stayed pinned to the
+small tier and because small-tier agent requests are slow by assumption.
+That assumption (6\,s on the small tier against 2.5 and 3.5\,s on the
+larger ones) is unmeasured and contradicted by our own bench; with a
+monotone ladder the directional coordination gain disappeared and
+\jcac{}'s wins over capped KEDA and the static share became ties
+(exploratory). At the level field of LEVEL the monotone row changed no
+verdict (LV-R1), so the final RQ1 answer does not rest on it; the
+synthetic price ladder was not varied there and remains an assumption under
+every final verdict. RQ2's conclusion that coordination is small holds under
+both rows and both ladders. The cache is a synthetic hit
+curve, bounded by the CS campaign but with no model of similarity,
+eviction, drift or wrong answers; its memory is almost free (0.2\% of the
+bill), so more cache is always better up to the caps. $J$ uses the planner's own
+weights; it ignores budget overruns (3.1--10.4\% of the comparators'
+tenant-steps), prices a shed request only through a capped violation term,
+leaves network, storage and control-plane cost unpriced, and includes
+answer quality only in QUALITY. In an exploratory re-scoring, the registered
+violation weight of 2 was exactly the crossover against re-tuned HPA (at 4
+HPA was better, at 8 KEDA too) and the re-scoring did not re-optimise the
+arms at each weight. The cost per request served changes sign with its
+aggregation (Section~\ref{sec:shed}), so we make no per-request cost claim.
+The budgets were set below the small tier's peak spend for several
+workloads, so part of the shedding is a property of the budgets we chose.
+
+\paragraph{Internal validity}
+The comparators are hand-written rules with one or two parameters, tuned
+on a 12-run slice; per-size re-tuning moved their cost and violation but
+barely their $J$, because $J$ is nearly flat in their targets. The
+registered layered stacks were not held to the cluster caps, and the
+cheapest-tier stack used up to twice the small cluster's replicas; its
+capped re-run is exploratory and was not re-tuned under the caps. In the
+first eleven campaigns only \jcac{} could shed or keep a budget, and the
+budget-matched campaign could not remove that asymmetry
+(Section~\ref{sec:budget}). LEVEL removed both leaks (every arm capped and
+re-tuned; a budget-gated stack), but its own choices carry risk: the
+treatment variant was selected on the comparators' tuning slice under
+instant actuation, which is how a variant fragile under lag was chosen; the
+gate sheds whole steps, as \jcac{} does, rather than refusing only the
+requests beyond the budget; and the comparators were not re-tuned for lag,
+held-out demand or the trace. \jcac{} plans one held move
+per interval on a three-point trend forecast; a damped Holt forecaster cut
+one-step error on the BurstGPT trace by 6.9--26.9\%, but joint and
+decoupled search share the forecast, so RQ2 is unaffected. A multi-step
+planner might find sequenced coordination that a held move cannot; the
+wide-lattice \jcac{} beat neither the default-behaviour nor the capped HPA
+(RV-W1, RV-W2). The solver is joint within a tenant and coordinate descent
+across tenants; on the earlier, non-convergent solver, six sweep orders moved
+mean Jain fairness by at most 0.0076 and cost by 0.91\%. Actuation is
+instantaneous outside ACTUATION, and even there tier switches never lag.
+Besides the comparator defects of Section~\ref{sec:chain}, our audits found
+two defects that hurt \jcac{} (the non-convergent solver, replaced in every
+campaign here, and the comparators' missing budget, which BM measures) and
+several in the live harness (Section~\ref{sec:live}).
+
+\paragraph{External validity}
+The main workloads are synthetic and periodic, every design point puts
+eight tenants of a single workload class together (so tenants interact
+only through the cluster caps), HELDOUT has one AI class, the coupled plant was chosen from a probe grid, and the live-fitted
+plant is a parameter scenario, not a live experiment: no measured run
+reached congestion and AI requests never loaded a replica, so the coupling
+that coordination needs was absent from the deployed system's
+measurements. The two non-periodic workloads and the BurstGPT windows,
+where \jcac{} beat no tuned comparator, are the closest we come to
+deployment conditions. Nothing in Sections~\ref{sec:chain}--\ref{sec:width}
+ran on a cluster, and the live case study of Section~\ref{sec:live} is one
+host, two replications and an in-sample calibration. Our conclusions are
+conditional on the simulated workloads and coupling.
+
+\paragraph{Statistical conclusion validity}
+The intervals resample design points, so they generalise only over the
+60 cells we chose; with the five workload classes as the unit, the
+confirmatory tests we re-checked had $p$-values between 0.25 and 0.997. Replications are
+nearly redundant (intraclass correlation 0.97--0.99), so the effective
+sample is the design point, not the run. The $\pm0.025$ margin is the
+design's minimum detectable difference, not an operational threshold; an
+operator who cares about 1\% of $J$ should read Table~\ref{tab:coord} as a
+small directional effect. Several registered passes do not survive a
+programme-wide correction (\ref{app:tests}). The programme is sequential
+and adaptive: most campaigns were designed after an exploratory reading of
+the same 60 design points, so their confirmatory status protects against
+analytic flexibility but not against the choice of what to test next; only
+HELDOUT tested design points no earlier analysis had seen, and LEVEL re-ran
+the known design points on fresh seeds.
+
+\paragraph{Registration evidence}
+A registration is only as strong as its timestamp. The protocols of the
+seven core campaigns and of LEVEL were pushed to the public repository
+before their first runs (LEVEL's 15\,s before its runner started, with the
+push recorded by a CI run); those of RV, TA, CS, BM and the SA re-run were
+committed locally before their runs and published afterwards, and six
+protocol--campaign pairs began within two minutes of their protocol's
+commit. LEVEL's scorer needed one post-run loader fix, disclosed in a dated
+note, which changed no number. Software
+Heritage holds pre-run snapshots for two protocols only, and the Open
+Science Framework registration is a single post-run mirror of the first 48
+protocols. The public history was later rewritten twice to edit commit
+messages and a few non-protocol files; no protocol, record, data file or
+figure changed, commit timestamps were preserved, and a map in the artifact
+resolves the old commit identifiers that server-side witnesses cite.

@@ -1,0 +1,45 @@
+% =====================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% =====================================================================
+
+We set out to show that one controller over replicas, semantic-cache
+memory and model tier beats three independent loops in a multi-tenant LLM
+gateway, and found, for our rate-limited planner and simulated plant, that
+it does not. Coordination itself is small: joint search adds 1.6\% of the
+objective over decoupled search when outages are free, and 1.3--4.5\% when
+every refused request is charged, because bounded steps make the
+per-tenant joint problem locally separable; it grows only with wide steps
+on layers that share capacity, a regime in which this planner does worse.
+As a complete policy, the joint controller's apparent advantages came first
+from comparator defects and then from leaks that flattered it, chiefly
+outages its objective priced lightly and a budget only it could keep. A
+final registered campaign removed every leak we had found on both sides and
+gave the controller its documented fixes. It beat no comparator on
+synthetic, held-out or lagged demand, lost to an ungated per-layer stack and,
+under actuation lag, to capped HPA, and won once: on real, bursty demand,
+among arms that keep the budget, it beat a reactive budget gate by 2.7\%.
+
+Three consequences follow. For operators: tune, cap and budget the
+per-layer loops, choose the cheapest adequate model, and enforce budgets as
+explicit gateway policy before building a coordinator; check first whether
+the deployment is in the separable regime. Where budgets are hard and demand
+is bursty, a budget-aware planner is the one place our evidence favours joint
+control. For researchers: report any joint-control gain beside a
+decoupled-search ablation; re-tuned, capped, budget-matched and
+cheapest-adequate baselines with the same action set; held-out demand; an
+outage price; and the number of requests each arm actually served. And for
+anyone running a registered programme: our own early rules missed a
+comparator above the caps, an unmeasured latency constant, and a hysteresis
+setting that was a defect under one actuation model and a hedge under
+another, so an audit of the whole programme belongs before its last word.
+
+What this study does not settle is whether the regularity holds on GPU
+model servers with batching, backlog and tier-switch lag, under multi-step
+planning, under a measured price ladder at a level field, or on a live
+system; a registered live replication of the corrected controller was
+designed and is the first experiment we would fund. Code, protocols, run
+data and the scripts that regenerate every table and figure are publicly
+archived\ifblind; the links are withheld for review.\else{} at
+\url{https://github.com/mohaimin-8/polyforge} (data DOI
+10.5281/zenodo.22801195; registration mirror DOI 10.17605/OSF.IO/DYZKV).\fi

@@ -1,0 +1,124 @@
+% =====================================================================
+\section{Introduction}
+\label{sec:intro}
+% =====================================================================
+
+A gateway that serves large language model (LLM) traffic to many tenants
+decides, every few seconds and for every tenant, how many serving replicas
+to run, how much semantic-cache memory to grant, and which model tier
+should answer the requests the cache misses. In deployed stacks a
+different controller owns each decision: the Kubernetes Horizontal Pod
+Autoscaler (HPA) or KEDA scales replicas on a utilisation or queue
+signal~\cite{k8shpa,keda}, a semantic cache such as GPTCache answers
+repeated prompts~\cite{gptcache}, and a router or cascade sends the
+remaining requests to a cheaper or a stronger model~\cite{frugalgpt,routellm}.
+In the vocabulary of self-adaptive systems, the gateway runs three
+feedback loops over one managed system~\cite{kephart2003,weyns2013}. The
+loops share capacity: every cache hit removes work from the replicas,
+replica congestion slows every miss, and every miss pays its tier's price.
+The best setting of each loop in isolation therefore need not be the best
+joint setting, and the natural engineering response is one controller
+that sets all three knobs together.
+
+Whether that response pays is not settled. Joint configuration of serving
+knobs has been built and reported to win: INFaaS selects model variants
+together with autoscaling~\cite{infaas}, IPA and Proteus adapt model
+variants together with replicas~\cite{ipa,proteus}, Cascadia co-optimises
+cascade deployment and routing~\cite{cascadia}, and Zhu et~al.\ design a
+cache jointly with a model selector~\cite{zhu2023}. Each compares the joint
+design with separately configured or fixed alternatives. Two things are
+missing from that evidence. First, controller comparisons are sensitive to
+how well the authors tune and instrument their
+baselines~\cite{chameleon,zhang2026drl,khilji2026}, and an evaluation that
+removes the comparators' handicaps one at a time is rare. Second, few
+evaluations isolate what coordination itself is worth, which requires
+holding the objective, the forecaster, the actuation limits, the budgets
+and the cost model fixed while varying only the search: joint, or per
+knob. The question matters to anyone who builds or operates such a
+gateway, because a joint controller is costlier to build, to verify and to
+debug than three loops that each have a mature implementation.
+
+We built a joint controller, \jcacintro{}, as the planner of \polyforge{},
+a Kubernetes-native control plane for multi-tenant LLM gateways, and then
+tried to falsify our own hypothesis that joint control is worth building.
+Over twelve pre-registered simulation campaigns (33{,}612 runs) we asked
+two questions. \emph{RQ1:} does the joint controller beat independently
+operated per-layer controllers, each run as a complete policy?
+\emph{RQ2:} what does joint search add when everything else is held
+fixed? RQ2 is the better isolated of the two; the answer to RQ1 depends on
+how the comparators are built and constrained, and we report how it
+changed as we corrected them.
+
+The joint controller's advantage did not survive. On RQ2, joint search
+lowered the objective by 1.6\% relative to searching each knob with the
+other two held fixed: a directional difference, but inside the registered
+equivalence margin, and in ten other registered settings the difference
+stayed between a 1.4\% loss and a 1.4\% gain. A registered experiment that
+varied the actuation step explains why: when one interval may move a
+tenant by at most two replicas and one cache level, the per-tenant joint
+problem is \emph{locally separable}, so per-knob search finds the joint
+move in almost every decision. Coordination grew four- to five-fold with
+eight-replica steps, but only on plants where AI work loads the replicas,
+and the wide steps made the controller worse. On RQ1, the controller first
+appeared to beat HPA by 27.5\% and a layered stack by 60\% of the
+objective; both gains came from comparator defects, removed one registered
+re-scoring at a time. What then remained rested on the largest cluster, on
+actuation lag and on shedding: the controller answered 10.1\% of AI requests
+with no model at all, an outage the objective priced lightly.
+
+An audit of all eleven campaigns found leaks on both sides: free outages and
+a budget that only the joint controller could keep, which flattered it, and
+a comparator running above the cluster caps and an over-punitive never-shed
+fallback, which flattered the comparators. A twelfth campaign removed them
+together. It charged every refused request, gave a per-layer stack a gateway
+budget gate, held every arm to the caps, re-tuned the comparators, and gave
+the joint controller its documented fixes, chosen on the comparators' tuning
+data. At that level field the joint controller beat no comparator on
+synthetic, held-out or lagged demand; it lost to the ungated cheapest-tier
+stack, and under actuation lag to the gated stack and to capped HPA, because
+the corrected hysteresis that helps it elsewhere pays for every late replica.
+It won once: on real BurstGPT demand, among arms that keep the budget, it beat
+the budget-gated stack by 2.7\%. With outages priced, coordination rose to
+1.3--4.5\% of the objective, and still bought no win.
+
+These are negative results about a controller we designed, and we report
+them as the contribution, together with the mechanism that explains them
+and the evaluation rules that would have caught our own early errors. The
+paper makes six contributions:
+\begin{itemize}
+\item \textbf{A measurement of what coordination is worth}
+  (Sections~\ref{sec:coordination} and~\ref{sec:level},
+  Tables~\ref{tab:coord} and~\ref{tab:level}): across eleven registered
+  settings joint search changes the objective by between $-1.4\%$ and
+  $+1.6\%$ relative to decoupled search, inside the equivalence margin; with
+  outages priced it gains 1.3--4.5\%, directional everywhere.
+\item \textbf{A final test at a level field}
+  (Section~\ref{sec:level}, Table~\ref{tab:level}): with every audited
+  leak removed on both sides, the joint controller beats no comparator on
+  synthetic, held-out or lagged demand, and beats a budget-gated stack only
+  on real BurstGPT demand.
+\item \textbf{A mechanism confirmed under pre-registration}
+  (Section~\ref{sec:width}, Fig.~\ref{fig:width}): coordination grows with
+  how far one interval may move a tenant, and only where the layers share
+  capacity; all five registered predictions held.
+\item \textbf{An adjudication of the complete-policy comparison}
+  (Sections~\ref{sec:chain}--\ref{sec:generalise}, Fig.~\ref{fig:chain}):
+  the initial 27.5--60\% gains traced to comparator defects, each removed by
+  a registered re-scoring, and what then remained attributed to cluster
+  size, actuation lag and shedding; the leaks a final audit found on both
+  sides are what the level-field campaign removed.
+\item \textbf{An accounting of where the savings come from}
+  (Section~\ref{sec:shed}, Table~\ref{tab:served}): request-level counters,
+  added without changing any registered metric, show the controller's
+  spend advantage is unserved traffic, not cheaper service.
+\item \textbf{Evaluation rules and an open artifact}
+  (Section~\ref{sec:lessons}, Table~\ref{tab:checklist}): seven rules paired
+  with the defects they caught, and code, protocols, run data and scripts
+  that regenerate every number in the paper.
+\end{itemize}
+
+The simulator's plant is our own model, with serving replicas that are not
+GPU model servers, a synthetic cache-hit curve and a synthetic price
+ladder; all comparisons are simulated, and a registered live replication
+was not funded. Section~\ref{sec:threats} states what these limits leave
+open; the results should be read as conditional on that plant.

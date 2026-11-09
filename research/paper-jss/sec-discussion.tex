@@ -1,0 +1,105 @@
+% =====================================================================
+\section{Lessons}
+\label{sec:lessons}
+% =====================================================================
+
+\paragraph{When a joint controller is worth building}
+For planners of this kind, joint search earns its cost only when one
+interval may move a tenant far relative to its size \emph{and} the layers
+share a resource. The rate-limited lattice moves a tenant by at most
+one-eighth to one-third of its replica cap per interval; the wide lattice
+by half or more. Kubernetes' default HPA scale-up policy, which may double
+a deployment or add four pods every 15\,s~\cite{k8shpa}, resembles the wide
+lattice at 6 to 16 replicas, so the regime in which coordination pays is
+not exotic; but in our plant it was also the regime in which the planner
+did worst. Whether a deployment is in the separable regime can be checked
+before anything is built: probe the disagreement between joint and per-knob
+best responses on recorded states, as Fig.~\ref{fig:width}(b) does, in the
+spirit of Bristol's interaction measure~\cite{bristol1966}. Below a few
+percent disagreement, three well-tuned loops will do.
+
+\paragraph{What to build instead}
+In this plant the bill is model spend, and the decision that moves it is
+the tier. A per-layer stack with a tuned, capped autoscaler and the
+cheapest adequate model matched the joint controller on the matrix and beat
+it on unseen demand, also when held to the cluster caps, and on the
+live-fitted plant. What the joint
+controller added that the stack lacked was a hard per-tenant budget, which
+it kept by refusing service. A budget is an operator policy and should be
+enforced, and reported, as one: a gateway that refuses AI calls once a
+tenant's budget is spent makes the trade explicit, whereas an objective that
+prices the refusal through a capped violation term hides it. The final
+campaign gave a per-layer stack exactly that gate. On the synthetic matrix
+the gate rarely fired and the gated stack tied the joint controller; on real
+BurstGPT demand, where the budgets bind, the joint controller kept them at a
+lower cost than the gate did. That is the one place our evidence favours a
+budget-aware planner over a reactive layer, and it is narrow: arms that
+simply overspent the budget scored better still.
+
+\paragraph{Fixes interact with the actuation model}
+The published controller's switching penalty ratchets replicas upward, which
+the audit flagged as a defect, and the corrected penalty was the treatment's
+best variant on the instant-actuation tuning slice. Under one-interval lag
+the ranking reversed: the ratchet held replicas the plant could not deliver
+in time anyway, while the corrected controller paid for every replica that
+arrived late, and it lost to the reactive stacks it had tied. Hysteresis in a
+controller is a bet on the actuation model, and a variant selected under one
+model needs a registered test under the others before it is called a fix.
+
+\paragraph{How to evaluate a joint controller}
+Every comparator defect we found favoured the joint controller.
+Table~\ref{tab:checklist} turns them into rules, each paired with the
+defect it caught here and the effect of correcting it. None of the rules is
+new on its own~\cite{chameleon,hoefler2015}; what this study adds is a
+measurement of how much each was worth in one realistic evaluation, and
+the observation that they compound: the first two corrections alone
+removed a 27.5\% lead, and the fourth removed a 60\% one.
+
+\begin{table}[t]
+\caption{Rules for comparing a joint controller with per-layer
+controllers, the defect each caught in this study, and the effect of
+correcting it on the joint controller's measured advantage ($\Delta J$ as
+a percentage of the comparator's $J$; negative: joint better).}
+\label{tab:checklist}
+\centering\tablefont
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.25\textwidth}
+                >{\raggedright\arraybackslash}p{0.36\textwidth}
+                >{\raggedright\arraybackslash}p{0.31\textwidth}@{}}
+\toprule
+Rule & Defect it caught & Effect (campaign) \\
+\midrule
+One cost model for all arms & Only baselines paid a $1.4581\times$
+  inference surcharge; their cache was pinned at 128\,MB &
+  $-27.5\%\rightarrow-0.4\%$ (EVICTION\_PARITY) \\
+Interior tuning optima, per cluster size & HPA's optimum on a grid edge &
+  $-0.9\%\rightarrow0.0\%$ (RT-H1) \\
+Same caps, budgets and action set for all arms & Re-tuned HPA and the
+  cheapest-tier stack ran up to twice the small cluster's replica cap; only
+  the joint controller kept budgets or could shed &
+  capped HPA still a tie (JN-B4); capped stack: small-cluster loss
+  $+0.0732\rightarrow+0.0066$ (exploratory); with caps, a budget gate and an
+  outage price for all, no joint win on the matrix (LEVEL) \\
+A cheapest-adequate per-layer stack & Registered tier rule ranked tiers by
+  latency, at 3.4$\times$ the cost & $-60.4\%\rightarrow+4.7\%$ (JN-B1) \\
+A decoupled-search ablation & Coordination never isolated &
+  1.6\% of $J$, inside the margin (JN-C1) \\
+Count requests served; price outages & $J$ priced a shed request only
+  through a capped violation term & 10.1\% of AI requests unserved; priced
+  and level, no win on the matrix (SA, LEVEL) \\
+Held-out demand & Every workload periodic, comparators tuned on them &
+  $+23.3\%$ against the cheapest-tier stack (HO-B1); $+6.5\%$ with the stack
+  capped (exploratory) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{For multi-loop self-adaptive systems}
+The question of when separate adaptation loops need a coordinator is
+usually argued from the loops' interactions~\cite{weyns2013,kephart2007}.
+Our results suggest it can also be answered by measurement, and that the
+answer depends on two properties an engineer controls: how far each loop
+may move per decision, and whether the loops' effects meet in a shared
+resource. Rate limits, which operators impose for stability anyway, make
+the joint problem locally separable and the coordinator nearly redundant.
+This is one plant and one family of planners; whether the regularity holds
+for other multi-loop systems is an open, testable question.
