@@ -10,8 +10,8 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 
 | | |
 |---|---:|
-| records | 103 |
-| regenerated and compared | 87 |
+| records | 104 |
+| regenerated and compared | 88 |
 | outside the gate, reason stated | 16 |
 | outside the gate, no entry | 0 |
 
@@ -66,6 +66,7 @@ Verdicts are deliberately absent. A PASS or a FAIL misattributed by a regular ex
 | `RESULTS_LAYERED_FIX.md` | LF-H1, LF-H2 | yes |
 | `RESULTS_LEARNED.md` | LR-H1, LR-H2 | yes |
 | `RESULTS_LEVEL.md` | - | yes |
+| `RESULTS_LEVEL2.md` | - | yes |
 | `RESULTS_LEVEL_LAG.md` | LL-H1, LL-H2, LL-H3, LL-H4, LL-H5 | yes |
 | `RESULTS_LIVE_CHAOS_P99.md` | LC-H1 | yes |
 | `RESULTS_LIVE_SOAK.md` | RB-H1, SK-H1, SK-H2, SK-H3, SK-H4 | yes |

@@ -159,6 +159,9 @@ CAMPAIGN_RECORDS = [
     # PREREG_LEVEL_LAG (2026-11-10): one changed factor after LEVEL's lag failure,
     # from metrics_matrix_level_{lag2,inst2}.csv.gz.
     ("analysis_level_lag.py", [], "RESULTS_LEVEL_LAG.md"),
+    # PREREG_LEVEL2 (2026-11-10): the best joint controller found, re-tested against
+    # every level comparator, from metrics_matrix_level2*.csv.gz.
+    ("analysis_level2.py", [], "RESULTS_LEVEL2.md"),
     # fig22 / fig23 (2026-10-22): the adjudication chain and the width mechanism,
     # each drawn through the frozen scorers from the committed exports.
     ("fig_adjudication_chain.py", [], "FIGURE_ADJUDICATION_CHAIN.md"),
