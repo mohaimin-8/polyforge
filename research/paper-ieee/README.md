@@ -10,8 +10,10 @@ Deadline and rules: `SUBMISSION.md`.
 - `main.tex` – the paper
 - `IEEEtran.cls` – IEEE class file
 - `figures/*.pdf`, `tables/*.tex` – figures and generated tables (`make_assets.py`)
-- `POLYFORGE_IEEE_submission.pdf` – double-blind review copy (upload this to CMT)
-- `POLYFORGE_IEEE_camera_ready_preview.pdf` – preview of the final version with authors
+- `ICEEICT2027_submission.pdf` – double-blind review copy: **upload this one**
+  (its file name carries no author or system name)
+- `ICEEICT2027_camera_ready_preview.pdf` – preview of the final version with
+  authors and links: **never upload it for review**
 - `REVIEW_RESPONSE.md` – point-by-point responses to the internal and external reviews
 - `CHANGES_round11.pdf` – the eleventh round (31 Oct 2026): the second
   external review and three registered follow-up experiments, marked against
