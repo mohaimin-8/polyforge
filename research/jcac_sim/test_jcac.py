@@ -915,6 +915,29 @@ class ModelFormTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             model.set_model_form(wu_tier_factor={"mid": 0.0})
 
+    def test_a_rejected_form_changes_nothing(self):
+        # The last knob validated is rejected after the earlier ones were
+        # already reset and applied: the active form must survive intact.
+        model.set_model_form(agent_latency_ms={"small": 937.5, "mid": 2500.0, "large": 6250.0},
+                             congestion_exponent=0.86)
+        before = model.form_snapshot()
+        with self.assertRaises(ValueError):
+            model.set_model_form(congestion_exponent=0.5, wu_tier_factor={"huge": 2.0})
+        self.assertEqual(model.form_snapshot(), before)
+
+    def test_a_rejected_economy_changes_nothing(self):
+        try:
+            model.set_economy(tier_cost_usd_per_req={"mid": 1.52e-4}, cache_hit_max=0.9)
+            before = (dict(model.TIER_COST_USD_PER_REQ), model.CACHE_HIT_MAX, model.CACHE_HALF_MB)
+            for bad in ({"cache_hit_max": 1.5}, {"cache_half_mb": 0.0},
+                        {"tier_cost_usd_per_req": {"huge": 1.0}}):
+                with self.assertRaises(ValueError):
+                    model.set_economy(**bad)
+                self.assertEqual((dict(model.TIER_COST_USD_PER_REQ), model.CACHE_HIT_MAX,
+                                  model.CACHE_HALF_MB), before, bad)
+        finally:
+            model.set_economy()
+
 
 class AnchorMovesTests(unittest.TestCase):
     """PREREG_MOVE_CLAMP: the coordination-gap audit caught the second

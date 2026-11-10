@@ -193,8 +193,25 @@ def set_economy(
     Always resets first so a worker process is stateless across runs: calling
     with no arguments restores the frozen constants exactly. The price table
     is mutated in place (never rebound) so `from model import` aliases keep
-    seeing the active economy.
+    seeing the active economy. A rejected argument raises and changes
+    nothing: the economy active before the call stays active.
     """
+    global CACHE_HIT_MAX, CACHE_HALF_MB
+    prices, hit_max, half_mb = dict(TIER_COST_USD_PER_REQ), CACHE_HIT_MAX, CACHE_HALF_MB
+    try:
+        _set_economy(tier_cost_usd_per_req, cache_hit_max, cache_half_mb)
+    except Exception:
+        # The body resets and validates knob by knob (and assigns the cache
+        # curve before testing it), so a failure would otherwise leave a
+        # half-reset economy, or an invalid curve, active.
+        TIER_COST_USD_PER_REQ.clear()
+        TIER_COST_USD_PER_REQ.update(prices)
+        CACHE_HIT_MAX, CACHE_HALF_MB = hit_max, half_mb
+        raise
+
+
+def _set_economy(tier_cost_usd_per_req: dict | None, cache_hit_max: float | None,
+                 cache_half_mb: float | None) -> None:
     global CACHE_HIT_MAX, CACHE_HALF_MB
     TIER_COST_USD_PER_REQ.clear()
     TIER_COST_USD_PER_REQ.update(_DEFAULT_TIER_COST_USD_PER_REQ)
@@ -279,8 +296,31 @@ def set_model_form(
     Same contract as set_economy: always resets first so a pooled worker
     process is stateless across runs; calling with no arguments restores
     the published forms exactly. The factor table is mutated in place so
-    `from model import` aliases keep seeing the active form.
+    `from model import` aliases keep seeing the active form. A rejected
+    argument raises and changes nothing: the form active before the call
+    stays active (the body resets and validates knob by knob).
     """
+    before = form_snapshot()
+    try:
+        _set_model_form(congestion_exponent, p95_tail, mixture_p95, wu_tier_factor, replica_capacity_wu,
+                        wu_ai_scale, crud_base_scale, cacheable_uniform, tier_latency_ms, agent_latency_ms)
+    except Exception:
+        _restore_form(before)
+        raise
+
+
+def _set_model_form(
+    congestion_exponent: float | None,
+    p95_tail: tuple | None,
+    mixture_p95: bool | None,
+    wu_tier_factor: dict | None,
+    replica_capacity_wu: float | None,
+    wu_ai_scale: float | None,
+    crud_base_scale: float | None,
+    cacheable_uniform: bool | None,
+    tier_latency_ms: dict | None,
+    agent_latency_ms: dict | None,
+) -> None:
     global CONGESTION_EXPONENT, P95_TAIL, MIXTURE_P95
     global REPLICA_CAPACITY_WU, WU_AI_SCALE, CRUD_BASE_SCALE, CACHEABLE_UNIFORM, TIER_LATENCY_FLAT
     global AGENT_LATENCY

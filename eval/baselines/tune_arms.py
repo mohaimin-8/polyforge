@@ -284,20 +284,29 @@ def main(argv: list[str] | None = None) -> None:
                     help="tune only these arms and MERGE them into tuned_arms.yaml "
                          "(every other entry is kept verbatim); default: all, rewritten")
     ap.add_argument("--workers", type=int, default=1, help="parallel processes")
-    ap.add_argument("--quality", action="store_true",
-                    help="tune the PREREG_QUALITY comparators (GPU economy, quality-priced J) "
-                         "and MERGE them into tuned_arms.yaml")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--quality", action="store_true",
+                      help="tune the PREREG_QUALITY comparators (GPU economy, quality-priced J) "
+                           "and MERGE them into tuned_arms.yaml")
     ap.add_argument("--quality-arms", nargs="+", choices=list(QUALITY_ARMS),
                     help="with --quality: only these arms")
-    ap.add_argument("--level", action="store_true",
-                    help="tune the PREREG_LEVEL comparators (J plus the outage price) "
-                         "and MERGE them into tuned_arms.yaml")
+    mode.add_argument("--level", action="store_true",
+                      help="tune the PREREG_LEVEL comparators (J plus the outage price) "
+                           "and MERGE them into tuned_arms.yaml")
     ap.add_argument("--level-arms", nargs="+", choices=list(LEVEL_ARMS),
                     help="with --level: only these arms")
-    ap.add_argument("--level-gpu", action="store_true",
-                    help="tune the PREREG_LEVEL_GPU comparators (J_L at the GPU price "
-                         "ladder) and MERGE them into tuned_arms.yaml")
+    mode.add_argument("--level-gpu", action="store_true",
+                      help="tune the PREREG_LEVEL_GPU comparators (J_L at the GPU price "
+                           "ladder) and MERGE them into tuned_arms.yaml")
     args = ap.parse_args(argv)
+    # A scoping flag outside its own mode used to be dropped silently, and the
+    # run then tuned (and merged) arms nobody asked for.
+    if args.quality_arms and not args.quality:
+        ap.error("--quality-arms needs --quality")
+    if args.level_arms and not args.level:
+        ap.error("--level-arms needs --level")
+    if args.arms and (args.quality or args.level or args.level_gpu):
+        ap.error("--arms tunes the main comparators; it does not combine with --quality, --level or --level-gpu")
     if args.level_gpu:
         tuned = yaml.safe_load((OUT / "tuned_arms.yaml").read_text(encoding="utf-8")) or {}
         tuned.update(tune_level(args.workers, gpu=True))
