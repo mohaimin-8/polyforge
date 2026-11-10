@@ -536,6 +536,23 @@ Arrival noise: every run Poisson-resamples each bucket's request counts from its
 | layered_costaware_tuned | layered_costaware |  |  | The layered stack with a cost-aware tier layer: the cheapest tier whose projected AI p95 meets target, else the cheapest; replica layer re-tuned per size |
 | static_share | static_share |  |  | Best-static lower bound: an equal share of the cluster per tenant on the cheapest tier, never adapting |
 
+Level-field arms (`PREREG_LEVEL`, `PREREG_LEVEL_LAG`, `PREREG_LEVEL2`):
+
+| arm | controller | params | static cache MB | description |
+|---|---|---|---|---|
+| jcac_level | jcac | {'anchor_moves': True, 'converge_sweeps': True, 'shed_price_tier': 'small', 'degrade_gracefully': True, 'switch_penalty': 0.006666666666666667, 'forecast_method': 'holt'} |  | jcac_converged that pays, in its objective, the small-tier price for every request it would refuse (tier none); whose infeasible-lattice fallback serves on the cheapest affordable tier before it sheds; with the corrected half-replica hysteresis and the damped-Holt forecaster |
+| jcac_level_decoupled | jcac | {'anchor_moves': True, 'converge_sweeps': True, 'shed_price_tier': 'small', 'degrade_gracefully': True, 'switch_penalty': 0.006666666666666667, 'forecast_method': 'holt', 'knob_search': 'decoupled'} |  | jcac_level searching each knob on its own (the RQ2 ablation) |
+| jcac_level_ratchet | jcac | {'anchor_moves': True, 'converge_sweeps': True, 'shed_price_tier': 'small', 'degrade_gracefully': True, 'forecast_method': 'holt'} |  | jcac_level with the published switching penalty (0.05 per changed knob) instead of the half-replica one |
+| jcac_level_ratchet_decoupled | jcac | {'anchor_moves': True, 'converge_sweeps': True, 'shed_price_tier': 'small', 'degrade_gracefully': True, 'forecast_method': 'holt', 'knob_search': 'decoupled'} |  | jcac_level_ratchet searching each knob on its own (RQ2 ablation, PREREG_LEVEL2) |
+| layered_small_level_capped | layered_small_capped |  |  | the cheapest-tier stack inside the cluster caps, replica layer re-tuned per size under the caps and the LEVEL objective |
+| layered_small_level_gated | layered_small_gated_capped |  |  | the cheapest-tier stack inside the cluster caps whose gateway refuses AI model calls in any interval the tenant's budget cannot pay for (baselines.BudgetGated); re-tuned per size under the caps and the LEVEL objective |
+| hpa_level_capped | hpa_capped |  | 512 | hpa_fair_capped re-tuned per size under the LEVEL objective |
+| keda_level_capped | keda_capped |  | 512 | keda_fair_capped re-tuned per size under the LEVEL objective |
+| layered_costaware_gpu_gated | layered_costaware_gated_capped |  |  | cost-aware layered stack inside the caps with the gateway budget gate, re-tuned under J_L at the GPU price ladder |
+| layered_costaware_gpu_capped | layered_costaware_capped |  |  | cost-aware layered stack inside the caps, re-tuned under J_L at the GPU price ladder |
+| layered_small_gpu_gated | layered_small_gated_capped |  |  | LEVEL's gated cheapest-tier stack re-tuned under J_L at the GPU price ladder |
+| hpa_gpu_capped | hpa_capped |  | 512 | capped HPA re-tuned under J_L at the GPU price ladder |
+
 Tuned baseline parameters (`eval/baselines/tuned.yaml`, `eval/baselines/tuned_arms.yaml`):
 
 ```yaml
@@ -563,6 +580,13 @@ hpa_fair:
   small:
     target_rho: 0.05
 hpa_fair_capped:
+  large:
+    target_rho: 0.075
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.1
+hpa_gpu_capped:
   large:
     target_rho: 0.075
   medium:
@@ -614,6 +638,20 @@ keda_level_capped:
     rps_per_replica: 0.25
   small:
     rps_per_replica: 0.5
+layered_costaware_gpu_capped:
+  large:
+    target_rho: 0.1
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.4
+layered_costaware_gpu_gated:
+  large:
+    target_rho: 0.4
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.4
 layered_costaware_tuned:
   large:
     target_rho: 0.8
@@ -635,6 +673,13 @@ layered_quality_tuned:
     target_rho: 0.075
   small:
     target_rho: 0.05
+layered_small_gpu_gated:
+  large:
+    target_rho: 0.1
+  medium:
+    target_rho: 0.05
+  small:
+    target_rho: 0.1
 layered_small_level_capped:
   large:
     target_rho: 0.1
