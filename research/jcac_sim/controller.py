@@ -1455,17 +1455,22 @@ class JCACController:
         # PREREG_LEVEL: guarded like carbon, so the default score is the
         # published expression to the last bit.
         if self.shed_price_tier and candidate.tier == "none":
-            score += self.weights.alpha * self._shed_charge(tid, candidate, horizons[tid]) / COST_SCALE_USD
+            # Charged on the horizon the cost term used: the point forecast
+            # (memo tag 1) when costs are judged there, else the risk horizon.
+            charge = (self._shed_charge(tid, candidate, cost_horizons[tid], 1) if cost_horizons is not None
+                      else self._shed_charge(tid, candidate, horizons[tid]))
+            score += self.weights.alpha * charge / COST_SCALE_USD
         return score
 
-    def _shed_charge(self, tid: str, candidate: TenantState, horizon: list[Demand]) -> float:
+    def _shed_charge(self, tid: str, candidate: TenantState, horizon: list[Demand], tag: int = 0) -> float:
         """Objective-only charge for a tier-"none" candidate: its projected
         cache misses priced at `shed_price_tier`. Same replicas and cache on
         the small tier differ from the shed candidate only by the tier spend
         on those misses (work units do not depend on the tier), so the
-        difference of the two projections is misses x small price."""
-        on_small = self._project(tid, replace(candidate, tier="small"), horizon)[0]
-        shed = self._project(tid, candidate, horizon)[0]
+        difference of the two projections is misses x small price. `tag`
+        names the horizon for `_project`'s memo."""
+        on_small = self._project(tid, replace(candidate, tier="small"), horizon, tag)[0]
+        shed = self._project(tid, candidate, horizon, tag)[0]
         prices = model.TIER_COST_USD_PER_REQ
         return max(0.0, on_small - shed) * prices[self.shed_price_tier] / prices["small"]
 

@@ -185,6 +185,11 @@ def load(path: str | Path) -> ExperimentSpec:
             raise ValueError("agent_latency_small, agent_latency_mid and agent_latency_large must be set together")
         if agent and tiers:
             raise ValueError("agent_latency_* and tier_latency_* are exclusive")
+        # The plant refuses a non-positive latency (model.set_model_form);
+        # refuse it here too, before the campaign starts, not at its first run.
+        zero = {k: spec.model_form[k] for k in sorted(agent | tiers) if spec.model_form[k] <= 0}
+        if zero:
+            raise ValueError(f"tier and agent latencies must be positive: {zero}")
     return spec
 
 
