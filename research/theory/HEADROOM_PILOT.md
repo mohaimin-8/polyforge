@@ -57,15 +57,19 @@ Both references are clairvoyant: they know each world's realised demand, Poisson
 | `layered_small_level_gated` | 1.46 | 5.74 | 1.69 | 2.55 | 182.72 |
 | `static_share` | 1.10 | 4.07 | 1.94 | 4.34 | 313.59 |
 
-## The joint controller's distance to the clairvoyant references (means over the worlds)
+## The joint controller's distance to the references (means over the worlds)
 
-| reference | J_L | minus joint |
+| reference | J_L | minus joint search |
 |---|---:|---:|
-| decoupled search (same planner, per-knob) | 0.4079 | +0.0021 |
 | joint search | 0.4058 | |
+| decoupled search (same planner, per-knob) | 0.4079 | +0.0021 |
 | best per-layer arm (by its mean) | 0.3999 | -0.0059 |
-| hindsight static | 0.3647 | -0.0411 |
-| clairvoyant plan found (UB) | 0.3286 | -0.0772 |
+| static chosen on the noise-free demand curve, run on realised demand | 0.3699 | -0.0359 |
+| hindsight static (chosen on realised demand) | 0.3647 | -0.0411 |
+| plan made on the noise-free demand curve, run on realised demand | 0.3525 | -0.0532 |
+| clairvoyant plan found (knows the noise too; best of both plans) | 0.3286 | -0.0772 |
 | lower bound (LB2) | 0.3093 | -0.0965 |
+
+The plan made on the noise-free curve beats the heuristic's plan for the realised world in 0% of worlds; the best of the two is a valid upper bound on the capped clairvoyant optimum. The distance from joint search to the curve plan is what a perfect forecast of the demand curve could buy; the further distance to the clairvoyant plan is the price of the Poisson noise.
 
 Caveats: one plant (the published one) and one objective; the static reference is an equal share, not the best unequal fixed allocation; the clairvoyant references know the realised Poisson noise, so part of every gap to them cannot be forecast.

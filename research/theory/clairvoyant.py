@@ -179,9 +179,11 @@ def tenant_arrays(tid: str, config, demands: Sequence) -> TenantArrays:
 
 def world_from_harness(workload: str, tenant_mix: str, cluster_size: str, seed: int,
                        steps: int, economy: tuple = (), model_form: tuple = (),
-                       transition_costs: bool = False, interference: bool = False) -> World:
+                       transition_costs: bool = False, interference: bool = False,
+                       jitter: bool = True) -> World:
     """The world `harness.sim_backend.execute` builds for a run, with the same
-    Poisson jitter. Scored demand is buckets[1:] (the engine scores a plan
+    Poisson jitter (`jitter=False`: the noise-free demand curve the jitter is
+    drawn around). Scored demand is buckets[1:] (the engine scores a plan
     made on bucket t against bucket t + 1).
 
     Refuses the engine options under which the served state is not the
@@ -201,7 +203,8 @@ def world_from_harness(workload: str, tenant_mix: str, cluster_size: str, seed: 
         sim_backend._apply_economy(economy)
         sim_backend._apply_model_form(model_form)
         tenant_ids, buckets, configs, limits = workloads.build(workload, tenant_mix, cluster_size, seed, steps)
-        buckets = simulate.jitter_buckets(buckets, seed ^ sim_backend._JITTER_SALT)
+        if jitter:
+            buckets = simulate.jitter_buckets(buckets, seed ^ sim_backend._JITTER_SALT)
         scored = buckets[1:]
         tenants = [tenant_arrays(tid, configs[tid], [b[tid] for b in scored]) for tid in tenant_ids]
     finally:
@@ -210,12 +213,13 @@ def world_from_harness(workload: str, tenant_mix: str, cluster_size: str, seed: 
     return World(tenants, limits.replicas, limits.cache_mb, len(scored))
 
 
-def world_for_run(run) -> World:
+def world_for_run(run, jitter: bool = True) -> World:
     """`world_from_harness` for a harness RunSpec (chaos settings live in the
     arm, not the run; the arrays are arm-independent)."""
     return world_from_harness(run.workload, run.tenant_mix, run.cluster_size, run.seed, run.steps,
                               economy=run.economy, model_form=run.model_form,
-                              transition_costs=run.transition_costs, interference=run.interference)
+                              transition_costs=run.transition_costs, interference=run.interference,
+                              jitter=jitter)
 
 
 # --------------------------------------------------------------------------
@@ -366,6 +370,8 @@ class Bounds:
     ub_nofair: float  # the UB plan's objective without the fairness term (comparable with LB2)
     static: float
     iterations: int
+    ub_plan: list  # the UB plan: one path of (r, c, k) indices per tenant
+    static_plan: list
 
 
 def static_best(world: World, price_out: float) -> tuple[float, list]:
@@ -409,7 +415,7 @@ def bounds(world: World, price_out: float, iterations: int = 120,
     mbs = ref.cache_mb.astype(float)
     masks = [start_mask(ten, start) for ten in world.tenants]
     static_val, static_plan = static_best(world, price_out)
-    best_ub, best_ub_nofair = math.inf, math.inf
+    best_ub, best_ub_nofair, best_plan = math.inf, math.inf, None
     best_feasible_sum = sum(path_value(W[i], p) for i, p in enumerate(static_plan))
     w_true = [W[i] for i in range(n)]
     lam_r = np.zeros(T)
@@ -449,7 +455,7 @@ def bounds(world: World, price_out: float, iterations: int = 120,
             cand, value = _improve(world, cand, w_true, price_out, start)
             nofair = sum(path_value(W[i], p) for i, p in enumerate(cand))
             if value < best_ub:
-                best_ub, best_ub_nofair = value, nofair / (n * T)
+                best_ub, best_ub_nofair, best_plan = value, nofair / (n * T), cand
             best_feasible_sum = min(best_feasible_sum, nofair)
         norm = float((g_r ** 2).sum() + (g_c ** 2).sum())
         slack_value = float((lam_r * -g_r).sum() + (lam_c * -g_c).sum())
@@ -464,4 +470,4 @@ def bounds(world: World, price_out: float, iterations: int = 120,
         raise RuntimeError("the primal heuristic produced no plan")
     return Bounds(lb0=lb0(world, price_out), lb1=lb1_sum / (n * T),
                   lb2=best_dual / (n * T), ub=best_ub, ub_nofair=best_ub_nofair,
-                  static=static_val, iterations=it + 1)
+                  static=static_val, iterations=it + 1, ub_plan=best_plan, static_plan=static_plan)

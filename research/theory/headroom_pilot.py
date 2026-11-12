@@ -24,7 +24,7 @@ for p in (HERE, REPO / "research" / "jcac_sim", REPO / "eval"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from clairvoyant import bounds, world_for_run  # noqa: E402
+from clairvoyant import bounds, plan_objective, world_for_run  # noqa: E402
 from harness import config as hconfig  # noqa: E402
 from index_pilot import objective  # noqa: E402
 
@@ -44,11 +44,18 @@ def jobs() -> list:
 
 
 def solve(run) -> dict:
+    """The world's bounds, plus the plans a planner with a perfect forecast
+    of the demand CURVE (but not of the Poisson noise around it) would make:
+    planned on the noise-free world, scored on the realised one."""
     t0 = time.time()
-    b = bounds(world_for_run(run), PRICE_OUT)
+    world = world_for_run(run)
+    b = bounds(world, PRICE_OUT)
+    curve = bounds(world_for_run(run, jitter=False), PRICE_OUT, iterations=60)
     return {"workload": run.workload, "tenant_mix": run.tenant_mix, "cluster_size": run.cluster_size,
             "rep": run.rep, "seed": run.seed, "lb0": b.lb0, "lb1": b.lb1, "lb2": b.lb2, "ub": b.ub,
             "ub_nofair": b.ub_nofair, "static": b.static, "iterations": b.iterations,
+            "ub_curve": plan_objective(world, curve.ub_plan, PRICE_OUT),
+            "static_curve": plan_objective(world, curve.static_plan, PRICE_OUT),
             "wall_s": time.time() - t0}
 
 
@@ -121,17 +128,27 @@ def _decomposition(df: pd.DataFrame, w: pd.DataFrame) -> list[str]:
     joint = df[df.system == "jcac_level_ratchet"].J_L.mean()
     decoupled = df[df.system == "jcac_level_ratchet_decoupled"].J_L.mean()
     best_layer = df[~df.system.isin(JOINT)].groupby("system").J_L.mean().min()
-    return [
-        "## The joint controller's distance to the clairvoyant references (means over the worlds)", "",
-        "| reference | J_L | minus joint |", "|---|---:|---:|",
-        f"| decoupled search (same planner, per-knob) | {decoupled:.4f} | {decoupled - joint:+.4f} |",
-        f"| joint search | {joint:.4f} | |",
-        f"| best per-layer arm (by its mean) | {best_layer:.4f} | {best_layer - joint:+.4f} |",
-        f"| hindsight static | {w.static.mean():.4f} | {w.static.mean() - joint:+.4f} |",
-        f"| clairvoyant plan found (UB) | {w.ub.mean():.4f} | {w.ub.mean() - joint:+.4f} |",
-        f"| lower bound (LB2) | {w.lb2.mean():.4f} | {w.lb2.mean() - joint:+.4f} |",
-        "",
+    ub_best = w[["ub", "ub_curve"]].min(axis=1)  # both plans are feasible in the realised world
+    rows = [
+        ("decoupled search (same planner, per-knob)", decoupled),
+        ("best per-layer arm (by its mean)", best_layer),
+        ("static chosen on the noise-free demand curve, run on realised demand", w.static_curve.mean()),
+        ("hindsight static (chosen on realised demand)", w.static.mean()),
+        ("plan made on the noise-free demand curve, run on realised demand", w.ub_curve.mean()),
+        ("clairvoyant plan found (knows the noise too; best of both plans)", ub_best.mean()),
+        ("lower bound (LB2)", w.lb2.mean()),
     ]
+    L = ["## The joint controller's distance to the references (means over the worlds)", "",
+         "| reference | J_L | minus joint search |", "|---|---:|---:|",
+         f"| joint search | {joint:.4f} | |"]
+    L += [f"| {name} | {value:.4f} | {value - joint:+.4f} |" for name, value in rows]
+    L += ["",
+          f"The plan made on the noise-free curve beats the heuristic's plan for the realised world in "
+          f"{(w.ub_curve < w.ub - 1e-12).mean():.0%} of worlds; the best of the two is a valid upper "
+          "bound on the capped clairvoyant optimum. The distance from joint search to the curve plan is "
+          "what a perfect forecast of the demand curve could buy; the further distance to the "
+          "clairvoyant plan is the price of the Poisson noise.", ""]
+    return L
 
 
 def report(worlds: pd.DataFrame) -> str:

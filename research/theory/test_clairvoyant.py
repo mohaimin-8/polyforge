@@ -154,6 +154,29 @@ def test_bounds_refuse_bad_input():
         bounds(world, 0.0, start=(2, 128))  # not on the tiny world's grid
 
 
+def test_a_plan_made_on_the_noise_free_curve_scores_in_the_realised_world():
+    """The curve world differs from the realised one only by the jitter; a
+    plan made on the curve is feasible in the realised world and scores at
+    or above its lower bounds there."""
+    import sys
+    sys.path.insert(0, str(REPO / "eval"))
+    from harness import config as hconfig
+
+    from clairvoyant import world_for_run
+
+    spec = hconfig.load(REPO / "eval" / "experiments" / "matrix_level2.yaml")
+    # An AI workload: its model spend follows demand (CRUD cost does not).
+    run = next(r for r in hconfig.expand(spec) if r.workload == "ai_uncacheable" and r.cluster_size == "small")
+    run = dataclasses.replace(run, steps=8)
+    noisy, curve = world_for_run(run), world_for_run(run, jitter=False)
+    assert noisy.steps == curve.steps == 8
+    assert not np.allclose(noisy.tenants[0].cost, curve.tenants[0].cost)
+    assert not np.allclose(noisy.tenants[0].violation, curve.tenants[0].violation)
+    b = bounds(curve, 1e-4, iterations=10)
+    value = plan_objective(noisy, b.ub_plan, 1e-4)
+    assert lb1(noisy, 1e-4)[0] <= value
+
+
 REAL_CELLS = [("ai_cacheable", "whale", "small"), ("agentic", "uniform", "small"),
               ("crud_bursty", "premium_heavy", "large")]
 REAL_ARMS = ["jcac_level_ratchet", "hpa_level_capped", "static_share"]
