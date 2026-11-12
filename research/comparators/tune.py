@@ -138,21 +138,53 @@ def _reference(job: dict) -> dict:
     return {"static": b.static, "lb0": b.lb0, "lb1": b.lb1, "lb2": b.lb2, "ub": b.ub}
 
 
-def execute(jobs: list[dict], workers: int, label: str, stall_s: float = 3600.0) -> list[dict]:
+def job_key(row: dict) -> str:
+    """A job's identity in the journal: phase, arm, configuration, workload."""
+    return json.dumps([row.get("phase"), row.get("arm"), row.get("config"), row.get("workload")])
+
+
+def load_journal(journal: Path | None) -> dict[str, dict]:
+    """Rows already finished by an earlier, interrupted invocation."""
+    if journal is None or not journal.exists():
+        return {}
+    done = {}
+    with journal.open(encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                row = json.loads(line)
+                done[job_key(row)] = row
+    return done
+
+
+def execute(jobs: list[dict], workers: int, label: str, stall_s: float = 3600.0,
+            journal: Path | None = None) -> list[dict]:
     """Run `jobs` in order (one worker) or on a pool. A pool that finishes no
     run for `stall_s` seconds raises: a worker killed outside Python (out of
-    memory) loses its task and would otherwise leave the campaign waiting."""
+    memory) loses its task and would otherwise leave the campaign waiting.
+    With a `journal`, every finished row is appended to it at once and jobs
+    already in it are not run again, so an interrupted campaign resumes."""
     if not jobs:
         return []
-    t0, rows, step = time.time(), [], max(1, len(jobs) // 20)
+    done = load_journal(journal)
+    rows = [done[job_key(j)] for j in jobs if job_key(j) in done and not done[job_key(j)].get("error")]
+    finished = {job_key(r) for r in rows}
+    jobs = [j for j in jobs if job_key(j) not in finished]
+    if rows:
+        print(f"  {label}: {len(rows)} runs taken from the journal, {len(jobs)} to go", flush=True)
+    if not jobs:
+        return rows
+    t0, step = time.time(), max(1, len(jobs) // 20)
 
     def note(row: dict) -> None:
         rows.append(row)
+        if journal is not None:
+            with journal.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(row, default=str) + "\n")
         if row.get("error"):
             print(f"  FAILED {row['phase']} {row.get('arm', '')} {row.get('config', '')} "
                   f"{row['workload']}: {row['error']}", file=sys.stderr, flush=True)
-        if len(rows) % step == 0 or len(rows) == len(jobs):
-            print(f"  {label}: {len(rows)}/{len(jobs)} in {time.time() - t0:.0f}s", flush=True)
+        if len(rows) % step == 0:
+            print(f"  {label}: {len(rows)} rows in {time.time() - t0:.0f}s", flush=True)
 
     if workers <= 1 or len(jobs) == 1:
         for job in jobs:
@@ -277,13 +309,17 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     t0 = time.time()
+    meta = meta_of(args, tuning, evaluation, classes)
+    out_dir = Path(args.out) / run_tag(meta)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    journal = out_dir / "journal.jsonl"  # resumable: rerun the same command after an interruption
     runs_t = build_runs(args, tuning)
     base = {"budget": args.budget, "quality_weight": args.quality_weight}
     jobs = [{**base, "phase": "tuning", "arm": name, "config": i, "params": cfg, "workload": w,
              "class": classes[w], "run": runs_t[w]}
             for name in args.arms for i, cfg in enumerate(configs[name]) for w in tuning]
     print(f"tuning: {len(jobs)} runs on {args.workers} workers", flush=True)
-    tuning_rows = execute(jobs, args.workers, "tuning", args.stall_timeout)
+    tuning_rows = execute(jobs, args.workers, "tuning", args.stall_timeout, journal)
     selection = protocol.select(tuning_rows, {w: classes[w] for w in tuning})
 
     runs_e = build_runs(args, evaluation)
@@ -294,12 +330,10 @@ def main(argv: list[str] | None = None) -> int:
         jobs += [{"phase": "reference", "workload": w, "class": classes[w], "run": runs_e[w],
                   "iterations": args.reference_iterations} for w in evaluation]
     print(f"evaluation: {len(jobs)} runs on {args.workers} workers", flush=True)
-    done = execute(jobs, args.workers, "evaluation", args.stall_timeout)
+    done = execute(jobs, args.workers, "evaluation", args.stall_timeout, journal)
     rows = tuning_rows + [r for r in done if r["phase"] == "evaluation"]
     references = [r for r in done if r["phase"] == "reference"]
 
-    meta = meta_of(args, tuning, evaluation, classes)
-    out_dir = Path(args.out) / run_tag(meta)
     write_outputs(out_dir, meta, arms_meta(args), configs, selection, classes, tuning, evaluation, rows,
                   references)
     failed = sum(1 for r in rows + references if r.get("error"))
