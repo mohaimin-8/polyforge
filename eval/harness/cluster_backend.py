@@ -843,7 +843,13 @@ def operator_install_plan(run: RunSpec, workdir: Path) -> list[list[str]]:
          "--set=planner.image.tag=dev",
          "--set=features.url=http://polyforge-control-plane.polyforge.svc:80",
          f"--set=features.adminKeySecret.name={ADMIN_SECRET_NAME}",
-         *(["--set=features.rateFromCount=true"] if EVAL_DEMAND_RATE_FROM_COUNT else []),
+         # Pinned, not left to the chart: since 2026-11-12 the chart defaults
+         # to count-based demand and the corrected solver (final audit, E1
+         # and E2), while every registered live campaign ran the per-pod
+         # mean and the published two-sweep solver.
+         f"--set=features.rateFromCount={'true' if EVAL_DEMAND_RATE_FROM_COUNT else 'false'}",
+         "--set=planner.anchorMoves=false",
+         "--set=planner.convergeSweeps=false",
          f"--set=planner.limits.replicas={size.limits_replicas}",
          f"--set=planner.limits.cacheMB={size.limits_cache_mb}",
          # jcac-calibrated (session 48): the planner's two corrections, on

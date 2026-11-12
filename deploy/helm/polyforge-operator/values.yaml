@@ -40,9 +40,11 @@ features:
   # load-balanced pods the mean reads about 1/N of a tenant's demand (a 16-pod
   # kind run, 2026-09-28: 0.36 rps reported for 4.1 sent). REQUIRES the control
   # plane on one shared PostgreSQL: on per-pod SQLite each pod counts only its
-  # own events and the count reads ~1/N again. Off keeps the signal the
-  # registered campaigns ran on.
-  rateFromCount: false
+  # own events and the count reads ~1/N again. On by default since 2026-11-12
+  # (final audit, E1): the application chart's default store is PostgreSQL.
+  # Set false only for a control plane on per-pod SQLite; the eval harness
+  # pins false for the registered campaigns, which ran the per-pod mean.
+  rateFromCount: true
 
 # JCAC planner (W31): jointly plans replicas, cache and tier every 10 s.
 # Disabled = operator enforces static Policy guardrails only.
@@ -81,10 +83,12 @@ planner:
   # from the interval-start lattice, so no tenant moves more than +/-2
   # replicas per interval (the published solver can move +/-4 through its
   # second sweep). convergeSweeps sweeps to a fixed point (the simulator's
-  # `jcac_converged` treatment) and implies anchorMoves. Both off = the
-  # published jcac solver every live campaign ran.
-  anchorMoves: false
-  convergeSweeps: false
+  # `jcac_converged` treatment) and implies anchorMoves. On by default since
+  # 2026-11-12 (final audit, E2): both are correctness fixes. Both off = the
+  # published jcac solver every registered live campaign ran; the eval
+  # harness pins that explicitly (cluster_backend.operator_install_plan).
+  anchorMoves: true
+  convergeSweeps: true
   # Shared bearer token guarding /v1/plan and /v1/state. On by default: those
   # routes steer every tenant's capacity and export/overwrite per-tenant demand
   # history, and the NetworkPolicy below is inert on CNIs that do not enforce

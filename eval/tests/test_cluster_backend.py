@@ -611,14 +611,25 @@ def _operator_install(plan):
 
 
 def test_demand_rate_from_count_is_opt_in(monkeypatch, tmp_path):
-    # Off by default: the registered live campaigns ran the per-pod mean.
+    # Off unless asked: the registered live campaigns ran the per-pod mean.
+    # The chart now defaults to count, so "off" must be passed explicitly.
     monkeypatch.setattr(cb, "EVAL_DEMAND_RATE_FROM_COUNT", False)
     plan = cb.command_plan(_run(system="jcac"), tmp_path)
-    assert "features.rateFromCount" not in _operator_install(plan)
+    assert "--set=features.rateFromCount=false" in _operator_install(plan)
     monkeypatch.setattr(cb, "EVAL_DEMAND_RATE_FROM_COUNT", True)
     monkeypatch.setattr(cb, "EVAL_SHARED_PG", True)
     plan = cb.command_plan(_run(system="jcac"), tmp_path)
     assert "--set=features.rateFromCount=true" in _operator_install(plan)
+
+
+@pytest.mark.parametrize("system", ["jcac", "jcac-calibrated"])
+def test_live_arms_pin_the_published_solver(system, tmp_path):
+    # The chart defaults to the corrected solver since 2026-11-12; every
+    # registered live arm ran the published two-sweep solver, so the harness
+    # must pin it rather than inherit the chart default.
+    install = _operator_install(cb.command_plan(_run(system=system), tmp_path))
+    assert "--set=planner.anchorMoves=false" in install
+    assert "--set=planner.convergeSweeps=false" in install
 
 
 def test_demand_rate_from_count_requires_a_shared_store(monkeypatch, tmp_path):

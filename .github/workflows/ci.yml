@@ -260,6 +260,8 @@ jobs:
         run: python -m pytest services/planner -q
       - name: Harness tests
         run: python -m pytest eval/tests -q
+      - name: Programme-2 theory tests (interaction index, reference points)
+        run: python -m pytest research/theory -q
       - name: Smoke the runner end to end (4 runs)
         # Independent of the suites above, so a failure there must not skip
         # it: that is how three steps went unrun on 2026-09-05.
@@ -466,6 +468,18 @@ jobs:
           fi
           if grep -q 'polyforge/planner' off.yaml; then
             echo "FAIL: planner.enabled=false still renders the planner"; exit 1
+          fi
+
+          # Final audit 2026-11-12 (E1, E2): a default install runs the
+          # corrected solver and count-based demand, and the eval harness's
+          # pins (cluster_backend.operator_install_plan) turn all three off.
+          for want in '--anchor-moves' '--converge-sweeps' 'POLYFORGE_PLANNER_DEMAND_RATE'; do
+            grep -q -e "$want" on.yaml || { echo "FAIL: the default operator render lacks ${want}"; exit 1; }
+          done
+          helm template t deploy/helm/polyforge-operator --set planner.anchorMoves=false \
+            --set planner.convergeSweeps=false --set features.rateFromCount=false > pinned.yaml
+          if grep -q -e '--anchor-moves' -e '--converge-sweeps' -e 'POLYFORGE_PLANNER_DEMAND_RATE' pinned.yaml; then
+            echo "FAIL: the harness pins do not restore the published solver and demand"; exit 1
           fi
 
           # Audit 2026-09-26: the application chart rendered no
