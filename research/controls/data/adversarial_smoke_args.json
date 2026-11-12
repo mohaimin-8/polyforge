@@ -1,0 +1,22 @@
+{
+  "budget": 3,
+  "random": 2,
+  "panel": 1,
+  "steps": 10,
+  "max_width": 2,
+  "objective": "constrained",
+  "two_sided": false,
+  "tau": 0.25,
+  "eps": 0.05,
+  "large_gain": 0.03,
+  "batch": 1,
+  "patience": 1,
+  "step": 0.15,
+  "confirm": 1,
+  "confirm_reps": 1,
+  "confirm_steps": null,
+  "seed": 20261112,
+  "workers": 1,
+  "tag": "smoke",
+  "smoke": true
+}
