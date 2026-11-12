@@ -6,7 +6,11 @@ tenants built from real request-stream windows (BurstGPT v1.1, Azure LLM
 and rescaled to the tenant's drawn rate. Tenants are a construction: the
 traces carry no tenant identity.
 
-A population workload brings its own tenants, so its tenant mix is `own`:
+A population workload brings its own tenants, so its tenant mix is `own`
+(demand from each tenant's MMPP2) or `native` (the same tenants, demand
+replayed from real 10 s counts of the tenant's stream, `research/population/
+native.py`: real days superposed at their own time of day and thinned to the
+tenant's rate, no rescaling). Either way:
 SLO classes come from the population file, and each budget is the tenant's
 drawn factor times the active plant's cost of serving its mean demand on the
 small tier (replicas sized for 70% utilisation, plus per-request spend). The
@@ -30,6 +34,8 @@ from pathlib import Path
 
 PREFIX = "pop"
 OWN_MIX = "own"
+NATIVE_MIX = "native"
+MIXES = (OWN_MIX, NATIVE_MIX)
 REPO_ROOT = Path(__file__).resolve().parents[2]
 POPULATION = REPO_ROOT / "research" / "population" / "data" / "population.json"
 REFERENCE_UTILISATION = 0.7
@@ -50,15 +56,26 @@ def _load() -> dict:
     return _CACHE["data"]
 
 
-def _generator():
-    if "gen" not in _CACHE:
-        path = REPO_ROOT / "research" / "population" / "generator.py"
-        spec = importlib.util.spec_from_file_location("population_generator", path)
+def _module(name: str):
+    key = f"population_{name}"
+    if key not in _CACHE:
+        path = REPO_ROOT / "research" / "population" / f"{name}.py"
+        spec = importlib.util.spec_from_file_location(key, path)
         mod = importlib.util.module_from_spec(spec)
-        sys.modules["population_generator"] = mod  # dataclasses resolve annotations through sys.modules
+        sys.modules[key] = mod  # dataclasses resolve annotations through sys.modules
         spec.loader.exec_module(mod)
-        _CACHE["gen"] = mod
-    return _CACHE["gen"]
+        _CACHE[key] = mod
+    return _CACHE[key]
+
+
+def _generator():
+    return _module("generator")
+
+
+def _native_days() -> dict:
+    if "days" not in _CACHE:
+        _CACHE["days"] = _module("native").load_days()
+    return _CACHE["days"]
 
 
 def names(split: str | None = None) -> list[str]:
@@ -88,8 +105,8 @@ def build(workload: str, tenant_mix: str, size, seed: int, steps: int):
     from controller import ClusterLimits
     from model import Demand, TenantConfig
 
-    if tenant_mix != OWN_MIX:
-        raise ValueError(f"population workload {workload} brings its own tenants: use tenant mix {OWN_MIX!r}")
+    if tenant_mix not in MIXES:
+        raise ValueError(f"population workload {workload} brings its own tenants: use a tenant mix in {MIXES}")
     check(workload)
     spec = _load()[workload]
     gen = _generator()
@@ -101,7 +118,11 @@ def build(workload: str, tenant_mix: str, size, seed: int, steps: int):
             hourly_budget_usd=t["budget_factor"] * reference_cost_usd_hr(t["rate_rps"]),
             replica_max=size.replica_max)
         rng = np.random.default_rng([t["seed"], seed])
-        series[t["tenant"]] = gen.MMPP2(**t["mmpp"]).rates(steps + 1, rng, scale=t["scale"])
+        if tenant_mix == NATIVE_MIX:
+            series[t["tenant"]] = _module("native").series(_native_days()[t["stream"]], t["rate_rps"],
+                                                            steps + 1, rng)[0]
+        else:
+            series[t["tenant"]] = gen.MMPP2(**t["mmpp"]).rates(steps + 1, rng, scale=t["scale"])
     buckets = [{tid: Demand(rps={"chat": float(series[tid][step])}) for tid in tenant_ids}
                for step in range(steps + 1)]
     limits = ClusterLimits(cache_mb=size.limits_cache_mb, replicas=size.limits_replicas)

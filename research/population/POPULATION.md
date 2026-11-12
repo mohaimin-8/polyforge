@@ -12,15 +12,15 @@ Tenants per stream: azure2024/code 342, azure2024/conv 334, burstgpt/ChatGPT/api
 | acf_10s | -0.49 to 0.93 | 0.06 | 100% |
 | dispersion | 0.15 to 51.65 | 1.17 | 94% |
 
-## Per stream: medians, real windows against simulated tenants
+## Per stream: medians, real windows / MMPP2 tenants / native replay
 
-| stream | ACF 10 s real / simulated | p99 ratio real / simulated | dispersion real / simulated |
+| stream | ACF 10 s | p99 ratio | dispersion |
 |---|---|---|---|
-| azure2024/code | 0.37 / 0.15 | 1.36 / 1.56 | 4.75 / 1.62 |
-| azure2024/conv | 0.56 / 0.08 | 1.16 / 1.41 | 3.16 / 1.16 |
-| burstgpt/ChatGPT/api | 0.32 / 0.07 | 1.98 / 1.77 | 2.42 / 1.33 |
-| burstgpt/ChatGPT/conv | -0.01 / -0.00 | 4.02 / 1.51 | 0.95 / 1.07 |
-| burstgpt/GPT-4/api | 0.09 / 0.04 | 3.08 / 1.65 | 1.00 / 1.13 |
-| burstgpt/GPT-4/conv | -0.06 / -0.00 | 4.00 / 1.48 | 0.89 / 1.01 |
+| azure2024/code | 0.37 / 0.15 / 0.16 | 1.36 / 1.56 / 1.56 | 4.75 / 1.62 / 1.65 |
+| azure2024/conv | 0.56 / 0.08 / 0.13 | 1.16 / 1.41 / 1.39 | 3.16 / 1.16 / 1.20 |
+| burstgpt/ChatGPT/api | 0.32 / 0.07 / 0.38 | 1.98 / 1.77 / 1.67 | 2.42 / 1.33 / 3.87 |
+| burstgpt/ChatGPT/conv | -0.01 / -0.00 / 0.01 | 4.02 / 1.51 / 1.36 | 0.95 / 1.07 / 0.97 |
+| burstgpt/GPT-4/api | 0.09 / 0.04 / 0.12 | 3.08 / 1.65 / 1.94 | 1.00 / 1.13 / 3.54 |
+| burstgpt/GPT-4/conv | -0.06 / -0.00 / -0.03 | 4.00 / 1.48 / 1.42 | 0.89 / 1.01 / 0.99 |
 
-Rescaling a window's rate keeps the modulation's relative shape but not its weight against Poisson noise: the modulation variance scales with the square of the factor, the Poisson part with the factor, so a busy stream (Azure, tens of requests per second) rescaled to a few requests per second keeps little of its autocorrelation. The range check passes; the medians show the attenuation. Native replay (WP8 step 5: superposing real days at their own timestamps) is the construction that keeps it.
+Rescaling a window's rate keeps the modulation's relative shape but not its weight against Poisson noise: the modulation variance scales with the square of the factor, the Poisson part with the factor, so a busy stream (Azure, tens of requests per second) rescaled to a few requests per second keeps little of its autocorrelation. The range check passes; the medians show the attenuation. Native replay (`native.py`, harness tenant mix `native`) builds each tenant from real arrivals instead: superposing a thin stream's days keeps its burstiness (compare the API streams), while thinning a busy stream to a tenant's rate attenuates its autocorrelation as rescaling does, because a small share of a busy service is less autocorrelated than the service.

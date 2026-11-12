@@ -67,3 +67,15 @@ def test_the_validator_keeps_population_workloads_apart(tmp_path):
         bad.write_text(body, encoding="utf-8")
         with pytest.raises(ValueError):
             hconfig.load(bad)
+
+
+def test_native_mix_replays_real_arrivals_at_each_tenants_rate():
+    from harness.population_workloads import _load
+
+    name = pw.names("evaluation")[1]
+    ids, buckets, _, _ = workloads.build(name, "native", "large", 5, 59)
+    spec = {t["tenant"]: t for t in _load()[name]["tenants"]}
+    for tid in ids:
+        counts = [b[tid].rps["chat"] * 10 for b in buckets]
+        assert all(abs(c - round(c)) < 1e-9 for c in counts)
+        assert sum(counts) == round(spec[tid]["rate_rps"] * 10 * 60)

@@ -158,9 +158,10 @@ def load(path: str | Path) -> ExperimentSpec:
     if population and spec.backend != "sim":
         raise ValueError("population workloads are sim-only: their budgets follow the simulated plant")
     if population and (len(population) != len(spec.workloads)
-                       or spec.tenant_mixes != [population_workloads.OWN_MIX]):
+                       or not spec.tenant_mixes
+                       or not set(spec.tenant_mixes) <= set(population_workloads.MIXES)):
         raise ValueError("population workloads bring their own tenants: list only population "
-                         f"workloads, with tenant_mixes: [{population_workloads.OWN_MIX}]")
+                         f"workloads, with tenant_mixes from {list(population_workloads.MIXES)}")
     _check_membership([w for w in spec.workloads
                        if not trace_workloads.is_trace(w) and not population_workloads.is_population(w)],
                       WORKLOAD_CLASSES, "workload class")
