@@ -1,0 +1,78 @@
+{
+ "first_turns": 1000000.0,
+ "tenants": {
+  "all": 30,
+  "conversation": 27,
+  "code": 3
+ },
+ "components": {
+  "embed LMSYS first turns": {
+   "cpu_hours": 27.985749421296298,
+   "parallelism": 4.5,
+   "wall_hours": 6.219055426954733
+  },
+  "replay grid": {
+   "cpu_hours": 3.833234249941969,
+   "parallelism": 4.5,
+   "wall_hours": 0.8518298333204375
+  },
+  "embed QQP questions": {
+   "cpu_hours": 2.7191840277777777,
+   "parallelism": 4.5,
+   "wall_hours": 0.6042631172839505
+  },
+  "old check: loader": {
+   "cpu_hours": 0.009837962962962962,
+   "parallelism": 1.0,
+   "wall_hours": 0.009837962962962962
+  },
+  "old check: embed 200,000 turns": {
+   "cpu_hours": 5.859375,
+   "parallelism": 4.5,
+   "wall_hours": 1.3020833333333333
+  },
+  "old check: old NN + engine": {
+   "cpu_hours": 0.3975504276487562,
+   "parallelism": 2.25,
+   "wall_hours": 0.17668907895500274
+  },
+  "fit and Go heap measurement": {
+   "cpu_hours": 0.08333333333333333,
+   "parallelism": 1.0,
+   "wall_hours": 0.08333333333333333
+  }
+ },
+ "total_wall_hours": 9.247092086143754,
+ "parallel": 4.5,
+ "machine": "Intel i5-1135G7, 4 cores / 8 threads, 15.7 GB",
+ "measured": {
+  "encoder": {
+   "lmsys_first_turn": {
+    "cpu_s_per_text": 0.10074869791666667,
+    "mean_tokens": 67.27604166666667
+   },
+   "qqp_question": {
+    "cpu_s_per_text": 0.018229166666666668,
+    "mean_tokens": 16.458333333333332
+   },
+   "old_raw_turn": {
+    "cpu_s_per_text": 0.10546875,
+    "mean_tokens": 75.17708333333333
+   }
+  },
+  "replay": {
+   "costaware_us_per_lookup": 76.171875,
+   "lru_us_per_lookup": 35.71428571428571,
+   "victim_us_n1024": 30.852770578797976,
+   "victim_us_n4096": 46.33920296570899,
+   "victim_us_n16384": 99.16699722332407
+  },
+  "kernels": {
+   "gemm_gflop_per_cpu_s": 17.926820018086957,
+   "argpartition_ns_per_element": 8.195638656616211
+  },
+  "old_loader": {
+   "cpu_s_per_conversation": 3.541666666666666e-05
+  }
+ }
+}

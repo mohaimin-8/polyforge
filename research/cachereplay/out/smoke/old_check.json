@@ -1,0 +1,51 @@
+{
+ "preset": "smoke",
+ "prompts": 600,
+ "embed_seconds": 0.0,
+ "source": "first 1,000 conversations of file 0",
+ "ladder": [
+  30,
+  200,
+  300
+ ],
+ "engine": {
+  "engine_seconds": 0.028419800000847317,
+  "by_size": {
+   "30": {
+    "max_abs_score_diff": 7.771561172376096e-16,
+    "hit_count_diffs": {
+     "0.70": 0,
+     "0.75": 0,
+     "0.80": 0,
+     "0.85": 0,
+     "0.90": 0,
+     "0.95": 0
+    }
+   },
+   "200": {
+    "max_abs_score_diff": 1.6653345369377348e-15,
+    "hit_count_diffs": {
+     "0.70": 0,
+     "0.75": 0,
+     "0.80": 0,
+     "0.85": 0,
+     "0.90": 0,
+     "0.95": 0
+    }
+   },
+   "300": {
+    "max_abs_score_diff": 1.6653345369377348e-15,
+    "hit_count_diffs": {
+     "0.70": 0,
+     "0.75": 0,
+     "0.80": 0,
+     "0.85": 0,
+     "0.90": 0,
+     "0.95": 0
+    }
+   }
+  }
+ },
+ "engine_identical": true,
+ "published": null
+}

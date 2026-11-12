@@ -1,0 +1,59 @@
+{
+ "work_package": "programme 2, WP6 steps 1-4",
+ "commit": "20dd700e89926a2a5b8c64e67545ccdd416ae599",
+ "encoder": "sentence-transformers/all-MiniLM-L6-v2",
+ "dims": 384,
+ "key_format": "gateway",
+ "first_turns": 2000,
+ "class_sizes": {
+  "all": 2000,
+  "conversation": 1775,
+  "code": 225,
+  "english": 1558,
+  "other_language": 442
+ },
+ "tenants": {
+  "all": 8,
+  "conversation": 7,
+  "code": 0,
+  "english": 6,
+  "other_language": 1
+ },
+ "stream_length": 250,
+ "capacities": [
+  4,
+  8,
+  16,
+  32,
+  64,
+  128,
+  0
+ ],
+ "taus": [
+  0.75,
+  0.8,
+  0.85,
+  0.9,
+  0.95
+ ],
+ "policies": [
+  "costaware",
+  "lru"
+ ],
+ "dt_seconds": 1.2,
+ "neighbours_k": 64,
+ "mean_bytes": {
+  "prompt_bytes": 319.1055,
+  "key_bytes": 326.1055,
+  "completion_bytes": 774.213
+ },
+ "timings": {
+  "load_and_embed_s": 0.15006269999867072,
+  "embed_s": 0.0,
+  "embedded": 0,
+  "replay_s": 18.50899439999921,
+  "workers": 1,
+  "threads": 2
+ },
+ "cpu_count": 8
+}

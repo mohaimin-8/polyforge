@@ -1,0 +1,4078 @@
+{
+ "schema": "polyforge.wp6.cache/1",
+ "replay": {
+  "work_package": "programme 2, WP6 steps 1-4",
+  "commit": "20dd700e89926a2a5b8c64e67545ccdd416ae599",
+  "encoder": "sentence-transformers/all-MiniLM-L6-v2",
+  "dims": 384,
+  "key_format": "gateway",
+  "first_turns": 2000,
+  "class_sizes": {
+   "all": 2000,
+   "conversation": 1775,
+   "code": 225,
+   "english": 1558,
+   "other_language": 442
+  },
+  "tenants": {
+   "all": 8,
+   "conversation": 7,
+   "code": 0,
+   "english": 6,
+   "other_language": 1
+  },
+  "stream_length": 250,
+  "capacities": [
+   4,
+   8,
+   16,
+   32,
+   64,
+   128,
+   0
+  ],
+  "taus": [
+   0.75,
+   0.8,
+   0.85,
+   0.9,
+   0.95
+  ],
+  "policies": [
+   "costaware",
+   "lru"
+  ],
+  "dt_seconds": 1.2,
+  "neighbours_k": 64,
+  "mean_bytes": {
+   "prompt_bytes": 319.1055,
+   "key_bytes": 326.1055,
+   "completion_bytes": 774.213
+  },
+  "timings": {
+   "load_and_embed_s": 0.15006269999867072,
+   "embed_s": 0.0,
+   "embedded": 0,
+   "replay_s": 18.50899439999921,
+   "workers": 1,
+   "threads": 2
+  },
+  "cpu_count": 8
+ },
+ "bytes_per_entry": {
+  "overhead_bytes": 2383.683,
+  "overhead_range": [
+   2381.3555000000006,
+   2384.992
+  ],
+  "minimal_entry_bytes": 2331.926,
+  "vector_bytes": 1536,
+  "go_version": "go1.26.10",
+  "runs": [
+   {
+    "lengths": "minimal",
+    "n": 500,
+    "heap_bytes_per_entry": 2347.76,
+    "mean_key_bytes": 15,
+    "mean_completion_bytes": 0
+   },
+   {
+    "lengths": "sample",
+    "n": 500,
+    "heap_bytes_per_entry": 3515.28,
+    "mean_key_bytes": 325.486,
+    "mean_completion_bytes": 804.802
+   },
+   {
+    "lengths": "minimal",
+    "n": 1000,
+    "heap_bytes_per_entry": 2331.416,
+    "mean_key_bytes": 15,
+    "mean_completion_bytes": 0
+   },
+   {
+    "lengths": "sample",
+    "n": 1000,
+    "heap_bytes_per_entry": 3511.904,
+    "mean_key_bytes": 323.715,
+    "mean_completion_bytes": 803.304
+   },
+   {
+    "lengths": "minimal",
+    "n": 2000,
+    "heap_bytes_per_entry": 2324.68,
+    "mean_key_bytes": 15,
+    "mean_completion_bytes": 0
+   },
+   {
+    "lengths": "sample",
+    "n": 2000,
+    "heap_bytes_per_entry": 3484.06,
+    "mean_key_bytes": 326.3475,
+    "mean_completion_bytes": 774.213
+   },
+   {
+    "lengths": "minimal",
+    "n": 4000,
+    "heap_bytes_per_entry": 2323.848,
+    "mean_key_bytes": 15,
+    "mean_completion_bytes": 0
+   },
+   {
+    "lengths": "sample",
+    "n": 4000,
+    "heap_bytes_per_entry": 3481.916,
+    "mean_key_bytes": 326.3475,
+    "mean_completion_bytes": 774.213
+   }
+  ]
+ },
+ "units": {
+  "mb": "MiB (2^20 bytes) of resident gateway heap per tenant",
+  "knob_mb": "MiB of completion bytes (the live knob's accounting)",
+  "entries": "cache entries per tenant"
+ },
+ "curves": {
+  "all": {
+   "costaware": {
+    "0.75": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.011,
+       "resident_mb": 0.015802841186523437,
+       "knob_mb": 0.005364797592163086,
+       "bytes_per_entry": 4142.62,
+       "completion_bytes_per_entry": 1406.3495,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.028,
+       "resident_mb": 0.03159604358673095,
+       "knob_mb": 0.010763209342956543,
+       "bytes_per_entry": 4141.356624999999,
+       "completion_bytes_per_entry": 1410.755375,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.038,
+       "resident_mb": 0.06337611293792725,
+       "knob_mb": 0.021670164108276366,
+       "bytes_per_entry": 4153.4169375,
+       "completion_bytes_per_entry": 1420.175875,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.055,
+       "resident_mb": 0.12659733390808103,
+       "knob_mb": 0.04329928016662597,
+       "bytes_per_entry": 4148.341437499999,
+       "completion_bytes_per_entry": 1418.8308124999999,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.072,
+       "resident_mb": 0.2535700626373291,
+       "knob_mb": 0.08654238796234132,
+       "bytes_per_entry": 4154.49190625,
+       "completion_bytes_per_entry": 1417.9104843750001,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.192,
+       "hit_rate": 0.112,
+       "resident_mb": 0.4556990443572998,
+       "knob_mb": 0.12357455253601074,
+       "bytes_per_entry": 3756.801380086798,
+       "completion_bytes_per_entry": 1018.7536165796591,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.09890236416831026,
+      "half": 0.09733131717373775,
+      "cache_hit_max_ci95": [
+       0.0671518806459561,
+       0.13630190452997112
+      ],
+      "half_ci95": [
+       0.0496452436877132,
+       0.16978835924785315
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.09881950897632397,
+      "half": 0.033173353789376275,
+      "cache_hit_max_ci95": [
+       0.0663064061598008,
+       0.13426008725212843
+      ],
+      "half_ci95": [
+       0.017143966539100303,
+       0.05632430797484777
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.09898950339254575,
+      "half": 24.642111327111564,
+      "cache_hit_max_ci95": [
+       0.06722866064362405,
+       0.13647582553342089
+      ],
+      "half_ci95": [
+       12.371272911533403,
+       43.46952595184484
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.80": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.004,
+       "resident_mb": 0.01575105667114258,
+       "knob_mb": 0.005327068328857422,
+       "bytes_per_entry": 4129.045,
+       "completion_bytes_per_entry": 1396.459,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.017,
+       "resident_mb": 0.031509244918823245,
+       "knob_mb": 0.010683421134948731,
+       "bytes_per_entry": 4129.97975,
+       "completion_bytes_per_entry": 1400.297375,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.031,
+       "resident_mb": 0.06311704349517823,
+       "knob_mb": 0.02141994380950928,
+       "bytes_per_entry": 4136.4385625,
+       "completion_bytes_per_entry": 1403.7774375000001,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.032,
+       "resident_mb": 0.12668390464782714,
+       "knob_mb": 0.04324697780609131,
+       "bytes_per_entry": 4151.1781875,
+       "completion_bytes_per_entry": 1417.11696875,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.047,
+       "resident_mb": 0.25433444690704343,
+       "knob_mb": 0.08710341835021973,
+       "bytes_per_entry": 4167.015578125,
+       "completion_bytes_per_entry": 1427.10240625,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.387,
+       "hit_rate": 0.088,
+       "resident_mb": 0.4581666224679947,
+       "knob_mb": 0.12549996852874756,
+       "bytes_per_entry": 3771.3622608350934,
+       "completion_bytes_per_entry": 1033.0430499187516,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.06222582874568836,
+      "half": 0.0904780021333751,
+      "cache_hit_max_ci95": [
+       0.043263383047795284,
+       0.17101861216166211
+      ],
+      "half_ci95": [
+       0.043409441407861696,
+       0.5224239398176826
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.061917512036611104,
+      "half": 0.030459574242595353,
+      "cache_hit_max_ci95": [
+       0.04311356108102321,
+       0.14965692739145037
+      ],
+      "half_ci95": [
+       0.015046706457695553,
+       0.15494318962975195
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.06246380519781922,
+      "half": 23.08240948012961,
+      "cache_hit_max_ci95": [
+       0.043519389655180866,
+       0.18807874347778783
+      ],
+      "half_ci95": [
+       10.820238076120315,
+       136.83262747249245
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.85": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.002,
+       "resident_mb": 0.015761637687683107,
+       "knob_mb": 0.005329130172729492,
+       "bytes_per_entry": 4131.81875,
+       "completion_bytes_per_entry": 1396.9995,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.005,
+       "resident_mb": 0.03151757621765137,
+       "knob_mb": 0.010666160583496093,
+       "bytes_per_entry": 4131.07175,
+       "completion_bytes_per_entry": 1398.0349999999999,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.021,
+       "resident_mb": 0.06322621536254883,
+       "knob_mb": 0.021499446868896488,
+       "bytes_per_entry": 4143.59325,
+       "completion_bytes_per_entry": 1408.9877500000002,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.023,
+       "resident_mb": 0.12687271976470949,
+       "knob_mb": 0.04344384956359863,
+       "bytes_per_entry": 4157.36528125,
+       "completion_bytes_per_entry": 1423.5680625,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.027,
+       "resident_mb": 0.2547412157058716,
+       "knob_mb": 0.08749582767486572,
+       "bytes_per_entry": 4173.680078125,
+       "completion_bytes_per_entry": 1433.531640625,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.61,
+       "hit_rate": 0.054,
+       "resident_mb": 0.4607974649715424,
+       "knob_mb": 0.12758381271362304,
+       "bytes_per_entry": 3786.3894885197087,
+       "completion_bytes_per_entry": 1048.3608181177024,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.039641578454554814,
+      "half": 0.09966867623460547,
+      "cache_hit_max_ci95": [
+       0.02021479901870609,
+       0.06392109222167393
+      ],
+      "half_ci95": [
+       0.06499086095873104,
+       0.23045160555192476
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.03939928549542217,
+      "half": 0.03354194300719001,
+      "cache_hit_max_ci95": [
+       0.020012968348669665,
+       0.06342740887838298
+      ],
+      "half_ci95": [
+       0.022685191041722803,
+       0.07321244808706627
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.039809372840721134,
+      "half": 25.406549351980203,
+      "cache_hit_max_ci95": [
+       0.020410438105570482,
+       0.063468328713202
+      ],
+      "half_ci95": [
+       16.378604009436366,
+       59.96222499163302
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.90": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.015749659538269043,
+       "knob_mb": 0.00533867359161377,
+       "bytes_per_entry": 4128.67875,
+       "completion_bytes_per_entry": 1399.50125,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.03152978610992432,
+       "knob_mb": 0.010698018074035644,
+       "bytes_per_entry": 4132.672125,
+       "completion_bytes_per_entry": 1402.210625,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.004,
+       "resident_mb": 0.06318109035491944,
+       "knob_mb": 0.02141343116760254,
+       "bytes_per_entry": 4140.6359375,
+       "completion_bytes_per_entry": 1403.350625,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.004,
+       "resident_mb": 0.12676377296447755,
+       "knob_mb": 0.04327719593048096,
+       "bytes_per_entry": 4153.7953125,
+       "completion_bytes_per_entry": 1418.1071562500001,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.006,
+       "resident_mb": 0.25484186458587643,
+       "knob_mb": 0.08760989475250244,
+       "bytes_per_entry": 4175.3291093749995,
+       "completion_bytes_per_entry": 1435.400515625,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.707,
+       "hit_rate": 0.023,
+       "resident_mb": 0.4627355707941055,
+       "knob_mb": 0.1293019542694092,
+       "bytes_per_entry": 3799.426921633113,
+       "completion_bytes_per_entry": 1061.6718425771494,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.011536390518100749,
+      "half": 0.22683583061457013,
+      "cache_hit_max_ci95": [
+       0.0056103761767051594,
+       1.0
+      ],
+      "half_ci95": [
+       0.09700013535763671,
+       89.58956711239313
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.01137144727091724,
+      "half": 0.07565128900760662,
+      "cache_hit_max_ci95": [
+       0.005375135294495685,
+       1.0
+      ],
+      "half_ci95": [
+       0.0315354543698267,
+       30.6731046287358
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.011655235116214028,
+      "half": 58.20484462399296,
+      "cache_hit_max_ci95": [
+       0.005801002383323212,
+       1.0
+      ],
+      "half_ci95": [
+       25.579915410216223,
+       22681.765135996815
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.95": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.015748027801513673,
+       "knob_mb": 0.0053369922637939455,
+       "bytes_per_entry": 4128.251,
+       "completion_bytes_per_entry": 1399.0605,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.03152109050750732,
+       "knob_mb": 0.010692091941833496,
+       "bytes_per_entry": 4131.532375,
+       "completion_bytes_per_entry": 1401.433875,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.06307941627502442,
+       "knob_mb": 0.02131879234313965,
+       "bytes_per_entry": 4133.972625,
+       "completion_bytes_per_entry": 1397.1483750000002,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.12664358425140382,
+       "knob_mb": 0.04316302585601807,
+       "bytes_per_entry": 4149.85696875,
+       "completion_bytes_per_entry": 1414.36603125,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.25506790065765383,
+       "knob_mb": 0.08781017971038818,
+       "bytes_per_entry": 4179.032484375,
+       "completion_bytes_per_entry": 1438.681984375,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.80000000000001,
+       "hit_rate": 0.014,
+       "resident_mb": 0.4643471006393433,
+       "knob_mb": 0.1305216770172119,
+       "bytes_per_entry": 3809.884392801252,
+       "completion_bytes_per_entry": 1070.906870109546,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": null,
+     "knob_mb": null,
+     "entries": null
+    }
+   },
+   "lru": {
+    "0.75": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.012,
+       "resident_mb": 0.013222101211547852,
+       "knob_mb": 0.002894695281982422,
+       "bytes_per_entry": 3466.0945,
+       "completion_bytes_per_entry": 758.827,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.022,
+       "resident_mb": 0.026472326278686523,
+       "knob_mb": 0.005810573577880859,
+       "bytes_per_entry": 3469.78075,
+       "completion_bytes_per_entry": 761.6034999999999,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.043,
+       "resident_mb": 0.05295813369750977,
+       "knob_mb": 0.011643177032470704,
+       "bytes_per_entry": 3470.6642500000003,
+       "completion_bytes_per_entry": 763.0472500000001,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.075,
+       "resident_mb": 0.10604105854034424,
+       "knob_mb": 0.023423860549926755,
+       "bytes_per_entry": 3474.75340625,
+       "completion_bytes_per_entry": 767.5530624999999,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.092,
+       "resident_mb": 0.21326700115203856,
+       "knob_mb": 0.04795450592041016,
+       "bytes_per_entry": 3494.1665468749998,
+       "completion_bytes_per_entry": 785.686625,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.192,
+       "hit_rate": 0.126,
+       "resident_mb": 0.42748362935638423,
+       "knob_mb": 0.09730566024780274,
+       "bytes_per_entry": 3524.1923559343354,
+       "completion_bytes_per_entry": 802.1918045160073,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.1527219527387592,
+      "half": 0.1302772437499378,
+      "cache_hit_max_ci95": [
+       0.11564467989205919,
+       0.21069902330349846
+      ],
+      "half_ci95": [
+       0.08300649886626969,
+       0.27584840037949576
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.15004441297623308,
+      "half": 0.027921425813385466,
+      "cache_hit_max_ci95": [
+       0.11341367641958688,
+       0.20541742588172635
+      ],
+      "half_ci95": [
+       0.018043928469947373,
+       0.0565941724173018
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.15356384922930294,
+      "half": 39.67357188563429,
+      "cache_hit_max_ci95": [
+       0.11623597868392682,
+       0.21234308081272654
+      ],
+      "half_ci95": [
+       24.914794161283996,
+       86.29822047989035
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.80": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.01,
+       "resident_mb": 0.01322733497619629,
+       "knob_mb": 0.002902972221374512,
+       "bytes_per_entry": 3467.4665000000005,
+       "completion_bytes_per_entry": 760.99675,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.018,
+       "resident_mb": 0.02646693706512451,
+       "knob_mb": 0.005810816764831543,
+       "bytes_per_entry": 3469.0743749999997,
+       "completion_bytes_per_entry": 761.635375,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.032,
+       "resident_mb": 0.05292290687561035,
+       "knob_mb": 0.011620277404785157,
+       "bytes_per_entry": 3468.3556249999997,
+       "completion_bytes_per_entry": 761.5465,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.054,
+       "resident_mb": 0.10597934818267822,
+       "knob_mb": 0.02339413356781006,
+       "bytes_per_entry": 3472.73128125,
+       "completion_bytes_per_entry": 766.5789687500001,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.079,
+       "resident_mb": 0.21330754852294923,
+       "knob_mb": 0.04800529766082764,
+       "bytes_per_entry": 3494.830875,
+       "completion_bytes_per_entry": 786.518796875,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.387,
+       "hit_rate": 0.109,
+       "resident_mb": 0.42797296840763094,
+       "knob_mb": 0.0974244499206543,
+       "bytes_per_entry": 3522.825589118199,
+       "completion_bytes_per_entry": 801.9416423967909,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.15059131272641485,
+      "half": 0.19249998952255082,
+      "cache_hit_max_ci95": [
+       0.11334683735238987,
+       0.21440872591426532
+      ],
+      "half_ci95": [
+       0.12997848221019861,
+       0.4044997904631874
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.1464543576291548,
+      "half": 0.04077922981431916,
+      "cache_hit_max_ci95": [
+       0.1102049369090956,
+       0.20236876843791113
+      ],
+      "half_ci95": [
+       0.02815181896720278,
+       0.08071364677140071
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.15196293693376936,
+      "half": 58.886115569616365,
+      "cache_hit_max_ci95": [
+       0.11469669246750233,
+       0.2213851580872855
+      ],
+      "half_ci95": [
+       38.80613210046914,
+       129.13403959796833
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.85": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.004,
+       "resident_mb": 0.013223415374755859,
+       "knob_mb": 0.002901339530944824,
+       "bytes_per_entry": 3466.439,
+       "completion_bytes_per_entry": 760.5687499999999,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.007,
+       "resident_mb": 0.026449480056762693,
+       "knob_mb": 0.005803426742553711,
+       "bytes_per_entry": 3466.7862499999997,
+       "completion_bytes_per_entry": 760.66675,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.016,
+       "resident_mb": 0.05283720397949219,
+       "knob_mb": 0.01156933879852295,
+       "bytes_per_entry": 3462.739,
+       "completion_bytes_per_entry": 758.2081875,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.039,
+       "resident_mb": 0.10592023181915283,
+       "knob_mb": 0.023411363601684568,
+       "bytes_per_entry": 3470.79415625,
+       "completion_bytes_per_entry": 767.1435624999999,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.064,
+       "resident_mb": 0.21295483970642087,
+       "knob_mb": 0.047839648246765135,
+       "bytes_per_entry": 3489.0520937499996,
+       "completion_bytes_per_entry": 783.804796875,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.61,
+       "hit_rate": 0.079,
+       "resident_mb": 0.4280024992275238,
+       "knob_mb": 0.09733326721191407,
+       "bytes_per_entry": 3516.9120651202884,
+       "completion_bytes_per_entry": 799.7909881670716,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.3656607662837743,
+      "half": 0.9885685599858588,
+      "cache_hit_max_ci95": [
+       0.14045095184248443,
+       1.0
+      ],
+      "half_ci95": [
+       0.2584996585498314,
+       5.061374024464519
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.3195610444623331,
+      "half": 0.18803872342440417,
+      "cache_hit_max_ci95": [
+       0.133472124992288,
+       1.0
+      ],
+      "half_ci95": [
+       0.05388468957162265,
+       1.153395386286636
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.38292281027514025,
+      "half": 314.1584128548962,
+      "cache_hit_max_ci95": [
+       0.14174059570474165,
+       1.0
+      ],
+      "half_ci95": [
+       77.75330373955839,
+       1539.2401448793173
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.90": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.002,
+       "resident_mb": 0.013221421241760255,
+       "knob_mb": 0.0028999576568603516,
+       "bytes_per_entry": 3465.91625,
+       "completion_bytes_per_entry": 760.2065,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.004,
+       "resident_mb": 0.02644046115875244,
+       "knob_mb": 0.005795492172241211,
+       "bytes_per_entry": 3465.604125,
+       "completion_bytes_per_entry": 759.62675,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.011,
+       "resident_mb": 0.05283723926544189,
+       "knob_mb": 0.011569124221801758,
+       "bytes_per_entry": 3462.7413125,
+       "completion_bytes_per_entry": 758.194125,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.023,
+       "resident_mb": 0.1058066635131836,
+       "knob_mb": 0.023305047988891603,
+       "bytes_per_entry": 3467.0727500000003,
+       "completion_bytes_per_entry": 763.6598125,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.04,
+       "resident_mb": 0.2128969192504883,
+       "knob_mb": 0.04781387996673584,
+       "bytes_per_entry": 3488.103125,
+       "completion_bytes_per_entry": 783.382609375,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.707,
+       "hit_rate": 0.056,
+       "resident_mb": 0.4281053112802506,
+       "knob_mb": 0.09738486289978027,
+       "bytes_per_entry": 3515.084959172168,
+       "completion_bytes_per_entry": 799.6071476113291,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.2701905883500382,
+      "half": 1.2136507067404274,
+      "cache_hit_max_ci95": [
+       0.07506030886729781,
+       1.0
+      ],
+      "half_ci95": [
+       0.20024067234935297,
+       7.994091195864215
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.22660059006620709,
+      "half": 0.22083630977632707,
+      "cache_hit_max_ci95": [
+       0.07145911870728808,
+       1.0
+      ],
+      "half_ci95": [
+       0.043827805529681976,
+       1.7458544682113948
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.2870448441345968,
+      "half": 391.627423488805,
+      "cache_hit_max_ci95": [
+       0.077207092829108,
+       1.0
+      ],
+      "half_ci95": [
+       59.51168172657316,
+       2422.479662705606
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.95": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.002,
+       "resident_mb": 0.013221421241760255,
+       "knob_mb": 0.0028999576568603516,
+       "bytes_per_entry": 3465.91625,
+       "completion_bytes_per_entry": 760.2065,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.004,
+       "resident_mb": 0.026440000534057616,
+       "knob_mb": 0.0057950344085693365,
+       "bytes_per_entry": 3465.54375,
+       "completion_bytes_per_entry": 759.5667500000001,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.009,
+       "resident_mb": 0.0528274507522583,
+       "knob_mb": 0.011560151100158692,
+       "bytes_per_entry": 3462.0998125,
+       "completion_bytes_per_entry": 757.6060625,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.016,
+       "resident_mb": 0.10572475814819336,
+       "knob_mb": 0.023242989540100095,
+       "bytes_per_entry": 3464.388875,
+       "completion_bytes_per_entry": 761.6262812499999,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.031,
+       "resident_mb": 0.21281235980987548,
+       "knob_mb": 0.047776012420654296,
+       "bytes_per_entry": 3486.717703125,
+       "completion_bytes_per_entry": 782.7621875,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.80000000000001,
+       "hit_rate": 0.042,
+       "resident_mb": 0.4283280290603638,
+       "knob_mb": 0.09744929695129395,
+       "bytes_per_entry": 3514.3543928012523,
+       "completion_bytes_per_entry": 799.5539436619719,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.2729103778504874,
+      "half": 1.6635492711847337,
+      "cache_hit_max_ci95": [
+       0.0614723225783618,
+       1.0
+      ],
+      "half_ci95": [
+       0.21304063845050955,
+       11.48194650865242
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.21378622731590954,
+      "half": 0.28211667216112696,
+      "cache_hit_max_ci95": [
+       0.0590665175261712,
+       1.0
+      ],
+      "half_ci95": [
+       0.04610838500387721,
+       2.548540231772497
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.29760500546182905,
+      "half": 551.4182769898486,
+      "cache_hit_max_ci95": [
+       0.062171785692050105,
+       1.0
+      ],
+      "half_ci95": [
+       63.6633423148623,
+       3488.515463916013
+      ],
+      "bootstrap_fits": 400
+     }
+    }
+   }
+  },
+  "conversation": {
+   "costaware": {
+    "0.75": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0034285714285714284,
+       "resident_mb": 0.015997813088553293,
+       "knob_mb": 0.005599271501813616,
+       "bytes_per_entry": 4193.730714285714,
+       "completion_bytes_per_entry": 1467.8154285714286,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.005714285714285714,
+       "resident_mb": 0.03196737234933036,
+       "knob_mb": 0.011189619881766184,
+       "bytes_per_entry": 4190.027428571429,
+       "completion_bytes_per_entry": 1466.6458571428573,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.009142857142857144,
+       "resident_mb": 0.06395658220563616,
+       "knob_mb": 0.02214279065813337,
+       "bytes_per_entry": 4191.458571428571,
+       "completion_bytes_per_entry": 1451.1499285714285,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.022857142857142857,
+       "resident_mb": 0.12776078142438616,
+       "knob_mb": 0.04373125893729073,
+       "bytes_per_entry": 4186.4652857142855,
+       "completion_bytes_per_entry": 1432.9858928571427,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.04,
+       "resident_mb": 0.2538404323032924,
+       "knob_mb": 0.08604032461983817,
+       "bytes_per_entry": 4158.921642857143,
+       "completion_bytes_per_entry": 1409.6846785714285,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.13714285714285,
+       "hit_rate": 0.08228571428571428,
+       "resident_mb": 0.452073115032741,
+       "knob_mb": 0.1212390638078962,
+       "bytes_per_entry": 3728.5171588385997,
+       "completion_bytes_per_entry": 999.9310171243652,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.3500451086088423,
+      "half": 1.953892703982598,
+      "cache_hit_max_ci95": [
+       0.06361714771680255,
+       1.0
+      ],
+      "half_ci95": [
+       0.2576099607773906,
+       7.72094075468833
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.4376828638544716,
+      "half": 0.8494131676794054,
+      "cache_hit_max_ci95": [
+       0.06482009000016606,
+       1.0
+      ],
+      "half_ci95": [
+       0.08814897917142345,
+       2.6440161618183304
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.3218580017066851,
+      "half": 447.7711496746159,
+      "cache_hit_max_ci95": [
+       0.06325657821543458,
+       1.0
+      ],
+      "half_ci95": [
+       65.56063668452191,
+       1976.970725045234
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.80": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.002285714285714286,
+       "resident_mb": 0.016014837537493026,
+       "knob_mb": 0.005609789167131696,
+       "bytes_per_entry": 4198.193571428572,
+       "completion_bytes_per_entry": 1470.5725714285713,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.0034285714285714284,
+       "resident_mb": 0.03198532322474888,
+       "knob_mb": 0.011202638898577009,
+       "bytes_per_entry": 4192.3802857142855,
+       "completion_bytes_per_entry": 1468.3522857142857,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.006857142857142857,
+       "resident_mb": 0.06385011618477957,
+       "knob_mb": 0.022053378513881138,
+       "bytes_per_entry": 4184.481214285714,
+       "completion_bytes_per_entry": 1445.2902142857142,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.010285714285714285,
+       "resident_mb": 0.12780174473353795,
+       "knob_mb": 0.04365836334228516,
+       "bytes_per_entry": 4187.8075714285715,
+       "completion_bytes_per_entry": 1430.59725,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.022857142857142857,
+       "resident_mb": 0.25423990631103516,
+       "knob_mb": 0.08627241298130582,
+       "bytes_per_entry": 4165.466625,
+       "completion_bytes_per_entry": 1413.4872142857146,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.32685714285715,
+       "hit_rate": 0.06628571428571428,
+       "resident_mb": 0.453560821220398,
+       "knob_mb": 0.1223061229160854,
+       "bytes_per_entry": 3735.21346826615,
+       "completion_bytes_per_entry": 1007.2287027313283,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.8361732213527854,
+      "half": 9.145188102733938,
+      "cache_hit_max_ci95": [
+       0.02666740609715563,
+       1.0
+      ],
+      "half_ci95": [
+       0.14413142813474986,
+       16.990130046213814
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 1.0,
+      "half": 3.7352970378036643,
+      "cache_hit_max_ci95": [
+       0.02765832710306314,
+       1.0
+      ],
+      "half_ci95": [
+       0.053085318662287447,
+       5.789543254741268
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.6368663411224206,
+      "half": 1737.9364766119202,
+      "cache_hit_max_ci95": [
+       0.026212291328104046,
+       1.0
+      ],
+      "half_ci95": [
+       35.10965292590048,
+       4288.97989690729
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.85": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.016006040845598493,
+       "knob_mb": 0.005597282409667969,
+       "bytes_per_entry": 4195.887571428571,
+       "completion_bytes_per_entry": 1467.294,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.03196848624093192,
+       "knob_mb": 0.011185955592564174,
+       "bytes_per_entry": 4190.173428571428,
+       "completion_bytes_per_entry": 1466.1655714285714,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.002285714285714286,
+       "resident_mb": 0.06386100442068918,
+       "knob_mb": 0.022027595520019535,
+       "bytes_per_entry": 4185.194785714286,
+       "completion_bytes_per_entry": 1443.6005000000002,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.0034285714285714284,
+       "resident_mb": 0.12787935311453683,
+       "knob_mb": 0.04371608516148159,
+       "bytes_per_entry": 4190.350642857143,
+       "completion_bytes_per_entry": 1432.4886785714286,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.009142857142857144,
+       "resident_mb": 0.25451332855224607,
+       "knob_mb": 0.0865126735142299,
+       "bytes_per_entry": 4169.9463749999995,
+       "completion_bytes_per_entry": 1417.4236428571428,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.5382857142857,
+       "hit_rate": 0.037714285714285714,
+       "resident_mb": 0.454896579271589,
+       "knob_mb": 0.1231785409109933,
+       "bytes_per_entry": 3740.0035043191515,
+       "completion_bytes_per_entry": 1012.731674970429,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 1.0,
+      "half": 29.503700882638512,
+      "cache_hit_max_ci95": [
+       0.022773042653668554,
+       1.0
+      ],
+      "half_ci95": [
+       0.4948086790641339,
+       84.49670523557415
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 1.0,
+      "half": 10.0578675640476,
+      "cache_hit_max_ci95": [
+       0.028447375807016936,
+       1.0
+      ],
+      "half_ci95": [
+       0.17829309719433378,
+       28.540692346908646
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 1.0,
+      "half": 7408.320517076077,
+      "cache_hit_max_ci95": [
+       0.020474182085087327,
+       1.0
+      ],
+      "half_ci95": [
+       123.43506431204415,
+       21355.728103874564
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.90": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.016006040845598493,
+       "knob_mb": 0.005597282409667969,
+       "bytes_per_entry": 4195.887571428571,
+       "completion_bytes_per_entry": 1467.294,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.032004961286272324,
+       "knob_mb": 0.01119501713344029,
+       "bytes_per_entry": 4194.954285714286,
+       "completion_bytes_per_entry": 1467.3532857142857,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.06388053022112165,
+       "knob_mb": 0.022009371076311384,
+       "bytes_per_entry": 4186.474428571429,
+       "completion_bytes_per_entry": 1442.4061428571429,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.12775650133405414,
+       "knob_mb": 0.04352937752859933,
+       "bytes_per_entry": 4186.325035714286,
+       "completion_bytes_per_entry": 1426.370642857143,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.002285714285714286,
+       "resident_mb": 0.25470186832972935,
+       "knob_mb": 0.08679050990513393,
+       "bytes_per_entry": 4173.035410714286,
+       "completion_bytes_per_entry": 1421.9757142857143,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.63314285714286,
+       "hit_rate": 0.025142857142857144,
+       "resident_mb": 0.4566823978500366,
+       "knob_mb": 0.12487730734688894,
+       "bytes_per_entry": 3751.895403406191,
+       "completion_bytes_per_entry": 1025.9353056528084,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 1.0,
+      "half": 148.5317279432785,
+      "cache_hit_max_ci95": [
+       0.9611538329660202,
+       1.0
+      ],
+      "half_ci95": [
+       71.64601183073583,
+       290.96944758062074
+      ],
+      "bootstrap_fits": 359
+     },
+     "knob_mb": {
+      "cache_hit_max": 1.0,
+      "half": 50.70437556077078,
+      "cache_hit_max_ci95": [
+       0.9464440581605345,
+       1.0
+      ],
+      "half_ci95": [
+       24.105529058709266,
+       100.15270502411697
+      ],
+      "bootstrap_fits": 359
+     },
+     "entries": {
+      "cache_hit_max": 1.0,
+      "half": 37260.11303036617,
+      "cache_hit_max_ci95": [
+       0.9731213277217371,
+       1.0
+      ],
+      "half_ci95": [
+       18425.31838516862,
+       72542.96067329618
+      ],
+      "bootstrap_fits": 359
+     }
+    },
+    "0.95": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.01600838088989258,
+       "knob_mb": 0.0055995472499302465,
+       "bytes_per_entry": 4196.501,
+       "completion_bytes_per_entry": 1467.8877142857145,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.031997858319963726,
+       "knob_mb": 0.011185944693429128,
+       "bytes_per_entry": 4194.0232857142855,
+       "completion_bytes_per_entry": 1466.1641428571427,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.06387960052490235,
+       "knob_mb": 0.022006358555385047,
+       "bytes_per_entry": 4186.413500000001,
+       "completion_bytes_per_entry": 1442.2087142857144,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.12771095057896206,
+       "knob_mb": 0.04349585941859654,
+       "bytes_per_entry": 4184.832428571429,
+       "completion_bytes_per_entry": 1425.2723214285713,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.2548404006958008,
+       "knob_mb": 0.08691091156005859,
+       "bytes_per_entry": 4175.305125,
+       "completion_bytes_per_entry": 1423.948375,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.69714285714285,
+       "hit_rate": 0.02057142857142857,
+       "resident_mb": 0.45684710366930276,
+       "knob_mb": 0.1248982892717634,
+       "bytes_per_entry": 3751.367476663534,
+       "completion_bytes_per_entry": 1025.5934129860832,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": null,
+     "knob_mb": null,
+     "entries": null
+    }
+   },
+   "lru": {
+    "0.75": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.006857142857142857,
+       "resident_mb": 0.013068036215645926,
+       "knob_mb": 0.002857682364327567,
+       "bytes_per_entry": 3425.7072857142857,
+       "completion_bytes_per_entry": 749.1242857142857,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.012571428571428572,
+       "resident_mb": 0.02615329851422991,
+       "knob_mb": 0.0057044939313616065,
+       "bytes_per_entry": 3427.965142857143,
+       "completion_bytes_per_entry": 747.6994285714285,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.027428571428571427,
+       "resident_mb": 0.05244729614257812,
+       "knob_mb": 0.011457130432128908,
+       "bytes_per_entry": 3437.1859999999997,
+       "completion_bytes_per_entry": 750.8545000000001,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.05142857142857143,
+       "resident_mb": 0.10542017037527901,
+       "knob_mb": 0.023065201895577567,
+       "bytes_per_entry": 3454.4081428571426,
+       "completion_bytes_per_entry": 755.8005357142857,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.07885714285714286,
+       "resident_mb": 0.21176187133789065,
+       "knob_mb": 0.04642340305873326,
+       "bytes_per_entry": 3469.5065000000004,
+       "completion_bytes_per_entry": 760.6010357142858,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.13714285714285,
+       "hit_rate": 0.11428571428571428,
+       "resident_mb": 0.42357601093292235,
+       "knob_mb": 0.09406620134626115,
+       "bytes_per_entry": 3493.484510180233,
+       "completion_bytes_per_entry": 775.8201806822779,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.20486466620794813,
+      "half": 0.3334749570939671,
+      "cache_hit_max_ci95": [
+       0.1216584017900088,
+       0.36905164492626785
+      ],
+      "half_ci95": [
+       0.1877721311198237,
+       0.6549317175993822
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.20341555489908358,
+      "half": 0.07226380952831357,
+      "cache_hit_max_ci95": [
+       0.12066515132457592,
+       0.3498575708715131
+      ],
+      "half_ci95": [
+       0.041199751892212096,
+       0.1392206754751021
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.20870582980556443,
+      "half": 103.85010668780554,
+      "cache_hit_max_ci95": [
+       0.12206578646169065,
+       0.3795042262534974
+      ],
+      "half_ci95": [
+       57.714096413157954,
+       203.33547152201876
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.80": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.005714285714285714,
+       "resident_mb": 0.013069091251918248,
+       "knob_mb": 0.002858780997140067,
+       "bytes_per_entry": 3425.9838571428572,
+       "completion_bytes_per_entry": 749.4122857142858,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.011428571428571429,
+       "resident_mb": 0.026158963884626116,
+       "knob_mb": 0.005709855215890067,
+       "bytes_per_entry": 3428.7077142857142,
+       "completion_bytes_per_entry": 748.4021428571428,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.021714285714285714,
+       "resident_mb": 0.05244066074916295,
+       "knob_mb": 0.01145353262765067,
+       "bytes_per_entry": 3436.751142857143,
+       "completion_bytes_per_entry": 750.6187142857143,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.044571428571428574,
+       "resident_mb": 0.10537802450997488,
+       "knob_mb": 0.023033121381487165,
+       "bytes_per_entry": 3453.027107142857,
+       "completion_bytes_per_entry": 754.7493214285714,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.06742857142857143,
+       "resident_mb": 0.21140480259486605,
+       "knob_mb": 0.04618956647600446,
+       "bytes_per_entry": 3463.6562857142853,
+       "completion_bytes_per_entry": 756.7698571428571,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.32685714285715,
+       "hit_rate": 0.096,
+       "resident_mb": 0.4234654821265085,
+       "knob_mb": 0.09373537118094309,
+       "bytes_per_entry": 3487.369054339338,
+       "completion_bytes_per_entry": 771.9397366507795,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.18233686596066526,
+      "half": 0.35384446217121396,
+      "cache_hit_max_ci95": [
+       0.11037434294010928,
+       0.41767617062049045
+      ],
+      "half_ci95": [
+       0.19362729372155918,
+       1.0015838589024586
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.18232024625058732,
+      "half": 0.0773041403438992,
+      "cache_hit_max_ci95": [
+       0.11121007100097684,
+       0.4117666021751676
+      ],
+      "half_ci95": [
+       0.04338655420830603,
+       0.21781471096540347
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.18522414155727507,
+      "half": 109.80670644601415,
+      "cache_hit_max_ci95": [
+       0.1115937141077213,
+       0.43842065011518133
+      ],
+      "half_ci95": [
+       58.862569316449175,
+       327.5352478383967
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.85": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.001142857142857143,
+       "resident_mb": 0.013071078164236884,
+       "knob_mb": 0.002862826756068638,
+       "bytes_per_entry": 3426.504714285714,
+       "completion_bytes_per_entry": 750.472857142857,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.002285714285714286,
+       "resident_mb": 0.026147184099469867,
+       "knob_mb": 0.005707885742187501,
+       "bytes_per_entry": 3427.1637142857144,
+       "completion_bytes_per_entry": 748.1440000000001,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.009142857142857144,
+       "resident_mb": 0.05237328011648996,
+       "knob_mb": 0.011417308262416296,
+       "bytes_per_entry": 3432.335285714286,
+       "completion_bytes_per_entry": 748.2447142857144,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.026285714285714287,
+       "resident_mb": 0.1050710460117885,
+       "knob_mb": 0.02283654567173549,
+       "bytes_per_entry": 3442.9680357142856,
+       "completion_bytes_per_entry": 748.3079285714285,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.048,
+       "resident_mb": 0.2106914967128209,
+       "knob_mb": 0.04572486223493304,
+       "bytes_per_entry": 3451.9694821428575,
+       "completion_bytes_per_entry": 749.156142857143,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.5382857142857,
+       "hit_rate": 0.072,
+       "resident_mb": 0.42276892206246514,
+       "knob_mb": 0.09296492985316684,
+       "bytes_per_entry": 3475.860936485179,
+       "completion_bytes_per_entry": 764.3257374816302,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 1.0,
+      "half": 4.219884760826453,
+      "cache_hit_max_ci95": [
+       0.2063424402318683,
+       1.0
+      ],
+      "half_ci95": [
+       0.7262511547340305,
+       5.792812621516039
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 1.0,
+      "half": 0.9164989177018974,
+      "cache_hit_max_ci95": [
+       0.22509477302346917,
+       1.0
+      ],
+      "half_ci95": [
+       0.1640303023355154,
+       1.287082581024384
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 1.0,
+      "half": 1283.1968600399268,
+      "cache_hit_max_ci95": [
+       0.2080461561470791,
+       1.0
+      ],
+      "half_ci95": [
+       229.06912330676363,
+       1759.8742411732185
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.90": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.001142857142857143,
+       "resident_mb": 0.013071078164236884,
+       "knob_mb": 0.002862826756068638,
+       "bytes_per_entry": 3426.504714285714,
+       "completion_bytes_per_entry": 750.472857142857,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.002285714285714286,
+       "resident_mb": 0.026147184099469867,
+       "knob_mb": 0.005707885742187501,
+       "bytes_per_entry": 3427.1637142857144,
+       "completion_bytes_per_entry": 748.1440000000001,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.008,
+       "resident_mb": 0.05237328011648996,
+       "knob_mb": 0.011417308262416296,
+       "bytes_per_entry": 3432.335285714286,
+       "completion_bytes_per_entry": 748.2447142857144,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.02057142857142857,
+       "resident_mb": 0.1050798328944615,
+       "knob_mb": 0.0228534676688058,
+       "bytes_per_entry": 3443.2559642857145,
+       "completion_bytes_per_entry": 748.8624285714285,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.037714285714285714,
+       "resident_mb": 0.21069442531040736,
+       "knob_mb": 0.045774307250976566,
+       "bytes_per_entry": 3452.017464285714,
+       "completion_bytes_per_entry": 749.9662500000001,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.63314285714286,
+       "hit_rate": 0.056,
+       "resident_mb": 0.42281384468841554,
+       "knob_mb": 0.09303227342878068,
+       "bytes_per_entry": 3473.6467353486332,
+       "completion_bytes_per_entry": 764.3109537155597,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 1.0,
+      "half": 5.390450962122741,
+      "cache_hit_max_ci95": [
+       0.12270594079231434,
+       1.0
+      ],
+      "half_ci95": [
+       0.6456746943075008,
+       8.28759340716836
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 1.0,
+      "half": 1.17171838136554,
+      "cache_hit_max_ci95": [
+       0.12725477993766454,
+       1.0
+      ],
+      "half_ci95": [
+       0.1424883137300037,
+       1.9428189492327848
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 1.0,
+      "half": 1639.0193518735323,
+      "cache_hit_max_ci95": [
+       0.12270402146107728,
+       1.0
+      ],
+      "half_ci95": [
+       200.0528141827066,
+       2533.316430375921
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.95": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.001142857142857143,
+       "resident_mb": 0.013071078164236884,
+       "knob_mb": 0.002862826756068638,
+       "bytes_per_entry": 3426.504714285714,
+       "completion_bytes_per_entry": 750.472857142857,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.002285714285714286,
+       "resident_mb": 0.026147184099469867,
+       "knob_mb": 0.005707885742187501,
+       "bytes_per_entry": 3427.1637142857144,
+       "completion_bytes_per_entry": 748.1440000000001,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.006857142857142857,
+       "resident_mb": 0.052373332432338174,
+       "knob_mb": 0.011417413984026228,
+       "bytes_per_entry": 3432.3387142857146,
+       "completion_bytes_per_entry": 748.2516428571429,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.014857142857142857,
+       "resident_mb": 0.10504352460588727,
+       "knob_mb": 0.02283094896589007,
+       "bytes_per_entry": 3442.066214285714,
+       "completion_bytes_per_entry": 748.1245357142858,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.032,
+       "resident_mb": 0.21043224661690846,
+       "knob_mb": 0.045583902631487164,
+       "bytes_per_entry": 3447.721928571428,
+       "completion_bytes_per_entry": 746.8466607142857,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.69714285714285,
+       "hit_rate": 0.048,
+       "resident_mb": 0.4221143417412894,
+       "knob_mb": 0.09238221958705356,
+       "bytes_per_entry": 3466.1618741218062,
+       "completion_bytes_per_entry": 758.5900210319058,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 1.0,
+      "half": 6.576215088272759,
+      "cache_hit_max_ci95": [
+       0.22578430551967674,
+       1.0
+      ],
+      "half_ci95": [
+       1.430610132063703,
+       10.475851311853148
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 1.0,
+      "half": 1.4263143037745303,
+      "cache_hit_max_ci95": [
+       0.22525848872201867,
+       1.0
+      ],
+      "half_ci95": [
+       0.33427722707113483,
+       2.326596035727114
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 1.0,
+      "half": 2001.509920086061,
+      "cache_hit_max_ci95": [
+       0.23457083941930773,
+       1.0
+      ],
+      "half_ci95": [
+       460.1747398881699,
+       3210.439749888077
+      ],
+      "bootstrap_fits": 400
+     }
+    }
+   }
+  },
+  "english": {
+   "costaware": {
+    "0.75": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.028,
+       "resident_mb": 0.016159592946370444,
+       "knob_mb": 0.005578709920247396,
+       "bytes_per_entry": 4236.140333333334,
+       "completion_bytes_per_entry": 1462.4253333333334,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.037333333333333336,
+       "resident_mb": 0.032127503712972,
+       "knob_mb": 0.011026782989501953,
+       "bytes_per_entry": 4211.016166666666,
+       "completion_bytes_per_entry": 1445.3025,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.044,
+       "resident_mb": 0.06416450754801432,
+       "knob_mb": 0.021851973215738934,
+       "bytes_per_entry": 4205.085166666667,
+       "completion_bytes_per_entry": 1432.0909166666668,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.052,
+       "resident_mb": 0.12832219696044922,
+       "knob_mb": 0.04410732014973958,
+       "bytes_per_entry": 4204.86175,
+       "completion_bytes_per_entry": 1445.3086666666666,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.06666666666666667,
+       "resident_mb": 0.25658464686075844,
+       "knob_mb": 0.0888308957417806,
+       "bytes_per_entry": 4203.882854166666,
+       "completion_bytes_per_entry": 1455.4053958333334,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.30000000000001,
+       "hit_rate": 0.104,
+       "resident_mb": 0.46233470335006716,
+       "knob_mb": 0.1283620236714681,
+       "bytes_per_entry": 3808.272379418696,
+       "completion_bytes_per_entry": 1057.3239382037182,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.06877209384538323,
+      "half": 0.028582340132211937,
+      "cache_hit_max_ci95": [
+       0.06329644214470147,
+       0.08328188019530612
+      ],
+      "half_ci95": [
+       0.009263313643775483,
+       0.11739691487685876
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.0688053363885111,
+      "half": 0.00983044544084657,
+      "cache_hit_max_ci95": [
+       0.06335796358287898,
+       0.08306788545087201
+      ],
+      "half_ci95": [
+       0.0032658139839096185,
+       0.03816578223438574
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.06869363504499981,
+      "half": 7.084623017484731,
+      "cache_hit_max_ci95": [
+       0.06313049518041532,
+       0.08327124649700009
+      ],
+      "half_ci95": [
+       2.2308381633952212,
+       30.814281249342105
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.80": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.021333333333333333,
+       "resident_mb": 0.01612233861287435,
+       "knob_mb": 0.005565418243408203,
+       "bytes_per_entry": 4226.374333333333,
+       "completion_bytes_per_entry": 1458.941,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.02666666666666667,
+       "resident_mb": 0.03210493850708008,
+       "knob_mb": 0.01098520278930664,
+       "bytes_per_entry": 4208.0585,
+       "completion_bytes_per_entry": 1439.8525,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.03866666666666667,
+       "resident_mb": 0.06435465749104818,
+       "knob_mb": 0.02202781931559245,
+       "bytes_per_entry": 4217.546833333334,
+       "completion_bytes_per_entry": 1443.6151666666667,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.032,
+       "resident_mb": 0.12858978525797526,
+       "knob_mb": 0.04439375178019206,
+       "bytes_per_entry": 4213.6300833333335,
+       "completion_bytes_per_entry": 1454.6944583333334,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.04666666666666667,
+       "resident_mb": 0.2571904258728027,
+       "knob_mb": 0.08937745030721028,
+       "bytes_per_entry": 4213.8079375,
+       "completion_bytes_per_entry": 1464.3601458333333,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.60933333333332,
+       "hit_rate": 0.08,
+       "resident_mb": 0.4658222769177755,
+       "knob_mb": 0.13104320271809897,
+       "bytes_per_entry": 3827.69854745212,
+       "completion_bytes_per_entry": 1076.7923767331545,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.045605646745896615,
+      "half": 0.019933787028274162,
+      "cache_hit_max_ci95": [
+       0.04189919084898251,
+       0.11268122421980055
+      ],
+      "half_ci95": [
+       0.0001449734712214286,
+       0.3696444269498657
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.04557789934569864,
+      "half": 0.0068355461704843615,
+      "cache_hit_max_ci95": [
+       0.04172026641084241,
+       0.10546929078257046
+      ],
+      "half_ci95": [
+       5.024662803382503e-05,
+       0.12012461874976468
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.04559169313873472,
+      "half": 4.95096975872397,
+      "cache_hit_max_ci95": [
+       0.04200638155140943,
+       0.11900695776738895
+      ],
+      "half_ci95": [
+       0.035289433685084796,
+       99.49358881695147
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.85": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.017333333333333333,
+       "resident_mb": 0.01615479787190755,
+       "knob_mb": 0.0055892295837402335,
+       "bytes_per_entry": 4234.883333333333,
+       "completion_bytes_per_entry": 1465.1829999999998,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.024,
+       "resident_mb": 0.03211608505249023,
+       "knob_mb": 0.010996224721272785,
+       "bytes_per_entry": 4209.519499999999,
+       "completion_bytes_per_entry": 1441.2971666666665,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.029333333333333333,
+       "resident_mb": 0.0644060427347819,
+       "knob_mb": 0.022075247446695964,
+       "bytes_per_entry": 4220.9144166666665,
+       "completion_bytes_per_entry": 1446.7234166666667,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.030666666666666665,
+       "resident_mb": 0.12865269088745118,
+       "knob_mb": 0.04446749877929688,
+       "bytes_per_entry": 4215.691375,
+       "completion_bytes_per_entry": 1457.111,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.024,
+       "resident_mb": 0.25713702901204427,
+       "knob_mb": 0.08941342290242511,
+       "bytes_per_entry": 4212.933083333333,
+       "completion_bytes_per_entry": 1464.949520833333,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.704,
+       "hit_rate": 0.04,
+       "resident_mb": 0.4678283505427043,
+       "knob_mb": 0.1327587750752767,
+       "bytes_per_entry": 3841.332930046566,
+       "completion_bytes_per_entry": 1090.0806970285453,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.02973875607199426,
+      "half": 0.0087257929607029,
+      "cache_hit_max_ci95": [
+       0.02317770656889242,
+       0.053287627197057964
+      ],
+      "half_ci95": [
+       0.00014604625877787014,
+       0.30873315090034326
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.029731140296851543,
+      "half": 0.0029998941408583427,
+      "cache_hit_max_ci95": [
+       0.02293410278061993,
+       0.05100211864135379
+      ],
+      "half_ci95": [
+       5.102574647506986e-05,
+       0.09659996435848836
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.029733749131950236,
+      "half": 2.1645212906883495,
+      "cache_hit_max_ci95": [
+       0.023226604013275514,
+       0.05554082332573609
+      ],
+      "half_ci95": [
+       0.035289433685084796,
+       83.58601871918428
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.90": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.016096258799235028,
+       "knob_mb": 0.005547650655110678,
+       "bytes_per_entry": 4219.537666666667,
+       "completion_bytes_per_entry": 1454.2833333333335,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.0013333333333333333,
+       "resident_mb": 0.032137316385904946,
+       "knob_mb": 0.011023679097493489,
+       "bytes_per_entry": 4212.302333333333,
+       "completion_bytes_per_entry": 1444.8956666666666,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.008,
+       "resident_mb": 0.06436399586995442,
+       "knob_mb": 0.022057730356852212,
+       "bytes_per_entry": 4218.158833333333,
+       "completion_bytes_per_entry": 1445.5754166666666,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.010666666666666666,
+       "resident_mb": 0.128492426554362,
+       "knob_mb": 0.04423134231567383,
+       "bytes_per_entry": 4210.439833333334,
+       "completion_bytes_per_entry": 1449.372625,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.010666666666666666,
+       "resident_mb": 0.2571920166015625,
+       "knob_mb": 0.08939404678344727,
+       "bytes_per_entry": 4213.834,
+       "completion_bytes_per_entry": 1464.6320625,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.832,
+       "hit_rate": 0.025333333333333333,
+       "resident_mb": 0.47002301908111566,
+       "knob_mb": 0.13484640884399413,
+       "bytes_per_entry": 3855.488901495713,
+       "completion_bytes_per_entry": 1106.1135552913197,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.017403098880944018,
+      "half": 0.12038063454818045,
+      "cache_hit_max_ci95": [
+       0.011985994155271547,
+       1.0
+      ],
+      "half_ci95": [
+       0.05384646065309001,
+       21.232921649855097
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.017277220991106484,
+      "half": 0.0408794941585252,
+      "cache_hit_max_ci95": [
+       0.011413093673032193,
+       1.0
+      ],
+      "half_ci95": [
+       0.01877860643834408,
+       7.398721190728874
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.01739924181707844,
+      "half": 29.94195400696201,
+      "cache_hit_max_ci95": [
+       0.012293002888441882,
+       1.0
+      ],
+      "half_ci95": [
+       13.243118547933356,
+       5274.224932059148
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.95": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.016096258799235028,
+       "knob_mb": 0.005547650655110678,
+       "bytes_per_entry": 4219.537666666667,
+       "completion_bytes_per_entry": 1454.2833333333335,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.032135161081949866,
+       "knob_mb": 0.011006580352783202,
+       "bytes_per_entry": 4212.019833333333,
+       "completion_bytes_per_entry": 1442.6544999999999,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.06437164942423503,
+       "knob_mb": 0.02205185317993164,
+       "bytes_per_entry": 4218.660416666667,
+       "completion_bytes_per_entry": 1445.1902499999999,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.12845325215657552,
+       "knob_mb": 0.04415098063151043,
+       "bytes_per_entry": 4209.156166666667,
+       "completion_bytes_per_entry": 1446.7393333333337,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.2573448333740235,
+       "knob_mb": 0.08955155817667643,
+       "bytes_per_entry": 4216.337750000001,
+       "completion_bytes_per_entry": 1467.2127291666666,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.88133333333332,
+       "hit_rate": 0.006666666666666667,
+       "resident_mb": 0.47116054689153036,
+       "knob_mb": 0.13581287765502928,
+       "bytes_per_entry": 3863.328827902952,
+       "completion_bytes_per_entry": 1113.611504415552,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": null,
+     "knob_mb": null,
+     "entries": null
+    }
+   },
+   "lru": {
+    "0.75": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.008,
+       "resident_mb": 0.013555102030436198,
+       "knob_mb": 0.003080493927001953,
+       "bytes_per_entry": 3553.3886666666667,
+       "completion_bytes_per_entry": 807.533,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.025333333333333333,
+       "resident_mb": 0.027129578908284505,
+       "knob_mb": 0.006164857228597005,
+       "bytes_per_entry": 3555.9281666666666,
+       "completion_bytes_per_entry": 808.0401666666667,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.048,
+       "resident_mb": 0.05423901240030925,
+       "knob_mb": 0.012295767466227214,
+       "bytes_per_entry": 3554.607916666667,
+       "completion_bytes_per_entry": 805.8154166666667,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.07066666666666667,
+       "resident_mb": 0.10853053283691405,
+       "knob_mb": 0.024593728383382158,
+       "bytes_per_entry": 3556.3284999999996,
+       "completion_bytes_per_entry": 805.8872916666666,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.09733333333333333,
+       "resident_mb": 0.21683955001831054,
+       "knob_mb": 0.049303574879964195,
+       "bytes_per_entry": 3552.6991875,
+       "completion_bytes_per_entry": 807.7897708333334,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.30000000000001,
+       "hit_rate": 0.12666666666666668,
+       "resident_mb": 0.43192490059534716,
+       "knob_mb": 0.09861491902669271,
+       "bytes_per_entry": 3557.785424718513,
+       "completion_bytes_per_entry": 812.2956585493584,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.16247235253182304,
+      "half": 0.1424880298886631,
+      "cache_hit_max_ci95": [
+       0.13792695679457906,
+       0.21412163194601194
+      ],
+      "half_ci95": [
+       0.09070266398002605,
+       0.3057522608087978
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.16220423548568552,
+      "half": 0.03224138643260522,
+      "cache_hit_max_ci95": [
+       0.13965423499388446,
+       0.2081288735083268
+      ],
+      "half_ci95": [
+       0.021109464289479664,
+       0.06342649381940593
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.1623842526620736,
+      "half": 41.990375104797906,
+      "cache_hit_max_ci95": [
+       0.13827440168149047,
+       0.21526313851706086
+      ],
+      "half_ci95": [
+       25.79350858936434,
+       93.55814333418229
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.80": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.005333333333333333,
+       "resident_mb": 0.013555769602457683,
+       "knob_mb": 0.0030854263305664063,
+       "bytes_per_entry": 3553.563666666667,
+       "completion_bytes_per_entry": 808.826,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.018666666666666668,
+       "resident_mb": 0.027132865905761718,
+       "knob_mb": 0.006179724375406901,
+       "bytes_per_entry": 3556.359,
+       "completion_bytes_per_entry": 809.9888333333333,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.03333333333333333,
+       "resident_mb": 0.05425413767496745,
+       "knob_mb": 0.012320054372151694,
+       "bytes_per_entry": 3555.599166666667,
+       "completion_bytes_per_entry": 807.4070833333334,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.04666666666666667,
+       "resident_mb": 0.10849545033772787,
+       "knob_mb": 0.024598102569580078,
+       "bytes_per_entry": 3555.1789166666667,
+       "completion_bytes_per_entry": 806.030625,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.072,
+       "resident_mb": 0.21676581446329754,
+       "knob_mb": 0.04931207784016927,
+       "bytes_per_entry": 3551.491104166667,
+       "completion_bytes_per_entry": 807.9290833333333,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.60933333333332,
+       "hit_rate": 0.10266666666666667,
+       "resident_mb": 0.4322450013237,
+       "knob_mb": 0.09845523325602214,
+       "bytes_per_entry": 3551.7914142225754,
+       "completion_bytes_per_entry": 809.0144503536837,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.12963401610731135,
+      "half": 0.1771756060151705,
+      "cache_hit_max_ci95": [
+       0.1082252641444153,
+       0.18462583693670828
+      ],
+      "half_ci95": [
+       0.104996403237928,
+       0.39221098276618
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.12950443075092222,
+      "half": 0.040180905105990754,
+      "cache_hit_max_ci95": [
+       0.10812388295922616,
+       0.18001401668327152
+      ],
+      "half_ci95": [
+       0.025194619551964913,
+       0.07953283831261072
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.12948076533693262,
+      "half": 52.1683546495385,
+      "cache_hit_max_ci95": [
+       0.10876238880741222,
+       0.18615971533226655
+      ],
+      "half_ci95": [
+       30.356063207760904,
+       118.39357341034763
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.85": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.004,
+       "resident_mb": 0.013559169769287109,
+       "knob_mb": 0.0030900395711263022,
+       "bytes_per_entry": 3554.455,
+       "completion_bytes_per_entry": 810.0353333333334,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.009333333333333334,
+       "resident_mb": 0.02712209955851237,
+       "knob_mb": 0.006173690795898437,
+       "bytes_per_entry": 3554.947833333333,
+       "completion_bytes_per_entry": 809.198,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.02,
+       "resident_mb": 0.05427429580688476,
+       "knob_mb": 0.012353649139404297,
+       "bytes_per_entry": 3556.9202499999997,
+       "completion_bytes_per_entry": 809.60875,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.04,
+       "resident_mb": 0.10859042358398438,
+       "knob_mb": 0.02473104476928711,
+       "bytes_per_entry": 3558.291,
+       "completion_bytes_per_entry": 810.386875,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.04933333333333333,
+       "resident_mb": 0.21661508178710936,
+       "knob_mb": 0.04930009460449219,
+       "bytes_per_entry": 3549.0215,
+       "completion_bytes_per_entry": 807.73275,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.704,
+       "hit_rate": 0.06533333333333333,
+       "resident_mb": 0.4323033159561157,
+       "knob_mb": 0.09829015986124676,
+       "bytes_per_entry": 3549.6373005700684,
+       "completion_bytes_per_entry": 807.0593142475309,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.09609738264911426,
+      "half": 0.18962217103732606,
+      "cache_hit_max_ci95": [
+       0.05552267999174774,
+       0.18908450973878263
+      ],
+      "half_ci95": [
+       0.08862570338904482,
+       0.5188771657427488
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.09614822978527607,
+      "half": 0.04320720902805931,
+      "cache_hit_max_ci95": [
+       0.054983472982385526,
+       0.18369829615013153
+      ],
+      "half_ci95": [
+       0.020461174953507088,
+       0.11091947768332729
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.09583695029333537,
+      "half": 55.69010840652489,
+      "cache_hit_max_ci95": [
+       0.0553855043689381,
+       0.19032803965090692
+      ],
+      "half_ci95": [
+       26.27966326573218,
+       154.06812221132574
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.90": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0026666666666666666,
+       "resident_mb": 0.013559092203776041,
+       "knob_mb": 0.003090619405110677,
+       "bytes_per_entry": 3554.4346666666665,
+       "completion_bytes_per_entry": 810.1873333333333,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.005333333333333333,
+       "resident_mb": 0.027120380401611327,
+       "knob_mb": 0.006173542022705078,
+       "bytes_per_entry": 3554.7225,
+       "completion_bytes_per_entry": 809.1785,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.009333333333333334,
+       "resident_mb": 0.05422642135620117,
+       "knob_mb": 0.012306144714355469,
+       "bytes_per_entry": 3553.78275,
+       "completion_bytes_per_entry": 806.4955,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.018666666666666668,
+       "resident_mb": 0.10848367563883463,
+       "knob_mb": 0.02465150197347005,
+       "bytes_per_entry": 3554.793083333333,
+       "completion_bytes_per_entry": 807.7804166666666,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.028,
+       "resident_mb": 0.2165080451965332,
+       "knob_mb": 0.04918009694417317,
+       "bytes_per_entry": 3547.2678124999998,
+       "completion_bytes_per_entry": 805.7667083333332,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.832,
+       "hit_rate": 0.04533333333333334,
+       "resident_mb": 0.4324674707310994,
+       "knob_mb": 0.09828963343302408,
+       "bytes_per_entry": 3547.429521476104,
+       "completion_bytes_per_entry": 806.2468761082254,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.07020230894333267,
+      "half": 0.32129567998912884,
+      "cache_hit_max_ci95": [
+       0.03435373634667398,
+       1.0
+      ],
+      "half_ci95": [
+       0.08916406900384917,
+       8.8246664389905
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.07025526669307251,
+      "half": 0.07307274506387867,
+      "cache_hit_max_ci95": [
+       0.034422757227126496,
+       1.0
+      ],
+      "half_ci95": [
+       0.020968619468897227,
+       1.960920439179027
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.06989441101344927,
+      "half": 94.26871160914233,
+      "cache_hit_max_ci95": [
+       0.034370572827828925,
+       1.0
+      ],
+      "half_ci95": [
+       26.24034740875355,
+       2657.55340104997
+      ],
+      "bootstrap_fits": 400
+     }
+    },
+    "0.95": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0026666666666666666,
+       "resident_mb": 0.013559092203776041,
+       "knob_mb": 0.003090619405110677,
+       "bytes_per_entry": 3554.4346666666665,
+       "completion_bytes_per_entry": 810.1873333333333,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.004,
+       "resident_mb": 0.02712045160929362,
+       "knob_mb": 0.006173137664794922,
+       "bytes_per_entry": 3554.7318333333333,
+       "completion_bytes_per_entry": 809.1255,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.005333333333333333,
+       "resident_mb": 0.05424353663126628,
+       "knob_mb": 0.012323951721191407,
+       "bytes_per_entry": 3554.9044166666667,
+       "completion_bytes_per_entry": 807.6625,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.008,
+       "resident_mb": 0.10846340306599934,
+       "knob_mb": 0.024636474609375,
+       "bytes_per_entry": 3554.1287916666665,
+       "completion_bytes_per_entry": 807.288,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.014666666666666666,
+       "resident_mb": 0.21647230021158856,
+       "knob_mb": 0.04916564432779948,
+       "bytes_per_entry": 3546.682166666667,
+       "completion_bytes_per_entry": 805.5299166666667,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 127.88133333333332,
+       "hit_rate": 0.028,
+       "resident_mb": 0.43257201285425817,
+       "knob_mb": 0.09836317189534505,
+       "bytes_per_entry": 3546.9182180667494,
+       "completion_bytes_per_entry": 806.5388328763125,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.031589791479123816,
+      "half": 0.2643620092927947,
+      "cache_hit_max_ci95": [
+       0.011540706608821671,
+       1.0
+      ],
+      "half_ci95": [
+       0.03626722450967015,
+       30.77623453280452
+      ],
+      "bootstrap_fits": 400
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.03162829592069798,
+      "half": 0.06016680135572253,
+      "cache_hit_max_ci95": [
+       0.01151856779681864,
+       1.0
+      ],
+      "half_ci95": [
+       0.00795406069001546,
+       6.715745607692835
+      ],
+      "bootstrap_fits": 400
+     },
+     "entries": {
+      "cache_hit_max": 0.03146912633934745,
+      "half": 77.60356545294137,
+      "cache_hit_max_ci95": [
+       0.011555158293351204,
+       1.0
+      ],
+      "half_ci95": [
+       10.922147667226184,
+       9253.174848702096
+      ],
+      "bootstrap_fits": 400
+     }
+    }
+   }
+  },
+  "other_language": {
+   "costaware": {
+    "0.75": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.048,
+       "resident_mb": 0.015377208709716797,
+       "knob_mb": 0.005267356872558594,
+       "bytes_per_entry": 4031.043,
+       "completion_bytes_per_entry": 1380.806,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.064,
+       "resident_mb": 0.031706375122070314,
+       "knob_mb": 0.011424278259277344,
+       "bytes_per_entry": 4155.818,
+       "completion_bytes_per_entry": 1497.403,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.088,
+       "resident_mb": 0.06302690124511719,
+       "knob_mb": 0.02237999725341797,
+       "bytes_per_entry": 4130.531,
+       "completion_bytes_per_entry": 1466.6955,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.128,
+       "resident_mb": 0.12157916259765625,
+       "knob_mb": 0.04005392456054688,
+       "bytes_per_entry": 3983.906,
+       "completion_bytes_per_entry": 1312.487,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.192,
+       "resident_mb": 0.23637613677978514,
+       "knob_mb": 0.07155659484863282,
+       "bytes_per_entry": 3872.7866249999997,
+       "completion_bytes_per_entry": 1172.38325,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 123.352,
+       "hit_rate": 0.264,
+       "resident_mb": 0.40743679181671144,
+       "knob_mb": 0.09248037719726564,
+       "bytes_per_entry": 3463.4901859394254,
+       "completion_bytes_per_entry": 786.1461832803684,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.2823321761417962,
+      "half": 0.1246565257319548
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.32133553937513926,
+      "half": 0.052725989532176054
+     },
+     "entries": {
+      "cache_hit_max": 0.2711075545975242,
+      "half": 29.984758194549972
+     }
+    },
+    "0.80": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.008,
+       "resident_mb": 0.015483989715576173,
+       "knob_mb": 0.005210273742675782,
+       "bytes_per_entry": 4059.0350000000003,
+       "completion_bytes_per_entry": 1365.842,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.016,
+       "resident_mb": 0.031013343811035154,
+       "knob_mb": 0.010667213439941406,
+       "bytes_per_entry": 4064.9809999999998,
+       "completion_bytes_per_entry": 1398.173,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.04,
+       "resident_mb": 0.061705307006835936,
+       "knob_mb": 0.02122894287109375,
+       "bytes_per_entry": 4043.919,
+       "completion_bytes_per_entry": 1391.26,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.104,
+       "resident_mb": 0.12436480712890625,
+       "knob_mb": 0.04238803863525391,
+       "bytes_per_entry": 4075.186,
+       "completion_bytes_per_entry": 1388.97125,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.112,
+       "resident_mb": 0.2427103271484375,
+       "knob_mb": 0.07768968963623046,
+       "bytes_per_entry": 3976.566,
+       "completion_bytes_per_entry": 1272.867875,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 125.032,
+       "hit_rate": 0.216,
+       "resident_mb": 0.42218584142303467,
+       "knob_mb": 0.10251345825195313,
+       "bytes_per_entry": 3540.6451216968458,
+       "completion_bytes_per_entry": 859.72512636765,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.23817084611475411,
+      "half": 0.2384301743299028
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.26614567304472553,
+      "half": 0.09450622560052396
+     },
+     "entries": {
+      "cache_hit_max": 0.23096870738830486,
+      "half": 59.02824242365474
+     }
+    },
+    "0.85": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.015483989715576173,
+       "knob_mb": 0.005210273742675782,
+       "bytes_per_entry": 4059.0350000000003,
+       "completion_bytes_per_entry": 1365.842,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.03085200500488281,
+       "knob_mb": 0.0104810791015625,
+       "bytes_per_entry": 4043.834,
+       "completion_bytes_per_entry": 1373.776,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.016,
+       "resident_mb": 0.06125291442871093,
+       "knob_mb": 0.020720733642578124,
+       "bytes_per_entry": 4014.2709999999997,
+       "completion_bytes_per_entry": 1357.954,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.072,
+       "resident_mb": 0.12366813659667969,
+       "knob_mb": 0.041810600280761716,
+       "bytes_per_entry": 4052.3575,
+       "completion_bytes_per_entry": 1370.04975,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.096,
+       "resident_mb": 0.2460880584716797,
+       "knob_mb": 0.0813824462890625,
+       "bytes_per_entry": 4031.90675,
+       "completion_bytes_per_entry": 1333.37,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 125.992,
+       "hit_rate": 0.176,
+       "resident_mb": 0.43174313787078855,
+       "knob_mb": 0.1085007553100586,
+       "bytes_per_entry": 3593.2082396977585,
+       "completion_bytes_per_entry": 903.0040637500794,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.7620106519429188,
+      "half": 1.6281055822963837
+     },
+     "knob_mb": {
+      "cache_hit_max": 1.0,
+      "half": 0.7320849344301315
+     },
+     "entries": {
+      "cache_hit_max": 0.7444494123293445,
+      "half": 412.2335184661833
+     }
+    },
+    "0.90": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.015483989715576173,
+       "knob_mb": 0.005210273742675782,
+       "bytes_per_entry": 4059.0350000000003,
+       "completion_bytes_per_entry": 1365.842,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.03085200500488281,
+       "knob_mb": 0.0104810791015625,
+       "bytes_per_entry": 4043.834,
+       "completion_bytes_per_entry": 1373.776,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.016,
+       "resident_mb": 0.06125291442871093,
+       "knob_mb": 0.020720733642578124,
+       "bytes_per_entry": 4014.2709999999997,
+       "completion_bytes_per_entry": 1357.954,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.072,
+       "resident_mb": 0.12366813659667969,
+       "knob_mb": 0.041810600280761716,
+       "bytes_per_entry": 4052.3575,
+       "completion_bytes_per_entry": 1370.04975,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.096,
+       "resident_mb": 0.24613690948486328,
+       "knob_mb": 0.08143354034423828,
+       "bytes_per_entry": 4032.707125,
+       "completion_bytes_per_entry": 1334.207125,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 125.992,
+       "hit_rate": 0.176,
+       "resident_mb": 0.43158865026092524,
+       "knob_mb": 0.10848081970214843,
+       "bytes_per_entry": 3591.9225072703025,
+       "completion_bytes_per_entry": 902.83814845387,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.7604402327421614,
+      "half": 1.6245654848823707
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.9972964619923803,
+      "half": 0.7302523383187954
+     },
+     "entries": {
+      "cache_hit_max": 0.7444494123293445,
+      "half": 412.2335184661833
+     }
+    },
+    "0.95": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.015483989715576173,
+       "knob_mb": 0.005210273742675782,
+       "bytes_per_entry": 4059.0350000000003,
+       "completion_bytes_per_entry": 1365.842,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.0,
+       "resident_mb": 0.03085200500488281,
+       "knob_mb": 0.0104810791015625,
+       "bytes_per_entry": 4043.834,
+       "completion_bytes_per_entry": 1373.776,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.016,
+       "resident_mb": 0.06125291442871093,
+       "knob_mb": 0.020720733642578124,
+       "bytes_per_entry": 4014.2709999999997,
+       "completion_bytes_per_entry": 1357.954,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.072,
+       "resident_mb": 0.12366813659667969,
+       "knob_mb": 0.041810600280761716,
+       "bytes_per_entry": 4052.3575,
+       "completion_bytes_per_entry": 1370.04975,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.096,
+       "resident_mb": 0.24605044555664063,
+       "knob_mb": 0.08137818145751953,
+       "bytes_per_entry": 4031.2905,
+       "completion_bytes_per_entry": 1333.300125,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 126.4,
+       "hit_rate": 0.168,
+       "resident_mb": 0.4326847640991211,
+       "knob_mb": 0.10853760528564453,
+       "bytes_per_entry": 3589.42135443038,
+       "completion_bytes_per_entry": 900.395,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.7632288939481682,
+      "half": 1.630852390570034
+     },
+     "knob_mb": {
+      "cache_hit_max": 1.0,
+      "half": 0.7320592425594348
+     },
+     "entries": {
+      "cache_hit_max": 0.7444494123293445,
+      "half": 412.2335184661833
+     }
+    }
+   },
+   "lru": {
+    "0.75": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.056,
+       "resident_mb": 0.012290088653564454,
+       "knob_mb": 0.0024785232543945313,
+       "bytes_per_entry": 3221.773,
+       "completion_bytes_per_entry": 649.73,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.112,
+       "resident_mb": 0.024776588439941405,
+       "knob_mb": 0.005026512145996094,
+       "bytes_per_entry": 3247.517,
+       "completion_bytes_per_entry": 658.835,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.144,
+       "resident_mb": 0.050108146667480466,
+       "knob_mb": 0.010579788208007812,
+       "bytes_per_entry": 3283.8875,
+       "completion_bytes_per_entry": 693.357,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.184,
+       "resident_mb": 0.0994105682373047,
+       "knob_mb": 0.0205147705078125,
+       "bytes_per_entry": 3257.4855000000002,
+       "completion_bytes_per_entry": 672.228,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.256,
+       "resident_mb": 0.20153078460693358,
+       "knob_mb": 0.04315493774414063,
+       "bytes_per_entry": 3301.8803749999997,
+       "completion_bytes_per_entry": 707.0505,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 123.352,
+       "hit_rate": 0.28,
+       "resident_mb": 0.39187028638458254,
+       "knob_mb": 0.08115526580810546,
+       "bytes_per_entry": 3331.1642893183734,
+       "completion_bytes_per_entry": 689.8750243206433,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.3131756552735446,
+      "half": 0.055603338393875906
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.30942192765971316,
+      "half": 0.01122306329001507
+     },
+     "entries": {
+      "cache_hit_max": 0.31449430329129185,
+      "half": 18.02782787066533
+     }
+    },
+    "0.80": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.048,
+       "resident_mb": 0.012254177093505859,
+       "knob_mb": 0.0024431610107421876,
+       "bytes_per_entry": 3212.359,
+       "completion_bytes_per_entry": 640.46,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.088,
+       "resident_mb": 0.02467179870605469,
+       "knob_mb": 0.004950614929199218,
+       "bytes_per_entry": 3233.782,
+       "completion_bytes_per_entry": 648.887,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.128,
+       "resident_mb": 0.049979522705078126,
+       "knob_mb": 0.010504066467285156,
+       "bytes_per_entry": 3275.458,
+       "completion_bytes_per_entry": 688.3945,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.168,
+       "resident_mb": 0.1004554443359375,
+       "knob_mb": 0.02158638000488281,
+       "bytes_per_entry": 3291.724,
+       "completion_bytes_per_entry": 707.3425,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.192,
+       "resident_mb": 0.20284384155273436,
+       "knob_mb": 0.04417128753662109,
+       "bytes_per_entry": 3323.3934999999997,
+       "completion_bytes_per_entry": 723.702375,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 125.032,
+       "hit_rate": 0.216,
+       "resident_mb": 0.4014931534347534,
+       "knob_mb": 0.08728076171874999,
+       "bytes_per_entry": 3367.1066995329193,
+       "completion_bytes_per_entry": 731.9767099622496,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.23492180882101837,
+      "half": 0.04236983268142713
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.23025084377315796,
+      "half": 0.0083634789600312
+     },
+     "entries": {
+      "cache_hit_max": 0.23662057788610424,
+      "half": 13.859127625504646
+     }
+    },
+    "0.85": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.04,
+       "resident_mb": 0.012254177093505859,
+       "knob_mb": 0.0024431610107421876,
+       "bytes_per_entry": 3212.359,
+       "completion_bytes_per_entry": 640.46,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.08,
+       "resident_mb": 0.02467179870605469,
+       "knob_mb": 0.004950614929199218,
+       "bytes_per_entry": 3233.782,
+       "completion_bytes_per_entry": 648.887,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.112,
+       "resident_mb": 0.0497589111328125,
+       "knob_mb": 0.010289894104003907,
+       "bytes_per_entry": 3261.0,
+       "completion_bytes_per_entry": 674.3585,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.144,
+       "resident_mb": 0.09996636199951171,
+       "knob_mb": 0.021174095153808595,
+       "bytes_per_entry": 3275.69775,
+       "completion_bytes_per_entry": 693.83275,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.16,
+       "resident_mb": 0.20294786071777343,
+       "knob_mb": 0.044330535888671876,
+       "bytes_per_entry": 3325.09775,
+       "completion_bytes_per_entry": 726.3115,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 125.992,
+       "hit_rate": 0.184,
+       "resident_mb": 0.4069006085739136,
+       "knob_mb": 0.08949658203125,
+       "bytes_per_entry": 3386.4547950346055,
+       "completion_bytes_per_entry": 744.8406882976697,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.19350022083561236,
+      "half": 0.03752921733885967
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.19005515413389074,
+      "half": 0.007364905667183417
+     },
+     "entries": {
+      "cache_hit_max": 0.19474186550751466,
+      "half": 12.295257072059854
+     }
+    },
+    "0.90": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.04,
+       "resident_mb": 0.012254177093505859,
+       "knob_mb": 0.0024431610107421876,
+       "bytes_per_entry": 3212.359,
+       "completion_bytes_per_entry": 640.46,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.08,
+       "resident_mb": 0.02467179870605469,
+       "knob_mb": 0.004950614929199218,
+       "bytes_per_entry": 3233.782,
+       "completion_bytes_per_entry": 648.887,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.104,
+       "resident_mb": 0.04968390655517578,
+       "knob_mb": 0.010221183776855469,
+       "bytes_per_entry": 3256.0845,
+       "completion_bytes_per_entry": 669.8555,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.144,
+       "resident_mb": 0.09995862579345703,
+       "knob_mb": 0.021173500061035157,
+       "bytes_per_entry": 3275.44425,
+       "completion_bytes_per_entry": 693.81325,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.16,
+       "resident_mb": 0.2029197692871094,
+       "knob_mb": 0.044341110229492185,
+       "bytes_per_entry": 3324.6375000000003,
+       "completion_bytes_per_entry": 726.48475,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 125.992,
+       "hit_rate": 0.176,
+       "resident_mb": 0.4071107602462769,
+       "knob_mb": 0.08966033935546876,
+       "bytes_per_entry": 3388.2037949711093,
+       "completion_bytes_per_entry": 746.2035684805385,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.19463910622738245,
+      "half": 0.03994267707500827
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.19093087417763135,
+      "half": 0.00781744999418216
+     },
+     "entries": {
+      "cache_hit_max": 0.1959759550383983,
+      "half": 13.097768407703901
+     }
+    },
+    "0.95": {
+     "points": [
+      {
+       "capacity": 4,
+       "entries": 4.0,
+       "hit_rate": 0.04,
+       "resident_mb": 0.012254177093505859,
+       "knob_mb": 0.0024431610107421876,
+       "bytes_per_entry": 3212.359,
+       "completion_bytes_per_entry": 640.46,
+       "filled": true
+      },
+      {
+       "capacity": 8,
+       "entries": 8.0,
+       "hit_rate": 0.08,
+       "resident_mb": 0.02467179870605469,
+       "knob_mb": 0.004950614929199218,
+       "bytes_per_entry": 3233.782,
+       "completion_bytes_per_entry": 648.887,
+       "filled": true
+      },
+      {
+       "capacity": 16,
+       "entries": 16.0,
+       "hit_rate": 0.104,
+       "resident_mb": 0.04968390655517578,
+       "knob_mb": 0.010221183776855469,
+       "bytes_per_entry": 3256.0845,
+       "completion_bytes_per_entry": 669.8555,
+       "filled": true
+      },
+      {
+       "capacity": 32,
+       "entries": 32.0,
+       "hit_rate": 0.128,
+       "resident_mb": 0.09979665374755858,
+       "knob_mb": 0.021042442321777342,
+       "bytes_per_entry": 3270.1367499999997,
+       "completion_bytes_per_entry": 689.51875,
+       "filled": true
+      },
+      {
+       "capacity": 64,
+       "entries": 64.0,
+       "hit_rate": 0.16,
+       "resident_mb": 0.20291015624999997,
+       "knob_mb": 0.044336517333984374,
+       "bytes_per_entry": 3324.4799999999996,
+       "completion_bytes_per_entry": 726.4095,
+       "filled": true
+      },
+      {
+       "capacity": 128,
+       "entries": 126.4,
+       "hit_rate": 0.176,
+       "resident_mb": 0.40747239227294924,
+       "knob_mb": 0.0892906494140625,
+       "bytes_per_entry": 3380.26717721519,
+       "completion_bytes_per_entry": 740.7281012658228,
+       "filled": false
+      }
+     ],
+     "fitted_on": "filled capacities only",
+     "mb": {
+      "cache_hit_max": 0.18623745135951048,
+      "half": 0.03872746711154129
+     },
+     "knob_mb": {
+      "cache_hit_max": 0.18273027540306835,
+      "half": 0.007567374473351052
+     },
+     "entries": {
+      "cache_hit_max": 0.18744503797889792,
+      "half": 12.695364731694578
+     }
+    }
+   }
+  }
+ },
+ "wrong_hit_rate": {
+  "qqp": {
+   "0.75": {
+    "tau": 0.75,
+    "pairs_at_or_above": 241,
+    "precision": 0.6182572614107884,
+    "recall": 0.8514285714285714,
+    "wrong_hit_rate": 0.3817427385892116,
+    "wrong_hit_ci95": [
+     0.322717758456705,
+     0.4444785314999124
+    ]
+   },
+   "0.80": {
+    "tau": 0.8,
+    "pairs_at_or_above": 206,
+    "precision": 0.6601941747572816,
+    "recall": 0.7771428571428571,
+    "wrong_hit_rate": 0.3398058252427184,
+    "wrong_hit_ci95": [
+     0.2785867493357069,
+     0.4068900846900461
+    ]
+   },
+   "0.85": {
+    "tau": 0.85,
+    "pairs_at_or_above": 151,
+    "precision": 0.7284768211920529,
+    "recall": 0.6285714285714286,
+    "wrong_hit_rate": 0.2715231788079471,
+    "wrong_hit_ci95": [
+     0.20691126842872554,
+     0.347471643625232
+    ]
+   },
+   "0.90": {
+    "tau": 0.9,
+    "pairs_at_or_above": 96,
+    "precision": 0.71875,
+    "recall": 0.3942857142857143,
+    "wrong_hit_rate": 0.28125,
+    "wrong_hit_ci95": [
+     0.20107410783337887,
+     0.378258962109691
+    ]
+   },
+   "0.95": {
+    "tau": 0.95,
+    "pairs_at_or_above": 44,
+    "precision": 0.8409090909090909,
+    "recall": 0.21142857142857144,
+    "wrong_hit_rate": 0.15909090909090906,
+    "wrong_hit_ci95": [
+     0.07926676969079993,
+     0.29366205184794414
+    ]
+   }
+  },
+  "lmsys_response_agreement": {
+   "by_tau": {
+    "0.70": {
+     "hit_rate": 0.411,
+     "precision_rho_0.60": 0.366,
+     "precision_rho_0.70": 0.249,
+     "precision_rho_0.80": 0.144,
+     "wrong_hit_rate": 0.751,
+     "incorrect_per_1k": 308.6
+    },
+    "0.75": {
+     "hit_rate": 0.347,
+     "precision_rho_0.60": 0.385,
+     "precision_rho_0.70": 0.273,
+     "precision_rho_0.80": 0.164,
+     "wrong_hit_rate": 0.727,
+     "incorrect_per_1k": 252.1
+    },
+    "0.80": {
+     "hit_rate": 0.291,
+     "precision_rho_0.60": 0.401,
+     "precision_rho_0.70": 0.293,
+     "precision_rho_0.80": 0.184,
+     "wrong_hit_rate": 0.707,
+     "incorrect_per_1k": 205.6
+    },
+    "0.85": {
+     "hit_rate": 0.241,
+     "precision_rho_0.60": 0.416,
+     "precision_rho_0.70": 0.313,
+     "precision_rho_0.80": 0.205,
+     "wrong_hit_rate": 0.687,
+     "incorrect_per_1k": 165.5
+    },
+    "0.90": {
+     "hit_rate": 0.197,
+     "precision_rho_0.60": 0.419,
+     "precision_rho_0.70": 0.328,
+     "precision_rho_0.80": 0.224,
+     "wrong_hit_rate": 0.672,
+     "incorrect_per_1k": 132.3
+    },
+    "0.95": {
+     "hit_rate": 0.156,
+     "precision_rho_0.60": 0.417,
+     "precision_rho_0.70": 0.338,
+     "precision_rho_0.80": 0.247,
+     "wrong_hit_rate": 0.662,
+     "incorrect_per_1k": 103.4
+    }
+   },
+   "first_turn_precision_at_0.85": 0.353,
+   "source": "research/analysis/CACHE_PRECISION.md",
+   "protocol": "100k reservoir (prompt, response) pairs, all user turns, raw text, insert first half, query second half, unbounded cache; correct if response cosine >= 0.70"
+  },
+  "notes": [
+   "QQP pairs were sampled to be topically related (about 37% are duplicates), so its precision is not the precision of a cache's hits; it bounds how often a pair at a given cosine is a true paraphrase.",
+   "The LMSYS proxy counts a hit wrong when responses disagree, including stylistic disagreement between models; it is a pessimistic bound (CACHE_PRECISION.md)."
+  ]
+ },
+ "plant2": {
+  "class": "all",
+  "policy": "costaware",
+  "tau": 0.85,
+  "cache_hit_max": 0.039641578454554814,
+  "cache_hit_max_ci95": [
+   0.02021479901870609,
+   0.06392109222167393
+  ],
+  "cache_half_mb": 0.09966867623460547,
+  "cache_half_mb_ci95": [
+   0.06499086095873104,
+   0.23045160555192476
+  ],
+  "cache_half_mb_knob_unit": 0.03354194300719001,
+  "unit": "MiB of resident gateway heap per tenant"
+ }
+}
