@@ -176,6 +176,12 @@ A refutation candidate must satisfy I <= tau and G >= g* (`--large-gain`,
 default 0.03), and it counts only if it survives re-evaluation on **fresh
 seeds** (`--confirm`), because the search selects on noise.
 
+**Fixed before the real search (2026-11-13, committed before any run with
+`--budget` above the smoke size):** tau = 0.25, g* = 0.03, objective
+`constrained`, one-sided, `--budget 200 --panel 4 --steps 60 --max-width 16`,
+seed as in the script. A search with any other value is reported as a
+separate, labelled exploration, never in place of this one.
+
 **Procedure.** Random search runs first. Stochastic hill-climbing then
 starts from the best regimes: each step evaluates a batch of neighbours, in
 which one or two parameters move. Everything is seeded.
