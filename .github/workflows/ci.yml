@@ -261,7 +261,7 @@ jobs:
       - name: Harness tests
         run: python -m pytest eval/tests -q
       - name: Programme-2 theory tests (interaction index, reference points)
-        run: python -m pytest research/theory research/control2 research/plant2 research/population tools/index-probe -q
+        run: python -m pytest research/theory research/control2 research/plant2 research/population research/speccurve tools/index-probe -q
       - name: Smoke the runner end to end (4 runs)
         # Independent of the suites above, so a failure there must not skip
         # it: that is how three steps went unrun on 2026-09-05.
