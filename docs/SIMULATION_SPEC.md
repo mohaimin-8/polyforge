@@ -338,7 +338,10 @@ def evaluate_step(
     a controller must not be able to plan around its own bookkeeping cost.
     """
     factor = SLO_CLASS_FACTOR[config.slo_class]
-    wu = demand.work_units(state.cache_mb, state.tier)
+    # Plant 2's admission gate: the share of AI misses the dollar budget
+    # admits; 1.0 (every published path) leaves all arithmetic below as is.
+    admitted = _admitted_share(config, state, demand) if ADMISSION_GATE else 1.0
+    wu = demand.work_units(state.cache_mb, state.tier, admitted)
     inflate = congestion(wu, state.replicas)
     hit = hit_rate(state.cache_mb)
     if P95_TAIL is None:
@@ -356,6 +359,11 @@ def evaluate_step(
     ai_p95 = 0.0
     miss_rps = 0.0
     quality_lost = 0.0
+    refused_rps = 0.0   # plant 2: misses the dollar gate refused
+    ai_within = 0.0     # plant 2: AI requests answered within target
+    if ATTAINMENT_SLO:
+        sigma = _lognormal_sigma(tail)
+        ai_target_eff = SLO_BASE_MS["ai"] * factor - extra_ai_latency_ms
     if ai_rps > 0.0:
         weighted_ms = 0.0
         # A miss is answered by the serving tier; a hit by a stored answer,
@@ -376,9 +384,24 @@ def evaluate_step(
             weighted_ms += rate * (hit_share * CACHE_HIT_LATENCY_MS + (1.0 - hit_share) * miss_ms)
             miss_rps += rate * (1.0 - hit_share)
             quality_lost += rate * (hit_share * hit_loss + (1.0 - hit_share) * miss_loss)
+            refused = rate * (1.0 - hit_share) * (1.0 - admitted) if admitted != 1.0 else 0.0
+            if refused:
+                # Plant 2: refused misses fail fast, unanswered and unbilled.
+                weighted_ms += refused * (NO_TIER_LATENCY_MS - miss_ms)
+                miss_rps -= refused
+                quality_lost += refused * (1.0 - miss_loss)
+                refused_rps += refused
             if MIXTURE_P95:
                 branches.append((rate * hit_share, CACHE_HIT_LATENCY_MS, True))
-                branches.append((rate * (1.0 - hit_share), miss_ms, False))
+                branches.append((rate * (1.0 - hit_share) - refused, miss_ms, False))
+                if refused:
+                    branches.append((refused, NO_TIER_LATENCY_MS, True))
+            if ATTAINMENT_SLO:
+                hit_ms = CACHE_HIT_LATENCY_MS
+                ai_within += rate * hit_share * (1.0 if hit_ms <= ai_target_eff else 0.0)
+                if state.tier != "none":
+                    ai_within += ((rate * (1.0 - hit_share) - refused)
+                                  * _lognormal_cdf(ai_target_eff, miss_ms, sigma))
         if MIXTURE_P95:
             # True percentile of the hit/miss mixture: a cache hit only
             # moves p95 once hits cross the quantile — the mean-based form
@@ -406,6 +429,13 @@ def evaluate_step(
             over = max(0.0, ai_p95 / ai_target - 1.0)
             violation += (ai_rps / total_rps) * min(1.0, over)
             excess += (ai_rps / total_rps) * over
+        if ATTAINMENT_SLO:
+            # Plant 2: the share of requests NOT answered within target.
+            within = ai_within
+            if crud_rps > 0.0:
+                crud_mean = demand.crud_base_ms * CRUD_BASE_SCALE * inflate
+                within += crud_rps * _lognormal_cdf(crud_target, crud_mean, sigma)
+            violation = min(1.0, max(0.0, 1.0 - within / total_rps))
 
     interval_hr = CONTROL_INTERVAL_S / 3600.0
     cost_infra = state.replicas * REPLICA_COST_USD_HR * interval_hr
@@ -419,6 +449,10 @@ def evaluate_step(
     energy_kwh = state.replicas * REPLICA_POWER_W / 1000.0 * interval_hr
     energy_kwh += (state.cache_mb / 1024.0) * MEM_POWER_W_PER_GB / 1000.0 * interval_hr
     energy_kwh += miss_rps * CONTROL_INTERVAL_S * TIER_ENERGY_WH_PER_REQ[state.tier] / 1000.0
+
+    ai_shed = (miss_rps * CONTROL_INTERVAL_S) if state.tier == "none" else 0.0
+    if refused_rps:
+        ai_shed += refused_rps * CONTROL_INTERVAL_S
 
     return StepMetrics(
         cost_usd=cost_infra + cost_tier,
@@ -434,7 +468,7 @@ def evaluate_step(
         quality_loss=quality_lost / total_rps if total_rps > 0.0 else 0.0,
         requests=total_rps * CONTROL_INTERVAL_S,
         ai_requests=ai_rps * CONTROL_INTERVAL_S,
-        ai_shed_requests=(miss_rps * CONTROL_INTERVAL_S) if state.tier == "none" else 0.0,
+        ai_shed_requests=ai_shed,
     )
 ```
 

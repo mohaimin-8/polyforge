@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from . import SCHEMA_VERSION, trace_workloads
+from . import SCHEMA_VERSION, population_workloads, trace_workloads
 from .systems import SYSTEMS
 from .workloads import CLUSTER_SIZES, TENANT_MIXES, WORKLOAD_CLASSES
 
@@ -26,6 +26,8 @@ BACKENDS = ("sim", "cluster")
 ECONOMY_KEYS = {
     "tier_cost_small", "tier_cost_mid", "tier_cost_large",
     "cache_hit_max", "cache_half_mb",
+    "replica_cost_usd_hr",  # plant 2 (programme 2): price of a replica-hour
+    "tier_quality_small", "tier_quality_mid", "tier_quality_large",  # plant 2: answer quality per tier
 }
 
 # Structural model-form overrides (Wave 5 preregs: PREREG_LM_ADOPTION,
@@ -45,6 +47,9 @@ MODEL_FORM_KEYS = {
     "tier_latency_small", "tier_latency_mid", "tier_latency_large",  # flat ms, all three together
     # PREREG_LEVEL robustness plant: the agent row only, all three together.
     "agent_latency_small", "agent_latency_mid", "agent_latency_large",
+    # Plant 2 (programme 2, research/plant2): CRUD work on the replicas,
+    # the dollar admission gate (0/1) and the attainment SLO metric (0/1).
+    "wu_crud_scale", "admission_gate", "attainment_slo",
 }
 
 
@@ -145,9 +150,22 @@ def load(path: str | Path) -> ExperimentSpec:
     for name in spec.workloads:
         if trace_workloads.is_trace(name):
             trace_workloads.window_index(name)  # raises on a malformed window
-    _check_membership([w for w in spec.workloads if not trace_workloads.is_trace(w)],
+    # Population workloads (programme 2, WP8) bring their own tenants, so a
+    # spec that lists them lists nothing else and uses the mix `own`.
+    population = [w for w in spec.workloads if population_workloads.is_population(w)]
+    for name in population:
+        population_workloads.check(name)
+    if population and spec.backend != "sim":
+        raise ValueError("population workloads are sim-only: their budgets follow the simulated plant")
+    if population and (len(population) != len(spec.workloads)
+                       or spec.tenant_mixes != [population_workloads.OWN_MIX]):
+        raise ValueError("population workloads bring their own tenants: list only population "
+                         f"workloads, with tenant_mixes: [{population_workloads.OWN_MIX}]")
+    _check_membership([w for w in spec.workloads
+                       if not trace_workloads.is_trace(w) and not population_workloads.is_population(w)],
                       WORKLOAD_CLASSES, "workload class")
-    _check_membership(spec.tenant_mixes, TENANT_MIXES, "tenant mix")
+    if not population:
+        _check_membership(spec.tenant_mixes, TENANT_MIXES, "tenant mix")
     _check_membership(spec.cluster_sizes, CLUSTER_SIZES, "cluster size")
     if spec.reps < 1 or spec.steps < 3:
         raise ValueError("reps must be >= 1 and steps >= 3")
@@ -175,6 +193,9 @@ def load(path: str | Path) -> ExperimentSpec:
                if not isinstance(v, (int, float)) or v < 0}
         if bad:
             raise ValueError(f"model_form values must be non-negative numbers: {bad}")
+        flags = {k: spec.model_form[k] for k in ("admission_gate", "attainment_slo") if k in spec.model_form}
+        if any(v not in (0, 1) for v in flags.values()):
+            raise ValueError(f"admission_gate and attainment_slo are 0/1 switches: {flags}")
         if ("p95_tail_f0" in spec.model_form) != ("p95_tail_b" in spec.model_form):
             raise ValueError("p95_tail_f0 and p95_tail_b must be set together")
         tiers = {k for k in spec.model_form if k.startswith("tier_latency_")}

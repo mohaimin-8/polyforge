@@ -181,12 +181,16 @@ CACHE_LEVELS_MB = (0, 64, 128, 256, 512, 1024)
 _DEFAULT_TIER_COST_USD_PER_REQ = dict(TIER_COST_USD_PER_REQ)
 _DEFAULT_CACHE_HIT_MAX = CACHE_HIT_MAX
 _DEFAULT_CACHE_HALF_MB = CACHE_HALF_MB
+_DEFAULT_REPLICA_COST_USD_HR = REPLICA_COST_USD_HR
+_DEFAULT_TIER_QUALITY = dict(TIER_QUALITY)
 
 
 def set_economy(
     tier_cost_usd_per_req: dict | None = None,
     cache_hit_max: float | None = None,
     cache_half_mb: float | None = None,
+    replica_cost_usd_hr: float | None = None,
+    tier_quality: dict | None = None,
 ) -> None:
     """Reset the economy to the published defaults, then apply overrides.
 
@@ -195,11 +199,24 @@ def set_economy(
     is mutated in place (never rebound) so `from model import` aliases keep
     seeing the active economy. A rejected argument raises and changes
     nothing: the economy active before the call stays active.
+
+    `replica_cost_usd_hr` (programme 2, plant 2) prices a replica-hour; in a
+    self-hosted plant a replica is a model server. Modules that copied the
+    published price at import (controller.SWITCH_PENALTY_HALF_REPLICA,
+    eval/baselines/isocost.py) keep the published value: an arm meant for a
+    repriced plant sets its own switch penalty.
+
+    `tier_quality` (programme 2, plant 2) replaces a tier's answer quality,
+    a share in (0, 1]; quality_shortfall reads the table at call time, so the
+    world and the planner's quality term move together. The table is
+    mutated in place, like the price table.
     """
-    global CACHE_HIT_MAX, CACHE_HALF_MB
+    global CACHE_HIT_MAX, CACHE_HALF_MB, REPLICA_COST_USD_HR
     prices, hit_max, half_mb = dict(TIER_COST_USD_PER_REQ), CACHE_HIT_MAX, CACHE_HALF_MB
+    replica_price = REPLICA_COST_USD_HR
+    quality = dict(TIER_QUALITY)
     try:
-        _set_economy(tier_cost_usd_per_req, cache_hit_max, cache_half_mb)
+        _set_economy(tier_cost_usd_per_req, cache_hit_max, cache_half_mb, replica_cost_usd_hr, tier_quality)
     except Exception:
         # The body resets and validates knob by knob (and assigns the cache
         # curve before testing it), so a failure would otherwise leave a
@@ -207,12 +224,32 @@ def set_economy(
         TIER_COST_USD_PER_REQ.clear()
         TIER_COST_USD_PER_REQ.update(prices)
         CACHE_HIT_MAX, CACHE_HALF_MB = hit_max, half_mb
+        REPLICA_COST_USD_HR = replica_price
+        TIER_QUALITY.clear()
+        TIER_QUALITY.update(quality)
         raise
 
 
 def _set_economy(tier_cost_usd_per_req: dict | None, cache_hit_max: float | None,
-                 cache_half_mb: float | None) -> None:
-    global CACHE_HIT_MAX, CACHE_HALF_MB
+                 cache_half_mb: float | None, replica_cost_usd_hr: float | None = None,
+                 tier_quality: dict | None = None) -> None:
+    global CACHE_HIT_MAX, CACHE_HALF_MB, REPLICA_COST_USD_HR
+    TIER_QUALITY.clear()
+    TIER_QUALITY.update(_DEFAULT_TIER_QUALITY)
+    if tier_quality:
+        unknown = set(tier_quality) - {"small", "mid", "large"}
+        if unknown:
+            raise ValueError(f"unknown tiers in tier_quality: {sorted(unknown)}")
+        if any(not 0.0 < float(v) <= 1.0 for v in tier_quality.values()):
+            raise ValueError("tier quality must be in (0, 1]")
+        TIER_QUALITY.update({k: float(v) for k, v in tier_quality.items()})
+        if max(TIER_QUALITY[t] for t in ("small", "mid")) > TIER_QUALITY["large"]:
+            raise ValueError("quality_shortfall is relative to `large`: no tier may exceed it")
+    REPLICA_COST_USD_HR = _DEFAULT_REPLICA_COST_USD_HR
+    if replica_cost_usd_hr is not None:
+        if not float(replica_cost_usd_hr) >= 0.0:  # also refuses NaN
+            raise ValueError("replica_cost_usd_hr must be non-negative")
+        REPLICA_COST_USD_HR = float(replica_cost_usd_hr)
     TIER_COST_USD_PER_REQ.clear()
     TIER_COST_USD_PER_REQ.update(_DEFAULT_TIER_COST_USD_PER_REQ)
     if tier_cost_usd_per_req:
@@ -273,6 +310,25 @@ TIER_LATENCY_FLAT: dict | None = None
 # PREREG_LEVEL runs a monotone row beside it as a robustness plant.
 AGENT_LATENCY: dict | None = None
 
+# --- plant 2 (programme 2, WP2; research/plant2) ---------------------------
+# Three mechanics of the measured plant, each off by default and guarded in
+# evaluate_step, so the published expressions run unchanged.
+# WU_CRUD_SCALE: CRUD work on the replicas (0 = CRUD never reaches a pool of
+#   model servers). ADMISSION_GATE: a token bucket in dollars per tenant;
+#   per-request (tier) spend beyond the budget left after infrastructure is
+#   refused. Refused requests load nothing, cost nothing and count as
+#   unserved; in the p95 signal the planner's objective reads (`excess`) they
+#   are charged the outage latency NO_TIER_LATENCY_MS, as shed AI is, so that
+#   refusing service never looks faster than serving it (the 2026-11-11
+#   audit found the published model rewarding refusals that way).
+#   ATTAINMENT_SLO: the bounded `violation` becomes the
+#   share of requests NOT answered within target (unserved ones included),
+#   read off the latency mixture's distribution function; `excess` stays the
+#   unbounded p95 overshoot the planner's objective uses.
+WU_CRUD_SCALE = 1.0
+ADMISSION_GATE = False
+ATTAINMENT_SLO = False
+
 _Z95 = 1.6448536269514722  # standard-normal 95th-percentile z
 
 # The lognormal branch family needs p95/mean < exp(z95^2 / 2).
@@ -290,6 +346,9 @@ def set_model_form(
     cacheable_uniform: bool | None = None,
     tier_latency_ms: dict | None = None,
     agent_latency_ms: dict | None = None,
+    wu_crud_scale: float | None = None,
+    admission_gate: bool | None = None,
+    attainment_slo: bool | None = None,
 ) -> None:
     """Reset the model form to the published defaults, then apply overrides.
 
@@ -303,7 +362,8 @@ def set_model_form(
     before = form_snapshot()
     try:
         _set_model_form(congestion_exponent, p95_tail, mixture_p95, wu_tier_factor, replica_capacity_wu,
-                        wu_ai_scale, crud_base_scale, cacheable_uniform, tier_latency_ms, agent_latency_ms)
+                        wu_ai_scale, crud_base_scale, cacheable_uniform, tier_latency_ms, agent_latency_ms,
+                        wu_crud_scale, admission_gate, attainment_slo)
     except Exception:
         _restore_form(before)
         raise
@@ -320,12 +380,22 @@ def _set_model_form(
     cacheable_uniform: bool | None,
     tier_latency_ms: dict | None,
     agent_latency_ms: dict | None,
+    wu_crud_scale: float | None = None,
+    admission_gate: bool | None = None,
+    attainment_slo: bool | None = None,
 ) -> None:
     global CONGESTION_EXPONENT, P95_TAIL, MIXTURE_P95
     global REPLICA_CAPACITY_WU, WU_AI_SCALE, CRUD_BASE_SCALE, CACHEABLE_UNIFORM, TIER_LATENCY_FLAT
-    global AGENT_LATENCY
+    global AGENT_LATENCY, WU_CRUD_SCALE, ADMISSION_GATE, ATTAINMENT_SLO
     TIER_LATENCY_FLAT = None
     AGENT_LATENCY = None
+    WU_CRUD_SCALE = 1.0
+    if wu_crud_scale is not None:
+        if not float(wu_crud_scale) >= 0.0:  # also refuses NaN
+            raise ValueError("wu_crud_scale must be non-negative")
+        WU_CRUD_SCALE = float(wu_crud_scale)
+    ADMISSION_GATE = bool(admission_gate) if admission_gate is not None else False
+    ATTAINMENT_SLO = bool(attainment_slo) if attainment_slo is not None else False
     if agent_latency_ms:
         if set(agent_latency_ms) != {"small", "mid", "large"}:
             raise ValueError("agent_latency_ms needs exactly small, mid and large")
@@ -390,7 +460,7 @@ def _set_model_form(
 # description of the structural form evaluate_step computes with.
 _FORM_GLOBALS = ("CONGESTION_EXPONENT", "P95_TAIL", "MIXTURE_P95", "REPLICA_CAPACITY_WU",
                  "WU_AI_SCALE", "CRUD_BASE_SCALE", "CACHEABLE_UNIFORM", "TIER_LATENCY_FLAT",
-                 "AGENT_LATENCY")
+                 "AGENT_LATENCY", "WU_CRUD_SCALE", "ADMISSION_GATE", "ATTAINMENT_SLO")
 
 
 def form_snapshot() -> tuple:
@@ -511,7 +581,7 @@ class Demand:
     rps: dict = field(default_factory=dict)  # kind -> requests/second
     crud_base_ms: float = 50.0  # mean expected latency of CRUD requests
 
-    def work_units(self, cache_mb: int, tier: str = "small") -> float:
+    def work_units(self, cache_mb: int, tier: str = "small", ai_admitted: float = 1.0) -> float:
         """Effective wu/s after the semantic cache absorbs its hits.
 
         `tier` matters only under the Wave 5 tier-scaled capacity form
@@ -519,6 +589,10 @@ class Demand:
         serving capacity per AI request. Under the published defaults
         (all factors 1.0) the argument is inert and the arithmetic is
         bit-identical to the original form.
+
+        `ai_admitted` (plant 2's admission gate) is the share of AI misses
+        admitted; refused ones load nothing. 1.0, the default, leaves the
+        arithmetic untouched, as does WU_CRUD_SCALE at 1.0.
         """
         total = 0.0
         hit = hit_rate(cache_mb)
@@ -531,10 +605,14 @@ class Demand:
             if kind in AI_KINDS:
                 cacheable = 1.0 if CACHEABLE_UNIFORM else CACHEABLE_FRACTION[kind]
                 served = rate * (1.0 - hit * cacheable)
+                if ai_admitted != 1.0:
+                    served = served * ai_admitted
                 if ai_factor != 1.0:
                     wu = wu * ai_factor
                 if WU_AI_SCALE != 1.0:
                     wu = wu * WU_AI_SCALE
+            elif WU_CRUD_SCALE != 1.0:
+                wu = wu * WU_CRUD_SCALE
             total += served * wu
         return total
 
@@ -683,7 +761,10 @@ def evaluate_step(
     a controller must not be able to plan around its own bookkeeping cost.
     """
     factor = SLO_CLASS_FACTOR[config.slo_class]
-    wu = demand.work_units(state.cache_mb, state.tier)
+    # Plant 2's admission gate: the share of AI misses the dollar budget
+    # admits; 1.0 (every published path) leaves all arithmetic below as is.
+    admitted = _admitted_share(config, state, demand) if ADMISSION_GATE else 1.0
+    wu = demand.work_units(state.cache_mb, state.tier, admitted)
     inflate = congestion(wu, state.replicas)
     hit = hit_rate(state.cache_mb)
     if P95_TAIL is None:
@@ -701,6 +782,11 @@ def evaluate_step(
     ai_p95 = 0.0
     miss_rps = 0.0
     quality_lost = 0.0
+    refused_rps = 0.0   # plant 2: misses the dollar gate refused
+    ai_within = 0.0     # plant 2: AI requests answered within target
+    if ATTAINMENT_SLO:
+        sigma = _lognormal_sigma(tail)
+        ai_target_eff = SLO_BASE_MS["ai"] * factor - extra_ai_latency_ms
     if ai_rps > 0.0:
         weighted_ms = 0.0
         # A miss is answered by the serving tier; a hit by a stored answer,
@@ -721,9 +807,24 @@ def evaluate_step(
             weighted_ms += rate * (hit_share * CACHE_HIT_LATENCY_MS + (1.0 - hit_share) * miss_ms)
             miss_rps += rate * (1.0 - hit_share)
             quality_lost += rate * (hit_share * hit_loss + (1.0 - hit_share) * miss_loss)
+            refused = rate * (1.0 - hit_share) * (1.0 - admitted) if admitted != 1.0 else 0.0
+            if refused:
+                # Plant 2: refused misses fail fast, unanswered and unbilled.
+                weighted_ms += refused * (NO_TIER_LATENCY_MS - miss_ms)
+                miss_rps -= refused
+                quality_lost += refused * (1.0 - miss_loss)
+                refused_rps += refused
             if MIXTURE_P95:
                 branches.append((rate * hit_share, CACHE_HIT_LATENCY_MS, True))
-                branches.append((rate * (1.0 - hit_share), miss_ms, False))
+                branches.append((rate * (1.0 - hit_share) - refused, miss_ms, False))
+                if refused:
+                    branches.append((refused, NO_TIER_LATENCY_MS, True))
+            if ATTAINMENT_SLO:
+                hit_ms = CACHE_HIT_LATENCY_MS
+                ai_within += rate * hit_share * (1.0 if hit_ms <= ai_target_eff else 0.0)
+                if state.tier != "none":
+                    ai_within += ((rate * (1.0 - hit_share) - refused)
+                                  * _lognormal_cdf(ai_target_eff, miss_ms, sigma))
         if MIXTURE_P95:
             # True percentile of the hit/miss mixture: a cache hit only
             # moves p95 once hits cross the quantile — the mean-based form
@@ -751,6 +852,13 @@ def evaluate_step(
             over = max(0.0, ai_p95 / ai_target - 1.0)
             violation += (ai_rps / total_rps) * min(1.0, over)
             excess += (ai_rps / total_rps) * over
+        if ATTAINMENT_SLO:
+            # Plant 2: the share of requests NOT answered within target.
+            within = ai_within
+            if crud_rps > 0.0:
+                crud_mean = demand.crud_base_ms * CRUD_BASE_SCALE * inflate
+                within += crud_rps * _lognormal_cdf(crud_target, crud_mean, sigma)
+            violation = min(1.0, max(0.0, 1.0 - within / total_rps))
 
     interval_hr = CONTROL_INTERVAL_S / 3600.0
     cost_infra = state.replicas * REPLICA_COST_USD_HR * interval_hr
@@ -764,6 +872,10 @@ def evaluate_step(
     energy_kwh = state.replicas * REPLICA_POWER_W / 1000.0 * interval_hr
     energy_kwh += (state.cache_mb / 1024.0) * MEM_POWER_W_PER_GB / 1000.0 * interval_hr
     energy_kwh += miss_rps * CONTROL_INTERVAL_S * TIER_ENERGY_WH_PER_REQ[state.tier] / 1000.0
+
+    ai_shed = (miss_rps * CONTROL_INTERVAL_S) if state.tier == "none" else 0.0
+    if refused_rps:
+        ai_shed += refused_rps * CONTROL_INTERVAL_S
 
     return StepMetrics(
         cost_usd=cost_infra + cost_tier,
@@ -779,8 +891,54 @@ def evaluate_step(
         quality_loss=quality_lost / total_rps if total_rps > 0.0 else 0.0,
         requests=total_rps * CONTROL_INTERVAL_S,
         ai_requests=ai_rps * CONTROL_INTERVAL_S,
-        ai_shed_requests=(miss_rps * CONTROL_INTERVAL_S) if state.tier == "none" else 0.0,
+        ai_shed_requests=ai_shed,
     )
+
+
+def _admitted_share(config: TenantConfig, state: TenantState, demand: Demand) -> float:
+    """Plant 2's dollar gate: the share of this step's AI cache misses the
+    tenant's budget admits after its infrastructure spend (replicas and cache
+    memory, which the gate cannot refuse). 1.0 when the tier is free or
+    "none", or when the per-request spend fits."""
+    price = TIER_COST_USD_PER_REQ[state.tier]
+    if price <= 0.0:
+        return 1.0
+    hit = hit_rate(state.cache_mb)
+    misses = 0.0
+    for kind in AI_KINDS:
+        rate = demand.rps.get(kind, 0.0)
+        if rate > 0.0:
+            misses += rate * (1.0 - hit * (1.0 if CACHEABLE_UNIFORM else CACHEABLE_FRACTION[kind]))
+    spend = misses * CONTROL_INTERVAL_S * price
+    if spend <= 0.0:
+        return 1.0
+    interval_hr = CONTROL_INTERVAL_S / 3600.0
+    infra = (state.replicas * REPLICA_COST_USD_HR * interval_hr
+             + (state.cache_mb / 1024.0) * MEM_COST_USD_GB_HR * interval_hr)
+    available = max(0.0, config.hourly_budget_usd * interval_hr - infra)
+    # A relative margin of 1e-12 keeps the gated spend at or below the budget
+    # in floating point, so a gated step never counts as a budget overrun.
+    return 1.0 if spend <= available else available / spend * (1.0 - 1e-12)
+
+
+def _lognormal_sigma(tail: float) -> float:
+    """Log-space sigma of a lognormal whose p95/mean ratio is `tail`: the
+    smaller root of z*s - s^2/2 = ln(tail), as `_mixture_p95_ms` uses."""
+    disc = _Z95 * _Z95 - 2.0 * math.log(tail)
+    return max(0.0, _Z95 - math.sqrt(disc)) if disc > 0.0 else 0.0
+
+
+def _lognormal_cdf(x: float, mean: float, sigma: float) -> float:
+    """P(L <= x) for a lognormal L with the given mean and log-space sigma;
+    a point mass at `mean` when sigma is 0."""
+    if x <= 0.0:
+        return 0.0
+    if mean <= 0.0:
+        return 1.0
+    if sigma <= 0.0:
+        return 1.0 if mean <= x else 0.0
+    mu = math.log(mean) - 0.5 * sigma * sigma
+    return 0.5 * (1.0 + math.erf((math.log(x) - mu) / (sigma * math.sqrt(2.0))))
 
 
 def jain_index(values: list[float]) -> float:

@@ -91,6 +91,9 @@ def _apply_economy(economy: tuple) -> None:
         tier_cost_usd_per_req=tier_cost or None,
         cache_hit_max=e.get("cache_hit_max"),
         cache_half_mb=e.get("cache_half_mb"),
+        replica_cost_usd_hr=e.get("replica_cost_usd_hr"),
+        tier_quality={tier: e[f"tier_quality_{tier}"] for tier in ("small", "mid", "large")
+                      if f"tier_quality_{tier}" in e} or None,
     )
 
 
@@ -120,6 +123,9 @@ def _apply_model_form(form: tuple) -> None:
                          if "tier_latency_small" in f else None),
         agent_latency_ms=({t: f[f"agent_latency_{t}"] for t in ("small", "mid", "large")}
                           if "agent_latency_small" in f else None),
+        wu_crud_scale=f.get("wu_crud_scale"),
+        admission_gate=bool(f.get("admission_gate", 0)),
+        attainment_slo=bool(f.get("attainment_slo", 0)),
     )
 
 

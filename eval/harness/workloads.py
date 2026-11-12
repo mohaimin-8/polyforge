@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from controller import ClusterLimits  # research/jcac_sim via harness sys.path
 from model import Demand, TenantConfig
 
-from . import trace_workloads
+from . import population_workloads, trace_workloads
 
 
 @dataclass(frozen=True)
@@ -286,6 +286,8 @@ def build(workload: str, tenant_mix: str, cluster_size: str, seed: int, steps: i
     is never scored), tenant configs from the mix, and cluster limits from
     the size. Deterministic in `seed`.
     """
+    if population_workloads.is_population(workload):
+        return population_workloads.build(workload, tenant_mix, CLUSTER_SIZES[cluster_size], seed, steps)
     if trace_workloads.is_trace(workload):
         return _build_trace(workload, tenant_mix, cluster_size, steps)
     cls = WORKLOAD_CLASSES[workload]

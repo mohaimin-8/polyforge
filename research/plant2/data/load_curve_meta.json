@@ -1,0 +1,34 @@
+{
+  "started": "2026-11-12T18:56:22+0600",
+  "finished": "2026-11-12T19:42:03+0600",
+  "l0_s": 1.165788496667119,
+  "mu_pre_rps": 1.4660149218501293,
+  "mu_post_rps": 1.5226684843859841,
+  "slots": 4,
+  "threads": 6,
+  "n_predict": 48,
+  "levels": [
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.85,
+    0.9
+  ],
+  "level_seconds": 120,
+  "capacity_seconds": 90,
+  "baseline_requests": 30,
+  "seed": 20261112,
+  "rho_offered_against": "mu_pre",
+  "host": {
+    "platform": "Windows-11-10.0.26300-SP0",
+    "processor": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "python": "3.13.5",
+    "power_scheme": "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)"
+  },
+  "quick": false
+}

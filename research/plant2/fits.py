@@ -151,27 +151,78 @@ def split_half(df: pd.DataFrame) -> list[tuple[pd.DataFrame, pd.DataFrame]]:
     return [(a, b), (b, a)]
 
 
-def cpu_analysis(rng: np.random.Generator) -> dict:
-    df = cpu_levels()
-    l0, mu = float(df.l0.iloc[0]), float(df.mu.iloc[0])
+def remeasured_levels(requests: pd.DataFrame, meta: dict) -> pd.DataFrame:
+    """Per-level summaries of `measure_load_curve.py`'s requests: rho is
+    restated against the mean of the before/after capacities."""
+    mu = 0.5 * (meta["mu_pre_rps"] + meta["mu_post_rps"])
+    load = requests[(requests.phase == "load") & requests.latency_s.notna()]
+    rows = []
+    for level, g in load.groupby("level"):
+        lat = np.sort(g.latency_s.to_numpy(float))
+        lam = level * meta["mu_pre_rps"]
+        rows.append({"level": level, "lambda_rps": lam, "rho_offered": lam / mu, "n": len(lat),
+                     "mean_s": float(lat.mean()), "p95_s": float(lat[max(0, math.ceil(0.95 * len(lat)) - 1)])})
+    return pd.DataFrame(rows).sort_values("rho_offered").reset_index(drop=True)
+
+
+BLOCK = 10  # requests per bootstrap block
+
+
+def _resample_requests(requests: pd.DataFrame, meta: dict, rng: np.random.Generator) -> tuple:
+    """One bootstrap draw: within each level, moving blocks of BLOCK requests
+    in arrival order (requests that queue together are correlated, so single
+    requests are not exchangeable); the baseline requests resampled singly
+    (they ran one at a time). Returns (levels, L0)."""
+    load = requests[(requests.phase == "load") & requests.latency_s.notna()]
+    parts = []
+    for _, g in load.groupby("level"):
+        g = g.sort_values(["pass_no", "scheduled_s"])
+        n = len(g)
+        if n <= BLOCK:
+            parts.append(g.iloc[rng.integers(0, n, n)])
+            continue
+        starts = rng.integers(0, n - BLOCK + 1, math.ceil(n / BLOCK))
+        idx = np.concatenate([np.arange(st, st + BLOCK) for st in starts])[:n]
+        parts.append(g.iloc[idx])
+    base = requests[requests.phase == "baseline"].latency_s.to_numpy(float)
+    return remeasured_levels(pd.concat(parts), meta), float(base[rng.integers(0, len(base), len(base))].mean())
+
+
+def cpu_analysis(rng: np.random.Generator, data: tuple | None = None) -> dict:
+    """`data` None: the committed six-level curve, bootstrapped over levels.
+    Otherwise (requests, meta) from measure_load_curve.py, bootstrapped over
+    requests within levels."""
+    if data is None:
+        df = cpu_levels()
+        l0, mu = float(df.l0.iloc[0]), float(df.mu.iloc[0])
+
+        def resample():
+            idx = rng.integers(0, len(df), len(df))
+            return (df.iloc[idx].sort_values("rho_offered"), l0) if len(set(idx)) >= 3 else None
+    else:
+        requests, meta = data
+        df = remeasured_levels(requests, meta)
+        base = requests[requests.phase == "baseline"].latency_s.to_numpy(float)
+        l0, mu = float(base.mean()), 0.5 * (meta["mu_pre_rps"] + meta["mu_post_rps"])
+
+        def resample():
+            return _resample_requests(requests, meta, rng)
     lam, obs = df.lambda_rps.to_numpy(), df.mean_s.to_numpy()
     zero = rt_from_l0_mu(l0, mu)
-    forms = {
-        "power, L0 and mu measured": (lambda d: fit_power_published(d, l0, mu), predict_power),
-        "power, L0 fitted": (lambda d: fit_power_free(d, mu), predict_power),
-        "Ramani-Tantawi, fitted": (lambda d: fit_rt_cpu(d, zero), predict_rt_cpu),
-        "Ramani-Tantawi, from L0 and mu only": (lambda d: zero, predict_rt_cpu),
+    forms = {  # each fit takes (levels, L0)
+        "power, L0 and mu measured": (lambda d, base: fit_power_published(d, base, mu), predict_power),
+        "power, L0 fitted": (lambda d, base: fit_power_free(d, mu), predict_power),
+        "Ramani-Tantawi, fitted": (lambda d, base: fit_rt_cpu(d, zero), predict_rt_cpu),
+        "Ramani-Tantawi, from L0 and mu only": (lambda d, base: rt_from_l0_mu(base, mu), predict_rt_cpu),
     }
     out = {"l0_s": l0, "mu_rps": mu, "levels": len(df), "forms": {}}
+    if data is not None:
+        out["failed_requests"] = int(data[0][(data[0].phase == "load") & data[0].latency_s.isna()].shape[0])
+    draws = [d for d in (resample() for _ in range(N_BOOT)) if d is not None]
     for name, (fit, pred) in forms.items():
-        full = fit(df)
-        held = [mare(pred(fit(tr), te.lambda_rps.to_numpy()), te.mean_s) for tr, te in split_half(df)]
-        boots = []
-        for _ in range(N_BOOT):
-            idx = rng.integers(0, len(df), len(df))
-            if len(set(idx)) < 3:
-                continue
-            boots.append(fit(df.iloc[idx].sort_values("rho_offered")))
+        full = fit(df, l0)
+        held = [mare(pred(fit(tr, l0), te.lambda_rps.to_numpy()), te.mean_s) for tr, te in split_half(df)]
+        boots = [fit(d, base) for d, base in draws]
         keys = [k for k in full if k not in ("mu", "l0") or name == "power, L0 fitted" and k == "l0"]
         out["forms"][name] = {
             "params": full, "in_sample_mare": mare(pred(full, lam), obs),
@@ -183,11 +234,7 @@ def cpu_analysis(rng: np.random.Generator) -> dict:
     held_tail = [mare(predict_tail(fit_tail(tr, mu), te.lambda_rps, mu), te.p95_s / te.mean_s)
                  for tr, te in split_half(df)]
     held_flat = [mare(np.full(len(te), 1.4), te.p95_s / te.mean_s) for _, te in split_half(df)]
-    tboots = []
-    for _ in range(N_BOOT):
-        idx = rng.integers(0, len(df), len(df))
-        if len(set(idx)) >= 3:
-            tboots.append(fit_tail(df.iloc[idx], mu))
+    tboots = [fit_tail(d, mu) for d, _ in draws]
     out["tail"] = {"params": tail, "held_out_mare": float(np.mean(held_tail)),
                    "published_flat_1.4_held_out_mare": float(np.mean(held_flat)),
                    "ci95": {k: [float(np.percentile([b[k] for b in tboots], q)) for q in (2.5, 97.5)]
@@ -271,15 +318,13 @@ def gpu_analysis(rng: np.random.Generator) -> dict:
 
 # ------------------------------------------------------------------ report
 
-def report(cpu: dict, gpu: dict) -> str:
-    L = ["# Plant 2 latency fits (programme 2, WP2)", "",
-         "Generated by `research/plant2/fits.py` from `research/calibration/` data. Every number below "
-         "is a fit to this project's own measurements; bootstrap intervals resample the measurement "
-         f"cells ({N_BOOT} draws) and are coarse because there are few cells. The rule (plan, WP2): "
-         "keep the form with the lower held-out error.", "",
-         "## CPU server, latency against load (llama.cpp, Qwen2.5-0.5B Q4_K_M, 4 slots, 48 new tokens)", "",
+def cpu_section(cpu: dict, title: str, boot_unit: str) -> list[str]:
+    L = [f"## {title}", "",
          f"Measured: L0 = {cpu['l0_s']:.3f} s unloaded, capacity mu = {cpu['mu_rps']:.3f} req/s, "
-         f"{cpu['levels']} load levels. Split-half: fit on alternate levels, predict the others, both ways.", "",
+         f"{cpu['levels']} load levels"
+         + (f", {cpu['failed_requests']} failed requests" if "failed_requests" in cpu else "")
+         + ". Split-half: fit on alternate levels, predict the others, both "
+         f"ways. Bootstrap over {boot_unit}.", "",
          "| form | parameters (95% bootstrap interval) | in-sample error | held-out error |",
          "|---|---|---:|---:|"]
     for name, f in cpu["forms"].items():
@@ -289,7 +334,7 @@ def report(cpu: dict, gpu: dict) -> str:
                 continue
             ci = f["ci95"].get(k)
             unit = " s" if k in ("alpha", "w_tot", "l0") else ""
-            ci_txt = f" [{ci[0]:.4g}, {ci[1]:.4g}]" if ci and name != "Ramani-Tantawi, from L0 and mu only" else ""
+            ci_txt = f" [{ci[0]:.4g}, {ci[1]:.4g}]" if ci else ""
             parts.append(f"{k} = {v:.4g}{unit}{ci_txt}")
         L.append(f"| {name} | {'; '.join(parts)} | {f['in_sample_mare']:.1%} | {f['held_out_mare']:.1%} |")
     best = min(cpu["forms"], key=lambda k: cpu["forms"][k]["held_out_mare"])
@@ -304,8 +349,23 @@ def report(cpu: dict, gpu: dict) -> str:
     L += ["", f"p95/mean = f0 (1 - rho)^(-b): f0 = {t['params']['f0']:.4f} "
           f"[{t['ci95']['f0'][0]:.3f}, {t['ci95']['f0'][1]:.3f}], b = {t['params']['b']:.4f} "
           f"[{t['ci95']['b'][0]:.3f}, {t['ci95']['b'][1]:.3f}]; held-out error {t['held_out_mare']:.1%} "
-          f"against {t['published_flat_1.4_held_out_mare']:.1%} for the published flat 1.4.", "",
-          "## GPU tiers, iteration cost (one T4, static batches 1-64, 48 and 96 new tokens)", "",
+          f"against {t['published_flat_1.4_held_out_mare']:.1%} for the published flat 1.4.", ""]
+    return L
+
+
+def report(cpu: dict, gpu: dict, cpu2: dict | None = None) -> str:
+    L = ["# Plant 2 latency fits (programme 2, WP2)", "",
+         "Generated by `research/plant2/fits.py` from this project's measurements. Every number below "
+         f"is a fit to them; bootstrap intervals use {N_BOOT} draws. The rule (plan, WP2): keep the "
+         "form with the lower held-out error.", ""]
+    L += cpu_section(cpu, "CPU server, latency against load: the committed six-level run "
+                     "(llama.cpp, Qwen2.5-0.5B Q4_K_M, 4 slots, 48 new tokens)",
+                     "the six levels (coarse: few cells)")
+    if cpu2 is not None:
+        L += cpu_section(cpu2, "CPU server, re-measured: ten levels, every request kept "
+                         "(`measure_load_curve.py`, same server and protocol)",
+                         f"moving blocks of {BLOCK} requests within each level, and the baseline requests")
+    L += ["## GPU tiers, iteration cost (one T4, static batches 1-64, 48 and 96 new tokens)", "",
           "The paper's iteration law T(x) = alpha + x delta, fitted per tier by non-negative least "
           "squares on relative error; held out: fit on batches {1, 32}, predict {8, 64}, and back. "
           "Cross-run check: the fit predicts the single-stream run measured separately "
@@ -335,10 +395,19 @@ def main() -> int:
     rng = np.random.default_rng(SEED)
     cpu = cpu_analysis(rng)
     gpu = gpu_analysis(rng)
+    cpu2 = None
+    req_path, meta_path = HERE / "data" / "load_curve_requests.csv", HERE / "data" / "load_curve_meta.json"
+    if req_path.exists() and meta_path.exists():
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        cpu2 = cpu_analysis(rng, (pd.read_csv(req_path), meta))
+    out = {"cpu": cpu, "gpu": gpu}
+    if cpu2 is not None:
+        out["cpu_remeasured"] = cpu2
     (HERE / "data").mkdir(exist_ok=True)
-    (HERE / "data" / "fits.json").write_text(json.dumps({"cpu": cpu, "gpu": gpu}, indent=2), encoding="utf-8")
-    (HERE / "FITS.md").write_text(report(cpu, gpu), encoding="utf-8")
-    print(report(cpu, gpu))
+    (HERE / "data" / "fits.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
+    text = report(cpu, gpu, cpu2)
+    (HERE / "FITS.md").write_text(text, encoding="utf-8")
+    print(text)
     return 0
 
 
