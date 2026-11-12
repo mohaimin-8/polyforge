@@ -324,12 +324,46 @@ def _sequential_feasible(world: World, wt: list[np.ndarray], order: Sequence[int
     return plan
 
 
+def _improve(world: World, plan: list, w: list[np.ndarray], price_out: float,
+             start: tuple[int, int] | None, rounds: int = 2) -> tuple[list, float]:
+    """Block-coordinate improvement of a capped-feasible plan: each tenant in
+    turn re-solves its path inside the capacity the others leave (its own
+    current path is feasible, so the re-solve never worsens its own sum);
+    the change is kept only if the full objective, fairness included,
+    improves. The plan stays capped-feasible and within the start window."""
+    plan = [list(p) for p in plan]
+    best = plan_objective(world, plan, price_out)
+    T = world.steps
+    for _ in range(rounds):
+        changed = False
+        for i, ten in enumerate(world.tenants):
+            use_r, use_c = usage(world, plan)
+            own_r = np.array([ten.replicas[p[0]] for p in plan[i]], dtype=float)
+            own_c = np.array([ten.cache_mb[p[1]] for p in plan[i]], dtype=float)
+            room_r = world.cap_replicas - (use_r - own_r)
+            room_c = world.cap_cache_mb - (use_c - own_c)
+            mask = ((ten.replicas[None, :] <= room_r[:, None])[:, :, None, None]
+                    & (ten.cache_mb[None, :] <= room_c[:, None])[:, None, :, None])
+            mask[0] &= start_mask(ten, start)[:, :, None]
+            path = best_path(dp_values(np.where(mask, w[i], np.inf)))
+            if path == plan[i]:
+                continue
+            trial = plan[:i] + [path] + plan[i + 1:]
+            value = plan_objective(world, trial, price_out)
+            if value < best - 1e-15:
+                plan, best, changed = trial, value, True
+        if not changed:
+            break
+    return plan, best
+
+
 @dataclass(frozen=True)
 class Bounds:
     lb0: float
     lb1: float
     lb2: float
     ub: float
+    ub_nofair: float  # the UB plan's objective without the fairness term (comparable with LB2)
     static: float
     iterations: int
 
@@ -375,8 +409,9 @@ def bounds(world: World, price_out: float, iterations: int = 120,
     mbs = ref.cache_mb.astype(float)
     masks = [start_mask(ten, start) for ten in world.tenants]
     static_val, static_plan = static_best(world, price_out)
-    best_ub = math.inf
+    best_ub, best_ub_nofair = math.inf, math.inf
     best_feasible_sum = sum(path_value(W[i], p) for i, p in enumerate(static_plan))
+    w_true = [W[i] for i in range(n)]
     lam_r = np.zeros(T)
     lam_c = np.zeros(T)
     best_dual, lb1_sum = -math.inf, None
@@ -411,9 +446,11 @@ def bounds(world: World, price_out: float, iterations: int = 120,
             wt = [Wt[i] for i in range(n)]
             candidates = [_sequential_feasible(world, wt, order, start) for order in orders]
         for cand in candidates:
-            best_ub = min(best_ub, plan_objective(world, cand, price_out))
-            best_feasible_sum = min(best_feasible_sum,
-                                    sum(path_value(W[i], p) for i, p in enumerate(cand)))
+            cand, value = _improve(world, cand, w_true, price_out, start)
+            nofair = sum(path_value(W[i], p) for i, p in enumerate(cand))
+            if value < best_ub:
+                best_ub, best_ub_nofair = value, nofair / (n * T)
+            best_feasible_sum = min(best_feasible_sum, nofair)
         norm = float((g_r ** 2).sum() + (g_c ** 2).sum())
         slack_value = float((lam_r * -g_r).sum() + (lam_c * -g_c).sum())
         if fits and slack_value <= 1e-9 * max(1.0, abs(dual)):
@@ -426,5 +463,5 @@ def bounds(world: World, price_out: float, iterations: int = 120,
     if not math.isfinite(best_ub):
         raise RuntimeError("the primal heuristic produced no plan")
     return Bounds(lb0=lb0(world, price_out), lb1=lb1_sum / (n * T),
-                  lb2=best_dual / (n * T), ub=best_ub, static=static_val,
-                  iterations=it + 1)
+                  lb2=best_dual / (n * T), ub=best_ub, ub_nofair=best_ub_nofair,
+                  static=static_val, iterations=it + 1)

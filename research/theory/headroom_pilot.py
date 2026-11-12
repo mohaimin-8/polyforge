@@ -3,8 +3,8 @@ matrix, and every registered arm placed between them. EXPLORATORY.
 
 For each of the 300 worlds of `matrix_level2` (60 design points x 5
 replications, shared seeds, so every arm of a world saw the same demand):
-LB0, LB1, LB2, UB and the best static plan (clairvoyant.bounds) on LEVEL's
-objective J_L, beside each arm's J_L from the committed export.
+LB0, LB1, LB2, UB and the hindsight-best static plan (clairvoyant.bounds)
+on LEVEL's objective J_L, beside each arm's J_L from the committed export.
 
     python headroom_pilot.py      # writes data/headroom_worlds.csv.gz and HEADROOM_PILOT.md
 """
@@ -16,7 +16,6 @@ import time
 from multiprocessing import Pool
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
@@ -49,7 +48,8 @@ def solve(run) -> dict:
     b = bounds(world_for_run(run), PRICE_OUT)
     return {"workload": run.workload, "tenant_mix": run.tenant_mix, "cluster_size": run.cluster_size,
             "rep": run.rep, "seed": run.seed, "lb0": b.lb0, "lb1": b.lb1, "lb2": b.lb2, "ub": b.ub,
-            "static": b.static, "iterations": b.iterations, "wall_s": time.time() - t0}
+            "ub_nofair": b.ub_nofair, "static": b.static, "iterations": b.iterations,
+            "wall_s": time.time() - t0}
 
 
 def arms() -> pd.DataFrame:
@@ -57,17 +57,91 @@ def arms() -> pd.DataFrame:
     return ex.assign(J_L=objective(ex, "J_L"))[["system"] + KEYS + ["J_L", "plan_fallback_share"]]
 
 
+def regret(arm: pd.Series, lb: pd.Series, ref: pd.Series) -> float:
+    """Regret over a cut as a ratio of means: (mean arm - mean LB2) /
+    (mean static - mean LB2). Per-world ratios are unstable where the static
+    plan is almost optimal (steady CRUD), so they are never averaged."""
+    den = ref.mean() - lb.mean()
+    return (arm.mean() - lb.mean()) / den if den > 0 else float("nan")
+
+
+def _checks(df: pd.DataFrame, w: pd.DataFrame) -> list[str]:
+    order = (w.lb0 <= w.lb1 + 1e-12) & (w.lb1 <= w.lb2 + 1e-12) & (w.lb2 <= w.ub + 1e-12)
+    joint = df[df.system.isin(JOINT)]
+    return [
+        "## Checks",
+        "",
+        f"- Worlds: {len(w)}; ordering LB0 <= LB1 <= LB2 <= UB holds in {int(order.sum())}.",
+        f"- Arm runs below LB0 (impossible unless the arrays are wrong): {int(df.below_lb0.sum())} of {len(df)}.",
+        f"- Joint-controller runs below LB1: {int(joint.below_lb1.sum())} of {len(joint)}; of those, runs "
+        f"that never used the move-breaking fallback (where it would be impossible): "
+        f"{int(joint[joint.plan_fallback_share.fillna(0) == 0].below_lb1.sum())}.",
+        f"- Arm runs below UB (a registered arm did better than the best plan found): "
+        f"{int(df.beats_ub.sum())} of {len(df)}.",
+        f"- Bound gap (UB - LB2) / (static - LB2): median {w.gap.median():.1%}, worlds under 10%: "
+        f"{(w.gap < 0.10).mean():.0%} (the plan asks for at least 80%). Without the fairness term in UB "
+        f"(the term LB2 cannot see): median {w.gap_nofair.median():.1%}, under 10%: "
+        f"{(w.gap_nofair < 0.10).mean():.0%}.",
+        "",
+    ]
+
+
+def _headroom(w: pd.DataFrame) -> list[str]:
+    L = ["## Headroom", "",
+         "| cut | worlds | static J_L | LB2 | UB | headroom (static - LB2) / static | (static - UB) / static |",
+         "|---|---:|---:|---:|---:|---:|---:|"]
+    cuts = [("all", w)] + [(f"size={s}", w[w.cluster_size == s]) for s in ("small", "medium", "large")]
+    cuts += [(f"workload={x}", w[w.workload == x]) for x in sorted(w.workload.unique())]
+    for name, s in cuts:
+        st, lb, ub = s.static.mean(), s.lb2.mean(), s.ub.mean()
+        L.append(f"| {name} | {len(s)} | {st:.4f} | {lb:.4f} | {ub:.4f} | {(st - lb) / st:.1%} | {(st - ub) / st:.1%} |")
+    return L + [""]
+
+
+def _arms(df: pd.DataFrame) -> list[str]:
+    L = ["## Every registered arm between the bounds", "",
+         "| arm | mean J_L | regret | regret: small / medium / large | beats hindsight static | beats UB |",
+         "|---|---:|---:|---|---:|---:|"]
+    for arm, s in df.groupby("system"):
+        by = [regret(*(s[s.cluster_size == z][c] for c in ("J_L", "lb2", "static")))
+              for z in ("small", "medium", "large")]
+        L.append(f"| `{arm}` | {s.J_L.mean():.4f} | {regret(s.J_L, s.lb2, s.static):.2f} | "
+                 + " / ".join(f"{v:.2f}" for v in by)
+                 + f" | {s.beats_static.mean():.0%} | {s.beats_ub.mean():.0%} |")
+    classes = sorted(df.workload.unique())
+    L += ["", "## Regret by workload class", "", "| arm | " + " | ".join(classes) + " |",
+          "|---|" + "---:|" * len(classes)]
+    for arm, s in df.groupby("system"):
+        cells = [regret(*(s[s.workload == x][c] for c in ("J_L", "lb2", "static"))) for x in classes]
+        L.append(f"| `{arm}` | " + " | ".join(f"{v:.2f}" for v in cells) + " |")
+    return L + [""]
+
+
+def _decomposition(df: pd.DataFrame, w: pd.DataFrame) -> list[str]:
+    joint = df[df.system == "jcac_level_ratchet"].J_L.mean()
+    decoupled = df[df.system == "jcac_level_ratchet_decoupled"].J_L.mean()
+    best_layer = df[~df.system.isin(JOINT)].groupby("system").J_L.mean().min()
+    return [
+        "## The joint controller's distance to the clairvoyant references (means over the worlds)", "",
+        "| reference | J_L | minus joint |", "|---|---:|---:|",
+        f"| decoupled search (same planner, per-knob) | {decoupled:.4f} | {decoupled - joint:+.4f} |",
+        f"| joint search | {joint:.4f} | |",
+        f"| best per-layer arm (by its mean) | {best_layer:.4f} | {best_layer - joint:+.4f} |",
+        f"| hindsight static | {w.static.mean():.4f} | {w.static.mean() - joint:+.4f} |",
+        f"| clairvoyant plan found (UB) | {w.ub.mean():.4f} | {w.ub.mean() - joint:+.4f} |",
+        f"| lower bound (LB2) | {w.lb2.mean():.4f} | {w.lb2.mean() - joint:+.4f} |",
+        "",
+    ]
+
+
 def report(worlds: pd.DataFrame) -> str:
     df = arms().merge(worlds, on=KEYS)
     w = worlds.assign(
-        headroom=(worlds.static - worlds.lb2) / worlds.static,
-        headroom_ub=(worlds.static - worlds.ub) / worlds.static,
         gap=(worlds.ub - worlds.lb2) / (worlds.static - worlds.lb2),
+        gap_nofair=(worlds.ub_nofair - worlds.lb2) / (worlds.static - worlds.lb2),
     )
-    df = df.assign(regret=(df.J_L - df.lb2) / (df.static - df.lb2),
-                   beats_ub=df.J_L < df.ub - 1e-12, below_lb0=df.J_L < df.lb0 - 1e-12,
-                   below_lb1=df.J_L < df.lb1 - 1e-12)
-    order = (w.lb0 <= w.lb1 + 1e-12) & (w.lb1 <= w.lb2 + 1e-12) & (w.lb2 <= w.ub + 1e-12)
+    df = df.assign(beats_ub=df.J_L < df.ub - 1e-12, below_lb0=df.J_L < df.lb0 - 1e-12,
+                   below_lb1=df.J_L < df.lb1 - 1e-12, beats_static=df.J_L < df.static - 1e-12)
     L = [
         "# Reference points for LEVEL2's main matrix (pilot, exploratory)",
         "",
@@ -77,57 +151,26 @@ def report(worlds: pd.DataFrame) -> str:
         "same demand (shared seeds).",
         "",
         "- LB0: the cheapest state per tenant and step, no move limits, no caps (below every controller).",
-        "- LB1: the best path per tenant under the planner's move limits (+-2 replicas, +-1 cache level), no caps.",
-        "- LB2: LB1 with the cluster caps dualised (Lagrangian, subgradient ascent).",
-        "- UB: the best capped-feasible plan found that starts within one move of the simulator's "
-        "initial state (2 replicas, 128 MB), scored with the full objective. The capped clairvoyant "
-        "optimum from that start lies in [LB2, UB].",
-        "- Static: the best fixed state per tenant inside an equal share of the caps, held from the "
-        "first step as the simulator's static arm is, full objective.",
-        "- Headroom: (static - LB2) / static, the largest share of the static plan's objective any "
-        "controller with these move limits could remove. Regret: (arm - LB2) / (static - LB2); 0 is the "
-        "bound, 1 the best static plan.",
+        "- LB1: the best path per tenant under the planner's move limits (+-2 replicas, +-1 cache level), "
+        "no caps.",
+        "- LB2: LB1 with the cluster caps dualised (Lagrangian, subgradient ascent). The lower bounds omit "
+        "the fairness term.",
+        "- UB: the best capped-feasible plan found (Lagrangian heuristic plus block-coordinate improvement) "
+        "that starts within one move of the simulator's initial state (2 replicas, 128 MB), scored with the "
+        "full objective. The capped clairvoyant optimum from that start lies in [LB2, UB].",
+        "- Static: the best fixed state per tenant inside an equal share of the caps, chosen with hindsight "
+        "and held from the first step (as the simulator's static arm is), full objective.",
+        "- Regret of an arm over a cut: (mean arm - mean LB2) / (mean static - mean LB2); 0 is the lower "
+        "bound, 1 the hindsight-static plan, above 1 worse than it.",
         "",
-        "## Checks",
+        "Both references are clairvoyant: they know each world's realised demand, Poisson noise included. "
+        "They bound what any controller could do; no deployable controller attains them.",
         "",
-        f"- Worlds: {len(w)}; ordering LB0 <= LB1 <= LB2 <= UB holds in {int(order.sum())}.",
-        f"- Arm runs below LB0 (impossible unless the arrays are wrong): {int(df.below_lb0.sum())} of {len(df)}.",
-        f"- Joint-controller runs below LB1: {int(df[df.system.isin(JOINT)].below_lb1.sum())} of "
-        f"{int(df.system.isin(JOINT).sum())}; of those, runs that never used the move-breaking "
-        f"fallback (where it would be impossible): "
-        f"{int(df[df.system.isin(JOINT) & (df.plan_fallback_share.fillna(0) == 0)].below_lb1.sum())}.",
-        f"- Arm runs below UB (a registered arm did better than the heuristic's best plan): "
-        f"{int(df.beats_ub.sum())} of {len(df)}.",
-        f"- Bound gap (UB - LB2) / (static - LB2): median {w.gap.median():.1%}, worlds under 10%: "
-        f"{(w.gap < 0.10).mean():.0%} (the plan asks for at least 80%).",
-        "",
-        "## Headroom",
-        "",
-        "| cut | worlds | static J_L | LB2 | UB | headroom (static - LB2) / static | (static - UB) / static |",
-        "|---|---:|---:|---:|---:|---:|---:|",
     ]
-    cuts = [("all", w)] + [(f"size={s}", w[w.cluster_size == s]) for s in ("small", "medium", "large")]
-    cuts += [(f"workload={x}", w[w.workload == x]) for x in sorted(w.workload.unique())]
-    for name, s in cuts:
-        L.append(f"| {name} | {len(s)} | {s.static.mean():.4f} | {s.lb2.mean():.4f} | {s.ub.mean():.4f} | "
-                 f"{s.headroom.mean():.1%} | {s.headroom_ub.mean():.1%} |")
-    L += ["", "## Every registered arm between the bounds", "",
-          "| arm | mean J_L | mean regret | regret: small / medium / large | runs below UB |",
-          "|---|---:|---:|---|---:|"]
-    for arm, s in df.groupby("system"):
-        by = s.groupby("cluster_size").regret.mean()
-        L.append(f"| `{arm}` | {s.J_L.mean():.4f} | {s.regret.mean():.2f} | "
-                 f"{by.get('small', np.nan):.2f} / {by.get('medium', np.nan):.2f} / {by.get('large', np.nan):.2f} | "
-                 f"{int(s.beats_ub.sum())} |")
-    L += ["", "## Regret by workload class (mean)", "",
-          "| arm | " + " | ".join(sorted(df.workload.unique())) + " |",
-          "|---|" + "---:|" * df.workload.nunique()]
-    for arm, s in df.groupby("system"):
-        by = s.groupby("workload").regret.mean()
-        L.append(f"| `{arm}` | " + " | ".join(f"{by[x]:.2f}" for x in sorted(df.workload.unique())) + " |")
-    L += ["", "Caveats: one plant (the published one) and one objective; the static reference is an equal "
-          "share, not the best unequal fixed allocation; LB2 ignores the fairness term, so regret is "
-          "overstated by at most the optimum's fairness term.", ""]
+    L += _checks(df, w) + _headroom(w) + _arms(df) + _decomposition(df, w)
+    L += ["Caveats: one plant (the published one) and one objective; the static reference is an equal "
+          "share, not the best unequal fixed allocation; the clairvoyant references know the realised "
+          "Poisson noise, so part of every gap to them cannot be forecast.", ""]
     return "\n".join(L)
 
 
