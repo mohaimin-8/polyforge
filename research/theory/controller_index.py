@@ -141,8 +141,9 @@ class IndexedController(JCACController):
 
     last: "IndexedController | None" = None
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, log_index: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
+        self.log_index = log_index
         if not self.anchor_moves:
             raise ValueError("the index needs anchored moves: unanchored, the analysed box "
                              "would be centred on the final choice, not the decision's start")
@@ -154,20 +155,24 @@ class IndexedController(JCACController):
 
     def plan(self, states, demands, interference=None):
         plans = super().plan(states, demands, interference)
-        self.index_rows.extend(analyse_plan(self))
+        if self.log_index:
+            self.index_rows.extend(analyse_plan(self))
         return plans
 
 
-def execute_indexed(run) -> tuple[dict, list[dict]]:
+def execute_indexed(run, controller_class: type = IndexedController) -> tuple[dict, list[dict]]:
     """`harness.sim_backend.execute(run)` with the planner replaced by
-    `IndexedController`; returns the result and the index rows. Raises if the
-    run built no planner (a baseline arm), so rows can never be stale."""
+    `controller_class` (an IndexedController); returns the result and the
+    index rows. Raises if the run built no planner (a baseline arm), so rows
+    can never be stale."""
     import simulate
     from harness import sim_backend
 
+    if not issubclass(controller_class, IndexedController):
+        raise TypeError("controller_class must be an IndexedController")
     original = simulate.JCACController
     IndexedController.last = None
-    simulate.JCACController = IndexedController
+    simulate.JCACController = controller_class
     try:
         result = sim_backend.execute(run)
     finally:
