@@ -1,0 +1,1192 @@
+{
+ "protocol": "WP9 random search (research/comparators/tune.py)",
+ "settings": {
+  "plant": "A",
+  "mix": "own",
+  "cluster_size": "large",
+  "steps": 120,
+  "arms": [
+   "joint",
+   "per_knob",
+   "one_knob",
+   "layers",
+   "rules"
+  ],
+  "configs": 16,
+  "include_default": true,
+  "seed": 20261112,
+  "budget": "enforced",
+  "quality_weight": 0.0,
+  "granularity": "both",
+  "granularities": [
+   "overall",
+   "per_class"
+  ],
+  "references_requested": false,
+  "reference_iterations": 120,
+  "tuning_n": 24,
+  "evaluation_n": 24,
+  "tuning_workloads": [
+   "pop005",
+   "pop006",
+   "pop007",
+   "pop009",
+   "pop010",
+   "pop011",
+   "pop013",
+   "pop014",
+   "pop015",
+   "pop018",
+   "pop021",
+   "pop022",
+   "pop024",
+   "pop025",
+   "pop027",
+   "pop030",
+   "pop031",
+   "pop034",
+   "pop035",
+   "pop036",
+   "pop038",
+   "pop042",
+   "pop054",
+   "pop058"
+  ],
+  "evaluation_workloads": [
+   "pop000",
+   "pop001",
+   "pop002",
+   "pop003",
+   "pop004",
+   "pop008",
+   "pop012",
+   "pop016",
+   "pop017",
+   "pop019",
+   "pop020",
+   "pop023",
+   "pop026",
+   "pop028",
+   "pop029",
+   "pop032",
+   "pop033",
+   "pop039",
+   "pop044",
+   "pop048",
+   "pop049",
+   "pop053",
+   "pop055",
+   "pop059"
+  ],
+  "tuning_total": 120,
+  "evaluation_total": 120,
+  "class_counts": {
+   "tuning": {
+    "api_or_code": 12,
+    "conversation": 12
+   },
+   "evaluation": {
+    "api_or_code": 12,
+    "conversation": 12
+   }
+  },
+  "generated": "2026-11-13"
+ },
+ "class_rule": "the stream family carrying the larger share of the workload's demand (sum of its tenants' rate_rps); conversation = azure2024/conv, burstgpt/ChatGPT/conv, burstgpt/GPT-4/conv; api_or_code = burstgpt/ChatGPT/api, burstgpt/GPT-4/api, azure2024/code; ties to the alphabetically first family",
+ "classes": {
+  "tuning": {
+   "api_or_code": [
+    "pop005",
+    "pop006",
+    "pop009",
+    "pop011",
+    "pop025",
+    "pop031",
+    "pop035",
+    "pop036",
+    "pop038",
+    "pop042",
+    "pop054",
+    "pop058"
+   ],
+   "conversation": [
+    "pop007",
+    "pop010",
+    "pop013",
+    "pop014",
+    "pop015",
+    "pop018",
+    "pop021",
+    "pop022",
+    "pop024",
+    "pop027",
+    "pop030",
+    "pop034"
+   ]
+  },
+  "evaluation": {
+   "api_or_code": [
+    "pop000",
+    "pop002",
+    "pop004",
+    "pop016",
+    "pop017",
+    "pop019",
+    "pop020",
+    "pop023",
+    "pop026",
+    "pop028",
+    "pop032",
+    "pop033"
+   ],
+   "conversation": [
+    "pop001",
+    "pop003",
+    "pop008",
+    "pop012",
+    "pop029",
+    "pop039",
+    "pop044",
+    "pop048",
+    "pop049",
+    "pop053",
+    "pop055",
+    "pop059"
+   ]
+  }
+ },
+ "arms": {
+  "joint": {
+   "maps_to": "controller.JCACController, knob_search 'joint' (registered arm jcac_converged), via tunable_planner.TunablePlanner",
+   "description": "the joint planner: one tenant's three knobs searched together on the move lattice, tenants coordinated by convergent sweeps on one shared objective",
+   "fixed": {
+    "anchor_moves": true,
+    "converge_sweeps": true,
+    "knob_search": "joint"
+   },
+   "space": [
+    {
+     "name": "switch_penalty",
+     "range": "log-uniform [0.001, 0.2]",
+     "default": 0.05,
+     "doc": "objective units charged per changed knob (hysteresis); published 0.05"
+    },
+    {
+     "name": "horizon_steps",
+     "range": "integer 1..6",
+     "default": 6,
+     "doc": "forecast steps of 10 s the plan is judged on"
+    },
+    {
+     "name": "forecast_method",
+     "range": "{persistence, trend, holt, seasonal}",
+     "default": "trend",
+     "doc": "demand forecaster"
+    },
+    {
+     "name": "weight_beta",
+     "range": "log-uniform [0.25, 32]",
+     "default": 2.0,
+     "doc": "SLO weight beta; the cost weight alpha is fixed at 1 (the objective's scale)"
+    },
+    {
+     "name": "weight_gamma",
+     "range": "uniform [0, 2]",
+     "default": 0.5,
+     "doc": "fairness weight gamma"
+    }
+   ],
+   "configs": [
+    {
+     "switch_penalty": 0.05,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 2.0,
+     "weight_gamma": 0.5
+    },
+    {
+     "switch_penalty": 0.00184755,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 2.30681,
+     "weight_gamma": 1.59174
+    },
+    {
+     "switch_penalty": 0.0256268,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.779789,
+     "weight_gamma": 1.46805
+    },
+    {
+     "switch_penalty": 0.0190052,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 7.06859,
+     "weight_gamma": 1.82602
+    },
+    {
+     "switch_penalty": 0.0270944,
+     "horizon_steps": 1,
+     "forecast_method": "trend",
+     "weight_beta": 0.259807,
+     "weight_gamma": 0.859487
+    },
+    {
+     "switch_penalty": 0.0681166,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 4.17007,
+     "weight_gamma": 1.82784
+    },
+    {
+     "switch_penalty": 0.00267478,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 6.17912,
+     "weight_gamma": 1.49091
+    },
+    {
+     "switch_penalty": 0.00273897,
+     "horizon_steps": 4,
+     "forecast_method": "seasonal",
+     "weight_beta": 7.01781,
+     "weight_gamma": 0.353943
+    },
+    {
+     "switch_penalty": 0.00813778,
+     "horizon_steps": 2,
+     "forecast_method": "holt",
+     "weight_beta": 1.02991,
+     "weight_gamma": 0.0628482
+    },
+    {
+     "switch_penalty": 0.0853004,
+     "horizon_steps": 1,
+     "forecast_method": "holt",
+     "weight_beta": 2.56952,
+     "weight_gamma": 1.15964
+    },
+    {
+     "switch_penalty": 0.0747281,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.91877,
+     "weight_gamma": 1.1492
+    },
+    {
+     "switch_penalty": 0.0422914,
+     "horizon_steps": 3,
+     "forecast_method": "trend",
+     "weight_beta": 6.42555,
+     "weight_gamma": 1.48189
+    },
+    {
+     "switch_penalty": 0.00419018,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 4.36774,
+     "weight_gamma": 1.15108
+    },
+    {
+     "switch_penalty": 0.0143744,
+     "horizon_steps": 4,
+     "forecast_method": "persistence",
+     "weight_beta": 2.25844,
+     "weight_gamma": 0.332205
+    },
+    {
+     "switch_penalty": 0.00839399,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 6.81235,
+     "weight_gamma": 1.23628
+    },
+    {
+     "switch_penalty": 0.0421271,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 24.2549,
+     "weight_gamma": 1.58454
+    }
+   ],
+   "overall": {
+    "config": 1,
+    "tuning_J": 0.19347040427644804,
+    "n": 24,
+    "params": {
+     "switch_penalty": 0.00184755,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 2.30681,
+     "weight_gamma": 1.59174
+    }
+   },
+   "per_class": {
+    "api_or_code": {
+     "config": 1,
+     "tuning_J": 0.17570433094174262,
+     "n": 12,
+     "params": {
+      "switch_penalty": 0.00184755,
+      "horizon_steps": 1,
+      "forecast_method": "persistence",
+      "weight_beta": 2.30681,
+      "weight_gamma": 1.59174
+     }
+    },
+    "conversation": {
+     "config": 1,
+     "tuning_J": 0.2112364776111535,
+     "n": 12,
+     "params": {
+      "switch_penalty": 0.00184755,
+      "horizon_steps": 1,
+      "forecast_method": "persistence",
+      "weight_beta": 2.30681,
+      "weight_gamma": 1.59174
+     }
+    }
+   }
+  },
+  "per_knob": {
+   "maps_to": "knob_search 'decoupled' (registered arm jcac_decoupled)",
+   "description": "the per-knob planner: each knob best-responded alone on the shared objective, winners combined",
+   "fixed": {
+    "anchor_moves": true,
+    "converge_sweeps": true,
+    "knob_search": "decoupled"
+   },
+   "space": [
+    {
+     "name": "switch_penalty",
+     "range": "log-uniform [0.001, 0.2]",
+     "default": 0.05,
+     "doc": "objective units charged per changed knob (hysteresis); published 0.05"
+    },
+    {
+     "name": "horizon_steps",
+     "range": "integer 1..6",
+     "default": 6,
+     "doc": "forecast steps of 10 s the plan is judged on"
+    },
+    {
+     "name": "forecast_method",
+     "range": "{persistence, trend, holt, seasonal}",
+     "default": "trend",
+     "doc": "demand forecaster"
+    },
+    {
+     "name": "weight_beta",
+     "range": "log-uniform [0.25, 32]",
+     "default": 2.0,
+     "doc": "SLO weight beta; the cost weight alpha is fixed at 1 (the objective's scale)"
+    },
+    {
+     "name": "weight_gamma",
+     "range": "uniform [0, 2]",
+     "default": 0.5,
+     "doc": "fairness weight gamma"
+    }
+   ],
+   "configs": [
+    {
+     "switch_penalty": 0.05,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 2.0,
+     "weight_gamma": 0.5
+    },
+    {
+     "switch_penalty": 0.00153212,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 1.26499,
+     "weight_gamma": 1.88366
+    },
+    {
+     "switch_penalty": 0.028533,
+     "horizon_steps": 3,
+     "forecast_method": "persistence",
+     "weight_beta": 6.17552,
+     "weight_gamma": 0.721032
+    },
+    {
+     "switch_penalty": 0.00110052,
+     "horizon_steps": 1,
+     "forecast_method": "seasonal",
+     "weight_beta": 3.02736,
+     "weight_gamma": 0.449323
+    },
+    {
+     "switch_penalty": 0.00596759,
+     "horizon_steps": 3,
+     "forecast_method": "persistence",
+     "weight_beta": 6.93862,
+     "weight_gamma": 1.5347
+    },
+    {
+     "switch_penalty": 0.00296389,
+     "horizon_steps": 2,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.419,
+     "weight_gamma": 0.997348
+    },
+    {
+     "switch_penalty": 0.102859,
+     "horizon_steps": 5,
+     "forecast_method": "trend",
+     "weight_beta": 14.2757,
+     "weight_gamma": 0.842961
+    },
+    {
+     "switch_penalty": 0.0335046,
+     "horizon_steps": 1,
+     "forecast_method": "trend",
+     "weight_beta": 4.33917,
+     "weight_gamma": 0.0595687
+    },
+    {
+     "switch_penalty": 0.00854133,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 1.09829,
+     "weight_gamma": 1.9138
+    },
+    {
+     "switch_penalty": 0.136389,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 3.5741,
+     "weight_gamma": 1.51194
+    },
+    {
+     "switch_penalty": 0.109541,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 0.33901,
+     "weight_gamma": 1.39507
+    },
+    {
+     "switch_penalty": 0.0567575,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.331983,
+     "weight_gamma": 1.26029
+    },
+    {
+     "switch_penalty": 0.00391232,
+     "horizon_steps": 2,
+     "forecast_method": "trend",
+     "weight_beta": 3.21328,
+     "weight_gamma": 0.358827
+    },
+    {
+     "switch_penalty": 0.00444632,
+     "horizon_steps": 4,
+     "forecast_method": "holt",
+     "weight_beta": 1.73499,
+     "weight_gamma": 1.56552
+    },
+    {
+     "switch_penalty": 0.0766737,
+     "horizon_steps": 3,
+     "forecast_method": "persistence",
+     "weight_beta": 2.53617,
+     "weight_gamma": 1.16355
+    },
+    {
+     "switch_penalty": 0.0190203,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 0.650986,
+     "weight_gamma": 0.11628
+    }
+   ],
+   "overall": {
+    "config": 1,
+    "tuning_J": 0.19300540456177603,
+    "n": 24,
+    "params": {
+     "switch_penalty": 0.00153212,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 1.26499,
+     "weight_gamma": 1.88366
+    }
+   },
+   "per_class": {
+    "api_or_code": {
+     "config": 1,
+     "tuning_J": 0.1752073426335978,
+     "n": 12,
+     "params": {
+      "switch_penalty": 0.00153212,
+      "horizon_steps": 6,
+      "forecast_method": "holt",
+      "weight_beta": 1.26499,
+      "weight_gamma": 1.88366
+     }
+    },
+    "conversation": {
+     "config": 1,
+     "tuning_J": 0.21080346648995427,
+     "n": 12,
+     "params": {
+      "switch_penalty": 0.00153212,
+      "horizon_steps": 6,
+      "forecast_method": "holt",
+      "weight_beta": 1.26499,
+      "weight_gamma": 1.88366
+     }
+    }
+   }
+  },
+  "one_knob": {
+   "maps_to": "knob_search 'knobwise' (registered arm jcac_knobwise)",
+   "description": "the iterated one-knob planner: one knob at a time to a fixed point, never a two-knob move",
+   "fixed": {
+    "anchor_moves": true,
+    "converge_sweeps": true,
+    "knob_search": "knobwise"
+   },
+   "space": [
+    {
+     "name": "switch_penalty",
+     "range": "log-uniform [0.001, 0.2]",
+     "default": 0.05,
+     "doc": "objective units charged per changed knob (hysteresis); published 0.05"
+    },
+    {
+     "name": "horizon_steps",
+     "range": "integer 1..6",
+     "default": 6,
+     "doc": "forecast steps of 10 s the plan is judged on"
+    },
+    {
+     "name": "forecast_method",
+     "range": "{persistence, trend, holt, seasonal}",
+     "default": "trend",
+     "doc": "demand forecaster"
+    },
+    {
+     "name": "weight_beta",
+     "range": "log-uniform [0.25, 32]",
+     "default": 2.0,
+     "doc": "SLO weight beta; the cost weight alpha is fixed at 1 (the objective's scale)"
+    },
+    {
+     "name": "weight_gamma",
+     "range": "uniform [0, 2]",
+     "default": 0.5,
+     "doc": "fairness weight gamma"
+    }
+   ],
+   "configs": [
+    {
+     "switch_penalty": 0.05,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 2.0,
+     "weight_gamma": 0.5
+    },
+    {
+     "switch_penalty": 0.0184437,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 4.21226,
+     "weight_gamma": 0.389862
+    },
+    {
+     "switch_penalty": 0.0478712,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 8.32376,
+     "weight_gamma": 0.345485
+    },
+    {
+     "switch_penalty": 0.0113111,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 2.44437,
+     "weight_gamma": 1.25659
+    },
+    {
+     "switch_penalty": 0.00314513,
+     "horizon_steps": 5,
+     "forecast_method": "trend",
+     "weight_beta": 1.18094,
+     "weight_gamma": 0.388577
+    },
+    {
+     "switch_penalty": 0.00991179,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 9.7261,
+     "weight_gamma": 0.441776
+    },
+    {
+     "switch_penalty": 0.0888775,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.84477,
+     "weight_gamma": 1.28694
+    },
+    {
+     "switch_penalty": 0.0249538,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 0.477667,
+     "weight_gamma": 1.03407
+    },
+    {
+     "switch_penalty": 0.00169312,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 6.00916,
+     "weight_gamma": 1.55914
+    },
+    {
+     "switch_penalty": 0.00758274,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 11.7285,
+     "weight_gamma": 0.173469
+    },
+    {
+     "switch_penalty": 0.0589714,
+     "horizon_steps": 5,
+     "forecast_method": "holt",
+     "weight_beta": 20.8713,
+     "weight_gamma": 0.170253
+    },
+    {
+     "switch_penalty": 0.00227213,
+     "horizon_steps": 5,
+     "forecast_method": "holt",
+     "weight_beta": 2.58055,
+     "weight_gamma": 0.303509
+    },
+    {
+     "switch_penalty": 0.0637706,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.990974,
+     "weight_gamma": 1.85103
+    },
+    {
+     "switch_penalty": 0.010706,
+     "horizon_steps": 2,
+     "forecast_method": "holt",
+     "weight_beta": 7.97115,
+     "weight_gamma": 0.71971
+    },
+    {
+     "switch_penalty": 0.014177,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 4.51345,
+     "weight_gamma": 0.867669
+    },
+    {
+     "switch_penalty": 0.00231366,
+     "horizon_steps": 2,
+     "forecast_method": "seasonal",
+     "weight_beta": 9.81266,
+     "weight_gamma": 1.87127
+    }
+   ],
+   "overall": {
+    "config": 8,
+    "tuning_J": 0.1928793189036738,
+    "n": 24,
+    "params": {
+     "switch_penalty": 0.00169312,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 6.00916,
+     "weight_gamma": 1.55914
+    }
+   },
+   "per_class": {
+    "api_or_code": {
+     "config": 8,
+     "tuning_J": 0.17498407070190689,
+     "n": 12,
+     "params": {
+      "switch_penalty": 0.00169312,
+      "horizon_steps": 3,
+      "forecast_method": "seasonal",
+      "weight_beta": 6.00916,
+      "weight_gamma": 1.55914
+     }
+    },
+    "conversation": {
+     "config": 8,
+     "tuning_J": 0.21077456710544065,
+     "n": 12,
+     "params": {
+      "switch_penalty": 0.00169312,
+      "horizon_steps": 3,
+      "forecast_method": "seasonal",
+      "weight_beta": 6.00916,
+      "weight_gamma": 1.55914
+     }
+    }
+   }
+  },
+  "layers": {
+   "maps_to": "new: layer_control.IndependentLayersController (router objective has the form of baselines.quality_aware_tier, with its own weights); caps baselines.CapEnforced",
+   "description": "independent per-layer planners: pool on utilisation or queue, cache on hit rate, router on latency and price; each its own local objective, no shared one",
+   "fixed": {},
+   "space": [
+    {
+     "name": "forecast_method",
+     "range": "{persistence, trend, holt, seasonal}",
+     "default": "trend",
+     "doc": "demand forecaster, every layer"
+    },
+    {
+     "name": "horizon_steps",
+     "range": "integer 1..6",
+     "default": 6,
+     "doc": "forecast steps each layer averages over"
+    },
+    {
+     "name": "pool_signal",
+     "range": "{utilisation, queue}",
+     "default": "utilisation",
+     "doc": "the pool planner's signal"
+    },
+    {
+     "name": "pool_target_utilisation",
+     "range": "log-uniform [0.05, 1]",
+     "default": 0.6,
+     "doc": "target when the signal is utilisation"
+    },
+    {
+     "name": "pool_target_queue",
+     "range": "log-uniform [0.25, 8]",
+     "default": 1.5,
+     "doc": "target work in flight per replica when the signal is queue"
+    },
+    {
+     "name": "pool_weight",
+     "range": "log-uniform [0.01, 100]",
+     "default": 1.0,
+     "doc": "price of signal overshoot against replica cost"
+    },
+    {
+     "name": "hit_value_usd",
+     "range": "log-uniform [1e-08, 0.01]",
+     "default": 0.0001,
+     "doc": "the cache planner's value of one hit, USD"
+    },
+    {
+     "name": "router_latency_weight",
+     "range": "log-uniform [0.1, 100]",
+     "default": 2.0,
+     "doc": "price of AI p95 overshoot against per-request spend"
+    }
+   ],
+   "configs": [
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 6,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.6,
+     "pool_target_queue": 1.5,
+     "pool_weight": 1.0,
+     "hit_value_usd": 0.0001,
+     "router_latency_weight": 2.0
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 2,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.0772877,
+     "pool_target_queue": 1.23182,
+     "pool_weight": 1.93792,
+     "hit_value_usd": 2.55433e-06,
+     "router_latency_weight": 2.79427
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 2,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.0664655,
+     "pool_target_queue": 0.26396,
+     "pool_weight": 0.0426756,
+     "hit_value_usd": 1.60683e-05,
+     "router_latency_weight": 3.16411
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 2,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.600035,
+     "pool_target_queue": 0.356315,
+     "pool_weight": 13.513,
+     "hit_value_usd": 3.66055e-07,
+     "router_latency_weight": 8.94182
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 1,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.398315,
+     "pool_target_queue": 0.276375,
+     "pool_weight": 26.3502,
+     "hit_value_usd": 0.00195827,
+     "router_latency_weight": 36.6851
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 4,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.928984,
+     "pool_target_queue": 7.469,
+     "pool_weight": 0.0305491,
+     "hit_value_usd": 2.81472e-07,
+     "router_latency_weight": 6.88356
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 6,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.350481,
+     "pool_target_queue": 1.56068,
+     "pool_weight": 0.259636,
+     "hit_value_usd": 4.7652e-08,
+     "router_latency_weight": 0.308043
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 2,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.11972,
+     "pool_target_queue": 0.69326,
+     "pool_weight": 0.141243,
+     "hit_value_usd": 4.31807e-07,
+     "router_latency_weight": 14.6629
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 5,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.942224,
+     "pool_target_queue": 1.1692,
+     "pool_weight": 0.960252,
+     "hit_value_usd": 1.83316e-08,
+     "router_latency_weight": 56.9378
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 5,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.265242,
+     "pool_target_queue": 0.727207,
+     "pool_weight": 3.87645,
+     "hit_value_usd": 0.0076814,
+     "router_latency_weight": 62.5888
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 5,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.284049,
+     "pool_target_queue": 0.437702,
+     "pool_weight": 0.978523,
+     "hit_value_usd": 7.4854e-08,
+     "router_latency_weight": 22.4609
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 6,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.101697,
+     "pool_target_queue": 0.607179,
+     "pool_weight": 0.139082,
+     "hit_value_usd": 0.00126303,
+     "router_latency_weight": 0.248137
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 4,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.413625,
+     "pool_target_queue": 0.491625,
+     "pool_weight": 1.00161,
+     "hit_value_usd": 2.20524e-06,
+     "router_latency_weight": 0.17207
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 4,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.354989,
+     "pool_target_queue": 0.439862,
+     "pool_weight": 29.3906,
+     "hit_value_usd": 1.05575e-05,
+     "router_latency_weight": 0.460929
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 1,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.766398,
+     "pool_target_queue": 0.462176,
+     "pool_weight": 22.5914,
+     "hit_value_usd": 2.39164e-08,
+     "router_latency_weight": 18.7956
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 4,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.611802,
+     "pool_target_queue": 2.3215,
+     "pool_weight": 0.0358065,
+     "hit_value_usd": 3.28822e-08,
+     "router_latency_weight": 92.8294
+    }
+   ],
+   "overall": {
+    "config": 4,
+    "tuning_J": 0.1940857540614925,
+    "n": 24,
+    "params": {
+     "forecast_method": "persistence",
+     "horizon_steps": 1,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.398315,
+     "pool_target_queue": 0.276375,
+     "pool_weight": 26.3502,
+     "hit_value_usd": 0.00195827,
+     "router_latency_weight": 36.6851
+    }
+   },
+   "per_class": {
+    "api_or_code": {
+     "config": 4,
+     "tuning_J": 0.17690004119871336,
+     "n": 12,
+     "params": {
+      "forecast_method": "persistence",
+      "horizon_steps": 1,
+      "pool_signal": "utilisation",
+      "pool_target_utilisation": 0.398315,
+      "pool_target_queue": 0.276375,
+      "pool_weight": 26.3502,
+      "hit_value_usd": 0.00195827,
+      "router_latency_weight": 36.6851
+     }
+    },
+    "conversation": {
+     "config": 4,
+     "tuning_J": 0.21127146692427165,
+     "n": 12,
+     "params": {
+      "forecast_method": "persistence",
+      "horizon_steps": 1,
+      "pool_signal": "utilisation",
+      "pool_target_utilisation": 0.398315,
+      "pool_target_queue": 0.276375,
+      "pool_weight": 26.3502,
+      "hit_value_usd": 0.00195827,
+      "router_latency_weight": 36.6851
+     }
+    }
+   }
+  },
+  "rules": {
+   "maps_to": "new: layer_control.RulesStackController; pool k8s_hpa.K8sReplicaLayer (in place of baselines.HPAController(policy='k8s_default'), see k8s_hpa.py); router fallback baselines.cheapest_meeting_tier; caps baselines.CapEnforced",
+   "description": "per-layer stack of rules: Kubernetes default-behaviour HPA on each pool, a cache-sizing rule, a router rule, the budget gate",
+   "fixed": {},
+   "space": [
+    {
+     "name": "hpa_metric",
+     "range": "{utilisation, queue}",
+     "default": "utilisation",
+     "doc": "HPA metric: utilisation (Resource) or queue (Pods, work in flight per replica)"
+    },
+    {
+     "name": "hpa_target_utilisation",
+     "range": "log-uniform [0.05, 1]",
+     "default": 0.6,
+     "doc": "averageUtilization target"
+    },
+    {
+     "name": "hpa_target_queue",
+     "range": "log-uniform [0.25, 8]",
+     "default": 1.5,
+     "doc": "averageValue target, work in flight per pod"
+    },
+    {
+     "name": "cache_hits_per_mb_s",
+     "range": "log-uniform [1e-05, 0.1]",
+     "default": 0.001,
+     "doc": "cache-sizing rule: grow while a level buys this many hits/s per MB"
+    },
+    {
+     "name": "router_tier",
+     "range": "{small, mid, large}",
+     "default": "small",
+     "doc": "router rule: preferred tier (latency fallback)"
+    }
+   ],
+   "configs": [
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.6,
+     "hpa_target_queue": 1.5,
+     "cache_hits_per_mb_s": 0.001,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.154327,
+     "hpa_target_queue": 4.56455,
+     "cache_hits_per_mb_s": 0.0113397,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.209558,
+     "hpa_target_queue": 1.00637,
+     "cache_hits_per_mb_s": 1.82378e-05,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0782558,
+     "hpa_target_queue": 0.448496,
+     "cache_hits_per_mb_s": 0.0805023,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.859613,
+     "hpa_target_queue": 2.34154,
+     "cache_hits_per_mb_s": 0.00570935,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.274967,
+     "hpa_target_queue": 6.79692,
+     "cache_hits_per_mb_s": 0.000979979,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.555806,
+     "hpa_target_queue": 1.30449,
+     "cache_hits_per_mb_s": 0.00194245,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.0828895,
+     "hpa_target_queue": 3.537,
+     "cache_hits_per_mb_s": 0.00572265,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.441581,
+     "hpa_target_queue": 0.854438,
+     "cache_hits_per_mb_s": 0.000457149,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.688863,
+     "hpa_target_queue": 7.9055,
+     "cache_hits_per_mb_s": 0.000131025,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.124838,
+     "hpa_target_queue": 0.5248,
+     "cache_hits_per_mb_s": 0.0227337,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0870421,
+     "hpa_target_queue": 6.50326,
+     "cache_hits_per_mb_s": 0.00754343,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.15574,
+     "hpa_target_queue": 4.12597,
+     "cache_hits_per_mb_s": 1.79043e-05,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.725649,
+     "hpa_target_queue": 2.15178,
+     "cache_hits_per_mb_s": 0.00925905,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.164431,
+     "hpa_target_queue": 3.8889,
+     "cache_hits_per_mb_s": 0.000306856,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.847045,
+     "hpa_target_queue": 0.463466,
+     "cache_hits_per_mb_s": 0.000536887,
+     "router_tier": "mid"
+    }
+   ],
+   "overall": {
+    "config": 12,
+    "tuning_J": 0.1930130182536078,
+    "n": 24,
+    "params": {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.15574,
+     "hpa_target_queue": 4.12597,
+     "cache_hits_per_mb_s": 1.79043e-05,
+     "router_tier": "small"
+    }
+   },
+   "per_class": {
+    "api_or_code": {
+     "config": 12,
+     "tuning_J": 0.17529086939316732,
+     "n": 12,
+     "params": {
+      "hpa_metric": "queue",
+      "hpa_target_utilisation": 0.15574,
+      "hpa_target_queue": 4.12597,
+      "cache_hits_per_mb_s": 1.79043e-05,
+      "router_tier": "small"
+     }
+    },
+    "conversation": {
+     "config": 12,
+     "tuning_J": 0.21073516711404824,
+     "n": 12,
+     "params": {
+      "hpa_metric": "queue",
+      "hpa_target_utilisation": 0.15574,
+      "hpa_target_queue": 4.12597,
+      "cache_hits_per_mb_s": 1.79043e-05,
+      "router_tier": "small"
+     }
+    }
+   }
+  }
+ }
+}
