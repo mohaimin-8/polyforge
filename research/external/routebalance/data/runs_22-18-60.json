@@ -1,0 +1,808 @@
+{
+ "preset": "22/18/60",
+ "rates": {
+  "12": {
+   "decoupled": {
+    "outcomes": {
+     "before_dispatch_ms": 52.40000000000064,
+     "cost_per_million_usd": 22.833558890147224,
+     "e2e_mean_s": 2.0380414377373803,
+     "mix": [
+      0.3035107587768969,
+      0.5645526613816535,
+      0.0,
+      0.1319365798414496
+     ],
+     "quality": 0.48275764439411095
+    }
+   },
+   "fused": {
+    "decisions": {
+     "anchor_differs_share": 0.37117780294450736,
+     "costly_perknob_share": 0.08900226757369614,
+     "decisions": 3532,
+     "gain_fused_mean": 0.018348653074124463,
+     "gain_fused_share_mean": 0.10482997400444634,
+     "gain_left_to_perknob": 0.13546392546214758,
+     "gain_left_to_sequential": 0.07968519424904484,
+     "index_mean": 0.020092568051550765,
+     "index_median": 0.0,
+     "index_p90": 0.055931666894230236,
+     "index_positive_share": 0.4609286523216308,
+     "index_share_mean": 0.12973106541280938,
+     "index_share_of_spread_mean": 0.06185853165646517,
+     "loss_iterated_mean": 0.0014621159844199416,
+     "loss_perknob_mean": 0.0024855805723640015,
+     "loss_perknob_share_mean": 0.017451086156939723,
+     "loss_sequential_mean": 0.0014621159844199416,
+     "loss_sequential_share_mean": 0.01084990496031712,
+     "model_differs_share": 0.22904869762174404,
+     "needs_repair_share": 0.0011325028312570782,
+     "phi_joint_mean": 0.22939653719734907,
+     "quantile_index_mean": 0.020092568051550765,
+     "queued_share": 0.46772366930917325,
+     "spread_mean": 0.4880618955025212,
+     "theorem1_checked": 3528,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 136.95516431106915,
+     "cost_per_million_usd": 19.434309173272933,
+     "e2e_mean_s": 2.0248665558387544,
+     "mean_round_size": 1.8787234042553191,
+     "mix": [
+      0.17072480181200453,
+      0.731030577576444,
+      0.0028312570781426952,
+      0.09541336353340883
+     ],
+     "quality": 0.45345413363533404,
+     "repeat_share": 0.01189127972819932,
+     "round_range": 0.2456639153627205,
+     "rounds": 1880
+    },
+    "probe": {
+     "decisions": 505,
+     "index_mean": 0.022077154401816842,
+     "max_index_difference": 0.0,
+     "theorem1_checked": 505,
+     "theorem1_violations": 0
+    }
+   },
+   "reqnorm": {
+    "decisions": {
+     "anchor_differs_share": 0.15685164212910532,
+     "costly_perknob_share": 0.05634201585503964,
+     "decisions": 3532,
+     "gain_fused_mean": 0.0108641665295658,
+     "gain_fused_share_mean": 0.05563726024755972,
+     "gain_left_to_perknob": 0.2400068103797604,
+     "gain_left_to_sequential": 0.20734309371167434,
+     "index_mean": 0.04453898335615331,
+     "index_median": 0.0,
+     "index_p90": 0.1397278804184302,
+     "index_positive_share": 0.45583238958097394,
+     "index_share_mean": 0.22107476853130753,
+     "index_share_of_spread_mean": 0.08499109365293345,
+     "loss_iterated_mean": 0.0022123534369690805,
+     "loss_perknob_mean": 0.0026074739561956386,
+     "loss_perknob_share_mean": 0.012608603710648848,
+     "loss_sequential_mean": 0.0022526098988389976,
+     "loss_sequential_share_mean": 0.010761637239778594,
+     "model_differs_share": 0.022366930917327294,
+     "needs_repair_share": 0.0,
+     "phi_joint_mean": 0.2491466299721773,
+     "quantile_index_mean": 0.04453898335615331,
+     "queued_share": 0.46772366930917325,
+     "spread_mean": 0.5637860529626737,
+     "theorem1_checked": 3532,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 136.95516431106915,
+     "cost_per_million_usd": 22.80384201585504,
+     "e2e_mean_s": 2.1353255023404922,
+     "mean_round_size": 1.8787234042553191,
+     "mix": [
+      0.29331823329558326,
+      0.5560588901472253,
+      0.0,
+      0.1506228765571914
+     ],
+     "quality": 0.48360702151755375,
+     "repeat_share": 0.004246885617214043,
+     "round_range": 0.2456639153627205,
+     "rounds": 1880
+    }
+   },
+   "sequential": {
+    "outcomes": {
+     "before_dispatch_ms": 136.95516431106915,
+     "cost_per_million_usd": 19.690750283125702,
+     "e2e_mean_s": 2.023193282305703,
+     "mean_round_size": 1.8787234042553191,
+     "mix": [
+      0.18856172140430352,
+      0.6792185730464326,
+      0.0033975084937712344,
+      0.12882219705549264
+     ],
+     "quality": 0.45889014722536803,
+     "repeat_share": 0.007361268403171008,
+     "round_range": 0.2456639153627205,
+     "rounds": 1880
+    }
+   }
+  },
+  "18": {
+   "decoupled": {
+    "outcomes": {
+     "before_dispatch_ms": 67.20000000000476,
+     "cost_per_million_usd": 22.833558890147224,
+     "e2e_mean_s": 2.114012655119356,
+     "mix": [
+      0.3035107587768969,
+      0.5645526613816535,
+      0.0,
+      0.1319365798414496
+     ],
+     "quality": 0.48275764439411095
+    }
+   },
+   "fused": {
+    "decisions": {
+     "anchor_differs_share": 0.4878255945639864,
+     "costly_perknob_share": 0.11908137227105188,
+     "decisions": 3532,
+     "gain_fused_mean": 0.021790543233577032,
+     "gain_fused_share_mean": 0.12116345971721644,
+     "gain_left_to_perknob": 0.1260639270839236,
+     "gain_left_to_sequential": 0.06360545047441031,
+     "index_mean": 0.023351052827845734,
+     "index_median": 0.019211364758207783,
+     "index_p90": 0.05739870861960916,
+     "index_positive_share": 0.5985277463193658,
+     "index_share_mean": 0.14665846272586647,
+     "index_share_of_spread_mean": 0.0773722098827543,
+     "loss_iterated_mean": 0.001384510773622501,
+     "loss_perknob_mean": 0.00274700145331674,
+     "loss_perknob_share_mean": 0.018603387586597492,
+     "loss_sequential_mean": 0.0013859973184537806,
+     "loss_sequential_share_mean": 0.010045376528449492,
+     "model_differs_share": 0.2669875424688562,
+     "needs_repair_share": 0.0014156285390713476,
+     "phi_joint_mean": 0.22129294616186784,
+     "quantile_index_mean": 0.023351052827845734,
+     "queued_share": 0.6016421291053228,
+     "spread_mean": 0.4538785500844437,
+     "theorem1_checked": 3527,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 148.27784964644815,
+     "cost_per_million_usd": 18.882188561721406,
+     "e2e_mean_s": 2.075659733936541,
+     "mean_round_size": 2.510305614783227,
+     "mix": [
+      0.15118912797281994,
+      0.7559456398640997,
+      0.0033975084937712344,
+      0.08946772366930918
+     ],
+     "quality": 0.4470271800679501,
+     "repeat_share": 0.04020385050962627,
+     "round_range": 0.30162251261743545,
+     "rounds": 1407
+    },
+    "probe": {
+     "decisions": 505,
+     "index_mean": 0.025373654821710685,
+     "max_index_difference": 0.0,
+     "theorem1_checked": 503,
+     "theorem1_violations": 0
+    }
+   },
+   "reqnorm": {
+    "decisions": {
+     "anchor_differs_share": 0.22310305775764439,
+     "costly_perknob_share": 0.07276330690826727,
+     "decisions": 3532,
+     "gain_fused_mean": 0.013719146334323064,
+     "gain_fused_share_mean": 0.06698331363693781,
+     "gain_left_to_perknob": 0.2649093728018456,
+     "gain_left_to_sequential": 0.21934635374267697,
+     "index_mean": 0.0543432457365083,
+     "index_median": 0.035266818637901876,
+     "index_p90": 0.1485962722655575,
+     "index_positive_share": 0.5891845979614949,
+     "index_share_mean": 0.2661402723450874,
+     "index_share_of_spread_mean": 0.10447277978987415,
+     "loss_iterated_mean": 0.0028645695284132875,
+     "loss_perknob_mean": 0.0036343304508022626,
+     "loss_perknob_share_mean": 0.01657091693042802,
+     "loss_sequential_mean": 0.003009244724895977,
+     "loss_sequential_share_mean": 0.013718916962661594,
+     "model_differs_share": 0.026896942242355604,
+     "needs_repair_share": 0.0,
+     "phi_joint_mean": 0.24830612433593555,
+     "quantile_index_mean": 0.0543432457365083,
+     "queued_share": 0.6016421291053228,
+     "spread_mean": 0.5612388860686379,
+     "theorem1_checked": 3532,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 148.27784964644815,
+     "cost_per_million_usd": 22.882763306908267,
+     "e2e_mean_s": 2.206951559492742,
+     "mean_round_size": 2.510305614783227,
+     "mix": [
+      0.29784824462061155,
+      0.5518120045300113,
+      0.0,
+      0.15033975084937712
+     ],
+     "quality": 0.48383352208380526,
+     "repeat_share": 0.009343148357870895,
+     "round_range": 0.30162251261743545,
+     "rounds": 1407
+    }
+   },
+   "sequential": {
+    "outcomes": {
+     "before_dispatch_ms": 148.27784964644815,
+     "cost_per_million_usd": 19.13516987542469,
+     "e2e_mean_s": 2.0675729709165287,
+     "mean_round_size": 2.510305614783227,
+     "mix": [
+      0.17072480181200453,
+      0.6967723669309174,
+      0.004246885617214043,
+      0.1282559456398641
+     ],
+     "quality": 0.4535956964892412,
+     "repeat_share": 0.026896942242355604,
+     "round_range": 0.30162251261743545,
+     "rounds": 1407
+    }
+   }
+  },
+  "24": {
+   "decoupled": {
+    "outcomes": {
+     "before_dispatch_ms": 80.60000000000166,
+     "cost_per_million_usd": 22.833558890147224,
+     "e2e_mean_s": 2.177731074063425,
+     "mix": [
+      0.3035107587768969,
+      0.5645526613816535,
+      0.0,
+      0.1319365798414496
+     ],
+     "quality": 0.48275764439411095
+    }
+   },
+   "fused": {
+    "decisions": {
+     "anchor_differs_share": 0.5603057757644394,
+     "costly_perknob_share": 0.14609929078014183,
+     "decisions": 3532,
+     "gain_fused_mean": 0.023628706117056943,
+     "gain_fused_share_mean": 0.13179185888911,
+     "gain_left_to_perknob": 0.13562922114781029,
+     "gain_left_to_sequential": 0.06670647956273844,
+     "index_mean": 0.0251537675032656,
+     "index_median": 0.020376657001058285,
+     "index_p90": 0.05942913214061318,
+     "index_positive_share": 0.6820498301245753,
+     "index_share_mean": 0.15960033127715992,
+     "index_share_of_spread_mean": 0.08646891725128925,
+     "loss_iterated_mean": 0.0015629022716762647,
+     "loss_perknob_mean": 0.003204743007386934,
+     "loss_perknob_share_mean": 0.02116196896599033,
+     "loss_sequential_mean": 0.0015761878016914116,
+     "loss_sequential_share_mean": 0.010988545874615735,
+     "model_differs_share": 0.2882219705549264,
+     "needs_repair_share": 0.0019818799546998866,
+     "phi_joint_mean": 0.2161065697658404,
+     "quantile_index_mean": 0.0251537675032656,
+     "queued_share": 0.6857304643261608,
+     "spread_mean": 0.4333227963757799,
+     "theorem1_checked": 3525,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 158.08016018513285,
+     "cost_per_million_usd": 18.60452151755379,
+     "e2e_mean_s": 2.133566914385771,
+     "mean_round_size": 3.181981981981982,
+     "mix": [
+      0.14099660249150622,
+      0.7678369195922989,
+      0.004246885617214043,
+      0.08691959229898075
+     ],
+     "quality": 0.443035107587769,
+     "repeat_share": 0.07502831257078142,
+     "round_range": 0.3501676763696221,
+     "rounds": 1110
+    },
+    "probe": {
+     "decisions": 505,
+     "index_mean": 0.025479541015227727,
+     "max_index_difference": 0.0,
+     "theorem1_checked": 504,
+     "theorem1_violations": 0
+    }
+   },
+   "reqnorm": {
+    "decisions": {
+     "anchor_differs_share": 0.28680634201585503,
+     "costly_perknob_share": 0.08833522083805209,
+     "decisions": 3532,
+     "gain_fused_mean": 0.01624617231648543,
+     "gain_fused_share_mean": 0.07800651556718559,
+     "gain_left_to_perknob": 0.2689913812568625,
+     "gain_left_to_sequential": 0.20116094205835594,
+     "index_mean": 0.0608427016156599,
+     "index_median": 0.0443543330796311,
+     "index_p90": 0.15234619023838958,
+     "index_positive_share": 0.6746885617214043,
+     "index_share_mean": 0.2987287273673335,
+     "index_share_of_spread_mean": 0.11718036589402166,
+     "loss_iterated_mean": 0.0030133720089178303,
+     "loss_perknob_mean": 0.004370080331548417,
+     "loss_perknob_share_mean": 0.018436090250914902,
+     "loss_sequential_mean": 0.0032680953280265924,
+     "loss_sequential_share_mean": 0.013854983909407103,
+     "model_differs_share": 0.033408833522083806,
+     "needs_repair_share": 0.0,
+     "phi_joint_mean": 0.24826135106011818,
+     "quantile_index_mean": 0.0608427016156599,
+     "queued_share": 0.6857304643261608,
+     "spread_mean": 0.5597646710247492,
+     "theorem1_checked": 3532,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 158.08016018513285,
+     "cost_per_million_usd": 22.79624575311438,
+     "e2e_mean_s": 2.2645299066965325,
+     "mean_round_size": 3.181981981981982,
+     "mix": [
+      0.2924688561721404,
+      0.5501132502831257,
+      0.0,
+      0.15741789354473387
+     ],
+     "quality": 0.4830124575311438,
+     "repeat_share": 0.020385050962627407,
+     "round_range": 0.3501676763696221,
+     "rounds": 1110
+    }
+   },
+   "sequential": {
+    "outcomes": {
+     "before_dispatch_ms": 158.08016018513285,
+     "cost_per_million_usd": 18.872151755379388,
+     "e2e_mean_s": 2.1245548131135465,
+     "mean_round_size": 3.181981981981982,
+     "mix": [
+      0.16053227633069084,
+      0.7058323895809739,
+      0.005096262740656852,
+      0.12853907134767836
+     ],
+     "quality": 0.4499716874292186,
+     "repeat_share": 0.05605889014722537,
+     "round_range": 0.3501676763696221,
+     "rounds": 1110
+    }
+   }
+  },
+  "30": {
+   "decoupled": {
+    "outcomes": {
+     "before_dispatch_ms": 112.89999999999901,
+     "cost_per_million_usd": 22.833558890147224,
+     "e2e_mean_s": 2.2514431319160164,
+     "mix": [
+      0.3035107587768969,
+      0.5645526613816535,
+      0.0,
+      0.1319365798414496
+     ],
+     "quality": 0.48275764439411095
+    }
+   },
+   "fused": {
+    "decisions": {
+     "anchor_differs_share": 0.6180634201585504,
+     "costly_perknob_share": 0.16283687943262412,
+     "decisions": 3532,
+     "gain_fused_mean": 0.02383375408841633,
+     "gain_fused_share_mean": 0.13470124045675314,
+     "gain_left_to_perknob": 0.1394768561122522,
+     "gain_left_to_sequential": 0.06412386462228899,
+     "index_mean": 0.027017457228922445,
+     "index_median": 0.021319474961158602,
+     "index_p90": 0.06478771407951223,
+     "index_positive_share": 0.7381087202718006,
+     "index_share_mean": 0.1726730500856183,
+     "index_share_of_spread_mean": 0.09589607346491283,
+     "loss_iterated_mean": 0.0015017413570553044,
+     "loss_perknob_mean": 0.0033242570896048463,
+     "loss_perknob_share_mean": 0.021712500374587926,
+     "loss_sequential_mean": 0.0015283124206065353,
+     "loss_sequential_share_mean": 0.010539731869569772,
+     "model_differs_share": 0.2995469988674972,
+     "needs_repair_share": 0.0019818799546998866,
+     "phi_joint_mean": 0.21258264858342749,
+     "quantile_index_mean": 0.027017457228922445,
+     "queued_share": 0.7417893544733862,
+     "spread_mean": 0.4130922173633218,
+     "theorem1_checked": 3525,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 167.65964701975975,
+     "cost_per_million_usd": 18.45293884484711,
+     "e2e_mean_s": 2.1923924750467307,
+     "mean_round_size": 3.8728070175438596,
+     "mix": [
+      0.1392978482446206,
+      0.7644394110985278,
+      0.005379388448471121,
+      0.09088335220838052
+     ],
+     "quality": 0.44371460928652323,
+     "repeat_share": 0.11494903737259343,
+     "round_range": 0.38414000483882,
+     "rounds": 912
+    },
+    "probe": {
+     "decisions": 505,
+     "index_mean": 0.026405280506133638,
+     "max_index_difference": 0.0,
+     "theorem1_checked": 505,
+     "theorem1_violations": 0
+    }
+   },
+   "reqnorm": {
+    "decisions": {
+     "anchor_differs_share": 0.3567383918459796,
+     "costly_perknob_share": 0.10427883253046188,
+     "decisions": 3532,
+     "gain_fused_mean": 0.018732662829753097,
+     "gain_fused_share_mean": 0.08978312785882744,
+     "gain_left_to_perknob": 0.2703319642221616,
+     "gain_left_to_sequential": 0.20736750757894862,
+     "index_mean": 0.06651497236959607,
+     "index_median": 0.05210599747674405,
+     "index_p90": 0.1549398961073043,
+     "index_positive_share": 0.7327293318233296,
+     "index_share_mean": 0.32200981993010785,
+     "index_share_of_spread_mean": 0.12867892718527182,
+     "loss_iterated_mean": 0.003353267934187317,
+     "loss_perknob_mean": 0.005064037537878631,
+     "loss_perknob_share_mean": 0.021155521968960533,
+     "loss_sequential_mean": 0.0038845456013227144,
+     "loss_sequential_share_mean": 0.016647357657612504,
+     "model_differs_share": 0.04218573046432616,
+     "needs_repair_share": 0.0008493771234428086,
+     "phi_joint_mean": 0.24847622818801926,
+     "quantile_index_mean": 0.06651497236959607,
+     "queued_share": 0.7417893544733862,
+     "spread_mean": 0.5580137255172632,
+     "theorem1_checked": 3529,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 167.65964701975975,
+     "cost_per_million_usd": 22.877358437146093,
+     "e2e_mean_s": 2.323344524891432,
+     "mean_round_size": 3.8728070175438596,
+     "mix": [
+      0.2953001132502831,
+      0.5438844847112118,
+      0.0,
+      0.16081540203850508
+     ],
+     "quality": 0.4835220838052095,
+     "repeat_share": 0.039071347678369193,
+     "round_range": 0.38414000483882,
+     "rounds": 912
+    }
+   },
+   "sequential": {
+    "outcomes": {
+     "before_dispatch_ms": 167.65964701975975,
+     "cost_per_million_usd": 18.65418176670442,
+     "e2e_mean_s": 2.1770456026958978,
+     "mean_round_size": 3.8728070175438596,
+     "mix": [
+      0.1531710079275198,
+      0.7078142695356738,
+      0.0065118912797281995,
+      0.13250283125707815
+     ],
+     "quality": 0.45056625141562856,
+     "repeat_share": 0.09060022650056625,
+     "round_range": 0.38414000483882,
+     "rounds": 912
+    }
+   }
+  },
+  "36": {
+   "decoupled": {
+    "outcomes": {
+     "before_dispatch_ms": 155.90000000000165,
+     "cost_per_million_usd": 22.833558890147224,
+     "e2e_mean_s": 2.3328813386960525,
+     "mix": [
+      0.3035107587768969,
+      0.5645526613816535,
+      0.0,
+      0.1319365798414496
+     ],
+     "quality": 0.48275764439411095
+    }
+   },
+   "fused": {
+    "decisions": {
+     "anchor_differs_share": 0.6857304643261608,
+     "costly_perknob_share": 0.19004267425320057,
+     "decisions": 3532,
+     "gain_fused_mean": 0.024065535863429424,
+     "gain_fused_share_mean": 0.13340455320563746,
+     "gain_left_to_perknob": 0.1451933347222727,
+     "gain_left_to_sequential": 0.05913203987968002,
+     "index_mean": 0.029802000211993605,
+     "index_median": 0.02211411964238913,
+     "index_p90": 0.07672999066034425,
+     "index_positive_share": 0.7910532276330691,
+     "index_share_mean": 0.1902511306072721,
+     "index_share_of_spread_mean": 0.11199718680781262,
+     "loss_iterated_mean": 0.0013468234096923506,
+     "loss_perknob_mean": 0.003494155403889766,
+     "loss_perknob_share_mean": 0.02172949775539824,
+     "loss_sequential_mean": 0.0014230442264021785,
+     "loss_sequential_share_mean": 0.009768301375002897,
+     "model_differs_share": 0.29614949037372595,
+     "needs_repair_share": 0.004246885617214043,
+     "phi_joint_mean": 0.20977950498663642,
+     "quantile_index_mean": 0.029802000211993605,
+     "queued_share": 0.7933182332955833,
+     "spread_mean": 0.3922406801462286,
+     "theorem1_checked": 3515,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 193.1105970687031,
+     "cost_per_million_usd": 18.429637599093997,
+     "e2e_mean_s": 2.2654670439187865,
+     "mean_round_size": 4.838356164383562,
+     "mix": [
+      0.13788221970554926,
+      0.7596262740656852,
+      0.004246885617214043,
+      0.09824462061155152
+     ],
+     "quality": 0.44300679501698753,
+     "repeat_share": 0.19110985277463194,
+     "round_range": 0.4141878617738241,
+     "rounds": 730
+    },
+    "probe": {
+     "decisions": 505,
+     "index_mean": 0.028408688398191915,
+     "max_index_difference": 0.0,
+     "theorem1_checked": 502,
+     "theorem1_violations": 0
+    }
+   },
+   "reqnorm": {
+    "decisions": {
+     "anchor_differs_share": 0.4320498301245753,
+     "costly_perknob_share": 0.12166761202495746,
+     "decisions": 3532,
+     "gain_fused_mean": 0.021255857469406152,
+     "gain_fused_share_mean": 0.10119108402850649,
+     "gain_left_to_perknob": 0.2625521866353467,
+     "gain_left_to_sequential": 0.19737194032469346,
+     "index_mean": 0.07059688269011086,
+     "index_median": 0.06139321209508436,
+     "index_p90": 0.15501986198555417,
+     "index_positive_share": 0.7890713476783692,
+     "index_share_mean": 0.3384596912563476,
+     "index_share_of_spread_mean": 0.13716345323222262,
+     "loss_iterated_mean": 0.003491109087206712,
+     "loss_perknob_mean": 0.005580771857401852,
+     "loss_perknob_share_mean": 0.022768481663480635,
+     "loss_sequential_mean": 0.004195309832001821,
+     "loss_sequential_share_mean": 0.017479457272598285,
+     "model_differs_share": 0.05407701019252548,
+     "needs_repair_share": 0.0014156285390713476,
+     "phi_joint_mean": 0.24905205244242715,
+     "quantile_index_mean": 0.07059688269011086,
+     "queued_share": 0.7933182332955833,
+     "spread_mean": 0.5555975409120362,
+     "theorem1_checked": 3526,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 193.1105970687031,
+     "cost_per_million_usd": 22.81489807474519,
+     "e2e_mean_s": 2.3853188780577836,
+     "mean_round_size": 4.838356164383562,
+     "mix": [
+      0.2916194790486976,
+      0.5407701019252548,
+      0.0,
+      0.16761041902604756
+     ],
+     "quality": 0.4833238958097395,
+     "repeat_share": 0.07587768969422423,
+     "round_range": 0.4141878617738241,
+     "rounds": 730
+    }
+   },
+   "sequential": {
+    "outcomes": {
+     "before_dispatch_ms": 193.1105970687031,
+     "cost_per_million_usd": 18.62969988674972,
+     "e2e_mean_s": 2.239918086098908,
+     "mean_round_size": 4.838356164383562,
+     "mix": [
+      0.15402038505096263,
+      0.7046998867497168,
+      0.00594563986409966,
+      0.13533408833522084
+     ],
+     "quality": 0.44997168742921856,
+     "repeat_share": 0.159682899207248,
+     "round_range": 0.4141878617738241,
+     "rounds": 730
+    }
+   }
+  },
+  "42": {
+   "decoupled": {
+    "outcomes": {
+     "before_dispatch_ms": 188.69999999999848,
+     "cost_per_million_usd": 22.833558890147224,
+     "e2e_mean_s": 2.403335465476832,
+     "mix": [
+      0.3035107587768969,
+      0.5645526613816535,
+      0.0,
+      0.1319365798414496
+     ],
+     "quality": 0.48275764439411095
+    }
+   },
+   "fused": {
+    "decisions": {
+     "anchor_differs_share": 0.7219705549263873,
+     "costly_perknob_share": 0.198408186469585,
+     "decisions": 3532,
+     "gain_fused_mean": 0.023376386330458312,
+     "gain_fused_share_mean": 0.12937723962969055,
+     "gain_left_to_perknob": 0.14788465397750242,
+     "gain_left_to_sequential": 0.05683083301790864,
+     "index_mean": 0.03179089183926976,
+     "index_median": 0.022323988117571913,
+     "index_p90": 0.08647328802026721,
+     "index_positive_share": 0.8318233295583239,
+     "index_share_mean": 0.20457315693031228,
+     "index_share_of_spread_mean": 0.12465041557156605,
+     "loss_iterated_mean": 0.0011785813801279378,
+     "loss_perknob_mean": 0.003457008803724245,
+     "loss_perknob_share_mean": 0.02113886316376948,
+     "loss_sequential_mean": 0.0013284995081083984,
+     "loss_sequential_share_mean": 0.008417195666720107,
+     "model_differs_share": 0.30039637599094,
+     "needs_repair_share": 0.0033975084937712344,
+     "phi_joint_mean": 0.2072450699699948,
+     "quantile_index_mean": 0.03179089183926976,
+     "queued_share": 0.8338052095130238,
+     "spread_mean": 0.37320480608312206,
+     "theorem1_checked": 3518,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 223.609016060009,
+     "cost_per_million_usd": 18.429900906002263,
+     "e2e_mean_s": 2.3384096615585155,
+     "mean_round_size": 6.017035775127768,
+     "mix": [
+      0.14524348810872026,
+      0.7491506228765572,
+      0.0033975084937712344,
+      0.1022083805209513
+     ],
+     "quality": 0.4433465458663647,
+     "repeat_share": 0.27321630804077013,
+     "round_range": 0.4369955522838319,
+     "rounds": 587
+    },
+    "probe": {
+     "decisions": 505,
+     "index_mean": 0.031264378416993914,
+     "max_index_difference": 0.0,
+     "theorem1_checked": 502,
+     "theorem1_violations": 0
+    }
+   },
+   "reqnorm": {
+    "decisions": {
+     "anchor_differs_share": 0.5172706681766704,
+     "costly_perknob_share": 0.1334090263979563,
+     "decisions": 3532,
+     "gain_fused_mean": 0.02362987457851412,
+     "gain_fused_share_mean": 0.10921676848822166,
+     "gain_left_to_perknob": 0.2545994376416303,
+     "gain_left_to_sequential": 0.18119481472405857,
+     "index_mean": 0.07266974774631822,
+     "index_median": 0.06865001406580573,
+     "index_p90": 0.15087052960196012,
+     "index_positive_share": 0.8270101925254814,
+     "index_share_mean": 0.3451048700968782,
+     "index_share_of_spread_mean": 0.14280758513170366,
+     "loss_iterated_mean": 0.0031031112647677407,
+     "loss_perknob_mean": 0.006016152779231951,
+     "loss_perknob_share_mean": 0.024858797257969835,
+     "loss_sequential_mean": 0.004281610746206608,
+     "loss_sequential_share_mean": 0.017400591998998443,
+     "model_differs_share": 0.07134767836919592,
+     "needs_repair_share": 0.0019818799546998866,
+     "phi_joint_mean": 0.24996488197231642,
+     "quantile_index_mean": 0.07266974774631822,
+     "queued_share": 0.8338052095130238,
+     "spread_mean": 0.5516025072038867,
+     "theorem1_checked": 3523,
+     "theorem1_violations": 0
+    },
+    "outcomes": {
+     "before_dispatch_ms": 223.609016060009,
+     "cost_per_million_usd": 22.919371460928648,
+     "e2e_mean_s": 2.468817378820236,
+     "mean_round_size": 6.017035775127768,
+     "mix": [
+      0.2944507361268403,
+      0.5302944507361268,
+      0.0,
+      0.17525481313703284
+     ],
+     "quality": 0.48400339750849375,
+     "repeat_share": 0.12967157417893543,
+     "round_range": 0.4369955522838319,
+     "rounds": 587
+    }
+   },
+   "sequential": {
+    "outcomes": {
+     "before_dispatch_ms": 223.609016060009,
+     "cost_per_million_usd": 18.60012174405436,
+     "e2e_mean_s": 2.3251376069932164,
+     "mean_round_size": 6.017035775127768,
+     "mix": [
+      0.15118912797281994,
+      0.7140430351075878,
+      0.00622876557191393,
+      0.12853907134767836
+     ],
+     "quality": 0.4471404303510759,
+     "repeat_share": 0.2516987542468856,
+     "round_range": 0.4369955522838319,
+     "rounds": 587
+    }
+   }
+  }
+ },
+ "surrogate": {
+  "a": 0.48,
+  "s": 0.16,
+  "s_len": 0.3
+ }
+}
