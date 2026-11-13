@@ -35,4 +35,6 @@ What the pilots say so far, in one line each (details in the files above):
 - Theorems 1 and 2 hold on every check; the run-level conjecture T4 is false as planned (WP18).
 - The index predicts the gain only weakly; an adversarially found regime with a small index and a
   large gain draws most of its gain from decisions that start infeasible, outside Theorem 1 (WP22).
+  Blind, on 40 fresh regimes, a rule fixed beforehand (one-step loss and index) ranks the gains at
+  Spearman +0.39 (one-sided p = 0.006).
 - On RouteBalance's decision the index is large and the per-knob loss 4-30 times ours (WP15).
