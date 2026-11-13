@@ -103,6 +103,11 @@ def remainder_table(values: Sequence[Sequence[Hashable]], phi: Objective,
     vals = _validate(values, anchor)
     anchor = tuple(anchor)
     table = {x: phi(x) for x in itertools.product(*vals)}
+    # None marks an infeasible point; anything else must be a finite number,
+    # or one NaN would silently give a finite and wrong index.
+    bad = next((x for x, s in table.items() if s is not None and not math.isfinite(s)), None)
+    if bad is not None:
+        raise ValueError(f"objective is not finite at {bad!r}: {table[bad]!r} (use None for infeasible)")
     phi0 = table[anchor]
     axis = tuple(
         {v: table[anchor[:k] + (v,) + anchor[k + 1:]] for v in vals[k]}

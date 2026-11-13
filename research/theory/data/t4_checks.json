@@ -1,0 +1,1490 @@
+{
+ "minimal": {
+  "anywhere": {
+   "draws_per_cell": 4000,
+   "empty_cells": [
+    [
+     2,
+     3
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     2,
+     5
+    ],
+    [
+     2,
+     6
+    ],
+    [
+     2,
+     7
+    ],
+    [
+     2,
+     8
+    ],
+    [
+     3,
+     3
+    ],
+    [
+     3,
+     4
+    ],
+    [
+     3,
+     5
+    ],
+    [
+     3,
+     6
+    ],
+    [
+     3,
+     7
+    ],
+    [
+     3,
+     8
+    ],
+    [
+     4,
+     3
+    ]
+   ],
+   "hit": {
+    "C": 4.0,
+    "E": 9.0,
+    "I_d": [
+     0.0,
+     2.0,
+     0.0,
+     0.0
+    ],
+    "I_j": [
+     0.0,
+     2.0,
+     2.0,
+     2.0
+    ],
+    "N": 4,
+    "T": 4,
+    "alpha": 2.0,
+    "beta": 6.0,
+    "e": [
+     0.0,
+     2.0,
+     4.0,
+     3.0
+    ],
+    "family": {
+     "K": 2,
+     "N": 4,
+     "T": 4,
+     "lambda": 1.0,
+     "numbers": "int",
+     "path": "adversarial",
+     "r": 1,
+     "schedule": "always",
+     "shape": "ridge",
+     "speed": 1,
+     "start": "anywhere",
+     "weights": "varying"
+    },
+    "id": 40452390,
+    "kind": "minimal",
+    "metric": "linf",
+    "minimisers": [
+     [
+      1,
+      1
+     ],
+     [
+      2,
+      0
+     ],
+     [
+      3,
+      0
+     ],
+     [
+      3,
+      0
+     ]
+    ],
+    "phi": [
+     [
+      [
+       6.0,
+       2.0,
+       4.0,
+       8.0
+      ],
+      [
+       4.0,
+       0.0,
+       4.0,
+       8.0
+      ],
+      [
+       4.0,
+       2.0,
+       6.0,
+       10.0
+      ],
+      [
+       6.0,
+       4.0,
+       8.0,
+       12.0
+      ]
+     ],
+     [
+      [
+       4.0,
+       4.0,
+       4.0,
+       6.0
+      ],
+      [
+       2.0,
+       2.0,
+       4.0,
+       6.0
+      ],
+      [
+       0.0,
+       2.0,
+       4.0,
+       6.0
+      ],
+      [
+       2.0,
+       4.0,
+       6.0,
+       8.0
+      ]
+     ],
+     [
+      [
+       12.0,
+       14.0,
+       16.0,
+       18.0
+      ],
+      [
+       8.0,
+       10.0,
+       12.0,
+       16.0
+      ],
+      [
+       4.0,
+       6.0,
+       10.0,
+       14.0
+      ],
+      [
+       0.0,
+       4.0,
+       8.0,
+       12.0
+      ]
+     ],
+     [
+      [
+       9.0,
+       10.0,
+       11.0,
+       12.0
+      ],
+      [
+       6.0,
+       7.0,
+       8.0,
+       11.0
+      ],
+      [
+       3.0,
+       4.0,
+       7.0,
+       10.0
+      ],
+      [
+       0.0,
+       3.0,
+       6.0,
+       9.0
+      ]
+     ]
+    ],
+    "r": 1,
+    "sum_I": 2.0,
+    "x0": [
+     1,
+     3
+    ],
+    "x_d": [
+     [
+      1,
+      3
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      1,
+      0
+     ],
+     [
+      2,
+      0
+     ]
+    ],
+    "x_j": [
+     [
+      1,
+      3
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      1,
+      1
+     ],
+     [
+      2,
+      0
+     ],
+     [
+      3,
+      0
+     ]
+    ]
+   }
+  },
+  "reach": {
+   "draws_per_cell": 4000,
+   "empty_cells": [
+    [
+     2,
+     3
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     2,
+     5
+    ],
+    [
+     2,
+     6
+    ],
+    [
+     2,
+     7
+    ],
+    [
+     2,
+     8
+    ],
+    [
+     3,
+     3
+    ]
+   ],
+   "hit": {
+    "C": 4.0,
+    "E": 9.0,
+    "I_d": [
+     2.0,
+     0.0,
+     0.0
+    ],
+    "I_j": [
+     2.0,
+     0.0,
+     2.0
+    ],
+    "N": 4,
+    "T": 3,
+    "alpha": 2.0,
+    "beta": 6.0,
+    "e": [
+     2.0,
+     4.0,
+     3.0
+    ],
+    "family": {
+     "K": 2,
+     "N": 4,
+     "T": 3,
+     "lambda": 1.0,
+     "numbers": "int",
+     "path": "adversarial",
+     "r": 1,
+     "schedule": "always",
+     "shape": "ridge",
+     "speed": 1,
+     "start": "reach",
+     "weights": "varying"
+    },
+    "id": 30401532,
+    "kind": "minimal",
+    "metric": "linf",
+    "minimisers": [
+     [
+      1,
+      2
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      3,
+      2
+     ]
+    ],
+    "phi": [
+     [
+      [
+       6.0,
+       4.0,
+       2.0,
+       2.0
+      ],
+      [
+       4.0,
+       2.0,
+       0.0,
+       2.0
+      ],
+      [
+       4.0,
+       2.0,
+       2.0,
+       4.0
+      ],
+      [
+       4.0,
+       4.0,
+       4.0,
+       6.0
+      ]
+     ],
+     [
+      [
+       14.0,
+       12.0,
+       10.0,
+       8.0
+      ],
+      [
+       10.0,
+       8.0,
+       6.0,
+       4.0
+      ],
+      [
+       6.0,
+       4.0,
+       2.0,
+       0.0
+      ],
+      [
+       8.0,
+       6.0,
+       4.0,
+       4.0
+      ]
+     ],
+     [
+      [
+       13.0,
+       11.0,
+       9.0,
+       9.0
+      ],
+      [
+       10.0,
+       8.0,
+       6.0,
+       6.0
+      ],
+      [
+       7.0,
+       5.0,
+       3.0,
+       3.0
+      ],
+      [
+       4.0,
+       2.0,
+       0.0,
+       2.0
+      ]
+     ]
+    ],
+    "r": 1,
+    "sum_I": 2.0,
+    "x0": [
+     0,
+     3
+    ],
+    "x_d": [
+     [
+      0,
+      3
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      2,
+      2
+     ]
+    ],
+    "x_j": [
+     [
+      0,
+      3
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      3,
+      2
+     ]
+    ]
+   }
+  }
+ },
+ "target": {
+  "0": {
+   "by_path": {
+    "adversarial": 4953,
+    "drift": 4965,
+    "still": 5064,
+    "walk": 5018
+   },
+   "by_shape": {
+    "l2": 2449,
+    "max": 2488,
+    "neg_l2": 2533,
+    "neg_max": 2486,
+    "none": 2419,
+    "random": 2552,
+    "ridge": 2570,
+    "valley": 2503
+   },
+   "by_start": {
+    "anywhere": 10021,
+    "reach": 9979
+   },
+   "counts": {
+    "accepted": 20000,
+    "accepted_l1": 19951,
+    "accepted_linf": 20000,
+    "drawn": 20000,
+    "t4a_checked_l1": 12180,
+    "t4a_checked_linf": 12180,
+    "t4a_violation_l1": 0,
+    "t4a_violation_linf": 0,
+    "t4b_checked_l1": 12180,
+    "t4b_checked_linf": 12180,
+    "t4b_violation_l1": 0,
+    "t4b_violation_linf": 0,
+    "violated_any_D": 11,
+    "violated_l1_D": 10,
+    "violated_l1_D_reach": 7,
+    "violated_l1_J": 7,
+    "violated_linf_D": 5,
+    "violated_linf_D_reach": 3,
+    "violated_linf_J": 2,
+    "within_assumptions": 3053,
+    "within_failed": 0
+   },
+   "draws": 20000,
+   "seconds": 80.5,
+   "smallest": [
+    [
+     4,
+     2,
+     9,
+     1,
+     5733,
+     "linf",
+     "anywhere",
+     1.5379
+    ],
+    [
+     4,
+     2,
+     10,
+     1,
+     15249,
+     "l1",
+     "reach",
+     1.0056
+    ],
+    [
+     4,
+     2,
+     10,
+     1,
+     15249,
+     "linf",
+     "reach",
+     1.0284
+    ],
+    [
+     4,
+     2,
+     10,
+     1,
+     15463,
+     "l1",
+     "reach",
+     1.6667
+    ],
+    [
+     5,
+     2,
+     9,
+     1,
+     5733,
+     "l1",
+     "anywhere",
+     1.5001
+    ],
+    [
+     5,
+     2,
+     10,
+     1,
+     13498,
+     "linf",
+     "reach",
+     1.3021
+    ],
+    [
+     6,
+     2,
+     10,
+     1,
+     13498,
+     "l1",
+     "reach",
+     1.2255
+    ],
+    [
+     6,
+     2,
+     11,
+     2,
+     16731,
+     "l1",
+     "reach",
+     1.1667
+    ],
+    [
+     6,
+     2,
+     12,
+     2,
+     7459,
+     "l1",
+     "reach",
+     1.1429
+    ],
+    [
+     6,
+     3,
+     7,
+     1,
+     13537,
+     "l1",
+     "anywhere",
+     1.0264
+    ],
+    [
+     7,
+     2,
+     9,
+     1,
+     18897,
+     "l1",
+     "reach",
+     1.0625
+    ],
+    [
+     8,
+     2,
+     10,
+     1,
+     12634,
+     "linf",
+     "reach",
+     1.001
+    ],
+    [
+     9,
+     2,
+     12,
+     1,
+     406,
+     "linf",
+     "anywhere",
+     1.1354
+    ],
+    [
+     10,
+     2,
+     12,
+     1,
+     406,
+     "l1",
+     "anywhere",
+     1.0686
+    ],
+    [
+     11,
+     2,
+     12,
+     1,
+     2605,
+     "l1",
+     "reach",
+     1.3075
+    ]
+   ],
+   "start": 0,
+   "violations_by_path": {
+    "adversarial": 7,
+    "drift": 3,
+    "walk": 1
+   },
+   "violations_by_shape": {
+    "ridge": 7,
+    "valley": 4
+   },
+   "violations_by_start": {
+    "anywhere": 3,
+    "reach": 8
+   },
+   "worst": {
+    "first_l1_D_reach": 4,
+    "first_linf_D_reach": 4,
+    "l1_D": 1.6666666666666667,
+    "l1_J": 1.3643790849673203,
+    "linf_D": 1.537858917804795,
+    "linf_J": 1.4496527777777777
+   }
+  },
+  "20000": {
+   "by_path": {
+    "adversarial": 4995,
+    "drift": 4939,
+    "still": 5024,
+    "walk": 5042
+   },
+   "by_shape": {
+    "l2": 2504,
+    "max": 2511,
+    "neg_l2": 2439,
+    "neg_max": 2489,
+    "none": 2494,
+    "random": 2556,
+    "ridge": 2481,
+    "valley": 2526
+   },
+   "by_start": {
+    "anywhere": 10070,
+    "reach": 9930
+   },
+   "counts": {
+    "accepted": 20000,
+    "accepted_l1": 19952,
+    "accepted_linf": 20000,
+    "drawn": 20000,
+    "t4a_checked_l1": 12057,
+    "t4a_checked_linf": 12057,
+    "t4a_violation_l1": 0,
+    "t4a_violation_linf": 0,
+    "t4b_checked_l1": 12057,
+    "t4b_checked_linf": 12057,
+    "t4b_violation_l1": 0,
+    "t4b_violation_linf": 0,
+    "violated_any_D": 9,
+    "violated_l1_D": 8,
+    "violated_l1_D_reach": 4,
+    "violated_l1_J": 7,
+    "violated_linf_D": 4,
+    "violated_linf_D_reach": 3,
+    "violated_linf_J": 4,
+    "within_assumptions": 3147,
+    "within_failed": 0
+   },
+   "draws": 20000,
+   "seconds": 88.2,
+   "smallest": [
+    [
+     4,
+     2,
+     10,
+     1,
+     38248,
+     "l1",
+     "anywhere",
+     2.6667
+    ],
+    [
+     6,
+     2,
+     10,
+     1,
+     36437,
+     "l1",
+     "reach",
+     1.1444
+    ],
+    [
+     6,
+     2,
+     10,
+     1,
+     36437,
+     "linf",
+     "reach",
+     1.159
+    ],
+    [
+     6,
+     2,
+     10,
+     1,
+     38248,
+     "linf",
+     "anywhere",
+     1.6
+    ],
+    [
+     6,
+     2,
+     12,
+     1,
+     34746,
+     "l1",
+     "reach",
+     2.1
+    ],
+    [
+     7,
+     2,
+     8,
+     1,
+     28786,
+     "l1",
+     "anywhere",
+     1.0952
+    ],
+    [
+     8,
+     2,
+     11,
+     1,
+     35956,
+     "l1",
+     "anywhere",
+     1.3333
+    ],
+    [
+     8,
+     2,
+     12,
+     1,
+     34746,
+     "linf",
+     "reach",
+     1.5
+    ],
+    [
+     9,
+     2,
+     11,
+     1,
+     33922,
+     "linf",
+     "reach",
+     1.0069
+    ],
+    [
+     10,
+     2,
+     10,
+     1,
+     25517,
+     "l1",
+     "reach",
+     1.0205
+    ],
+    [
+     11,
+     2,
+     11,
+     1,
+     30722,
+     "l1",
+     "reach",
+     1.3084
+    ],
+    [
+     12,
+     2,
+     10,
+     1,
+     27773,
+     "l1",
+     "anywhere",
+     1.2083
+    ]
+   ],
+   "start": 20000,
+   "violations_by_path": {
+    "adversarial": 7,
+    "drift": 2
+   },
+   "violations_by_shape": {
+    "ridge": 3,
+    "valley": 6
+   },
+   "violations_by_start": {
+    "anywhere": 4,
+    "reach": 5
+   },
+   "worst": {
+    "first_l1_D_reach": 6,
+    "first_linf_D_reach": 6,
+    "l1_D": 2.6666666666666665,
+    "l1_J": 2.6666666666666665,
+    "linf_D": 1.6,
+    "linf_J": 1.6
+   }
+  },
+  "40000": {
+   "by_path": {
+    "adversarial": 5004,
+    "drift": 4987,
+    "still": 5015,
+    "walk": 4994
+   },
+   "by_shape": {
+    "l2": 2495,
+    "max": 2554,
+    "neg_l2": 2475,
+    "neg_max": 2472,
+    "none": 2575,
+    "random": 2483,
+    "ridge": 2433,
+    "valley": 2513
+   },
+   "by_start": {
+    "anywhere": 9897,
+    "reach": 10103
+   },
+   "counts": {
+    "accepted": 20000,
+    "accepted_l1": 19965,
+    "accepted_linf": 20000,
+    "drawn": 20000,
+    "t4a_checked_l1": 12219,
+    "t4a_checked_linf": 12219,
+    "t4a_violation_l1": 0,
+    "t4a_violation_linf": 0,
+    "t4b_checked_l1": 12219,
+    "t4b_checked_linf": 12219,
+    "t4b_violation_l1": 0,
+    "t4b_violation_linf": 0,
+    "violated_any_D": 8,
+    "violated_l1_D": 7,
+    "violated_l1_D_reach": 2,
+    "violated_l1_J": 5,
+    "violated_linf_D": 4,
+    "violated_linf_D_reach": 1,
+    "violated_linf_J": 3,
+    "within_assumptions": 3126,
+    "within_failed": 0
+   },
+   "draws": 20000,
+   "seconds": 93.5,
+   "smallest": [
+    [
+     5,
+     2,
+     6,
+     2,
+     55298,
+     "linf",
+     "anywhere",
+     1.05
+    ],
+    [
+     5,
+     2,
+     7,
+     1,
+     53416,
+     "l1",
+     "anywhere",
+     1.2778
+    ],
+    [
+     5,
+     2,
+     7,
+     1,
+     53416,
+     "linf",
+     "anywhere",
+     1.2778
+    ],
+    [
+     5,
+     2,
+     8,
+     1,
+     45933,
+     "l1",
+     "reach",
+     1.2127
+    ],
+    [
+     5,
+     2,
+     11,
+     2,
+     59940,
+     "l1",
+     "anywhere",
+     1.1059
+    ],
+    [
+     7,
+     2,
+     5,
+     1,
+     52445,
+     "l1",
+     "anywhere",
+     1.0469
+    ],
+    [
+     7,
+     2,
+     11,
+     1,
+     46213,
+     "l1",
+     "anywhere",
+     1.5
+    ],
+    [
+     7,
+     2,
+     11,
+     1,
+     47115,
+     "l1",
+     "anywhere",
+     1.6737
+    ],
+    [
+     7,
+     2,
+     11,
+     1,
+     47115,
+     "linf",
+     "anywhere",
+     1.7291
+    ],
+    [
+     7,
+     2,
+     11,
+     1,
+     50074,
+     "l1",
+     "reach",
+     1.3462
+    ],
+    [
+     7,
+     2,
+     11,
+     1,
+     50074,
+     "linf",
+     "reach",
+     1.4583
+    ]
+   ],
+   "start": 40000,
+   "violations_by_path": {
+    "adversarial": 6,
+    "drift": 2
+   },
+   "violations_by_shape": {
+    "ridge": 3,
+    "valley": 5
+   },
+   "violations_by_start": {
+    "anywhere": 6,
+    "reach": 2
+   },
+   "worst": {
+    "first_l1_D_reach": 5,
+    "first_linf_D_reach": 7,
+    "l1_D": 1.6737191896927117,
+    "l1_J": 1.5,
+    "linf_D": 1.7291378075614057,
+    "linf_J": 1.4583333333333333
+   }
+  },
+  "60000": {
+   "by_path": {
+    "adversarial": 4965,
+    "drift": 4997,
+    "still": 5099,
+    "walk": 4939
+   },
+   "by_shape": {
+    "l2": 2448,
+    "max": 2453,
+    "neg_l2": 2545,
+    "neg_max": 2496,
+    "none": 2577,
+    "random": 2559,
+    "ridge": 2471,
+    "valley": 2451
+   },
+   "by_start": {
+    "anywhere": 9923,
+    "reach": 10077
+   },
+   "counts": {
+    "accepted": 20000,
+    "accepted_l1": 19959,
+    "accepted_linf": 20000,
+    "drawn": 20000,
+    "t4a_checked_l1": 12281,
+    "t4a_checked_linf": 12281,
+    "t4a_violation_l1": 0,
+    "t4a_violation_linf": 0,
+    "t4b_checked_l1": 12281,
+    "t4b_checked_linf": 12281,
+    "t4b_violation_l1": 0,
+    "t4b_violation_linf": 0,
+    "violated_any_D": 9,
+    "violated_l1_D": 7,
+    "violated_l1_D_reach": 5,
+    "violated_l1_J": 3,
+    "violated_linf_D": 5,
+    "violated_linf_D_reach": 3,
+    "within_assumptions": 3148,
+    "within_failed": 0
+   },
+   "draws": 20000,
+   "seconds": 92.3,
+   "smallest": [
+    [
+     4,
+     2,
+     10,
+     2,
+     65125,
+     "l1",
+     "reach",
+     1.3427
+    ],
+    [
+     4,
+     2,
+     11,
+     1,
+     68417,
+     "l1",
+     "reach",
+     1.3333
+    ],
+    [
+     4,
+     2,
+     11,
+     1,
+     68417,
+     "linf",
+     "reach",
+     1.3333
+    ],
+    [
+     5,
+     2,
+     5,
+     1,
+     77260,
+     "l1",
+     "reach",
+     1.0714
+    ],
+    [
+     6,
+     2,
+     12,
+     1,
+     77871,
+     "linf",
+     "reach",
+     1.2955
+    ],
+    [
+     7,
+     2,
+     10,
+     1,
+     60201,
+     "l1",
+     "anywhere",
+     1.3333
+    ],
+    [
+     7,
+     2,
+     11,
+     1,
+     79063,
+     "linf",
+     "anywhere",
+     1.0556
+    ],
+    [
+     7,
+     2,
+     12,
+     1,
+     77871,
+     "l1",
+     "reach",
+     1.0962
+    ],
+    [
+     8,
+     2,
+     11,
+     1,
+     61942,
+     "linf",
+     "anywhere",
+     1.0152
+    ],
+    [
+     9,
+     2,
+     12,
+     1,
+     76993,
+     "l1",
+     "anywhere",
+     1.0833
+    ],
+    [
+     10,
+     2,
+     12,
+     1,
+     68620,
+     "l1",
+     "reach",
+     1.0714
+    ],
+    [
+     10,
+     2,
+     12,
+     1,
+     68620,
+     "linf",
+     "reach",
+     1.0227
+    ]
+   ],
+   "start": 60000,
+   "violations_by_path": {
+    "adversarial": 4,
+    "drift": 4,
+    "walk": 1
+   },
+   "violations_by_shape": {
+    "ridge": 6,
+    "valley": 3
+   },
+   "violations_by_start": {
+    "anywhere": 4,
+    "reach": 5
+   },
+   "worst": {
+    "first_l1_D_reach": 4,
+    "first_linf_D_reach": 4,
+    "l1_D": 1.3426533840335217,
+    "l1_J": 1.3426533840335224,
+    "linf_D": 1.3333333333333333,
+    "linf_J": 1.0
+   }
+  },
+  "80000": {
+   "by_path": {
+    "adversarial": 4948,
+    "drift": 4959,
+    "still": 4972,
+    "walk": 5121
+   },
+   "by_shape": {
+    "l2": 2555,
+    "max": 2451,
+    "neg_l2": 2500,
+    "neg_max": 2550,
+    "none": 2522,
+    "random": 2518,
+    "ridge": 2425,
+    "valley": 2479
+   },
+   "by_start": {
+    "anywhere": 10196,
+    "reach": 9804
+   },
+   "counts": {
+    "accepted": 20000,
+    "accepted_l1": 19952,
+    "accepted_linf": 20000,
+    "drawn": 20000,
+    "t4a_checked_l1": 12027,
+    "t4a_checked_linf": 12027,
+    "t4a_violation_l1": 0,
+    "t4a_violation_linf": 0,
+    "t4b_checked_l1": 12027,
+    "t4b_checked_linf": 12027,
+    "t4b_violation_l1": 0,
+    "t4b_violation_linf": 0,
+    "violated_any_D": 9,
+    "violated_l1_D": 9,
+    "violated_l1_D_reach": 6,
+    "violated_l1_J": 6,
+    "violated_linf_D": 2,
+    "violated_linf_D_reach": 2,
+    "violated_linf_J": 1,
+    "within_assumptions": 3033,
+    "within_failed": 0
+   },
+   "draws": 20000,
+   "seconds": 81.9,
+   "smallest": [
+    [
+     4,
+     2,
+     8,
+     1,
+     87903,
+     "l1",
+     "reach",
+     1.625
+    ],
+    [
+     4,
+     2,
+     8,
+     1,
+     87903,
+     "linf",
+     "reach",
+     1.625
+    ],
+    [
+     5,
+     3,
+     5,
+     1,
+     81037,
+     "l1",
+     "anywhere",
+     1.008
+    ],
+    [
+     6,
+     2,
+     9,
+     1,
+     88072,
+     "l1",
+     "reach",
+     1.1199
+    ],
+    [
+     6,
+     2,
+     9,
+     1,
+     88072,
+     "linf",
+     "reach",
+     1.0925
+    ],
+    [
+     6,
+     2,
+     10,
+     1,
+     95315,
+     "l1",
+     "reach",
+     1.5351
+    ],
+    [
+     6,
+     3,
+     7,
+     1,
+     84219,
+     "l1",
+     "anywhere",
+     1.5
+    ],
+    [
+     7,
+     2,
+     11,
+     1,
+     89797,
+     "l1",
+     "reach",
+     1.24
+    ],
+    [
+     11,
+     2,
+     9,
+     1,
+     86226,
+     "l1",
+     "reach",
+     1.1006
+    ],
+    [
+     11,
+     2,
+     11,
+     2,
+     98180,
+     "l1",
+     "reach",
+     1.0376
+    ],
+    [
+     14,
+     2,
+     11,
+     1,
+     94404,
+     "l1",
+     "anywhere",
+     1.0417
+    ]
+   ],
+   "start": 80000,
+   "violations_by_path": {
+    "adversarial": 8,
+    "drift": 1
+   },
+   "violations_by_shape": {
+    "ridge": 4,
+    "valley": 5
+   },
+   "violations_by_start": {
+    "anywhere": 3,
+    "reach": 6
+   },
+   "worst": {
+    "first_l1_D_reach": 4,
+    "first_linf_D_reach": 4,
+    "l1_D": 1.625,
+    "l1_J": 1.625,
+    "linf_D": 1.625,
+    "linf_J": 1.625
+   }
+  }
+ },
+ "within": {
+  "0": {
+   "counts": {
+    "K2_r1": 2200,
+    "K2_r2": 2231,
+    "K2_r3": 4003,
+    "K2_r4": 1728,
+    "K3_r1": 1471,
+    "K3_r2": 2935,
+    "accepted": 14568,
+    "drawn": 17000,
+    "e_fails_excess_above_index": 0,
+    "e_fails_invariant_breaks": 0,
+    "failed_excess_le_index": 0,
+    "failed_excess_nonneg": 0,
+    "failed_invariant": 0,
+    "failed_joint_on_minimiser": 0,
+    "failed_step_le_index": 0,
+    "nonzero_index": 13694,
+    "positive_excess": 354,
+    "rejected_e": 2343,
+    "rejected_other": 89,
+    "t4a_checked_l1": 16911,
+    "t4a_checked_linf": 16911,
+    "t4a_violation_l1": 0,
+    "t4a_violation_linf": 0,
+    "t4b_checked_l1": 16911,
+    "t4b_checked_linf": 16911,
+    "t4b_violation_l1": 0,
+    "t4b_violation_linf": 0
+   },
+   "draws": 17000,
+   "seconds": 122.1,
+   "start": 0,
+   "worst": {
+    "max_E_over_sumI": 0.9239247505875369,
+    "max_T": 16
+   }
+  }
+ }
+}
