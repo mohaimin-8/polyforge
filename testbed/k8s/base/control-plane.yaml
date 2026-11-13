@@ -1,0 +1,80 @@
+# The control plane, one replica. In the testbed it does two jobs: mint the
+# tenants and API keys the gateway authenticates (provision.py, through the
+# NodePort) and export the gateway's per-request telemetry afterwards
+# (`/control-plane eval-export`, through kubectl exec). It carries no load.
+# Mirrors deploy/helm/polyforge/templates/deployment.yaml in shared-PostgreSQL
+# mode; plain YAML because the chart cannot express the testbed's gateway.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-plane
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: control-plane
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: control-plane
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: control-plane
+        app.kubernetes.io/part-of: polyforge-testbed
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      securityContext:
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: control-plane
+          image: polyforge/control-plane:dev
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: POLYFORGE_ADMIN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pf-admin
+                  key: admin-key
+            - name: POLYFORGE_POSTGRES_ADMIN_URL
+              value: postgres://polyforge_admin@postgres:5432/polyforge?sslmode=disable
+            - name: POLYFORGE_POSTGRES_APP_URL
+              value: postgres://polyforge_app@postgres:5432/polyforge?sslmode=disable
+            # Arrival rates are the experiment, not a policy under test.
+            - name: POLYFORGE_RATE_LIMIT_RPM
+              value: "1000000"
+            - name: POLYFORGE_RATE_LIMIT_BURST
+              value: "100000"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop: ["ALL"]

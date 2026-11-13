@@ -1,0 +1,155 @@
+# The semantic cache's encoder: sentence-transformers/all-MiniLM-L6-v2 (384-d)
+# at revision 1110a243, the model and revision WP6 replayed the cache with, so
+# the testbed's hit rates can be checked against research/cachereplay.
+# Served by Hugging Face Text Embeddings Inference from a local directory on
+# the models volume (no download at start-up). TEI 1.9.4 takes the maximum
+# input length from sentence_bert_config.json (256 tokens, as
+# sentence-transformers does) and truncates longer inputs (--auto-truncate
+# defaults to true), so a long prompt is embedded, not refused; the gateway
+# fails open to a miss on an embedder error, which would hide a refusal.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedder
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: embedder
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: embedder
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: embedder
+        app.kubernetes.io/part-of: polyforge-testbed
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-model
+          image: ghcr.io/ggml-org/llama.cpp:server-b9967
+          imagePullPolicy: Never
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              # Wait for the loader's marker of this exact lock entry set.
+              deadline=$(( $(date +%s) + 3600 ))
+              until [ "$(cat /models/.ready/embedder 2>/dev/null)" = "$EXPECTED_SET_DIGEST" ]; do
+                [ "$(date +%s)" -lt "$deadline" ] || { echo "model set embedder not ready" >&2; exit 1; }
+                sleep 5
+              done
+          env:
+            - name: EXPECTED_SET_DIGEST
+              value: 57883d652854a26d2f9a75bcdb40ae5572eee64a2ec5d0702a5c0431e0f2ffac
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+      containers:
+        - name: embedder
+          image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9.4
+          imagePullPolicy: Never
+          args:
+            - --model-id
+            - /models/all-MiniLM-L6-v2
+            - --served-model-name
+            - sentence-transformers/all-MiniLM-L6-v2
+            # Explicit: Kubernetes sets HOSTNAME to the pod name, which TEI
+            # would otherwise read as its listen address.
+            - --hostname
+            - 0.0.0.0
+            - --port
+            - "8080"
+            - --tokenization-workers
+            - "1"
+            - --json-output
+          env:
+            # The image defaults to 8 threads; one core is plenty for MiniLM at
+            # testbed rates and keeps it off the model servers' cores.
+            - name: RAYON_NUM_THREADS
+              value: "1"
+            - name: OMP_NUM_THREADS
+              value: "1"
+            - name: MKL_NUM_THREADS
+              value: "1"
+            - name: HOME
+              value: /tmp
+            - name: HF_HUB_OFFLINE
+              value: "1"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 90
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            # TEI's root filesystem behaviour as non-root is unverified; the
+            # model directory is read-only either way.
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: models
+            readOnly: true
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: embedder
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: embedder
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  selector:
+    app.kubernetes.io/name: embedder
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

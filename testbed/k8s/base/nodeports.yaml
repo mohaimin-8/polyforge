@@ -1,0 +1,82 @@
+# Host entry points. kind publishes these node ports on 127.0.0.1 only
+# (kind/kind-config.yaml), so nothing is reachable from the network.
+#
+# Load and measurement go through NodePorts, never `kubectl port-forward`: a
+# port-forward resolves ONE pod when it starts and never follows the Service,
+# and its userspace stream proxy dropped connections under load (WP14 attempt
+# 4: all load pinned to one replica of sixteen, 282 restarts, run void;
+# session-48 probe: 127-220 EOFs per run at about 100 rps). A NodePort is
+# forwarded by kube-proxy in the kernel to the Service's ready endpoints.
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-plane-nodeport
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: control-plane
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: 30080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-gateway-nodeport
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: ai-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: 30081
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-nodeport
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http
+      nodePort: 30090
+---
+# The tiers through tier-lb, for the load-curve measurement (measure/): the
+# same balanced path the gateway uses, without the gateway.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tier-lb-nodeport
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: tier-lb
+  ports:
+    - name: small
+      port: 9001
+      targetPort: small
+      nodePort: 30091
+    - name: mid
+      port: 9002
+      targetPort: mid
+      nodePort: 30092

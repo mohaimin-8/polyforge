@@ -1,0 +1,25 @@
+# Model files of the WP10 testbed. Tab-separated; '#' starts a comment.
+# Read in-cluster by load-models.sh (mounted from a ConfigMap) and by the
+# static checks. URLs pin a repository commit, so the bytes cannot move; the
+# loader still verifies size and sha256 of every file before marking a set ready.
+# GGUF sha256 and sizes: Hugging Face API (lfs.sha256) and X-Linked-ETag, read
+# 2026-11-13. MiniLM files: revision 1110a243 is the one WP6 embedded with
+# (research/cachereplay); the small files' sha256 were computed from that
+# snapshot after checking every file against the API's git blob id.
+# Sets: small and mid are the default tiers; mid3b is the larger alternative
+# (Qwen Research License, unlike the Apache-2.0 0.5B and 1.5B); embedder is
+# the semantic cache's encoder.
+# set	path	sha256	bytes	url
+small	qwen2.5-0.5b-instruct-q4_k_m.gguf	74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db	491400032	https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q4_k_m.gguf
+mid	qwen2.5-1.5b-instruct-q4_k_m.gguf	6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e	1117320736	https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf
+mid3b	qwen2.5-3b-instruct-q4_k_m.gguf	626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d	2104932768	https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/7dabda4d13d513e3e842b20f0d435c732f172cbe/qwen2.5-3b-instruct-q4_k_m.gguf
+embedder	all-MiniLM-L6-v2/config.json	953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41	612	https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/config.json
+embedder	all-MiniLM-L6-v2/tokenizer.json	be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037	466247	https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/tokenizer.json
+embedder	all-MiniLM-L6-v2/tokenizer_config.json	acb92769e8195aabd29b7b2137a9e6d6e25c476a4f15aa4355c233426c61576b	350	https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/tokenizer_config.json
+embedder	all-MiniLM-L6-v2/special_tokens_map.json	303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3	112	https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/special_tokens_map.json
+embedder	all-MiniLM-L6-v2/vocab.txt	07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3	231508	https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/vocab.txt
+embedder	all-MiniLM-L6-v2/modules.json	84e40c8e006c9b1d6c122e02cba9b02458120b5fb0c87b746c41e0207cf642cf	349	https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/modules.json
+embedder	all-MiniLM-L6-v2/sentence_bert_config.json	fc1993fde0a95c24ec6c022539d41cf6e2f7c9721e5415d6fb6897472a9cd4b7	53	https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/sentence_bert_config.json
+embedder	all-MiniLM-L6-v2/config_sentence_transformers.json	061ca9d39661d6c6d6de5ba27f79a1cd5770ea247f8d46412a68a498dc5ac9f3	116	https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/config_sentence_transformers.json
+embedder	all-MiniLM-L6-v2/1_Pooling/config.json	4be450dde3b0273bb9787637cfbd28fe04a7ba6ab9d36ac48e92b11e350ffc23	190	https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/1_Pooling/config.json
+embedder	all-MiniLM-L6-v2/model.safetensors	53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db	90868376	https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/model.safetensors

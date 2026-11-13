@@ -1,0 +1,5 @@
+{"step": 0, "t_s": 0, "replicas": {"small": 1, "mid": 1}, "note": "start of the actuation-delay probe"}
+{"step": 6, "t_s": 60, "replicas": {"small": 2}}
+{"step": 12, "t_s": 120, "replicas": {"small": 3}}
+{"step": 18, "t_s": 180, "replicas": {"small": 1, "mid": 2}}
+{"step": 24, "t_s": 240, "replicas": {"small": 1, "mid": 1}}

@@ -1,0 +1,171 @@
+# Mode A tiers: the latency mock (mock_server.py) as the small and mid
+# endpoints. One replica each is enough: a mock request costs a sleeping
+# thread, so the endpoint does not congest in the operating range, which is
+# what mode A assumes of an API-backed tier.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-small
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: mock-small
+    app.kubernetes.io/component: model-server
+    app.kubernetes.io/part-of: polyforge-testbed
+    polyforge.io/tier: small
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-small
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-small
+        app.kubernetes.io/component: model-server
+        app.kubernetes.io/part-of: polyforge-testbed
+        polyforge.io/tier: small
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mock
+          image: docker.io/library/python:3.13.17-slim-bookworm
+          imagePullPolicy: Never
+          command: ["python", "/app/mock_server.py"]
+          args: ["--latency", "/data/latency_small.json", "--answers", "/data/answers.json",
+                 "--model", "tier-small", "--port", "8080", "--seed", "1"]
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: app
+              mountPath: /app
+              readOnly: true
+            - name: data
+              mountPath: /data
+              readOnly: true
+      volumes:
+        - name: app
+          configMap:
+            name: mock-server
+        - name: data
+          configMap:
+            name: mock-data
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-mid
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: mock-mid
+    app.kubernetes.io/component: model-server
+    app.kubernetes.io/part-of: polyforge-testbed
+    polyforge.io/tier: mid
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-mid
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-mid
+        app.kubernetes.io/component: model-server
+        app.kubernetes.io/part-of: polyforge-testbed
+        polyforge.io/tier: mid
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mock
+          image: docker.io/library/python:3.13.17-slim-bookworm
+          imagePullPolicy: Never
+          command: ["python", "/app/mock_server.py"]
+          args: ["--latency", "/data/latency_mid.json", "--answers", "/data/answers.json",
+                 "--model", "tier-mid", "--port", "8080", "--seed", "2"]
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: app
+              mountPath: /app
+              readOnly: true
+            - name: data
+              mountPath: /data
+              readOnly: true
+      volumes:
+        - name: app
+          configMap:
+            name: mock-server
+        - name: data
+          configMap:
+            name: mock-data

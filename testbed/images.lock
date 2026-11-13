@@ -1,0 +1,17 @@
+# Container images of the WP10 testbed. Tab-separated; '#' starts a comment.
+# role: cluster = kind node image (pulled by `kind create`), workload = pulled
+# by digest on the host and side-loaded into kind, build = built from this
+# repository (its base images are digest-pinned in the Dockerfile).
+# Digests were read from the registries' public OCI distribution API
+# (anonymous token, manifest HEAD/GET, no layer pulled) on 2026-11-13;
+# `python testbed/scripts/verify_pins.py` repeats that check.
+# role	repository	tag	index_digest	linux_amd64_digest	compressed_bytes	source
+cluster	docker.io/kindest/node	v1.36.1	sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5	sha256:21c46cf61fd45873f89e6a1bfcba4b7904dffa84c2bec88aeeca9a0409af4725	383236249	https://github.com/kubernetes-sigs/kind/releases/tag/v0.32.0
+workload	ghcr.io/ggml-org/llama.cpp	server-b9967	sha256:d61d19a0a877a3e36865f06e0e4ebbff1e4877fec8833cc01a08a4e7096d4341	sha256:efd54f16832c612a3e81bd3375167b3558bde512911f0d5aab20ba28998d992c	306629795	https://github.com/ggml-org/llama.cpp/pkgs/container/llama.cpp
+workload	ghcr.io/huggingface/text-embeddings-inference	cpu-1.9.4	sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d	sha256:8419f533857b503ebf6ec292a95d4f1cf9c0464ac8b8abeef39518cf110e5726	239307989	https://github.com/huggingface/text-embeddings-inference/pkgs/container/text-embeddings-inference
+workload	docker.io/envoyproxy/envoy	v1.39.6	sha256:1fde8efee875e4e4f6a39a90fe49d9338e1caacce5762034ef9fb4bbb9ad6aed	sha256:9d117c1fbb4432621ed14603bc6e8da4fdf4602e702cc4ef8f40d59b7766489e	71943698	https://hub.docker.com/r/envoyproxy/envoy
+workload	docker.io/prom/prometheus	v3.13.5	sha256:aafa9d694e6a883c02db516d9f6e5b84e14195f49a2a6456a4cca815edda72b9	sha256:dc30314819e04a1a3d18d0b37eaa9c8e4e18f33f026e3e2d81bf127c7cddcd55	106844245	https://hub.docker.com/r/prom/prometheus
+workload	docker.io/library/postgres	16.15-alpine3.23	sha256:8dc5ce2495b2aeafbf033e4be590764f611248e9eb8495b5202170a6afcb64a4	sha256:751329300ebdcbde5461c14fac796c8840d13fc74cc49b9b94745b0285907961	115570150	https://hub.docker.com/_/postgres
+workload	docker.io/library/python	3.13.17-slim-bookworm	sha256:e32be0e55814a08977501ca863271d9bd02443710db8f2afaf8372e2c4508530	sha256:4cea12ab7d78a3312c85f8cab19b6971d4fe9704da25443986c0bc20a6678850	44199179	https://hub.docker.com/_/python
+build	polyforge/ai-gateway	dev	-	-	-	Dockerfile.gateway
+build	polyforge/control-plane	dev	-	-	-	Dockerfile

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pf-testbed
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+    # The testbed runs third-party images whose entrypoints are not all
+    # verified non-root (PostgreSQL's chowns as root first), so the namespace
+    # enforces "baseline" and warns on "restricted".
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted

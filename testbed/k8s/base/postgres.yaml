@@ -1,0 +1,110 @@
+# The shared store of the gateway and control plane: tenant API keys (the
+# gateway authenticates every chat call against it) and one telemetry row per
+# AI request. Adapted from eval/harness/manifests/postgres-eval.yaml, the store
+# of the live-AI plane's published sittings, with the same write-stall tuning
+# and the same justification: this database exists to be measured and thrown
+# away with the cluster, and the gateway writes its telemetry row before the
+# response leaves the buffer, so a storage stall would land on request latency.
+# fsync=off and synchronous_commit=off are correct here and nowhere else.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: pf-testbed
+data:
+  # Runs once during initdb. Roles mirror .github/workflows/ci.yml; the
+  # control plane's Open() verifies them.
+  init.sql: |
+    CREATE ROLE polyforge_admin LOGIN BYPASSRLS;
+    CREATE ROLE polyforge_app LOGIN NOBYPASSRLS;
+    ALTER DATABASE polyforge OWNER TO polyforge_admin;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: polyforge-testbed
+    spec:
+      containers:
+        - name: postgres
+          image: docker.io/library/postgres:16.15-alpine3.23
+          imagePullPolicy: Never
+          args: ["postgres",
+                 "-c", "max_connections=200",
+                 "-c", "shared_buffers=128MB",
+                 "-c", "synchronous_commit=off",
+                 "-c", "fsync=off",
+                 "-c", "full_page_writes=off",
+                 "-c", "max_wal_size=2GB",
+                 "-c", "checkpoint_timeout=30min"]
+          env:
+            - name: POSTGRES_DB
+              value: polyforge
+            # Trust auth inside the namespace only: the Service is ClusterIP
+            # and nothing publishes 5432 on the host.
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: trust
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            # TCP, not the socket: initdb's temporary server listens on the
+            # socket only, so a socket check passes before init.sql has run.
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-p", "5432", "-d", "polyforge"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          resources:
+            # No CPU limit: a throttled store stalls the gateway's telemetry
+            # write, which sits on the request path.
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+          volumeMounts:
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: initdb
+          configMap:
+            name: postgres-init
+        - name: pgdata
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

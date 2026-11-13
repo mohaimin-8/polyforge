@@ -1,0 +1,19 @@
+# Mode A: the same gateway, embedder, tier-lb and Prometheus against mock tier
+# endpoints that sleep for a recorded latency and return a stored answer.
+#   kubectl apply -k testbed/k8s/mode-a
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+  - ../../mock
+patches:
+  # Mode A serves no GGUF: load only the embedder's files.
+  - target:
+      kind: Job
+      name: model-loader
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0
+        value:
+          name: MODEL_SETS
+          value: embedder

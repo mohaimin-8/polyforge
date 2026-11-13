@@ -1,0 +1,12 @@
+# Files mounted into Linux containers (ConfigMaps) or read by sh must keep LF
+# endings on a Windows checkout: a CR at the end of a shell line or a lock-file
+# field breaks the in-cluster model loader and the set digests it writes.
+*.sh   text eol=lf
+*.lock text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.js   text eol=lf
+*.py   text eol=lf
+*.md   text eol=lf

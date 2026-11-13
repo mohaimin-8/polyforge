@@ -1,0 +1,7 @@
+{"meta": {"schema": "polyforge-wp10-schedule/1", "source": "fixture", "duration_s": 30, "steps": 3, "bin_s": 10, "warmup_s": 0, "requests": 3,
+  "tenants": [{"id": "t00", "stream": "fixture", "slo_class": "standard", "requests": 2}, {"id": "t01", "stream": "fixture", "slo_class": "premium", "requests": 1}]},
+ "requests": [
+  {"seq": 0, "t": 0.5, "tenant": "t00", "prompt": "synthetic fixture prompt one", "warmup": false},
+  {"seq": 1, "t": 4.25, "tenant": "t01", "prompt": "synthetic fixture prompt two", "warmup": false},
+  {"seq": 2, "t": 12.0, "tenant": "t00", "prompt": "synthetic fixture prompt three", "warmup": false}
+ ]}

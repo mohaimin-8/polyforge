@@ -1,0 +1,11 @@
+{
+ "kind": "lognormal",
+ "mu": 0.8372360455639356,
+ "sigma": 0.014003950050412106,
+ "unit": "s",
+ "matched": {
+  "mean_s": 2.3102,
+  "p95_s": 2.3638000000000003
+ },
+ "source": "research/calibration/tier_bench_1gpu.csv, tier mid (Qwen2.5-3B-Instruct, one GPU, single stream, n=25): mean 2310.2 ms, p95 2363.8 ms. Placeholder until WP2/WP7 record an API tier's per-request latencies."
+}

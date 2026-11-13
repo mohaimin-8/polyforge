@@ -1,0 +1,129 @@
+# The PolyForge AI gateway, unchanged code, configured for the testbed:
+#  - tier backends through its OpenAI-compatible adapter (POLYFORGE_TIER_BACKENDS,
+#    internal/ai/gateway/knobs.go), one per tier, both behind tier-lb so a
+#    tier's replicas share load per request (see tier-lb.yaml for why);
+#  - the real semantic cache (internal/ai/gateway/cache.go, threshold 0.95,
+#    per-tenant partitions, byte budget = the tenant's cache_size_mb knob);
+#  - a real embedder: all-MiniLM-L6-v2 at the revision WP6 replayed, served by
+#    TEI's OpenAI-compatible /v1/embeddings (internal/ai/embed/openai.go);
+#  - per-tenant knobs (tier pin, cache MB) on PUT /admin/tenants/{id}/knobs.
+# Mirrors deploy/helm/polyforge/templates/gateway.yaml; plain YAML because that
+# chart has no values for the embedder endpoint or model.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-gateway
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: ai-gateway
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  # One replica on purpose: the gateway is substrate here, not a knob, and the
+  # session-44 measurement on this 8-thread laptop found more gateway pods buy
+  # contention rather than capacity (eval/harness/cluster_backend.py).
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-gateway
+        app.kubernetes.io/part-of: polyforge-testbed
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: /metrics
+    spec:
+      securityContext:
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ai-gateway
+          image: polyforge/ai-gateway:dev
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8081
+          env:
+            - name: POLYFORGE_ADMIN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pf-admin
+                  key: admin-key
+            - name: POLYFORGE_POSTGRES_ADMIN_URL
+              value: postgres://polyforge_admin@postgres:5432/polyforge?sslmode=disable
+            - name: POLYFORGE_POSTGRES_APP_URL
+              value: postgres://polyforge_app@postgres:5432/polyforge?sslmode=disable
+            - name: POLYFORGE_TIER_BACKENDS
+              valueFrom:
+                configMapKeyRef:
+                  name: gateway-tiers
+                  key: gateway-tiers.json
+            # Unpinned tenants are served by this tier (server.go pickProvider).
+            - name: POLYFORGE_MODEL_TIER
+              value: small
+            # The single-backend fallback is never reached with tier backends
+            # configured; it points at the small tier rather than the binary's
+            # default 127.0.0.1:11434 so a mistake cannot dial a phantom host.
+            - name: POLYFORGE_LLM_BASE_URL
+              value: http://tier-lb:9001/v1
+            - name: POLYFORGE_LLM_MODEL
+              value: tier-small
+            - name: POLYFORGE_EMBED_BASE_URL
+              value: http://embedder/v1
+            - name: POLYFORGE_EMBED_MODEL
+              value: sentence-transformers/all-MiniLM-L6-v2
+            - name: POLYFORGE_EMBED_DIMS
+              value: "384"
+            # The gateway's own per-tenant limiter, lifted for the same reason
+            # as the control plane's: a 429 from this policy is not a property
+            # of the plant (cluster_backend.py, session 48).
+            - name: POLYFORGE_RATE_LIMIT_RPM
+              value: "1000000"
+            - name: POLYFORGE_RATE_LIMIT_BURST
+              value: "100000"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            # Requests only for CPU, like the chart: a CFS-throttled gateway
+            # would add its own queue in front of the tiers under test.
+            requests:
+              cpu: 250m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-gateway
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: ai-gateway
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  selector:
+    app.kubernetes.io/name: ai-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

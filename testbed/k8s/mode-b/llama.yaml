@@ -1,0 +1,296 @@
+# Mode B tiers: llama-server pools, one Deployment per tier. A replica is one
+# server; the actuator (actuator/actuate.py) sets the replica counts.
+#
+# Each pod is pinned to a whole number of cores, requests == limits
+# (Guaranteed QoS), and runs exactly that many compute threads: llama.cpp's
+# worker threads spin while they wait, so threads above the CFS quota would be
+# throttled every period. small: Qwen2.5-0.5B-Instruct Q4_K_M, 1 core per pod.
+# mid: Qwen2.5-1.5B-Instruct Q4_K_M, 2 cores per pod.
+#
+# Server settings repeat the WP2 congestion protocol where it fixes them
+# (research/plant2/measure_load_curve.py): 4 slots, context 4096 (1024 per
+# slot), 48-token completions, prompt caching off. The image is the published
+# build nearest to, and not newer than, the Windows b9971 binary that measured
+# the protocol on this laptop. --n-predict 48 is a server-side cap: the gateway
+# forwards no max_tokens, so without it a chat request would generate until
+# end-of-sequence or the slot's context ran out.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-small
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: llama-small
+    app.kubernetes.io/component: model-server
+    app.kubernetes.io/part-of: polyforge-testbed
+    polyforge.io/tier: small
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llama-small
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llama-small
+        app.kubernetes.io/component: model-server
+        app.kubernetes.io/part-of: polyforge-testbed
+        polyforge.io/tier: small
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      # In-flight requests finish before the server stops: preStop keeps the
+      # pod serving while it leaves DNS and tier-lb (<= 1 s refresh + 5 s DNS
+      # TTL), and the grace period covers the slowest queued completion.
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-model
+          image: ghcr.io/ggml-org/llama.cpp:server-b9967
+          imagePullPolicy: Never
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              deadline=$(( $(date +%s) + 3600 ))
+              until [ "$(cat /models/.ready/small 2>/dev/null)" = "$EXPECTED_SET_DIGEST" ]; do
+                [ "$(date +%s)" -lt "$deadline" ] || { echo "model set small not ready" >&2; exit 1; }
+                sleep 5
+              done
+          env:
+            - name: EXPECTED_SET_DIGEST
+              value: b84fd1d60276da9cce7c42f112a9c48fe9850d7c78a14859ffadae4731ca89fb
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+      containers:
+        - name: llama-server
+          image: ghcr.io/ggml-org/llama.cpp:server-b9967
+          imagePullPolicy: Never
+          args:
+            - --model
+            - /models/qwen2.5-0.5b-instruct-q4_k_m.gguf
+            - --alias
+            - tier-small
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8080"
+            - --threads
+            - "1"
+            - --threads-batch
+            - "1"
+            - --parallel
+            - "4"
+            - --no-kv-unified
+            - --ctx-size
+            - "4096"
+            - --n-predict
+            - "48"
+            - --no-cache-prompt
+            - --cache-ram
+            - "0"
+            - --metrics
+            - --no-slots
+            - --no-webui
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 90
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sleep", "20"]
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: models
+            readOnly: true
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-mid
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: llama-mid
+    app.kubernetes.io/component: model-server
+    app.kubernetes.io/part-of: polyforge-testbed
+    polyforge.io/tier: mid
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llama-mid
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llama-mid
+        app.kubernetes.io/component: model-server
+        app.kubernetes.io/part-of: polyforge-testbed
+        polyforge.io/tier: mid
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-model
+          image: ghcr.io/ggml-org/llama.cpp:server-b9967
+          imagePullPolicy: Never
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              deadline=$(( $(date +%s) + 3600 ))
+              until [ "$(cat /models/.ready/mid 2>/dev/null)" = "$EXPECTED_SET_DIGEST" ]; do
+                [ "$(date +%s)" -lt "$deadline" ] || { echo "model set mid not ready" >&2; exit 1; }
+                sleep 5
+              done
+          env:
+            - name: EXPECTED_SET_DIGEST
+              value: e7fa5b61cfeb79a2d75214de9871fb4685da2a3b815db627dbf8707a7454cb01
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+      containers:
+        - name: llama-server
+          image: ghcr.io/ggml-org/llama.cpp:server-b9967
+          imagePullPolicy: Never
+          args:
+            - --model
+            - /models/qwen2.5-1.5b-instruct-q4_k_m.gguf
+            - --alias
+            - tier-mid
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8080"
+            - --threads
+            - "2"
+            - --threads-batch
+            - "2"
+            - --parallel
+            - "4"
+            - --no-kv-unified
+            - --ctx-size
+            - "4096"
+            - --n-predict
+            - "48"
+            - --no-cache-prompt
+            - --cache-ram
+            - "0"
+            - --metrics
+            - --no-slots
+            - --no-webui
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 90
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sleep", "20"]
+          resources:
+            requests:
+              cpu: "2"
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: models
+            readOnly: true
+        - name: tmp
+          emptyDir: {}

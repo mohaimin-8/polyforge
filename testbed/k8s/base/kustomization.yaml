@@ -1,0 +1,35 @@
+# WP10 testbed, shared by both modes: namespace, store, control plane, gateway,
+# embedder, tier-lb, tier Services, model volume and loader, Prometheus, host
+# NodePorts. The overlays add the tier workloads: mode-b (llama-server) and
+# mode-a (latency mock). Render offline with `kubectl kustomize testbed/k8s/mode-b`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - control-plane.yaml
+  - gateway.yaml
+  - embedder.yaml
+  - models.yaml
+  - tier-lb.yaml
+  - tier-services.yaml
+  - prometheus.yaml
+  - nodeports.yaml
+configMapGenerator:
+  - name: gateway-tiers
+    namespace: pf-testbed
+    files:
+      - gateway-tiers.json
+  - name: tier-lb
+    namespace: pf-testbed
+    files:
+      - envoy.yaml
+  - name: prometheus
+    namespace: pf-testbed
+    files:
+      - prometheus.yml
+  - name: model-loader
+    namespace: pf-testbed
+    files:
+      - load-models.sh
+      - models.lock

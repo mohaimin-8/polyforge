@@ -1,0 +1,17 @@
+# The mode A mock tiers with their script and data, as a component the mode-a
+# overlay includes (kustomize only loads files at or below a kustomization).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - mock.yaml
+configMapGenerator:
+  - name: mock-server
+    namespace: pf-testbed
+    files:
+      - mock_server.py
+  - name: mock-data
+    namespace: pf-testbed
+    files:
+      - data/latency_small.json
+      - data/latency_mid.json
+      - data/answers.json

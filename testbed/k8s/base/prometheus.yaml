@@ -1,0 +1,155 @@
+# Prometheus: pod discovery in pf-testbed (namespaced Role) and the kubelet's
+# cAdvisor metrics (cluster-scoped read of nodes and nodes/metrics).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-pods
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-pods
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-pods
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: pf-testbed
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pf-testbed-prometheus-nodes
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/metrics"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pf-testbed-prometheus-nodes
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pf-testbed-prometheus-nodes
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: pf-testbed
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prometheus
+        app.kubernetes.io/part-of: polyforge-testbed
+    spec:
+      serviceAccountName: prometheus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: prometheus
+          image: docker.io/prom/prometheus:v3.13.5
+          imagePullPolicy: Never
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=7d
+            # The TSDB lives on an emptyDir: export a run's series before the
+            # pod or the cluster goes (scripts/check_run.py --export).
+          ports:
+            - name: http
+              containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+              readOnly: true
+            - name: data
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: polyforge-testbed
+spec:
+  selector:
+    app.kubernetes.io/name: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http

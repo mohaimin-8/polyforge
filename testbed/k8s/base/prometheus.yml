@@ -1,0 +1,65 @@
+# Prometheus for the WP10 testbed. Scrapes, every 5 s:
+#  - every pod in pf-testbed annotated prometheus.io/scrape=true, one target
+#    per pod (so each llama-server replica is its own series): the gateway
+#    (requests, cache hits/misses), llama-server (--metrics: tokens, busy
+#    requests, deferred requests), the embedder, tier-lb (Envoy), the mocks;
+#  - the kubelet's cAdvisor endpoint, for per-container CPU use and CFS
+#    throttling of the model servers (is a "2-core" pod really getting 2 cores?).
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+  external_labels:
+    testbed: polyforge-wp10
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: pods
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: [pf-testbed]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: "true"
+      - source_labels: [__meta_kubernetes_pod_phase]
+        action: drop
+        regex: Pending|Succeeded|Failed
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        regex: (.+)
+        target_label: __metrics_path__
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        target_label: app
+      - source_labels: [__meta_kubernetes_pod_label_polyforge_io_tier]
+        target_label: tier
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+
+  - job_name: cadvisor
+    scheme: https
+    tls_config:
+      # kind's kubelet serves a self-signed certificate.
+      insecure_skip_verify: true
+    authorization:
+      credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - target_label: __metrics_path__
+        replacement: /metrics/cadvisor
+    metric_relabel_configs:
+      - source_labels: [namespace]
+        action: keep
+        regex: pf-testbed
+      - source_labels: [__name__]
+        action: keep
+        regex: container_cpu_usage_seconds_total|container_cpu_cfs_periods_total|container_cpu_cfs_throttled_periods_total|container_cpu_cfs_throttled_seconds_total|container_memory_working_set_bytes|container_spec_cpu_quota|container_spec_cpu_period

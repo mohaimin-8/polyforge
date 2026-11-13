@@ -1,0 +1,43 @@
+# WP10 testbed cluster: ONE kind node (control plane schedulable), node image
+# pinned by digest (the default image of kind v0.32.0).
+#
+# One node, not several: every node is a container running a kubelet and
+# containerd on the same eight logical CPUs, so extra nodes buy overhead, not
+# capacity; the models volume is node-local (ReadWriteOnce, local-path); and
+# Guaranteed pods are scheduled against one allocatable pool, so the sum of
+# the model servers' cores is enforced by the scheduler itself.
+#
+# Ports are published on 127.0.0.1 only, and only at create time: kind cannot
+# add a port mapping to a running cluster (kubernetes-sigs/kind#2720).
+#   kind create cluster --config testbed/kind/kind-config.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: polyforge-testbed
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
+    extraPortMappings:
+      # control plane: tenant and API-key provisioning
+      - containerPort: 30080
+        hostPort: 30080
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+      # AI gateway: the load path (k6) and the knob actuator
+      - containerPort: 30081
+        hostPort: 30081
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+      # Prometheus
+      - containerPort: 30090
+        hostPort: 30090
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+      # tiers through tier-lb (load-curve measurement): small, mid
+      - containerPort: 30091
+        hostPort: 30091
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+      - containerPort: 30092
+        hostPort: 30092
+        listenAddress: "127.0.0.1"
+        protocol: TCP

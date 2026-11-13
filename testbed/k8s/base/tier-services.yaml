@@ -1,0 +1,38 @@
+# The two tier pools as headless Services: DNS returns one A record per Ready
+# pod, which is how tier-lb discovers the replicas the actuator adds or
+# removes. Mode B's llama-server pods and mode A's mock pods carry the same
+# polyforge.io/tier label, so the gateway, tier-lb and Prometheus are the same
+# objects in both modes.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tier-small
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+    polyforge.io/tier: small
+spec:
+  clusterIP: None
+  selector:
+    polyforge.io/tier: small
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tier-mid
+  namespace: pf-testbed
+  labels:
+    app.kubernetes.io/part-of: polyforge-testbed
+    polyforge.io/tier: mid
+spec:
+  clusterIP: None
+  selector:
+    polyforge.io/tier: mid
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

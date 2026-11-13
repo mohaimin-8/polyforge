@@ -1,0 +1,9 @@
+{
+  "namespace": "pf-testbed",
+  "core_budget": 5,
+  "tiers": {
+    "small": {"deployment": "llama-small", "min": 1, "max": 3, "cores_per_pod": 1},
+    "mid": {"deployment": "llama-mid", "min": 1, "max": 2, "cores_per_pod": 2}
+  },
+  "note": "core_budget is the cluster cap of the plant: of the laptop's 8 logical CPUs (4 physical cores), about 3 are left to kind, the gateway, the embedder, PostgreSQL, tier-lb, Prometheus and the host-side load generator. The scheduler also refuses a model-server pod that does not fit the node's allocatable CPU (the pods are Guaranteed), but that limit sits near 6 cores, so this budget, not the scheduler, is the binding constraint. cores_per_pod must equal the Deployment's CPU limit and llama-server --threads (static check: scripts/validate_static.py)."
+}

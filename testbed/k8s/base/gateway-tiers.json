@@ -1,0 +1,2 @@
+{"small": {"kind": "openai", "base_url": "http://tier-lb:9001/v1", "model": "tier-small"},
+ "mid": {"kind": "openai", "base_url": "http://tier-lb:9002/v1", "model": "tier-mid"}}

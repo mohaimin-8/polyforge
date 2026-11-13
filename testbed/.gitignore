@@ -1,0 +1,6 @@
+# Run outputs. Schedules and answer files can carry LMSYS-Chat-1M prompt text,
+# whose licence forbids transferring the dataset to any third party; tokens.json
+# and admin-key.txt are secrets. Nothing under out/ is ever committed.
+out/
+__pycache__/
+.pytest_cache/

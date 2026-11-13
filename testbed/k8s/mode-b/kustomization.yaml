@@ -1,0 +1,8 @@
+# Mode B: self-hosted pools. The gateway in front of two llama-server
+# Deployments (small, mid) whose replica counts the actuator sets.
+#   kubectl apply -k testbed/k8s/mode-b
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+  - llama.yaml
