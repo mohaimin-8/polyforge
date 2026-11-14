@@ -117,7 +117,8 @@ def tier_form(cal: dict, slo_ms: float):
         congestion_exponent=min(2.0, max(1e-3, cal["a"])), p95_tail=(cal["f0"], cal["b"]),
         mixture_p95=True, attainment_slo=True, replica_capacity_wu=cal["capacity_per_replica_rps"],
         wu_ai_scale=1.0 / model.WORK_UNITS["chat"], wu_crud_scale=0.0, cacheable_uniform=True,
-        tier_latency_ms={t: cal["l0_s"] * 1000 for t in ("small", "mid", "large")})
+        tier_latency_ms={t: cal["l0_s"] * 1000 for t in ("small", "mid", "large")},
+        replica_scaling_exponent=cal.get("replica_scaling_exponent"))
     model.set_economy(tier_cost_usd_per_req={"small": 0.0, "mid": 0.0, "large": 0.0})
     model.SLO_BASE_MS["ai"] = slo_ms  # a 'premium' tenant: class factor 1
     try:
@@ -250,11 +251,33 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def predict_all(calibration: Path, inputs: Path, price_core_hr: float) -> dict:
+def fitted_scaling(calibration: Path, tier: str) -> float:
+    """The exponent beta of capacity(n) = capacity(1) x n ** beta, least squares
+    in logs through n = 1, over every replica count measured for the tier."""
+    import math
+
+    mu1 = measured_capacity(calibration, tier, 1)
+    pts = []
+    for d in sorted(calibration.glob(f"{tier}_r*")):
+        n = int(d.name.split("_r")[1])
+        if n > 1 and (d / "load_curve_meta.json").exists():
+            pts.append((math.log(n), math.log(measured_capacity(calibration, tier, n) / mu1)))
+    if not pts:
+        raise ValueError(f"no {tier} capacity beyond one replica to fit the scaling to")
+    beta = sum(x * y for x, y in pts) / sum(x * x for x, _ in pts)
+    return min(1.0, max(1e-3, beta))
+
+
+def predict_all(calibration: Path, inputs: Path, price_core_hr: float, cells: Path | None = None,
+                scaling: str = "linear") -> dict:
     import cell_hits
 
-    design = json.loads((HERE / "cells.json").read_text(encoding="utf-8"))
+    design = json.loads((cells or HERE / "cells.json").read_text(encoding="utf-8"))
     cal = {t: calibrate(calibration / f"{t}_r1") for t in ("small", "mid")}
+    if scaling == "fitted":
+        cal = {t: {**c, "replica_scaling_exponent": fitted_scaling(calibration, t)} for t, c in cal.items()}
+    elif scaling != "linear":
+        raise ValueError(f"unknown replica scaling {scaling!r}")
     meta_path = cs.wp6_meta_path()
     wp6 = pd.read_parquet(meta_path, columns=["doc", "key_bytes"])
     vectors = np.load(str(meta_path).replace(".meta.parquet", ".f32.npy"), mmap_mode="r")
@@ -281,7 +304,8 @@ def predict_all(calibration: Path, inputs: Path, price_core_hr: float) -> dict:
                       "cache_knob_mb": cs.CACHE_KNOB_MB, "pins": cs.PINS, "threshold": float(TESTBED_TAU),
                       "price_core_hr": price_core_hr, "primary": "cache hits from the replay of each cell's prompts",
                       "secondary": "steady_cache: WP6's steady-state hit rate at the cell's knob",
-                      "secondary_2": "measured_capacity: each pool's capacity measured at its own replica count"},
+                      "secondary_2": "measured_capacity: each pool's capacity measured at its own replica count",
+                      **({"replica_scaling": scaling} if scaling != "linear" else {})},
             "calibration": cal, "predictions": preds}
 
 
@@ -291,8 +315,11 @@ def main() -> int:
     ap.add_argument("--inputs", type=Path, default=cs.INPUTS, help="dir with cellNN.csv.gz")
     ap.add_argument("--price-core-hr", type=float, default=0.526 / 4, help="USD per core-hour (T4 box / 4 vCPU)")
     ap.add_argument("--out", type=Path, default=HERE / "predictions.json")
+    ap.add_argument("--cells", type=Path, default=HERE / "cells.json")
+    ap.add_argument("--replica-scaling", choices=("linear", "fitted"), default="linear",
+                    help="linear: the simulator's form (WP11); fitted: capacity ~ n ** beta per tier from the curves")
     args = ap.parse_args()
-    out = predict_all(args.calibration, args.inputs, args.price_core_hr)
+    out = predict_all(args.calibration, args.inputs, args.price_core_hr, args.cells, args.replica_scaling)
     args.out.write_text(json.dumps(out, indent=1), encoding="utf-8")
     print(f"wrote {args.out}: {len(out['predictions'])} cells; commit it before any cell runs")
     return 0

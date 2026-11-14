@@ -250,15 +250,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--only", type=int, nargs="*", default=None, help="cell numbers (default: all)")
     ap.add_argument("--redo-invalid", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="print the order and stop")
+    ap.add_argument("--cells", type=Path, default=HERE / "cells.json")
+    ap.add_argument("--predictions", type=Path, default=PREDICTIONS)
     args = ap.parse_args(argv)
-    design = json.loads((HERE / "cells.json").read_text(encoding="utf-8"))
+    design = json.loads(args.cells.read_text(encoding="utf-8"))
     cells = {c["cell"]: c for c in design["cells"]}
     order = [(c, r) for c, r in run_order(sorted(cells), args.rounds) if args.only is None or c in args.only]
     if args.dry_run:
         print(" ".join(f"{c}/{r}" for c, r in order))
         return 0
-    commit = predictions_committed()
-    preds = {p["cell"]: p for p in json.loads(PREDICTIONS.read_text(encoding="utf-8"))["predictions"]}
+    commit = predictions_committed(args.predictions.resolve())
+    preds = {p["cell"]: p for p in json.loads(args.predictions.read_text(encoding="utf-8"))["predictions"]}
     bounds = actuate.Bounds.load(actuate.DEFAULT_BOUNDS)
     actuator = actuate.Actuator(bounds=bounds, kube=actuate.KubectlKube(bounds.namespace, context=CONTEXT),
                                 knobs=actuate.GatewayKnobs(GATEWAY, actuate.admin_key(args.admin_key_file)),

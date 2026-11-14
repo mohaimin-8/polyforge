@@ -122,8 +122,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--runs", type=Path, required=True)
     ap.add_argument("--predictions", type=Path, default=HERE / "predictions.json")
+    ap.add_argument("--cells", type=Path, default=HERE / "cells.json")
+    ap.add_argument("--report", type=Path, default=HERE / "VALIDATION.md")
+    ap.add_argument("--plot", type=Path, default=HERE / "validation_bland_altman.png")
     args = ap.parse_args()
-    design = json.loads((HERE / "cells.json").read_text(encoding="utf-8"))
+    design = json.loads(args.cells.read_text(encoding="utf-8"))
     preds = {p["cell"]: p for p in json.loads(args.predictions.read_text(encoding="utf-8"))["predictions"]}
     pairs = {m: [] for m in (*METRICS, "hit_rate")}
     steady = {m: [] for m in METRICS}
@@ -170,9 +173,9 @@ def main() -> int:
     L += ["", "## Per cell", "",
           "| cell | valid runs | attainment pred | attainment meas | mean s pred | mean s meas | hit pred | "
           "hit meas | failed share |", "|---:|---:|---:|---:|---:|---:|---:|---:|---:|", *per_cell, ""]
-    (HERE / "VALIDATION.md").write_text("\n".join(L), encoding="utf-8")
+    args.report.write_text("\n".join(L), encoding="utf-8")
     if primary:
-        plot(primary, HERE / "validation_bland_altman.png")
+        plot(primary, args.plot)
     print("\n".join(L))
     return 0
 

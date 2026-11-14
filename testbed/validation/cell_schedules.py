@@ -276,6 +276,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     c.add_argument("--curves", type=Path, required=True, help="dir of small_rN/, mid_rN/ load curves")
     c.add_argument("--out", type=Path, required=True)
     c.add_argument("--only", type=int, nargs="*", default=None, help="cell numbers (default: all)")
+    c.add_argument("--cells", type=Path, default=HERE / "cells.json", help="the cell design")
+    c.add_argument("--inputs", type=Path, default=INPUTS, help="where the request tables go")
     p = sub.add_parser("calibration-prompts")
     p.add_argument("--out", type=Path, required=True)
     args = ap.parse_args(argv)
@@ -286,7 +288,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     native = mk.research_module("native")
     population = json.loads(mk.POPULATION.read_text(encoding="utf-8"))
-    cells = json.loads((HERE / "cells.json").read_text(encoding="utf-8"))["cells"]
+    cells = json.loads(args.cells.read_text(encoding="utf-8"))["cells"]
     wanted = [x for x in cells if args.only is None or x["cell"] in args.only]
     with np.load(native.COUNTS) as z:
         counts = {s: z[s.replace("/", "__")] for s in {x["stream"] for x in wanted}}
@@ -294,7 +296,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     for cell in wanted:
         built = build_cell(cell, args.curves, population, counts, native.DAY_BINS, mk.lmsys_first_turns,
                            cache_bytes)
-        write_cell(args.out / f"cell{cell['cell']:02d}", built)
+        write_cell(args.out / f"cell{cell['cell']:02d}", built, args.inputs)
         m = built["meta"]
         print(f"cell {cell['cell']:2d}: {m['requests']} requests, small share {m['realised_small_share']:.3f}, "
               f"small-pool utilisation {m['utilisation_small']['mean']:.3f}, {m['anchor']['passes']} pass(es)")

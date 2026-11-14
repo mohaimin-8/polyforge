@@ -119,3 +119,14 @@ def test_build_cell_meets_the_target_on_the_cells_small_pool(tmp_path):
 def test_capacity_needs_the_measured_curve(tmp_path):
     with pytest.raises(FileNotFoundError):
         cs.capacity(tmp_path, "small", 2)
+
+
+def test_a_new_design_needs_only_a_new_seed(tmp_path):
+    import cells
+
+    out = tmp_path / "cells_v2.json"
+    assert cells.main(["--seed", "20261115", "--out", str(out)]) == 0
+    v2 = json.loads(out.read_text())
+    v1 = json.loads((HERE / "cells.json").read_text())
+    assert v2["seed"] == 20261115 and len(v2["cells"]) == 20
+    assert [c["target_util"] for c in v2["cells"]] != [c["target_util"] for c in v1["cells"]]

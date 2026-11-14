@@ -65,14 +65,20 @@ def design(seed: int = SEED, n: int = N) -> list[dict]:
     return cells
 
 
-def main() -> int:
-    cells = design()
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--seed", type=int, default=SEED)
+    ap.add_argument("--out", type=Path, default=HERE / "cells.json")
+    args = ap.parse_args(argv)
+    cells = design(args.seed)
     if any(c["cores"] > 5 for c in cells):
         raise SystemExit("a cell exceeds the 5-core budget")
-    out = {"protocol": "plan WP11; testbed/validation/cells.py", "seed": SEED, "targets": TARGETS,
+    out = {"protocol": "plan WP11; testbed/validation/cells.py", "seed": args.seed, "targets": TARGETS,
            "runs_per_cell": 3, "predictions": "written and committed after the in-cluster tier measurements, "
            "before any cell runs", "cells": cells}
-    (HERE / "cells.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+    args.out.write_text(json.dumps(out, indent=1), encoding="utf-8")
     for c in cells:
         print(c)
     return 0

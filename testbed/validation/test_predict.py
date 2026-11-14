@@ -149,3 +149,20 @@ def test_measured_capacity_uses_the_rate_at_the_cells_own_pool_size(tmp_path):
     slow = predict.predict_cell(_cell(pools=[3, 2]), _demand(0.5), PINS, None, cal, 0.1)
     fast = predict.predict_cell(_cell(pools=[3, 2]), _demand(0.5), PINS, None, CAL, 0.1)
     assert slow["attainment"] < fast["attainment"]
+
+
+def test_fitted_scaling_is_the_log_slope_through_one_replica(tmp_path):
+    for n, mu in ((1, 0.5), (2, 0.5 * 2 ** 0.6), (3, 0.5 * 3 ** 0.6)):
+        (tmp_path / f"small_r{n}").mkdir()
+        (tmp_path / f"small_r{n}" / "load_curve_meta.json").write_text(json.dumps({"mu_trace_rps": mu}))
+    assert predict.fitted_scaling(tmp_path, "small") == pytest.approx(0.6)
+
+
+def test_a_sublinear_pool_is_slower_than_the_linear_one():
+    sub = {t: {**c, "replica_scaling_exponent": 0.5} for t, c in CAL.items()}
+    lin = predict.predict_cell(_cell(pools=[3, 1]), _demand(0.6), PINS, None, CAL, 0.1)
+    slow = predict.predict_cell(_cell(pools=[3, 1]), _demand(0.6), PINS, None, sub, 0.1)
+    assert slow["attainment"] < lin["attainment"] and slow["mean_latency_s"] > lin["mean_latency_s"]
+    one = predict.predict_cell(_cell(pools=[1, 1]), _demand(0.1), PINS, None, sub, 0.1)
+    same = predict.predict_cell(_cell(pools=[1, 1]), _demand(0.1), PINS, None, CAL, 0.1)
+    assert one == same            # one replica: n ** beta = 1, nothing changes
