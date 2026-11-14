@@ -34,7 +34,13 @@ Step 3, the service's calibration at 0.25, 0.5, 1 and 2 cores: `python ../hvpa/c
 the cluster), then `python research/hvpa/calibration.py --curves testbed/out/hvpa/curves` fits the twin's
 plant and checks that capacity is linear in CPU within 10 %.
 
-Not written yet: the planner pod for A3 and A4, the in-cluster load generator, and the paired live runs.
+Live runs: `python ../hvpa/live.py run --arm A4 --target 2 --regime step_up:0.2:7 --calibration
+research/hvpa/calibration.json --out ../out/hvpa/live` resets the cluster (arm objects, VPA checkpoints,
+the recommender's history, the service at 2 x 0.5 core), installs the arm (A1/A2 objects, or the planner
+pod `planner/planner_pod.py` with the twin's own decision `research/hvpa/lattice.py`), runs the k6 Job
+(`load/rate.js`, k6 2.1.0 in the cluster), polls the pods for cost, resizes and reversals, and writes one
+JSON per run. Pairs run in ABBA order (`live.abba`). Still to come before any live run: the twin's
+predictions on the calibrated plant, committed, which also fix the regimes and the tuned A1/A2 targets.
 
 ```bash
 python -m pytest -q        # from testbed/: these tests run with the testbed's

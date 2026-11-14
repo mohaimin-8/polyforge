@@ -4,7 +4,8 @@
 # answers through a regional mirror after a 307 and an anonymous token);
 # `python testbed/scripts/verify_pins.py --lock testbed/hvpa/images.lock` repeats the check.
 # Versions: VPA 1.8.1 (chart 0.15.0, both 2026-10-21), the chart's default
-# certgen image, metrics-server v0.9.1 (2026-10-29), KEDA v2.21.0 (2026-09-23).
+# certgen image, metrics-server v0.9.1 (2026-10-29), KEDA v2.21.0 (2026-09-23), and the
+# in-cluster load generator k6 2.1.0, the version the host runs for WP10/WP11.
 # role	repository	tag	index_digest	linux_amd64_digest	compressed_bytes	source
 workload	registry.k8s.io/autoscaling/vpa-recommender	1.8.1	sha256:edf874b830984d1df9d60f839874eba42de3465051922b929754edc42ea0f69b	sha256:7b7bea7984a581caf85e077eca2fa8cf115721d8737c2e31dd6fcefa36fb376d	11828014	https://github.com/kubernetes/autoscaler/releases/tag/vertical-pod-autoscaler-1.8.1
 workload	registry.k8s.io/autoscaling/vpa-updater	1.8.1	sha256:b4a03d56131cc6f6c44cd91982b6db5961496f18b9bc24abe1c4b6160aefe04a	sha256:50764ab245a5b6e37ecfa0422c05aba9c788aa3540fa908a802a2562d32f088f	11759668	https://github.com/kubernetes/autoscaler/releases/tag/vertical-pod-autoscaler-1.8.1
@@ -14,4 +15,5 @@ workload	registry.k8s.io/metrics-server/metrics-server	v0.9.1	sha256:9b0ba1926e1
 workload	ghcr.io/kedacore/keda	2.21.0	sha256:81fe6547ce8d1cc29273f887b76507e9b853e5bc1f875ec23fe60061a38ed809	sha256:058179aa9ea3a66f16b2bb9924c25097854dcb48406b1352cf0749b2690265d7	98848578	https://github.com/kedacore/keda/releases/tag/v2.21.0
 workload	ghcr.io/kedacore/keda-metrics-apiserver	2.21.0	sha256:255375037fe592732eeb554743aae360c2da88cf0b9b1258d0a987ef885f0881	sha256:38ec9daa6eb40491f8c99a31bb00b90438213d927b837e8de1e8406db312fff9	72927497	https://github.com/kedacore/keda/releases/tag/v2.21.0
 workload	ghcr.io/kedacore/keda-admission-webhooks	2.21.0	sha256:e1969628cca6123e32eea13c47c75817091af2657fa68d9d0d58a8620d1b75b1	sha256:3e27e9fe4ff3270769fbcf38bc292cd27b3e9590a4105b266b3c0512a690eea4	31154288	https://github.com/kedacore/keda/releases/tag/v2.21.0
+workload	docker.io/grafana/k6	2.1.0	sha256:65c920dc067d5e2e00befbf982af6ad6ad0117034e8b1c65817c7975c52d4669	sha256:68e78d94140704ec4ee0cb7c5cf6cd12a32b7d310a6f98d94931ee9b0b9dc629	34068211	https://github.com/grafana/k6/releases/tag/v2.1.0
 build	polyforge/cpuburn	dev	-	-	-	testbed/hvpa/cpuburn/Dockerfile
