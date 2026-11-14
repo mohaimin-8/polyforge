@@ -138,6 +138,26 @@ def test_a_run_is_a_measurement_only_without_problems(change, expect):
         assert len(problems) == 1 and expect in problems[0]
 
 
+def test_a_closed_run_actuator_refuses_every_late_decision():
+    class Kube:
+        scaled = []
+
+        def replicas(self, deployment):
+            return (1, 1)
+
+        def scale(self, deployment, n):
+            self.scaled.append((deployment, n))
+
+    bounds = pairs.actuate.Bounds.load(pairs.actuate.DEFAULT_BOUNDS)
+    log = []
+    a = pairs.RunActuator(bounds=bounds, kube=Kube(), knobs=None, log=log.append)
+    a.apply(pairs.actuate.Decision(step=1, t_s=10.0, replicas={"small": 2}))
+    a.close()
+    late = [pairs.actuate.Decision(step=2, t_s=20.0, replicas={"small": 3})]
+    assert pairs.actuate.replay(a, late, start_unix=0.0, sleep=lambda s: None) == 1
+    assert Kube.scaled == [("llama-small", 2)] and log[-1]["event"] == "refused"
+
+
 def test_sample_sizes_are_the_plans_formulas():
     diffs = [0.01, 0.03, -0.01, 0.02, 0.00, 0.01]
     s = pairs.sample_sizes(diffs, comparator_mean=0.5, predicted_diff=-0.02)

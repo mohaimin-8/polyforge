@@ -235,6 +235,22 @@ def set_posture(actuator: actuate.Actuator, tenants: dict) -> dict:
     return {"knobs": record["knobs"], "errors": record["errors"], "attempts": attempt}
 
 
+class RunActuator(actuate.Actuator):
+    """The actuator of one run: once the run is over (`close`), any decision
+    its replay still holds is refused, so a late replay can never act in the
+    next run."""
+
+    closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+    def apply(self, decision, due_unix=None):
+        if self.closed:
+            raise actuate.DecisionError("the run is over: decision not applied")
+        return super().apply(decision, due_unix)
+
+
 def read_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
@@ -248,8 +264,8 @@ def run_arm(plan: dict, testbed: dict, schedule_dir: Path, table: list[dict], to
     log_path = out / "actuator.jsonl"
     if log_path.exists():
         log_path.unlink()
-    actuator = actuate.Actuator(bounds=bounds, kube=actuate.KubectlKube(bounds.namespace, context=rc.CONTEXT),
-                                knobs=actuate.GatewayKnobs(rc.GATEWAY, admin_key), log=actuate.jsonl_logger(log_path))
+    actuator = RunActuator(bounds=bounds, kube=actuate.KubectlKube(bounds.namespace, context=rc.CONTEXT),
+                           knobs=actuate.GatewayKnobs(rc.GATEWAY, admin_key), log=actuate.jsonl_logger(log_path))
     d0 = plan["decisions"][0]
     rec: dict = {"schedule": plan["schedule"], "regime": plan["regime"], "k": plan["k"], "arm": plan["arm"],
                  "ac_power": rc.on_ac_power(), "complete": False}
@@ -282,6 +298,7 @@ def run_arm(plan: dict, testbed: dict, schedule_dir: Path, table: list[dict], to
             proc.kill()
             rec["k6_exit"] = "timeout"
     thread.join(timeout=REPLAY_JOIN_S)
+    actuator.close()
     rec.update(start_unix=start, end_unix=time.time(), ac_power_end=rc.on_ac_power(),
                lag_p99_ms=rc.k6_lag_p99(out / "k6-summary.json"), replay_failed=outcome.get("failed"),
                replay_alive=thread.is_alive(), replay_error=outcome.get("error"))
