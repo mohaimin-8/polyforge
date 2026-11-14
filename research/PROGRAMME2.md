@@ -11,21 +11,22 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP3, WP18 index theory and property checks | `research/theory/` | `python property_check.py ...`, `python t4_check.py ...` | `INDEX_THEORY.md`, `PROPERTY_CHECKS.md` |
 | WP3 index on the planner's decisions | `research/theory/` | `python index_pilot.py` | `INDEX_PILOT.md` |
 | WP4 dose-response (step width x coupling) | `research/theory/`, `research/control2/` | `python dose_response_pilot.py` | `DOSE_RESPONSE_PILOT.md` |
-| WP5 Morris screen of plant 2 | `research/sensitivity/` | `python morris_pilot.py` | `MORRIS_PILOT.md` |
+| WP5 Morris screen of plant 2 | `research/sensitivity/` | `python morris_pilot.py` (`--crn` for common random numbers) | `MORRIS_PILOT.md` |
+| WP5 Sobol indices of the gain | `research/sensitivity/` | `python sobol.py` (after a Morris screen) | `SOBOL.md` once run |
 | WP5 specification curve | `research/speccurve/` | `python pilot_curve.py` | `SPEC_CURVE_PILOT.md`, `spec_curve_pilot.png` |
 | WP6 cache replay of real prompts (Go-verified) | `research/cachereplay/` | `python run_all.py --preset full --workers 6` | `out/full/` |
-| WP7 tier price and quality (RouterBench, mode A) | `research/tierquality/` | `python tiers.py` | `TIERS.md` |
+| WP7 tier price and quality (RouterBench, mode A; own ARC measurement, mode B) | `research/tierquality/` | `python tiers.py`, `python selfhosted.py run` | `TIERS.md`, `SELFHOSTED.md` |
 | WP8 workload population, native replay | `research/population/` | `python features.py`, `python native.py`, `python population.py` | `FEATURES.md`, `POPULATION.md` |
 | WP9 comparators and tuning | `research/comparators/` | `python tune.py --plant B ...` | `pilot/*/report.md`, `SAMPLE_SIZE.md` |
 | WP10 testbed | `testbed/` | runbook in `testbed/README.md`; `python scripts/bringup.py` | built and up on kind (2026-11-14) |
-| WP11 simulator against the testbed | `testbed/validation/` | `cell_schedules.py`, `predict.py`, `run_cells.py`, `score.py` | `VALIDATION.md` once the cells have run |
+| WP11 simulator against the testbed | `testbed/validation/` | `cell_schedules.py`, `predict.py`, `run_cells.py`, `score.py`, `diagnose.py` | `predictions.json` (committed before the runs), `VALIDATION.md`, `DIAGNOSE.md` once the cells have run; WP11b by the rule in `testbed/hvpa/after_wp11.py` |
 | WP15 external check (RouteBalance) | `research/external/routebalance/` | `python -I analyse.py report` | `REPORT.md`, `RESULTS.md` |
 | WP16 benchmark: any controller scored by regret | `research/benchmark/` | `python bench.py --controller module:Class --plant B` | per-workload CSV, summary JSON |
-| WP17 horizontal with vertical autoscaling (twin) | `research/hvpa/` | `python twin_pilot.py` | `VPA_MODEL.md`, `TWIN_PILOT.md` (a-priori plant) |
+| WP17 horizontal with vertical autoscaling | `research/hvpa/`, `testbed/hvpa/` | `python twin_pilot.py`; cluster: `install.py`, `calibrate_service.py`, `twin_predict.py`, `pilot.py` | `VPA_MODEL.md`, `TWIN_PILOT.md` (a-priori plant); calibration and predictions once measured |
 | WP22 controls, adversarial search, blind predictions | `research/controls/` | `python negative_control.py`, `adversarial_search.py`, `blind_predictions.py` | `NEGATIVE_CONTROL.md`, `ADVERSARIAL_SEARCH.md`, `DIAGNOSE_158.md`, `RANDOM_SAMPLE_CHECK.md`, `GATE_REACH.md` |
 | WP23 the index as a tool | `tools/index-probe/` | `python index_probe.py log|box ...` | `README.md` |
 
-Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (11 steps; two need downloaded inputs and are skipped without them).
+Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (16 steps; those needing downloaded inputs or not-yet-committed run data are skipped without them).
 
 Tests: `python -m pytest research/theory research/control2 research/plant2 research/population
 research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark research/sensitivity tools/index-probe -q`
