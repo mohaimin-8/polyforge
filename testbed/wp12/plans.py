@@ -3,9 +3,14 @@
   regimes the two regimes (plan WP12: one low-index, one high-index): every
           candidate load level (CANDIDATE_UTILS, the small pool's offered
           utilisation at its largest size with every request a miss, WP11's
-          measure) on PROBES schedules, both arms at their declared defaults;
-          low = the level with the smallest mean interaction index of the joint
-          planner's decisions, high = the largest -> regimes.json.
+          measure) on PROBES schedules, both arms at their declared defaults.
+          Eligible: an operating point, the joint planner's predicted
+          attainment at least MIN_ATTAINMENT. Low = the eligible level with
+          the smallest mean interaction index of the joint planner's
+          decisions, high = the largest, when the largest is at least
+          MIN_INDEX_RATIO x the smallest; otherwise the testbed has no
+          high-index regime and the two are the lightest and the heaviest
+          operating points -> regimes.json.
   design  the two regimes, each with PAIRS live schedules and TUNING tuning
           schedules of real arrivals: cell_schedules.build_cell's anchored
           native replay of an evaluation-half window, small share SMALL_SHARE,
@@ -57,8 +62,10 @@ import cell_schedules as cs  # noqa: E402
 import predict  # noqa: E402
 
 REGIMES = {"low": 0.30, "high": 0.75}   # used only when regimes.json has not chosen them
-CANDIDATE_UTILS = (0.15, 0.3, 0.45, 0.6, 0.75, 0.9)
-PROBES = 3                 # probe schedules per candidate level, one per stream
+CANDIDATE_UTILS = (0.1, 0.15, 0.2, 0.3, 0.45, 0.6, 0.75, 0.9)
+PROBES = 6                 # probe schedules per candidate level, the streams in turn
+MIN_ATTAINMENT = 0.8       # a regime is an operating point: the joint planner meets the SLO this often
+MIN_INDEX_RATIO = 2.0      # below this, the highest- and lowest-index levels are no index contrast
 SMALL_SHARE = 0.7
 STREAMS = ("burstgpt/ChatGPT/api", "burstgpt/ChatGPT/conv", "azure2024/conv")
 PAIRS = 8
@@ -91,7 +98,7 @@ def schedule_id(regime: str, role: str, k: int) -> int:
 
 
 def probe_cell(i: int, util: float, k: int) -> dict:
-    return {"cell": CELL_BASE + 900 + 10 * i + k, "target_util": util, "small_share": SMALL_SHARE,
+    return {"cell": CELL_BASE + 800 + 10 * i + k, "target_util": util, "small_share": SMALL_SHARE,
             "stream": STREAMS[k % len(STREAMS)], "pools": list(POOL_REF), "cache": "off"}
 
 
@@ -106,15 +113,42 @@ def load_sources() -> tuple[dict, dict, int]:
     return population, counts, native.DAY_BINS
 
 
-def choose_regimes(rows: Sequence[dict]) -> dict[str, float]:
-    """Low: the candidate level with the smallest mean index of the joint
-    planner's decisions (ties: the lower level); high: the largest (ties: the
-    higher level)."""
-    by: dict[float, list[float]] = {}
+def level_summary(rows: Sequence[dict]) -> dict[float, dict]:
+    """Per candidate level: mean index, mean predicted attainment, eligible."""
+    by: dict[float, list[dict]] = {}
     for r in rows:
-        by.setdefault(r["util"], []).append(r["mean_index"])
-    means = {u: float(np.mean(v)) for u, v in by.items()}
-    return {"low": min(means, key=lambda u: (means[u], u)), "high": max(means, key=lambda u: (means[u], u))}
+        by.setdefault(r["util"], []).append(r)
+    out = {}
+    for u, rs in sorted(by.items()):
+        att = float(np.mean([r["attainment"] for r in rs]))
+        out[u] = {"mean_index": float(np.mean([r["mean_index"] for r in rs])), "mean_attainment": att,
+                  "eligible": att >= MIN_ATTAINMENT}
+    return out
+
+
+def index_contrast(rows: Sequence[dict]) -> dict:
+    """The eligible levels (the joint planner's predicted attainment at least
+    MIN_ATTAINMENT; every level when fewer than two are), the levels with the
+    smallest and largest mean index (ties: lower, then higher level), their
+    ratio, and whether it is a contrast (at least MIN_INDEX_RATIO)."""
+    levels = level_summary(rows)
+    eligible = {u: s for u, s in levels.items() if s["eligible"]}
+    pool = eligible if len(eligible) >= 2 else levels
+    lo = min(pool, key=lambda u: (pool[u]["mean_index"], u))
+    hi = max((u for u in pool if u != lo), key=lambda u: (pool[u]["mean_index"], u))
+    ratio = pool[hi]["mean_index"] / pool[lo]["mean_index"] if pool[lo]["mean_index"] > 0 else math.inf
+    return {"pool": sorted(pool), "lowest_index": lo, "highest_index": hi, "ratio": ratio,
+            "contrast": ratio >= MIN_INDEX_RATIO}
+
+
+def choose_regimes(rows: Sequence[dict]) -> dict[str, float]:
+    """Low and high index (plan WP12) when the eligible levels offer an index
+    contrast; without one there is no high-index regime on the testbed, and
+    the two regimes are the lightest and the heaviest operating points."""
+    c = index_contrast(rows)
+    if c["contrast"]:
+        return {"low": c["lowest_index"], "high": c["highest_index"]}
+    return {"low": min(c["pool"]), "high": max(c["pool"])}
 
 
 def probe_regimes(tb: tbp.Testbed, curves: Path, out_file: Path | None = None) -> dict:
@@ -131,11 +165,16 @@ def probe_regimes(tb: tbp.Testbed, curves: Path, out_file: Path | None = None) -
             s = tbp.index_summary(res["joint"]["index_rows"])
             rows.append({"util": util, "k": k, "cell": cell["cell"], "stream": cell["stream"],
                          "requests": int(sum(demand.values())), **{f"joint_{m}": v for m, v in s.items()},
-                         "mean_index": s["mean_index"],
+                         "mean_index": s["mean_index"], "attainment": res["joint"]["outcome"]["attainment"],
                          "predicted_diff_J": res["per_knob"]["outcome"]["J"] - res["joint"]["outcome"]["J"]})
-    out = {"rule": "low: the smallest mean index of the joint planner's decisions; high: the largest "
-                   "(plan WP12: one low-index and one high-index regime); arms at their declared defaults",
-           "candidates": rows, "chosen": choose_regimes(rows)}
+    out = {"rule": f"among the levels where the joint planner's predicted attainment is at least {MIN_ATTAINMENT} "
+                   "(an operating point; every level if fewer than two are), low = the smallest mean index of its "
+                   "decisions, high = the largest (plan WP12: one low-index and one high-index regime), when the "
+                   f"largest is at least {MIN_INDEX_RATIO:g} x the smallest; otherwise there is no high-index regime "
+                   "and the regimes are the lightest and the heaviest operating points; both arms at their "
+                   "declared defaults",
+           "levels": {str(u): s for u, s in level_summary(rows).items()},
+           "index_contrast": index_contrast(rows), "candidates": rows, "chosen": choose_regimes(rows)}
     (out_file or REGIMES_FILE).write_text(json.dumps(out, indent=1), encoding="utf-8")
     return out
 

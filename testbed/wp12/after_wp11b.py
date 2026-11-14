@@ -91,10 +91,13 @@ def keep_runs(src: Path, dst: Path) -> int:
     return n
 
 
-def g3_section(pilot: dict, validated: bool | None, source: str) -> str:
+def g3_section(pilot: dict, validated: bool | None, source: str, contrast: dict | None = None) -> str:
     """Gate G3 (plan WP12): the simulator validated, and the pairs needed per
     regime feasible; judged on J, equivalence in the low regime and
     superiority in the high one, every other number beside it in PILOT.md."""
+    if contrast is not None:
+        source += (f"; highest over lowest mean index among the operating points {contrast['ratio']:.2f}x "
+                   f"({'an index contrast' if contrast['contrast'] else 'no index contrast: the testbed has no high-index regime, the regimes span the operating points'})")
     rows, feasible = [], []
     for regime, test in (("low", "n_equivalence"), ("high", "n_superiority")):
         n = pilot["summary"].get(regime, {}).get("J", {}).get(test)
@@ -130,8 +133,9 @@ def main() -> int:
           "--admin-key-file", str(out / "admin-key.txt"), "--out", str(OUT / "runs")])
     log(f"kept {keep_runs(OUT / 'runs', HERE / 'runs')} run records")
     pilot = json.loads((HERE / "pilot.json").read_text(encoding="utf-8"))
+    contrast = json.loads((HERE / "regimes.json").read_text(encoding="utf-8")).get("index_contrast")
     with (HERE / "PILOT.md").open("a", encoding="utf-8") as fh:
-        fh.write(g3_section(pilot, validated, source))
+        fh.write(g3_section(pilot, validated, source, contrast))
     commit(["testbed/wp12/PILOT.md", "testbed/wp12/pilot.json", "testbed/wp12/runs"],
            "results(testbed): WP12 live pilot, sigma_d and the pairs needed per regime, gate G3")
     log("done")

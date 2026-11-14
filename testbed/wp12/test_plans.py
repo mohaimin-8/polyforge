@@ -49,10 +49,29 @@ def test_the_design_has_disjoint_ids_and_the_declared_counts():
     assert {c["stream"] for c in cells} == set(plans.STREAMS)
 
 
-def test_the_regimes_are_the_lowest_and_highest_mean_index_levels(tmp_path):
-    rows = [{"util": u, "mean_index": i} for u, i in ((0.3, 0.02), (0.3, 0.04), (0.6, 0.01), (0.6, 0.05),
-                                                      (0.9, 0.06), (0.9, 0.06), (0.15, 0.03), (0.15, 0.03))]
-    assert plans.choose_regimes(rows) == {"low": 0.15, "high": 0.9}    # 0.15 ties 0.3 and 0.6 at 0.03: lowest wins
+def levels(spec):
+    return [{"util": u, "mean_index": i, "attainment": a} for u, i, a in spec for _ in range(2)]
+
+
+def test_the_regimes_are_the_lowest_and_highest_index_operating_points(tmp_path):
+    # 0.9 has the largest index but is no operating point; among the rest the index contrast is 5x
+    rows = levels(((0.15, 0.01, 0.95), (0.3, 0.05, 0.9), (0.6, 0.03, 0.85), (0.9, 0.2, 0.4)))
+    assert plans.choose_regimes(rows) == {"low": 0.15, "high": 0.3}
+    c = plans.index_contrast(rows)
+    assert c["pool"] == [0.15, 0.3, 0.6] and c["ratio"] == pytest.approx(5.0) and c["contrast"]
+    lv = plans.level_summary(rows)
+    assert lv[0.9]["eligible"] is False and lv[0.6]["mean_attainment"] == pytest.approx(0.85)
+
+
+def test_without_an_index_contrast_the_regimes_span_the_operating_points():
+    rows = levels(((0.15, 0.03, 0.95), (0.3, 0.04, 0.9), (0.6, 0.035, 0.85), (0.9, 0.2, 0.4)))
+    assert not plans.index_contrast(rows)["contrast"]
+    assert plans.choose_regimes(rows) == {"low": 0.15, "high": 0.6}
+    overloaded = [{**r, "attainment": 0.3} for r in rows]                  # fewer than two eligible: every level
+    assert plans.index_contrast(overloaded)["pool"] == [0.15, 0.3, 0.6, 0.9]
+    assert plans.choose_regimes(overloaded) == {"low": 0.15, "high": 0.9}  # 0.2 / 0.03: a contrast again
+
+def test_regimes_in_use_come_from_the_probe_file(tmp_path):
     f = tmp_path / "regimes.json"
     assert plans.regimes_in_use(f) == plans.REGIMES
     f.write_text(json.dumps({"chosen": {"low": 0.15, "high": 0.9}}))
