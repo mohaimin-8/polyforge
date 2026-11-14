@@ -1,7 +1,7 @@
 """WP17 twin workloads: four shapes (plan WP17) at three volatilities (programme 2).
 
 Rates are per 10 s step, relative to BASE_RPS, the rate the initial allocation
-(2 pods x 0.5 core of plant.Plant) serves at 60 % utilisation:
+(2 pods x 0.5 core of service_plant.Plant) serves at 60 % utilisation:
   step_up      BASE for the first third, then 3 x BASE
   step_down    3 x BASE for the first third, then BASE
   ramp         BASE rising linearly to 4 x BASE

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import plant
+import service_plant as plant
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "jcac_sim"))
 import model  # noqa: E402

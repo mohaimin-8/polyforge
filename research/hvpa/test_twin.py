@@ -7,7 +7,7 @@ import pytest
 
 import twin
 import workloads
-from plant import Plant
+from service_plant import Plant
 
 P = Plant()
 

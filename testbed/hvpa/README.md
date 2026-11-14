@@ -29,8 +29,12 @@ python images.py --lock ../hvpa/images.lock load && python images.py --lock ../h
 python ../hvpa/install.py --vpa-setting default --dry-run && python ../hvpa/install.py --vpa-setting default
 ```
 
-Next, not written yet: the calibration of the service at 0.25, 0.5, 1 and 2 cores (WP17 step 3), the
-planner pod for A3 and A4, the in-cluster load generator, and the paired live runs.
+Step 3, the service's calibration at 0.25, 0.5, 1 and 2 cores: `python ../hvpa/calibrate_service.py --out
+../out/hvpa/curves` (a Job per level runs `measure/cpu_curve.py`, the WP2 protocol on `GET /work`, inside
+the cluster), then `python research/hvpa/calibration.py --curves testbed/out/hvpa/curves` fits the twin's
+plant and checks that capacity is linear in CPU within 10 %.
+
+Not written yet: the planner pod for A3 and A4, the in-cluster load generator, and the paired live runs.
 
 ```bash
 python -m pytest -q        # from testbed/: these tests run with the testbed's

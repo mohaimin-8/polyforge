@@ -1,6 +1,6 @@
 """The WP17 simulation twin: horizontal with vertical autoscaling (programme 2).
 
-One Deployment of the CPU service (plant.py) on one node, 10 s steps.
+One Deployment of the CPU service (service_plant.py) on one node, 10 s steps.
 Arms (plan WP17):
   A1  HPA on CPU utilisation (target 80 %, the autoscaling API's default) with
       the VPA on CPU: the pairing the VPA documentation warns against;
@@ -50,7 +50,7 @@ for p in (HERE, HERE.parents[0] / "comparators"):
         sys.path.insert(0, str(p))
 
 import vpa  # noqa: E402
-from plant import Plant  # noqa: E402
+from service_plant import Plant  # noqa: E402
 
 DT_S = 10.0
 PLAN_S = 30.0
