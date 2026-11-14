@@ -87,6 +87,26 @@ def parse_k6(log: str) -> dict:
             "latency_ms": {k: lat.get(k) for k in ("avg", "med", "p(95)", "p(99)", "max")}}
 
 
+def on_ac_power() -> bool | None:
+    """Windows GetSystemPowerStatus: True on the mains, False on battery, None
+    unknown (testbed/validation/run_cells.py's check; WP14 lost runs to power
+    flapping)."""
+    import ctypes
+    import os
+
+    if os.name != "nt":
+        return None
+
+    class Status(ctypes.Structure):
+        _fields_ = [("ACLineStatus", ctypes.c_byte), ("BatteryFlag", ctypes.c_byte),
+                    ("BatteryLifePercent", ctypes.c_byte), ("SystemStatusFlag", ctypes.c_byte),
+                    ("BatteryLifeTime", ctypes.c_ulong), ("BatteryFullLifeTime", ctypes.c_ulong)]
+    s = Status()
+    if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(s)):
+        return None
+    return {0: False, 1: True}.get(s.ACLineStatus)
+
+
 def cpu_cores(q: str) -> float:
     q = str(q)
     return float(q[:-1]) / 1000.0 if q.endswith("m") else float(q)
@@ -108,8 +128,9 @@ def watch_record(polls: list[dict], price_core_hr: float) -> dict:
             d = 1 if b > a else -1
             reversals += int(last_dir != 0 and d != last_dir)
             last_dir = d
+    gaps = [b["t"] - a["t"] for a, b in zip(polls, polls[1:])]
     return {"cost": cost, "resizes": resizes, "reversals": reversals, "max_replicas": max(counts, default=0),
-            "polls": len(polls)}
+            "polls": len(polls), "max_gap_s": max(gaps, default=0.0)}
 
 
 def abba(a: str, b: str, pairs: int) -> list[str]:
@@ -171,19 +192,28 @@ def run(arm: str, target: float, regime: dict, calibration: Path, out: Path,
     configmap("wp17-load", {"rate.js": (HERE / "load" / "rate.js").read_text(encoding="utf-8"),
                             "schedule.json": json.dumps(regime)})
     name = f"wp17-load-{int(time.time())}"
+    power_start = on_ac_power()
     kubectl("apply", "-f", "-", stdin=yaml.safe_dump(k6_job(name)))
-    polls, t0 = [], time.time()
+    polls, t0, outcome = [], time.time(), "timeout"
     deadline = t0 + len(regime["rates"]) * regime["step_s"] + 600
     while time.time() < deadline:
         polls.append(poll())
         status = json.loads(kubectl("-n", NAMESPACE, "get", "job", name, "-o", "json")).get("status", {})
         if status.get("succeeded") or status.get("failed"):
+            outcome = "succeeded" if status.get("succeeded") else "failed"
             break
         time.sleep(POLL_S)
+    log = kubectl("-n", NAMESPACE, "logs", f"job/{name}", check=False)
+    if outcome == "timeout":   # a load still running would load the next run
+        kubectl("-n", NAMESPACE, "delete", "job", name, "--wait=true", check=False)
+    try:
+        k6, k6_error = parse_k6(log), ""
+    except (ValueError, KeyError) as err:   # no summary block: the run is not a measurement
+        k6, k6_error = None, f"{type(err).__name__}: {err}"[:300]
     plant = json.loads(calibration.read_text(encoding="utf-8"))
     rec = {"arm": arm, "target": target, "regime": {k: v for k, v in regime.items() if k != "rates"},
-           "start_unix": t0, "end_unix": time.time(),
-           "k6": parse_k6(kubectl("-n", NAMESPACE, "logs", f"job/{name}")),
+           "start_unix": t0, "end_unix": time.time(), "k6_job": outcome, "k6": k6, "k6_error": k6_error,
+           "power": {"start": power_start, "end": on_ac_power()},
            "watch": watch_record(polls, plant.get("price_core_hr", 0.526 / 4))}
     if arm in ("A3", "A4"):
         decisions = [json.loads(line) for line in kubectl("-n", NAMESPACE, "logs", "deployment/planner").splitlines()
@@ -210,7 +240,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     plant = service_plant.from_calibration(args.calibration)
     reg = schedule(shape, float(sigma), int(seed), plant.slo_s, plant)
     rec = run(args.arm, args.target, reg, args.calibration, args.out)
-    print(json.dumps({"arm": rec["arm"], "attainment": rec["k6"]["attainment"], "cost": rec["watch"]["cost"]}))
+    print(json.dumps({"arm": rec["arm"], "k6_job": rec["k6_job"], "cost": rec["watch"]["cost"],
+                      "attainment": rec["k6"]["attainment"] if rec["k6"] else None}))
     return 0
 
 

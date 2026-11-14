@@ -38,10 +38,48 @@ PAIRS = 6
 KAPPA = 1e-4          # the twin's (lattice.KAPPA)
 EQUIVALENCE = 0.02
 Z_ALPHA, Z_POWER = 1.645, 1.282
+ATTEMPTS = 3          # an invalid run is repeated at most this often, then its pair is left out
+MAX_POLL_GAP_S = 30.0  # three poll periods: a longer gap is the host stalling (WP14), not the arm
 
 
 def order(pair: int, a: str, b: str) -> tuple[str, str]:
     return (a, b) if pair % 2 == 0 else (b, a)
+
+
+def problems(rec: dict) -> list[str]:
+    """Why a live run is not a measurement (empty: it is one)."""
+    if rec.get("error"):
+        return [rec["error"]]
+    out = []
+    if rec.get("k6_job") != "succeeded":
+        out.append(f"k6 job {rec.get('k6_job')}")
+    if not rec.get("k6"):
+        out.append(f"no k6 summary ({rec.get('k6_error', '')})")
+    if rec.get("watch", {}).get("max_gap_s", 0.0) > MAX_POLL_GAP_S:
+        out.append(f"pod polls {rec['watch']['max_gap_s']:.0f} s apart: the host stalled")
+    if False in (rec.get("power", {}).get("start"), rec.get("power", {}).get("end")):
+        out.append("on battery")
+    return out
+
+
+def attempt(arm: str, target: float, regime: dict, calibration: Path, path: Path) -> dict | None:
+    """One arm's run of a pair, repeated while it is not a measurement; every
+    invalid attempt is kept beside it. None when all attempts failed."""
+    import live
+
+    for i in range(1, ATTEMPTS + 1):
+        try:
+            rec = live.run(arm, target, regime, calibration, path.parent)
+        except Exception as err:  # one run's trouble (kubectl, a timeout) must not end a 72-hour pilot
+            rec = {"arm": arm, "error": f"{type(err).__name__}: {err}"[:400]}
+        rec["attempt"], rec["problems"] = i, problems(rec)
+        if not rec["problems"]:
+            path.write_text(json.dumps(rec, indent=1), encoding="utf-8")
+            return rec
+        path.parent.mkdir(parents=True, exist_ok=True)
+        (path.parent / f"{arm}.attempt{i}.invalid.json").write_text(json.dumps(rec, indent=1, default=str),
+                                                                    encoding="utf-8")
+    return None
 
 
 def j_live(rec: dict, kappa: float = KAPPA) -> float:
@@ -95,6 +133,7 @@ def main(argv: list[str] | None = None) -> int:
               f"J = cost + {KAPPA:g} x late requests; differences are comparator minus joint.", "",
               "| regime | contrast | pairs | mean diff | sigma_d | predicted gain | n superiority | n equivalence (+-2 %) |",
               "|---|---|---:|---:|---:|---:|---:|---:|"]
+    left_out = []
     for c in contrasts(preds):
         diffs, comp_j = [], []
         for k in range(args.pairs):
@@ -102,16 +141,24 @@ def main(argv: list[str] | None = None) -> int:
             js = {}
             for arm in order(k, "A4", c["arm"]):
                 path = record_path(args.out, c, k, arm)
-                if not path.exists():
+                if path.exists():
+                    rec = json.loads(path.read_text(encoding="utf-8"))
+                else:
                     target = c["width"] if arm == "A4" else c["target"]
-                    rec = live.run(arm, float(target), reg, args.calibration, path.parent)
-                    path.write_text(json.dumps(rec, indent=1), encoding="utf-8")
-                js[arm] = j_live(json.loads(path.read_text(encoding="utf-8")))
+                    rec = attempt(arm, float(target), reg, args.calibration, path)
+                if rec is None:
+                    break
+                js[arm] = j_live(rec)
+            if len(js) < 2:
+                left_out.append(f"w{c['width']} s{c['sigma']} A4 vs {c['arm']} pair {k}")
+                continue
             diffs.append(js[c["arm"]] - js["A4"])
             comp_j.append(js[c["arm"]])
-        s = sample_sizes(diffs, statistics.fmean(comp_j), c["gain"])
+        s = sample_sizes(diffs, statistics.fmean(comp_j) if comp_j else math.nan, c["gain"])
         report.append(f"| w{c['width']} s{c['sigma']} | A4 vs {c['arm']} | {s['pairs']} | {s['mean_diff']:+.5f} | "
                       f"{s['sigma_d']:.5f} | {c['gain']:+.3f} | {s['n_superiority']} | {s['n_equivalence']} |")
+    report += ["", f"Pairs left out after {ATTEMPTS} invalid attempts of an arm: "
+               + (", ".join(left_out) if left_out else "none") + "."]
     (args.out / "PILOT.md").write_text("\n".join(report) + "\n", encoding="utf-8")
     print("\n".join(report))
     return 0

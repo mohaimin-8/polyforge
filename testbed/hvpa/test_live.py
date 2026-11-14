@@ -46,6 +46,7 @@ def test_watch_integrates_cost_and_counts_resizes_and_reversals():
     w = live.watch_record(polls, price_core_hr=3600.0)
     assert w["cost"] == pytest.approx(1.0 * 10 + 3.0 * 10 + 2.0 * 10)
     assert w["resizes"] == 2 and w["reversals"] == 2 and w["max_replicas"] == 3
+    assert w["max_gap_s"] == 10.0                       # the host-stall check reads it
 
 
 def test_abba_order_and_quantities():
