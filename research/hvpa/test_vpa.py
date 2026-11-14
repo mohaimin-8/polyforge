@@ -62,9 +62,11 @@ def test_floor_and_a_single_sample():
 
 def test_updater_raises_a_starved_pod_and_leaves_a_generous_one_in_a_short_run():
     rec = vpa.Recommendation(target=0.6, lower=0.5, upper=12.0)
-    assert vpa.pods_to_update([0.25, 0.25, 1.0], [600.0] * 3, rec) == [0]   # tolerance: 1 of 3 per loop
-    assert vpa.pods_to_update([0.25, 0.25, 0.25, 0.25], [600.0] * 4, rec) == [0, 1]
+    assert vpa.pods_to_update([0.25, 0.25, 1.0], [600.0] * 3, rec) == [0, 1]   # in place: all eligible
+    assert vpa.pods_to_update([0.25, 0.25, 1.0], [600.0] * 3, rec, skip_disruption_budget=False) == [0]
+    assert vpa.pods_to_update([0.25] * 4, [600.0] * 4, rec, skip_disruption_budget=False) == [0, 1]
     assert vpa.pods_to_update([1.0, 1.0], [600.0] * 2, rec) == []           # inside the range: kept
-    assert vpa.pods_to_update([1.0, 1.0], [13 * 3600.0] * 2, rec) == [0]     # past 12 h: lowered
+    assert vpa.pods_to_update([1.0, 1.0], [13 * 3600.0] * 2, rec) == [0, 1]  # past 12 h: lowered
+    assert vpa.pods_to_update([1.0, 1.0], [13 * 3600.0] * 2, rec, skip_disruption_budget=False) == [0]
     assert vpa.pods_to_update([0.25], [600.0], rec) == []                    # below min-replicas
     assert vpa.pods_to_update([0.25], [600.0], rec, min_replicas=1) == [0]

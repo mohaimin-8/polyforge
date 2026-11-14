@@ -18,8 +18,10 @@ Recommender, per container across all pods of the target:
 Updater, every minute (update_priority_calculator.go, docs/features.md): a
 pod is updated when its request is outside [lower, upper], or when it has
 run past 12 h and the relative difference of request and target is at least
-0.1; at most max(1, floor(replicas x 0.5)) pods per loop (eviction
-tolerance 0.5); none when the target has fewer than min-replicas (2) pods.
+0.1; none when the target has fewer than min-replicas (2) pods. The chart
+WP17 installs skips the disruption budget for in-place updates, so every
+eligible pod is resized in one loop (without that flag, at most
+max(1, floor(replicas x 0.5)) per loop, the eviction tolerance).
 In place (InPlaceOrRecreate, GA in VPA 1.6): the pod's request becomes the
 target without a restart.
 """
@@ -159,8 +161,11 @@ class Recommender:
 
 
 def pods_to_update(requests: list[float], ages_s: list[float], rec: Recommendation | None,
-                   min_replicas: int = MIN_REPLICAS) -> list[int]:
-    """Indices of the pods one updater loop resizes to the target."""
+                   min_replicas: int = MIN_REPLICAS, skip_disruption_budget: bool = True) -> list[int]:
+    """Indices of the pods one updater loop resizes to the target. The VPA
+    chart (0.15.0) runs the updater with --in-place-skip-disruption-budget=true,
+    so in-place updates of NotRequired containers skip the eviction tolerance
+    and every eligible pod is resized in the same loop; False applies it."""
     if rec is None or len(requests) < min_replicas:
         return []
     chosen = []
@@ -171,5 +176,5 @@ def pods_to_update(requests: list[float], ages_s: list[float], rec: Recommendati
             if rec.target != req:
                 chosen.append((not (rec.target > req), -diff, i))  # scale-ups first, then larger diffs
     chosen.sort()
-    allowed = max(1, int(len(requests) * EVICTION_TOLERANCE))
+    allowed = len(chosen) if skip_disruption_budget else max(1, int(len(requests) * EVICTION_TOLERANCE))
     return [i for _, _, i in chosen[:allowed]]

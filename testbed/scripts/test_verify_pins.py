@@ -49,3 +49,28 @@ def test_models_lock_rows_have_five_columns():
     rows = vp.read_models()
     assert rows and all(len(r) == 5 for r in rows)
     assert {r[0] for r in rows} == {"small", "mid", "mid3b", "embedder"}
+
+
+def test_registry_k8s_io_redirect_and_bearer_challenge():
+    """registry.k8s.io: 307 to a mirror, which asks for an anonymous token."""
+    import images as images_lock
+
+    index = {"manifests": [{"digest": "sha256:amd", "platform": {"os": "linux", "architecture": "amd64"}}]}
+    calls = []
+
+    def fake(url, headers, method="GET"):
+        calls.append((url, dict(headers)))
+        if url.startswith("https://registry.k8s.io/"):
+            return 307, {"location": "https://mirror.example/v2/x/y/manifests/1.0"}, b""
+        if url.startswith("https://mirror.example/token"):
+            assert "scope=repository%3Ax%2Fy%3Apull" in url
+            return 200, {}, json.dumps({"token": "t0k"}).encode()
+        if headers.get("Authorization") != "Bearer t0k":
+            return 401, {"www-authenticate": 'Bearer realm="https://mirror.example/token",'
+                                             'service="mirror",scope="repository:x/y:pull"'}, b""
+        return 200, {"docker-content-digest": "sha256:idx"}, json.dumps(index).encode()
+
+    image = images_lock.Image("workload", "registry.k8s.io/x/y", "1.0", "sha256:idx", "sha256:amd", "1", "src")
+    check = vp.check_image(image, get=fake)
+    assert check.ok, check.detail
+    assert any(u.startswith("https://mirror.example/token") for u, _ in calls)

@@ -1,0 +1,7 @@
+# Release files the WP17 installer applies (install.py downloads each into
+# testbed/out/hvpa/ and refuses it unless size and sha256 match). Hashes
+# computed from the downloads on 2026-11-14. Tab-separated.
+# name	bytes	sha256	url
+metrics-server	4330	3c7f57cdbee0f57fb0259a150e8f6d6cb4f29d72d1aa5dce8803151dd6d4c2a1	https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.1/components.yaml
+keda	782690	b43c89ffeef81722d7e2dd2c079d74789767a0f89cae1336cff784994814f6d7	https://github.com/kedacore/keda/releases/download/v2.21.0/keda-2.21.0.yaml
+vpa-chart	25493	dc9682d3d41a92b535e01d0fc2726e9d595eacd22f676ccc3f5333b4c6425624	https://github.com/kubernetes/autoscaler/releases/download/vertical-pod-autoscaler-chart-0.15.0/vertical-pod-autoscaler-0.15.0.tgz

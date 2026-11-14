@@ -12,8 +12,10 @@ redirects not followed, nothing downloaded).
 from __future__ import annotations
 
 import json
+import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -67,8 +69,35 @@ class Check:
     detail: str
 
 
+def challenged_get(url: str, headers: Mapping[str, str], get: Fetch = fetch,
+                   hops: int = 3) -> tuple[int, Mapping[str, str], bytes]:
+    """GET that follows a redirect (registry.k8s.io sends manifest requests to
+    a regional mirror with a 307) and answers a Bearer challenge with an
+    anonymous token from the challenge's realm."""
+    status, resp_headers, body = get(url, headers, "GET")
+    if status in (301, 302, 307, 308) and hops > 0 and "location" in resp_headers:
+        return challenged_get(resp_headers["location"], headers, get, hops - 1)
+    challenge = resp_headers.get("www-authenticate", "")
+    if status == 401 and challenge.lower().startswith("bearer") and hops > 0:
+        params = dict(re.findall(r'(\w+)="([^"]*)"', challenge))
+        query = urllib.parse.urlencode({k: v for k, v in params.items() if k in ("service", "scope")})
+        t_status, _, t_body = get(f"{params.get('realm', '')}?{query}", {}, "GET")
+        if t_status != 200:
+            return t_status, {}, b""
+        token = json.loads(t_body)
+        token = token.get("token") or token.get("access_token", "")
+        return challenged_get(url, {**headers, "Authorization": f"Bearer {token}"}, get, hops - 1)
+    return status, resp_headers, body
+
+
 def check_image(image: images_lock.Image, get: Fetch = fetch) -> Check:
     host, repo = split_repo(image.repository)
+    if host == "registry.k8s.io":
+        status, headers, body = challenged_get(f"https://{host}/v2/{repo}/manifests/{image.tag}",
+                                               {"Accept": ACCEPT}, get)
+        if status != 200:
+            return Check(image.ref, False, f"manifest -> {status}")
+        return _compare(image, headers, body)
     if host not in REGISTRIES:
         return Check(image.ref, False, f"no registry API known for {host}")
     api, token_url = REGISTRIES[host]
@@ -79,6 +108,10 @@ def check_image(image: images_lock.Image, get: Fetch = fetch) -> Check:
     status, headers, body = get(f"{api}/v2/{repo}/manifests/{image.tag}", auth, "GET")
     if status != 200:
         return Check(image.ref, False, f"manifest -> {status}")
+    return _compare(image, headers, body)
+
+
+def _compare(image: images_lock.Image, headers: Mapping[str, str], body: bytes) -> Check:
     digest = headers.get("docker-content-digest", "")
     index = json.loads(body)
     amd64 = [m["digest"] for m in index.get("manifests", [])
@@ -113,8 +146,15 @@ def check_model(row: Sequence[str], get: Fetch = fetch) -> Check:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    checks = [check_image(i) for i in images_lock.read_lock() if i.role != "build"]
-    checks += [check_model(r) for r in read_models()]
+    import argparse
+
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--lock", type=Path, default=images_lock.LOCK)
+    ap.add_argument("--no-models", action="store_true", help="images only (the WP17 lock has no models)")
+    args = ap.parse_args(argv)
+    checks = [check_image(i) for i in images_lock.read_lock(args.lock) if i.role != "build"]
+    if not args.no_models:
+        checks += [check_model(r) for r in read_models()]
     for c in checks:
         print(f"{'ok ' if c.ok else 'BAD'}  {c.item}: {c.detail}")
     bad = [c for c in checks if not c.ok]

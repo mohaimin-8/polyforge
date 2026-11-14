@@ -29,7 +29,10 @@ A pod is updated when its request lies outside [lower bound, upper bound], or af
 when it has run longer than the pod-lifetime threshold (12 h) and the relative difference between
 requested and recommended resources is at least the update threshold (0.1). The updater runs every
 minute (`updater-interval` 1m) and by default skips controllers with fewer than 2 replicas
-(`min-replicas` 2), unless the VPA object's update policy sets its own `minReplicas`.
+(`min-replicas` 2), unless the VPA object's update policy sets its own `minReplicas`. The VPA
+chart 0.15.0 runs the updater with `--in-place-skip-disruption-budget=true` (rendered with
+`helm template`), so in-place updates of containers whose resize policy is NotRequired skip the
+eviction tolerance (0.5) and every eligible pod is resized in the same loop.
 
 So within a run of a few hours with a fresh VPA, the upper bound is far above any request and the
 12-hour path is closed: the VPA raises a pod's CPU when the request falls below about the median usage

@@ -89,7 +89,16 @@ def pull_steps(images: Sequence[Image]) -> list[list[str]]:
 
 
 def build_steps(images: Sequence[Image]) -> list[list[str]]:
-    return [["docker", "build", "-f", im.source, "-t", im.ref, "."] for im in images if im.role == "build"]
+    """`docker build`, run from the repository root. The context is the
+    Dockerfile's own directory: the root for the product images (whose
+    .dockerignore keeps research data and testbed/ out), the service's own
+    directory for a testbed image such as testbed/hvpa/cpuburn."""
+    steps = []
+    for im in images:
+        if im.role == "build":
+            context = Path(im.source).parent.as_posix()
+            steps.append(["docker", "build", "-f", im.source, "-t", im.ref, context if context != "" else "."])
+    return steps
 
 
 def load_steps(images: Sequence[Image], cluster: str) -> list[list[str]]:
@@ -187,8 +196,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("action", choices=("plan", "pull", "build", "load", "verify"))
     ap.add_argument("--cluster", default=CLUSTER)
+    ap.add_argument("--lock", type=Path, default=LOCK, help="images.lock to act on (WP17: testbed/hvpa/images.lock)")
     args = ap.parse_args(argv)
-    images = read_lock()
+    images = read_lock(args.lock)
     if args.action == "plan":
         for cmd in pull_steps(images) + build_steps(images) + load_steps(images, args.cluster):
             print(" ".join(cmd))

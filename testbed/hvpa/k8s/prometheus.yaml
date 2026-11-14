@@ -1,0 +1,190 @@
+# WP17's own Prometheus (pf-hvpa): the WP10 one watches pf-testbed only and is
+# not touched while WP11 runs. Same image, already side-loaded into kind.
+# Scrapes the cpuburn pods (request counter for KEDA and the planner) and the
+# kubelet's cAdvisor (CPU use and CFS throttling per pod, the HPA's view).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: pf-hvpa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-pods
+  namespace: pf-hvpa
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-pods
+  namespace: pf-hvpa
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-pods
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: pf-hvpa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pf-hvpa-prometheus-nodes
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/metrics"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pf-hvpa-prometheus-nodes
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pf-hvpa-prometheus-nodes
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: pf-hvpa
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus
+  namespace: pf-hvpa
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      evaluation_interval: 5s
+      external_labels:
+        testbed: polyforge-wp17
+    scrape_configs:
+      - job_name: pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [pf-hvpa]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_phase]
+            action: drop
+            regex: Pending|Succeeded|Failed
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            regex: (.+)
+            target_label: __metrics_path__
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+      - job_name: cadvisor
+        scheme: https
+        tls_config:
+          insecure_skip_verify: true
+        authorization:
+          credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - target_label: __metrics_path__
+            replacement: /metrics/cadvisor
+        metric_relabel_configs:
+          - source_labels: [namespace]
+            action: keep
+            regex: pf-hvpa
+          - source_labels: [__name__]
+            action: keep
+            regex: container_cpu_usage_seconds_total|container_cpu_cfs_periods_total|container_cpu_cfs_throttled_periods_total|container_spec_cpu_quota
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: pf-hvpa
+  labels:
+    app.kubernetes.io/name: prometheus
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prometheus
+    spec:
+      serviceAccountName: prometheus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: prometheus
+          image: docker.io/prom/prometheus:v3.13.5
+          imagePullPolicy: Never
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=2d
+          ports:
+            - name: http
+              containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+              readOnly: true
+            - name: data
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: pf-hvpa
+spec:
+  selector:
+    app.kubernetes.io/name: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http
