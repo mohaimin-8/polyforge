@@ -14,8 +14,10 @@ import run_queue as rq  # noqa: E402
 def test_wp9_runs_first_and_start_skips_to_a_named_campaign():
     names = [c.name for c in rq.CAMPAIGNS]
     assert names == ["wp9-B-own", "wp9-A-own", "wp9-B-own-plant", "wp9-A-own-plant", "speccurve-runs",
-                     "speccurve", "morris-r20", "sobol", "wp9-B-native", "wp9-A-native"]
-    assert [c.name for c in rq.selected("sobol")] == ["sobol", "wp9-B-native", "wp9-A-native"]
+                     "speccurve", "morris-r20", "sobol", "wp9-B-native", "wp9-A-native", "wp17-pilot"]
+    assert [c.name for c in rq.selected("sobol")] == ["sobol", "wp9-B-native", "wp9-A-native", "wp17-pilot"]
+    pilot = rq.CAMPAIGNS[-1]
+    assert (pilot.cwd / pilot.args[0]).exists() and pilot.ok == (0,)
     assert "--budget" in rq.wp9("B", "own", "plant").args and rq.wp9("B", "own", "plant").args[
         rq.wp9("B", "own", "plant").args.index("--budget") + 1] == "plant"
     assert rq.selected(None) == list(rq.CAMPAIGNS)
