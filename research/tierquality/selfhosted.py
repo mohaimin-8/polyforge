@@ -1,0 +1,150 @@
+"""Answer quality of the self-hosted tiers, measured (programme 2, WP7, mode B).
+
+Plan, WP7 mode B: "run each served model on 500-1,000 benchmark questions
+with known answers; accuracy with a Wilson 95% interval; record latency and
+throughput in the same run." Benchmark: ARC-Challenge, test split (Clark et
+al. 2018, allenai/ai2_arc, CC BY-SA 4.0), a seeded sample of 500 questions.
+Models: the testbed's pinned Qwen2.5 Instruct GGUFs (Q4_K_M; testbed/k8s/
+base/models.lock), served one at a time by the local llama.cpp server on the
+CPU. Zero-shot prompt, temperature 0, one token constrained by a grammar to a
+valid choice letter, so every answer is the model's own pick among the
+choices. Quantised CPU models, so the numbers are for these files, not for
+the models' published fp16 scores.
+
+    python selfhosted.py fetch            # the benchmark parquet into data/
+    python selfhosted.py run [--n 500]    # writes data/selfhosted_answers.csv and SELFHOSTED.md
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import random
+import subprocess
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+import pandas as pd
+
+HERE = Path(__file__).resolve().parent
+DATA = HERE / "data"
+CAL = HERE.parents[0] / "calibration" / "data"
+SERVER = CAL / "llama-cpp" / "llama-server.exe"
+MODELS = {"0.5B": "qwen2.5-0.5b-instruct-q4_k_m.gguf", "1.5B": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+          "3B": "qwen2.5-3b-instruct-q4_k_m.gguf"}
+PORT, THREADS, SEED = 8993, 6, 20261114
+PARQUET_API = "https://huggingface.co/api/datasets/allenai/ai2_arc/parquet/ARC-Challenge/test"
+Z = 1.959963984540054
+
+
+def fetch() -> Path:
+    DATA.mkdir(exist_ok=True)
+    urls = json.loads(urllib.request.urlopen(PARQUET_API, timeout=60).read())
+    out = DATA / "arc_challenge_test.parquet"
+    with urllib.request.urlopen(urls[0], timeout=120) as r:
+        out.write_bytes(r.read())
+    return out
+
+
+def questions(n: int) -> list[dict]:
+    df = pd.read_parquet(DATA / "arc_challenge_test.parquet")
+    rows = df.to_dict(orient="records")
+    random.Random(SEED).shuffle(rows)
+    out = []
+    for r in rows[:n]:
+        labels, texts = list(r["choices"]["label"]), list(r["choices"]["text"])
+        letters = "ABCDE"[:len(texts)]
+        out.append({"id": r["id"], "letters": letters, "answer": letters[labels.index(r["answerKey"])],
+                    "prompt": "Question: " + r["question"] + "\n"
+                              + "".join(f"{l}. {t}\n" for l, t in zip(letters, texts)) + "Answer:"})
+    return out
+
+
+def _post(body: dict) -> dict:
+    req = urllib.request.Request(f"http://127.0.0.1:{PORT}/completion", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"})
+    return json.loads(urllib.request.urlopen(req, timeout=600).read())
+
+
+def _wait_healthy(deadline_s: float = 300) -> None:
+    t0 = time.time()
+    while time.time() - t0 < deadline_s:
+        try:
+            if urllib.request.urlopen(f"http://127.0.0.1:{PORT}/health", timeout=5).status == 200:
+                return
+        except OSError:
+            time.sleep(1)
+    raise RuntimeError("llama-server did not become healthy")
+
+
+def run_model(name: str, qs: list[dict]) -> list[dict]:
+    server = subprocess.Popen([str(SERVER), "-m", str(CAL / MODELS[name]), "--port", str(PORT), "-t", str(THREADS),
+                               "--parallel", "1", "-c", "2048", "--no-webui", "--log-disable"],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    rows = []
+    try:
+        _wait_healthy()
+        for q in qs:
+            grammar = "root ::= " + " | ".join(f'"{l}"' for l in q["letters"])
+            t0 = time.perf_counter()
+            out = _post({"prompt": q["prompt"], "n_predict": 1, "temperature": 0.0, "grammar": grammar,
+                         "cache_prompt": False})
+            pick = out.get("content", "").strip()[:1]
+            rows.append({"model": name, "id": q["id"], "pick": pick, "answer": q["answer"],
+                         "correct": int(pick == q["answer"]), "latency_s": time.perf_counter() - t0})
+    finally:
+        server.terminate()
+        try:
+            server.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            server.kill()
+    return rows
+
+
+def wilson(k: int, n: int) -> tuple[float, float]:
+    p = k / n
+    c = (p + Z * Z / (2 * n)) / (1 + Z * Z / n)
+    h = Z * math.sqrt(p * (1 - p) / n + Z * Z / (4 * n * n)) / (1 + Z * Z / n)
+    return c - h, c + h
+
+
+def run(n: int) -> int:
+    qs = questions(n)
+    rows = [r for name in MODELS for r in run_model(name, qs)]
+    df = pd.DataFrame(rows)
+    df.to_csv(DATA / "selfhosted_answers.csv", index=False)
+    chance = sum(1 / len(q["letters"]) for q in qs) / len(qs)
+    L = ["# Answer quality of the self-hosted tiers (WP7, mode B)", "",
+         f"Generated by `research/tierquality/selfhosted.py`. ARC-Challenge test, {len(qs)} questions (seed {SEED}), "
+         "zero-shot, temperature 0, one grammar-constrained answer letter; Qwen2.5 Instruct Q4_K_M on the local "
+         f"llama.cpp CPU server ({THREADS} threads, one request at a time). Chance level {chance:.3f}.", "",
+         "| model | correct | accuracy [95% Wilson] | mean latency per question s |", "|---|---:|---|---:|"]
+    for name, g in df.groupby("model", sort=False):
+        k, m = int(g.correct.sum()), len(g)
+        lo, hi = wilson(k, m)
+        L.append(f"| Qwen2.5-{name}-Instruct Q4_K_M | {k}/{m} | {k / m:.3f} [{lo:.3f}, {hi:.3f}] | "
+                 f"{g.latency_s.mean():.2f} |")
+    L.append("")
+    (HERE / "SELFHOSTED.md").write_text("\n".join(L), encoding="utf-8")
+    print("\n".join(L))
+    return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("fetch")
+    r = sub.add_parser("run")
+    r.add_argument("--n", type=int, default=500)
+    args = ap.parse_args()
+    if args.cmd == "fetch":
+        print(fetch())
+        return 0
+    return run(args.n)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
