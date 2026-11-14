@@ -83,4 +83,26 @@ def test_prometheus_checks_build_queries_over_the_run_window():
     out = cr.prometheus_checks(query, start=1000.0, end=1600.0)
     assert out["window"] == "600s" and out["distribution_findings"] == []
     assert out["throttled_period_share"] == {"a": 0.05}
-    assert all(at == 1600.0 and "[600s]" in q for q, at in seen)
+    assert all(at == 1600.0 and ("[600s]" in q or "last_over_time" in q) for q, at in seen)
+
+
+def test_a_pod_scaled_down_at_the_start_is_not_a_starved_replica():
+    def query(promql, at):
+        if "last_over_time" in promql:   # live at the end: a and b; c went at the start
+            return [{"metric": {"tier": "small", "pod": p}, "value": [at, "1"]} for p in ("a", "b")]
+        if "tokens_predicted" in promql:
+            return [{"metric": {"tier": "small", "pod": "a"}, "value": [at, "5000"]},
+                    {"metric": {"tier": "small", "pod": "b"}, "value": [at, "5100"]},
+                    {"metric": {"tier": "small", "pod": "c"}, "value": [at, "0"]}]
+        return []
+
+    out = cr.prometheus_checks(query, 0.0, 600.0)
+    assert out["distribution_findings"] == [] and out["pods_not_live"] == ["small/c"]
+    assert set(out["token_shares"]["small"]) == {"a", "b"}
+
+
+def test_a_tier_with_too_little_work_is_not_judged():
+    tokens = {("mid", "a"): 48.0, ("mid", "b"): 0.0, ("small", "x"): 9000.0, ("small", "y"): 200.0}
+    kept, skipped = cr.judged(tokens, set(tokens))
+    assert "mid" in skipped and ("mid", "b") not in kept
+    assert cr.distribution_findings(cr.pod_shares(kept))   # small is judged, and y is starved

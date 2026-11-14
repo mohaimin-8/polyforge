@@ -126,10 +126,41 @@ def distribution_findings(shares: Mapping[str, Mapping[str, float]], min_fair: f
     return findings
 
 
+MIN_TOKENS_PER_POD = 20 * 48   # about 20 answers of 48 tokens per pod: below that a split is noise
+
+
+def live_pods(query: Query, end: float) -> set[tuple]:
+    """(tier, pod) of the model servers scraped in the window's last 30 s. A pod
+    scaled down as the run starts keeps a series inside the window but serves
+    nothing; it is not a starved replica (WP11, 2026-11-14: three runs flagged
+    so, with the live pods splitting the load 0.496 / 0.504)."""
+    return set(by_labels(query("count by (tier, pod) (last_over_time(llamacpp:tokens_predicted_total[30s]))", end),
+                         "tier", "pod"))
+
+
+def judged(tokens: Mapping[tuple, float], alive: set) -> tuple[dict, dict]:
+    """The live pods whose spread can be judged, and each skipped tier with why:
+    a tier that got too little work (one request on two pods) has no fair share."""
+    live = {k: v for k, v in tokens.items() if k in alive}
+    totals: dict[str, list[float]] = {}
+    for (tier, _pod), v in live.items():
+        totals.setdefault(tier, []).append(v)
+    kept, skipped = {}, {}
+    for (tier, pod), v in live.items():
+        total, n = sum(totals[tier]), len(totals[tier])
+        if total < MIN_TOKENS_PER_POD * n:
+            skipped[tier] = f"{total:.0f} tokens over {n} pods: too few to judge the spread"
+        else:
+            kept[(tier, pod)] = v
+    return kept, skipped
+
+
 def prometheus_checks(query: Query, start: float, end: float) -> dict:
     window = f"{max(1, int(end - start))}s"
-    tokens = by_labels(query(f"sum by (tier, pod) (increase(llamacpp:tokens_predicted_total[{window}]))", end),
-                       "tier", "pod")
+    all_tokens = by_labels(query(f"sum by (tier, pod) (increase(llamacpp:tokens_predicted_total[{window}]))", end),
+                           "tier", "pod")
+    alive = live_pods(query, end)
+    tokens, skipped = judged(all_tokens, alive)
     throttled = by_labels(query(
         f'sum by (pod) (increase(container_cpu_cfs_throttled_periods_total{{container="llama-server"}}[{window}]))'
         f' / sum by (pod) (increase(container_cpu_cfs_periods_total{{container="llama-server"}}[{window}]))', end), "pod")
@@ -137,6 +168,8 @@ def prometheus_checks(query: Query, start: float, end: float) -> dict:
                           end), "pod")
     shares = pod_shares(tokens)
     return {"window": window, "token_shares": shares, "distribution_findings": distribution_findings(shares),
+            "token_shares_all_series": pod_shares(all_tokens), "distribution_skipped": skipped,
+            "pods_not_live": sorted("/".join(k) for k in all_tokens if k not in alive),
             "throttled_period_share": {k[0]: v for k, v in throttled.items()},
             "cpu_cores_used": {k[0]: v for k, v in cpu.items()}}
 
