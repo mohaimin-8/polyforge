@@ -116,9 +116,12 @@ def main() -> int:
         return 5
     py, kc = sys.executable, ["kubectl", "--context", CONTEXT]
     keep_wp11_runs()
-    commit(["testbed/validation/runs"],
-           "results(testbed): WP11 run data (k6 samples, summaries, checks, run records)\n\n"
-           "score.py --runs testbed/validation/runs reproduces VALIDATION.md; no prompt text, no keys.")
+    step([py, str(TESTBED / "validation" / "diagnose.py"), "--runs", str(TESTBED / "validation" / "runs")],
+         fatal=False)
+    commit(["testbed/validation/runs", "testbed/validation/DIAGNOSE.md"],
+           "results(testbed): WP11 run data and the error breakdown by cell factor\n\n"
+           "score.py --runs testbed/validation/runs reproduces VALIDATION.md; diagnose.py wrote DIAGNOSE.md\n"
+           "(descriptive). No prompt text, no keys.")
     step(kc + ["-n", "pf-testbed", "scale", "deployment", "--all", "--replicas=0"])
     step([py, "twin_pilot.py"], cwd=RESEARCH)
     commit(["research/hvpa/TWIN_PILOT.md", "research/hvpa/out/twin_pilot.csv"],
