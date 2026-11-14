@@ -75,6 +75,16 @@ def test_local_pin_check_flags_unpinned_and_missing_images():
     assert len(problems) == len(workloads) - 1
 
 
+def test_a_docker_hub_pin_reported_by_its_familiar_name_passes():
+    hub = next(i for i in IMAGES if i.role == "workload" and i.repository == "docker.io/library/postgres")
+    familiar = "postgres@" + hub.index_digest
+    run = fake_run({("docker", "image", "inspect", "--format", "{{json .RepoDigests}}", hub.ref):
+                    (0, json.dumps([familiar]))})
+    assert im.check_local_pins([hub], run=run) == []
+    assert im.normalise_digest("envoyproxy/envoy@sha256:ab") == "docker.io/envoyproxy/envoy@sha256:ab"
+    assert im.normalise_digest("ghcr.io/x/y@sha256:ab") == "ghcr.io/x/y@sha256:ab"
+
+
 def test_normalise_matches_containerd_names():
     assert im.normalise("polyforge/ai-gateway:dev") == "docker.io/polyforge/ai-gateway:dev"
     assert im.normalise("docker.io/library/python:3.13.17-slim-bookworm") == "docker.io/library/python:3.13.17-slim-bookworm"

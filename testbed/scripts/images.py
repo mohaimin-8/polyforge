@@ -121,7 +121,7 @@ def check_local_pins(images: Sequence[Image], run: Runner = run_cmd) -> list[str
             problems.append(f"{im.ref}: not present locally (run `images.py pull`)")
             continue
         digests = json.loads(proc.stdout.strip() or "[]")
-        if im.pinned not in digests:
+        if normalise_digest(im.pinned) not in {normalise_digest(d) for d in digests}:
             problems.append(f"{im.ref}: RepoDigests {digests} lack the pinned {im.pinned}")
     return problems
 
@@ -138,14 +138,25 @@ def node_images(cluster: str, run: Runner = run_cmd) -> dict[str, list[str]]:
     return out
 
 
-def normalise(ref: str) -> str:
-    """containerd's fully qualified form of a reference (docker.io/library/...)."""
-    name, _, tag = ref.rpartition(":")
+def _qualified(name: str) -> str:
     if "/" not in name:
         name = f"library/{name}"
     if "." not in name.split("/")[0] and name.split("/")[0] != "localhost":
         name = f"docker.io/{name}"
-    return f"{name}:{tag}"
+    return name
+
+
+def normalise(ref: str) -> str:
+    """containerd's fully qualified form of a reference (docker.io/library/...)."""
+    name, _, tag = ref.rpartition(":")
+    return f"{_qualified(name)}:{tag}"
+
+
+def normalise_digest(ref: str) -> str:
+    """The same for a digest reference: Docker reports Docker Hub images by
+    their familiar name (postgres@sha256:...), the lock pins the full one."""
+    name, _, digest = ref.partition("@")
+    return f"{_qualified(name)}@{digest}"
 
 
 def verify_node(images: Sequence[Image], present: dict[str, list[str]]) -> tuple[list[str], dict]:
