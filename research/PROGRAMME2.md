@@ -20,6 +20,7 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP10 testbed | `testbed/` | runbook in `testbed/README.md`; `python scripts/bringup.py` | built and up on kind (2026-11-14) |
 | WP11 simulator against the testbed | `testbed/validation/` | `cell_schedules.py`, `predict.py`, `run_cells.py`, `score.py` | `VALIDATION.md` once the cells have run |
 | WP15 external check (RouteBalance) | `research/external/routebalance/` | `python -I analyse.py report` | `REPORT.md`, `RESULTS.md` |
+| WP16 benchmark: any controller scored by regret | `research/benchmark/` | `python bench.py --controller module:Class --plant B` | per-workload CSV, summary JSON |
 | WP17 horizontal with vertical autoscaling (twin) | `research/hvpa/` | `python twin_pilot.py` | `VPA_MODEL.md`, `TWIN_PILOT.md` (a-priori plant) |
 | WP22 controls, adversarial search, blind predictions | `research/controls/` | `python negative_control.py`, `adversarial_search.py`, `blind_predictions.py` | `NEGATIVE_CONTROL.md`, `ADVERSARIAL_SEARCH.md`, `DIAGNOSE_158.md`, `RANDOM_SAMPLE_CHECK.md`, `GATE_REACH.md` |
 | WP23 the index as a tool | `tools/index-probe/` | `python index_probe.py log|box ...` | `README.md` |
@@ -27,7 +28,7 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (11 steps; two need downloaded inputs and are skipped without them).
 
 Tests: `python -m pytest research/theory research/control2 research/plant2 research/population
-research/speccurve research/comparators research/controls research/cachereplay research/hvpa tools/index-probe -q`
+research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark tools/index-probe -q`
 (CI runs the same line), plus `testbed/` (`python -m pytest -q` inside it).
 
 What the pilots say so far, in one line each (details in the files above):
