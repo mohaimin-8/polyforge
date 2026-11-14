@@ -61,6 +61,7 @@ class Plant:
     slo_s: float = 0.5
     price_core_hr: float = 0.526 / 4
     cpu_levels: tuple = (0.25, 0.5, 1.0, 2.0)
+    node_cpu: float = 6.0          # cores the node leaves for the service (measured with the calibration)
     status: str = "a-priori placeholder"
 
     def capacity_rps(self, cpu: float) -> float:
@@ -95,4 +96,5 @@ def from_calibration(path: Path) -> Plant:
     cal = json.loads(Path(path).read_text(encoding="utf-8"))
     return replace(Plant(), cpu_per_request_s=cal["cpu_per_request_s"],
                    congestion_exponent=cal["congestion_exponent"], tail_f0=cal["tail_f0"],
-                   tail_b=cal["tail_b"], slo_s=cal["slo_s"], status=f"measured: {path.name}")
+                   tail_b=cal["tail_b"], slo_s=cal["slo_s"], node_cpu=float(cal.get("node_cpu", 6.0)),
+                   status=f"measured: {path.name}")

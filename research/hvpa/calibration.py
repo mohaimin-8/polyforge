@@ -11,7 +11,9 @@ The plan's check: capacity is linear in CPU when every w(c) lies within
 form), otherwise the check fails and is reported (the measured curve must
 then replace the linear form before the twin predicts). a, f0 and b are the
 medians over levels. Rule fixed here, before any live run: the SLO is
-SLO_FACTOR x s(1 core), the twin's choice (10 x the CPU per request).
+SLO_FACTOR x s(1 core), the twin's choice (10 x the CPU per request). With
+--node-cpu-file, the node's free CPU (calibrate_service.py measures it) is
+the twin's node size.
 
     python calibration.py --curves ../../testbed/out/hvpa/curves --out calibration.json
 """
@@ -46,7 +48,7 @@ def level(curve_dir: Path) -> dict:
             "l0_fitted_s": power["l0"], "f0": tail["f0"], "b": tail["b"]}
 
 
-def fit(curves: Path) -> dict:
+def fit(curves: Path, node_cpu_file: Path | None = None) -> dict:
     rows = sorted((level(d) for d in curves.iterdir() if (d / "load_curve_meta.json").exists()),
                   key=lambda r: r["cpu"])
     if not rows:
@@ -59,15 +61,19 @@ def fit(curves: Path) -> dict:
             "tail_b": max(0.0, statistics.median(r["b"] for r in rows)),
             "slo_s": SLO_FACTOR * one_core["s_s"], "linear_within_10pct": worst <= LINEAR_TOLERANCE,
             "worst_w_deviation": worst, "levels": rows,
-            "rule": f"SLO = {SLO_FACTOR:g} x the unloaded latency at {one_core['cpu']:g} core"}
+            "rule": f"SLO = {SLO_FACTOR:g} x the unloaded latency at {one_core['cpu']:g} core",
+            **({"node_cpu": json.loads(node_cpu_file.read_text(encoding="utf-8"))["node_cpu"]}
+               if node_cpu_file else {})}
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--curves", type=Path, required=True)
     ap.add_argument("--out", type=Path, default=HERE / "calibration.json")
+    ap.add_argument("--node-cpu-file", type=Path, default=None,
+                    help="node_cpu.json from calibrate_service.py: the cores the node leaves for the service")
     args = ap.parse_args(argv)
-    cal = fit(args.curves)
+    cal = fit(args.curves, args.node_cpu_file)
     args.out.write_text(json.dumps(cal, indent=1), encoding="utf-8")
     print(f"w {cal['cpu_per_request_s'] * 1000:.1f} ms, a {cal['congestion_exponent']:.2f}, SLO {cal['slo_s']:.3f} s; "
           f"linear within 10 %: {cal['linear_within_10pct']} (worst {cal['worst_w_deviation']:.1%})")

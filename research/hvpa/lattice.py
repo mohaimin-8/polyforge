@@ -43,7 +43,8 @@ def box(plant, r: int, c: float, width: int) -> tuple[list[int], list[float]]:
 def decide(plant, rate: float, r: int, c: float, width: int, joint: bool) -> tuple[tuple, dict]:
     """(next (replicas, CPU), log record) of the joint or the per-knob planner."""
     rs, cs = box(plant, r, c, width)
-    J = {(rr, cc): lattice_j(plant, rate, rr, cc) for rr in rs for cc in cs if fits(rr, cc)}
+    node = getattr(plant, "node_cpu", NODE_CPU)
+    J = {(rr, cc): lattice_j(plant, rate, rr, cc) for rr in rs for cc in cs if fits(rr, cc, node)}
     if (r, c) not in J:
         J[(r, c)] = lattice_j(plant, rate, r, c)   # the current state is scored even if a resize left it over
     key = lambda rc: (J[rc], rc != (r, c), rc[0] * rc[1])  # noqa: E731

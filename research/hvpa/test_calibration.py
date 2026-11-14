@@ -47,3 +47,14 @@ def test_a_sublinear_level_fails_the_plans_check(tmp_path):
 def test_no_curves_is_an_error(tmp_path):
     with pytest.raises(ValueError):
         calibration.fit(tmp_path)
+
+
+def test_the_node_size_is_carried_into_the_plant(tmp_path):
+    for c in (0.25, 0.5, 1.0, 2.0):
+        _curve(tmp_path / f"c{int(c * 1000)}m", c)
+    nf = tmp_path / "node_cpu.json"
+    nf.write_text(json.dumps({"node_cpu": 4.75}))
+    cal = calibration.fit(tmp_path, nf)
+    out = tmp_path / "cal.json"
+    out.write_text(json.dumps(cal))
+    assert cal["node_cpu"] == 4.75 and plant.from_calibration(out).node_cpu == 4.75

@@ -28,7 +28,7 @@ index (oscillation of the remainder over the box's feasible points) and the
 one-step loss of the per-knob choice (research/theory/INDEX_THEORY.md); a
 per-knob choice whose combined move does not fit the node is applied anyway
 and counted (the node then leaves pods Pending or defers resizes).
-Node: pods are scheduled in creation order while their requests fit NODE_CPU
+Node: pods are scheduled in creation order while their requests fit the plant's node_cpu
 (the rest stay Pending); a pod serves STARTUP_S after it is scheduled; an
 in-place resize that does not fit is deferred and after 5 min the pod is
 recreated at the new size (VPA docs/features.md), to wait for the scheduler.
@@ -84,6 +84,7 @@ class Pod:
 @dataclass
 class Cluster:
     pods: list = field(default_factory=list)
+    node_cpu: float = NODE_CPU
     resizes: int = 0
     recreations: int = 0
     pending_steps: int = 0
@@ -96,7 +97,7 @@ class Cluster:
 
     def schedule(self, now: float) -> None:
         for p in self.pods:
-            if p.scheduled_s is None and self.scheduled_cpu() + p.cpu <= NODE_CPU + EPS:
+            if p.scheduled_s is None and self.scheduled_cpu() + p.cpu <= self.node_cpu + EPS:
                 p.scheduled_s = now
 
     def scale_to(self, n: int, cpu: float, now: float) -> None:
@@ -113,7 +114,7 @@ class Cluster:
             pod.resize_to = pod.resize_since = None
         elif pod.scheduled_s is None:
             pod.cpu = cpu
-        elif self.scheduled_cpu() - pod.cpu + cpu <= NODE_CPU + EPS:
+        elif self.scheduled_cpu() - pod.cpu + cpu <= self.node_cpu + EPS:
             pod.cpu, pod.resize_to, pod.resize_since = cpu, None, None
             self.resizes += 1
         elif pod.resize_to is None or abs(pod.resize_to - cpu) > EPS:
@@ -221,7 +222,7 @@ class Planner:
 
 
 def run(arm, plant: Plant, rates: np.ndarray) -> dict:
-    cl = Cluster()
+    cl = Cluster(node_cpu=plant.node_cpu)
     arm.start(cl)
     totals = {"cost": 0.0, "late": 0.0, "requests": 0.0}
     seen, usage, last_n, last_dir, reversals = float(rates[0]), {}, len(cl.pods), 0, 0
@@ -255,12 +256,13 @@ def run(arm, plant: Plant, rates: np.ndarray) -> dict:
 
 
 def best_static(plant: Plant, rates: np.ndarray) -> dict:
-    runs = [run(Static(r, c), plant, rates) for r in range(RMIN, RMAX + 1) for c in plant.cpu_levels if fits(r, c)]
+    runs = [run(Static(r, c), plant, rates) for r in range(RMIN, RMAX + 1) for c in plant.cpu_levels
+            if fits(r, c, plant.node_cpu)]
     return min(runs, key=lambda x: x["J"])
 
 
 def clairvoyant(plant: Plant, rates: np.ndarray) -> float:
     """Sum over steps of the best fitting allocation for that step's known
     rate, with no actuation delay: a lower bound on every arm's J."""
-    points = [(r, c) for r in range(RMIN, RMAX + 1) for c in plant.cpu_levels if fits(r, c)]
+    points = [(r, c) for r in range(RMIN, RMAX + 1) for c in plant.cpu_levels if fits(r, c, plant.node_cpu)]
     return float(sum(min(lattice_j(plant, float(rate), r, c, DT_S) for r, c in points) for rate in rates))
