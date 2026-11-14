@@ -261,8 +261,19 @@ def recheck(c: Campaign, arms_to_check: tuple[str, ...] = ("rules", "joint")) ->
                              f"gave different {diff or again.get('error')}; not running anything")
 
 
+def same_plant(camps: dict[tuple[str, str], Campaign]) -> None:
+    """An asymmetric specification pairs a plant's two budget campaigns: they
+    must have run on the same plant constants."""
+    for p in CHOICES["plant"]:
+        digests = {b: camps[(p, b)].tuned["settings"].get("plant_digest") for b in CHOICES["joint_budget"]}
+        if None in digests.values() or len(set(digests.values())) != 1:
+            raise SystemExit(f"plant {p}: the budget campaigns ran on different or unrecorded plant constants "
+                             f"{digests}; rerun the older one")
+
+
 def campaigns(root: Path = WP9) -> dict[tuple[str, str], Campaign]:
     out = {(p, b): load(p, b, root) for p in CHOICES["plant"] for b in CHOICES["joint_budget"]}
+    same_plant(out)
     for c in out.values():
         check_against_wp9(c)
     return out

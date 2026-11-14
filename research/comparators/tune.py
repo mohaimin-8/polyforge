@@ -226,9 +226,17 @@ def dry_run(args: argparse.Namespace, configs: dict, tuning: list[str], evaluati
     print(f"total: {total_t} tuning runs + at most {total_e} evaluation runs + {refs} reference worlds")
 
 
+def plant_digest(mode: str) -> str:
+    """A digest of the plant's model form and economy: campaigns run on
+    different plant constants never pass as the same plant (2026-11-15: the
+    WP9 pilot predates the measured cache curve and tier qualities)."""
+    return hashlib.sha256(json.dumps(plant_bundle(mode), sort_keys=True, default=repr).encode()).hexdigest()[:12]
+
+
 def meta_of(args: argparse.Namespace, tuning: list[str], evaluation: list[str], classes: dict) -> dict:
     return {
-        "plant": args.plant, "mix": args.mix, "cluster_size": args.cluster_size, "steps": args.steps,
+        "plant": args.plant, "plant_digest": plant_digest(args.plant),
+        "mix": args.mix, "cluster_size": args.cluster_size, "steps": args.steps,
         "arms": list(args.arms), "configs": args.configs, "include_default": not args.no_default,
         "seed": args.seed, "budget": args.budget, "quality_weight": args.quality_weight,
         "granularity": args.granularity, "granularities": list(granularities(args)),

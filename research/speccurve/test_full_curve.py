@@ -117,3 +117,17 @@ def test_find_takes_the_one_finished_campaign_and_not_a_quality_variant(tmp_path
     assert fc.find("B", "enforced", tmp_path).name == "plantB_own_large_s120_enforced_abcd1234"
     with pytest.raises(SystemExit):
         fc.find("B", "plant", tmp_path)                              # not finished: no tuned.json
+
+
+def test_a_plants_two_budget_campaigns_must_share_the_plant_constants():
+    rng = np.random.default_rng(13)
+    camps = {(p, b): campaign(rng, p, b) for p in ("A", "B") for b in ("enforced", "plant")}
+    for c in camps.values():
+        c.tuned["settings"]["plant_digest"] = "abc" if c.plant == "A" else "def"
+    fc.same_plant(camps)
+    camps[("B", "plant")].tuned["settings"]["plant_digest"] = "xyz"
+    with pytest.raises(SystemExit):
+        fc.same_plant(camps)
+    del camps[("B", "plant")].tuned["settings"]["plant_digest"]
+    with pytest.raises(SystemExit):
+        fc.same_plant(camps)
