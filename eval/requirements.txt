@@ -7,5 +7,7 @@ scipy>=1.11
 statsmodels>=0.14
 matplotlib>=3.8
 seaborn>=0.13
+# Programme 2, WP5 global sensitivity (research/sensitivity/sobol.py)
+SALib==1.6.0
 # Tests
 pytest>=8.0

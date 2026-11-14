@@ -28,7 +28,7 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (11 steps; two need downloaded inputs and are skipped without them).
 
 Tests: `python -m pytest research/theory research/control2 research/plant2 research/population
-research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark tools/index-probe -q`
+research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark research/sensitivity tools/index-probe -q`
 (CI runs the same line), plus `testbed/` (`python -m pytest -q` inside it).
 
 What the pilots say so far, in one line each (details in the files above):

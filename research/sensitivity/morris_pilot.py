@@ -87,8 +87,28 @@ def run_one(job: tuple) -> dict:
             "cost": m["total_cost_usd"], "violation": m["mean_violation"], "wall_s": time.time() - t0, **values}
 
 
-def jobs(points: np.ndarray, names: list[str], fac: list) -> tuple[list, list[dict]]:
+def common_seeds(workloads: list[str]) -> dict[str, int]:
+    """One demand seed per workload, from the default plant, so every sampled
+    plant draws the same demand (the harness otherwise derives the seed from
+    the plant's own constants, mixing demand noise into the plant's effect)."""
+    form, econ = plant.mode_b()
+    spec = hconfig.ExperimentSpec(
+        name="wp5_crn", steps=120, reps=1, systems=["x_joint"], workloads=workloads, tenant_mixes=["own"],
+        cluster_sizes=["large"], shared_seeds=True, timeseries_reps=0, model_form=form, economy=econ)
+    return {r.workload: r.seed for r in hconfig.expand(spec)}
+
+
+def factor_names_of(runs: pd.DataFrame) -> list[str]:
+    """The factors a screen ran with, in its order: run_one writes them after
+    wall_s. A saved screen is read with its own design even after plant.py
+    gains factors (2026-11-14: the measured tier qualities got WP5 ranges)."""
+    cols = list(runs.columns)
+    return cols[cols.index("wall_s") + 1:]
+
+
+def jobs(points: np.ndarray, names: list[str], fac: list, crn: bool = False) -> tuple[list, list[dict]]:
     workloads = pw.names("tuning")[:N_WORKLOADS]
+    seeds = common_seeds(workloads) if crn else None
     out, plants = [], []
     for pid, x in enumerate(points.reshape(-1, points.shape[-1])):
         values = {c.name: c.sweep[0] + float(u) * (c.sweep[1] - c.sweep[0]) for c, u in zip(fac, x)}
@@ -98,7 +118,7 @@ def jobs(points: np.ndarray, names: list[str], fac: list) -> tuple[list, list[di
             workloads=workloads, tenant_mixes=["own"], cluster_sizes=["large"],
             shared_seeds=True, timeseries_reps=0, model_form=form, economy=econ)
         for run in hconfig.expand(spec):
-            out.append((pid, values, run))
+            out.append((pid, values, dataclasses.replace(run, seed=seeds[run.workload]) if seeds else run))
         plants.append({"plant": pid, **values})
     return out, plants
 
@@ -124,19 +144,24 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=max(1, min(6, (os.cpu_count() or 2) - 2)))
     ap.add_argument("--report-only", action="store_true",
                     help="rebuild the report from data/morris_runs.csv.gz without running anything")
+    ap.add_argument("--crn", action="store_true",
+                    help="common random numbers: every plant draws the same demand per workload")
     args = ap.parse_args()
     fac = factors()
     names = [c.name for c in fac]
     traj = trajectories(len(fac), args.trajectories, np.random.default_rng(SEED))
-    todo, _ = jobs(traj, names, fac)
+    todo, _ = jobs(traj, names, fac, crn=args.crn)
     print(f"{len(fac)} factors, {traj.shape[0] * traj.shape[1]} plants, {len(todo)} runs", flush=True)
     t0 = time.time()
     (HERE / "data").mkdir(exist_ok=True)
     if args.report_only:
-        return write_report(pd.read_csv(HERE / "data" / "morris_runs.csv.gz"), traj, names, fac, args, t0)
+        saved = pd.read_csv(HERE / "data" / "morris_runs.csv.gz")
+        names = factor_names_of(saved)
+        traj = trajectories(len(names), args.trajectories, np.random.default_rng(SEED))
+        return write_report(saved, traj, names, names, args, t0)
     # Resumable: every finished run is appended at once, and a restart skips
     # the runs already on disk (a killed session must not lose finished work).
-    partial = HERE / "data" / f"morris_runs_r{args.trajectories}.partial.csv"
+    partial = HERE / "data" / f"morris_runs_r{args.trajectories}{'_crn' if args.crn else ''}.partial.csv"
     done = set()
     if partial.exists():
         prev = pd.read_csv(partial)
