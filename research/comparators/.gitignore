@@ -1,3 +1,4 @@
 smoke/
 __pycache__/
 pilot/*/journal.jsonl
+full/*/journal.jsonl
