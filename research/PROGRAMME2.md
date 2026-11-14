@@ -22,6 +22,8 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP22 controls, adversarial search, blind predictions | `research/controls/` | `python negative_control.py`, `adversarial_search.py`, `blind_predictions.py` | `NEGATIVE_CONTROL.md`, `ADVERSARIAL_SEARCH.md`, `DIAGNOSE_158.md`, `RANDOM_SAMPLE_CHECK.md`, `GATE_REACH.md` |
 | WP23 the index as a tool | `tools/index-probe/` | `python index_probe.py log|box ...` | `README.md` |
 
+Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (11 steps; two need downloaded inputs and are skipped without them).
+
 Tests: `python -m pytest research/theory research/control2 research/plant2 research/population
 research/speccurve research/comparators research/controls research/cachereplay tools/index-probe -q`
 (CI runs the same line), plus `testbed/` (`python -m pytest -q` inside it).
