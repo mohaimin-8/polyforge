@@ -48,6 +48,12 @@ STEPS = [
     ("WP11 score", T / "validation", ["score.py", "--runs", "runs"], ["VALIDATION.md"], ["runs/actuator.jsonl"]),
     ("WP11 error breakdown", T / "validation", ["diagnose.py", "--runs", "runs"], ["DIAGNOSE.md"],
      ["runs/actuator.jsonl"]),
+    ("WP5 Morris screen, r = 20", R / "sensitivity", ["morris_pilot.py", "--trajectories", "20", "--crn",
+                                                     "--report-only"], ["MORRIS_r20_crn.md"],
+     ["data/morris_runs_r20_crn.csv.gz"]),
+    ("WP5 Sobol indices", R / "sensitivity", ["sobol.py", "--report-only"], ["SOBOL.md"], ["data/sobol_runs.csv.gz"]),
+    ("WP5 specification curve, arms re-selected", R / "speccurve", ["full_curve.py", "curve"],
+     ["FULL_SPEC_CURVE.md"], ["full/curve_effects.csv.gz"]),
 ]
 
 

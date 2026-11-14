@@ -160,7 +160,8 @@ def main(argv: list[str] | None = None) -> int:
                 pd.DataFrame([row]).to_csv(partial, mode="a", header=not partial.exists(), index=False)
                 if i % 200 == 0:
                     print(f"{i}/{len(todo)} runs, {time.time() - t0:.0f} s", flush=True)
-    runs = pd.read_csv(partial)
+    # the partial file is not committed: a report-only rebuild elsewhere reads the finished runs
+    runs = pd.read_csv(partial if partial.exists() or not args.report_only else OUT / "sobol_runs.csv.gz")
     pp = per_plant(runs)
     if len(pp) != len(X):
         raise RuntimeError(f"{len(pp)} of {len(X)} plants finished; rerun to resume")

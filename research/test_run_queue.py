@@ -13,8 +13,11 @@ import run_queue as rq  # noqa: E402
 
 def test_wp9_runs_first_and_start_skips_to_a_named_campaign():
     names = [c.name for c in rq.CAMPAIGNS]
-    assert names == ["wp9-B-own", "wp9-A-own", "morris-r20", "sobol", "wp9-B-native", "wp9-A-native"]
+    assert names == ["wp9-B-own", "wp9-A-own", "wp9-B-own-plant", "wp9-A-own-plant", "speccurve-runs",
+                     "speccurve", "morris-r20", "sobol", "wp9-B-native", "wp9-A-native"]
     assert [c.name for c in rq.selected("sobol")] == ["sobol", "wp9-B-native", "wp9-A-native"]
+    assert "--budget" in rq.wp9("B", "own", "plant").args and rq.wp9("B", "own", "plant").args[
+        rq.wp9("B", "own", "plant").args.index("--budget") + 1] == "plant"
     assert rq.selected(None) == list(rq.CAMPAIGNS)
     with pytest.raises(SystemExit):
         rq.selected("nope")
@@ -28,7 +31,8 @@ def test_outputs_expand_to_the_files_the_campaign_wrote_and_never_its_journal(tm
     rel = "research/comparators/full/plantB_own_large_s120_enforced_abcd1234/"
     assert rq.expand(rq.wp9("B", "own").outputs, tmp_path) == [rel + f for f in ("report.md", "runs.csv.gz",
                                                                                  "tuned.json")]
-    assert rq.expand(rq.wp9("B", "native").outputs, tmp_path) == []     # another mix's directory
+    assert rq.expand(rq.wp9("B", "native").outputs, tmp_path) == []          # another mix's directory
+    assert rq.expand(rq.wp9("B", "own", "plant").outputs, tmp_path) == []    # another budget's directory
 
 
 def test_a_wp9_exit_1_is_a_result_and_a_crash_is_not(monkeypatch, tmp_path):

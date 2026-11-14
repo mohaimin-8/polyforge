@@ -5,18 +5,27 @@ would change what the testbed measures. The queue waits until a given
 process has exited (the post-WP11 chain, testbed/hvpa/after_wp11.py), then
 runs, in this order:
 
-  wp9-B-own     WP9's full tuning protocol, plant B, own mix, with the WP1
-                reference lines (research/comparators/full/)
-  wp9-A-own     the same for plant A
-  morris-r20    WP5's Morris screen as the plan sets it: 20 trajectories,
-                common random numbers (research/sensitivity/MORRIS_r20_crn.md)
-  sobol         WP5's Sobol indices on that screen's six leading factors,
-                N = 128 (research/sensitivity/SOBOL.md)
-  wp9-B-native  WP9, plant B, native (real-arrival) mix
-  wp9-A-native  WP9, plant A, native mix
+  wp9-B-own        WP9's full tuning protocol, plant B, own mix, budget
+                   enforced, with the WP1 reference lines
+                   (research/comparators/full/)
+  wp9-A-own        the same for plant A
+  wp9-B-own-plant  plant B with --budget plant (only the plant's own
+                   admission gate): the budget-symmetry choice of WP5's curve
+  wp9-A-own-plant  the same for plant A
+  speccurve-runs   the evaluation runs WP5's specification curve needs beyond
+                   WP9's (research/speccurve/full_curve.py run)
+  speccurve        the curve, every arm re-selected per specification
+                   (research/speccurve/FULL_SPEC_CURVE.md)
+  morris-r20       WP5's Morris screen as the plan sets it: 20 trajectories,
+                   common random numbers (research/sensitivity/MORRIS_r20_crn.md)
+  sobol            WP5's Sobol indices on that screen's six leading factors,
+                   N = 128 (research/sensitivity/SOBOL.md)
+  wp9-B-native     WP9, plant B, native (real-arrival) mix
+  wp9-A-native     WP9, plant A, native mix
 
 WP9 comes first because its tuned comparators feed the registration (WP13);
-WP5's indices are a robustness report. Each campaign resumes from its own
+the specification curve then decides how RQ1 can be stated; WP5's
+sensitivity indices are a robustness report. Each campaign resumes from its own
 journal or partial file, so the queue can be stopped for testbed work and
 started again (`--start` names the first campaign) at the cost of the runs in
 flight; a finished campaign that is run again only rebuilds its report. A
@@ -53,13 +62,14 @@ class Campaign:
     ok: tuple[int, ...] = (0,)  # exit codes after which the outputs are a result
 
 
-def wp9(plant: str, mix: str) -> Campaign:
-    d = f"research/comparators/full/plant{plant}_{mix}_*"
+def wp9(plant: str, mix: str, budget: str = "enforced") -> Campaign:
+    d = f"research/comparators/full/plant{plant}_{mix}_large_s120_{budget}_*"
     return Campaign(
-        f"wp9-{plant}-{mix}", HERE / "comparators",
-        ("tune.py", "--plant", plant, "--mix", mix, "--references", "--workers", WORKERS, "--out", "full"),
+        f"wp9-{plant}-{mix}" + ("" if budget == "enforced" else f"-{budget}"), HERE / "comparators",
+        ("tune.py", "--plant", plant, "--mix", mix, "--budget", budget, "--references", "--workers", WORKERS,
+         "--out", "full"),
         tuple(f"{d}/{f}" for f in ("tuned.json", "report.md", "runs.csv.gz", "references.csv.gz")),
-        f"results(comparators): WP9 full tuning protocol, plant {plant}, {mix} mix\n\n"
+        f"results(comparators): WP9 full tuning protocol, plant {plant}, {mix} mix, budget {budget}\n\n"
         "5 arms x 64 configurations x 120 tuning workloads, selection overall and per class, the selected\n"
         "configurations on the 120 evaluation workloads, WP1's reference lines. Exploratory until registered.",
         ok=(0, 1))   # tune.py exits 1 when some runs failed: excluded from selection, listed in the report
@@ -68,6 +78,15 @@ def wp9(plant: str, mix: str) -> Campaign:
 CAMPAIGNS = (
     wp9("B", "own"),
     wp9("A", "own"),
+    wp9("B", "own", "plant"),
+    wp9("A", "own", "plant"),
+    Campaign("speccurve-runs", HERE / "speccurve", ("full_curve.py", "run", "--workers", WORKERS),
+             ("research/speccurve/full/*.eval.csv.gz",),
+             "results(speccurve): the evaluation runs the re-selected specifications need beyond WP9's"),
+    Campaign("speccurve", HERE / "speccurve", ("full_curve.py", "curve"),
+             ("research/speccurve/FULL_SPEC_CURVE.md", "research/speccurve/full_spec_curve.png",
+              "research/speccurve/full/curve_effects.csv.gz"),
+             "results(speccurve): the plan's specification curve, every arm re-selected per specification"),
     Campaign("morris-r20", HERE / "sensitivity", ("morris_pilot.py", "--trajectories", "20", "--crn",
                                                   "--workers", WORKERS),
              ("research/sensitivity/MORRIS_r20_crn.md", "research/sensitivity/data/morris_runs_r20_crn.csv.gz",
