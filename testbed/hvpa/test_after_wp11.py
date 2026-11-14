@@ -35,3 +35,16 @@ def test_run_data_is_kept_without_the_progress_log(tmp_path, monkeypatch):
     kept = sorted(p.name for p in (dst / "cell03" / "run1").iterdir())
     assert kept == ["check.json", "k6-samples.csv.gz", "k6-summary.json", "run.json"]
     assert not (dst / "cell04").exists() and (dst / "actuator.jsonl").exists()
+
+
+def test_the_wp11b_trigger_reads_the_primary_attainment_verdict(tmp_path):
+    report = tmp_path / "VALIDATION.md"
+    assert after_wp11.wp11_primary_met(report) is None
+    table = ("## Primary prediction (cache hits replayed)\n\n| metric | cells | x | y | z | target met |\n"
+             "|---|---:|---:|---:|---|---|\n| attainment | 20 | 41.0% | +0.55 | +0.2 [0, 1] | {v} |\n"
+             "| cost | 20 | 0.0% | +1.00 | +0 [0, 0] | yes |\n\n## Declared secondary: steady-state cache curve\n\n"
+             "| attainment | 20 | 5.0% | +0.90 | +0 [0, 0] | yes |\n")
+    report.write_text(table.format(v="NO"))
+    assert after_wp11.wp11_primary_met(report) is False      # the secondary's 'yes' does not count
+    report.write_text(table.format(v="yes"))
+    assert after_wp11.wp11_primary_met(report) is True

@@ -22,6 +22,16 @@ committed predictions (programme 2). Launched now, it waits.
               CPU within 10 % (the twin's form must change first);
   8. predict  research/hvpa/twin_predict.py on the measured plant; commit the
               calibration, its curves and the predictions before any live run.
+  9. WP11b    the rule, fixed on 2026-11-14 while WP11's cells were still
+              running: if the WP11 primary prediction misses its attainment
+              target (VALIDATION.md), the revised simulator (capacity ~ n **
+              beta per tier, beta fitted on the calibration curves:
+              predict.py --replica-scaling fitted) is validated on a NEW design
+              (cells.py --seed 20261115) with the same protocol: predictions
+              committed before any run, three runs per cell, score, run data
+              committed. The WP17 service is scaled to 0 for it, WP10's
+              workloads come back (Postgres starts empty, so the tenants are
+              provisioned again), and they are scaled to 0 again after.
 The live pilots are not started here: their regimes and arms come from the
 predictions, and a person reads those first. Log:
 testbed/out/hvpa/after_wp11.log.
@@ -151,8 +161,64 @@ def main() -> int:
            "results(hvpa): WP17 calibration and the twin's predictions, before any live run\n\n"
            "The service measured at 0.25, 0.5, 1 and 2 cores in the cluster, the node's free CPU, the fitted\n"
            "plant, and twin_predict.py's regimes, gains, live choices and tuned targets.")
-    log("done: WP17 is ready for its live pilots, which start after the predictions are read")
+    log("WP17 is ready for its live pilots, which start after the predictions are read")
+    met = wp11_primary_met()
+    if met is None:
+        log("VALIDATION.md has no readable attainment verdict: WP11b not started")
+    elif met:
+        log("the WP11 primary met its attainment target: WP11b not needed")
+    else:
+        wp11b(py, kc)
+    log("done")
     return 0
+
+
+def wp11_primary_met(report: Path = TESTBED / "validation" / "VALIDATION.md") -> bool | None:
+    """The primary prediction's attainment verdict in VALIDATION.md: True for
+    'yes', False for 'NO', None when the report or the row is missing."""
+    if not report.exists():
+        return None
+    text = report.read_text(encoding="utf-8")
+    start = text.find("## Primary prediction")
+    end = text.find("\n## ", start + 1)
+    for line in text[start:end if end > 0 else None].splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if cells and cells[0] == "attainment":
+            return {"yes": True, "NO": False}.get(cells[-1])
+    return None
+
+
+def wp11b(py: str, kc: list[str]) -> None:
+    val, out = TESTBED / "validation", TESTBED / "out"
+    log("WP11 primary missed its attainment target: WP11b, the fitted-scaling simulator on a new design")
+    step(kc + ["-n", "pf-hvpa", "scale", "deployment", "cpuburn", "--replicas=0"])
+    step(kc + ["-n", "pf-testbed", "scale", "deployment", "--all", "--replicas=1"])
+    step(kc + ["-n", "pf-testbed", "wait", "--for=condition=available", "deployment", "--all", "--timeout=900s"])
+    step([py, "scripts/provision.py", "--meta", "out/tenants.meta.json", "--admin-key-file", "out/admin-key.txt",
+          "--out-dir", "out"], cwd=TESTBED)
+    step([py, "cells.py", "--seed", "20261115", "--out", "cells_v2.json"], cwd=val)
+    step([py, "cell_schedules.py", "cells", "--cells", "cells_v2.json", "--curves", "calibration",
+          "--out", str(out / "schedules_v2"), "--inputs", "inputs_v2"], cwd=val)
+    step([py, "predict.py", "--calibration", "calibration", "--cells", "cells_v2.json", "--inputs", "inputs_v2",
+          "--replica-scaling", "fitted", "--out", "predictions_v2.json"], cwd=val)
+    commit(["testbed/validation/cells_v2.json", "testbed/validation/inputs_v2", "testbed/validation/predictions_v2.json"],
+           "results(testbed): WP11b predictions, committed before any of its cells runs\n\n"
+           "The simulator with capacity ~ n ** beta per tier (beta fitted on the calibration curves) on a new\n"
+           "design (seed 20261115), by the rule fixed while WP11 ran (testbed/hvpa/after_wp11.py).")
+    runner = [py, "run_cells.py", "--cells", "cells_v2.json", "--predictions", "predictions_v2.json",
+              "--schedules", str(out / "schedules_v2"), "--tokens", str(out / "tokens.json"),
+              "--admin-key-file", str(out / "admin-key.txt"), "--out", str(out / "validation_v2")]
+    step(runner, cwd=val)
+    step(runner + ["--redo-invalid"], cwd=val)
+    step([py, "score.py", "--runs", str(out / "validation_v2"), "--cells", "cells_v2.json", "--predictions",
+          "predictions_v2.json", "--report", "VALIDATION_V2.md", "--plot", "validation_v2_bland_altman.png"], cwd=val)
+    keep_wp11_runs(out / "validation_v2", val / "runs_v2")
+    step([py, "diagnose.py", "--runs", "runs_v2", "--cells", "cells_v2.json", "--predictions", "predictions_v2.json",
+          "--out", "DIAGNOSE_V2.md"], cwd=val, fatal=False)
+    commit(["testbed/validation/VALIDATION_V2.md", "testbed/validation/validation_v2_bland_altman.png",
+            "testbed/validation/runs_v2", "testbed/validation/DIAGNOSE_V2.md"],
+           "results(testbed): WP11b scored, the revised simulator against the testbed on new cells")
+    step(kc + ["-n", "pf-testbed", "scale", "deployment", "--all", "--replicas=0"])
 
 
 if __name__ == "__main__":
