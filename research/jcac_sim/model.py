@@ -294,6 +294,7 @@ _DEFAULT_WU_TIER_FACTOR = dict(WU_TIER_FACTOR)
 # let a pre-registered rerun put the measured plant under every arm at
 # once. Defaults are the published constants, bit-identical.
 _DEFAULT_REPLICA_CAPACITY_WU = REPLICA_CAPACITY_WU
+REPLICA_SCALING_EXPONENT = 1.0  # plant 2: pool capacity grows as replicas ** this (1.0 = linear, published)
 WU_AI_SCALE = 1.0          # multiplier on AI kinds' work units (0 = off the replicas)
 CRUD_BASE_SCALE = 1.0      # multiplier on demand.crud_base_ms
 CACHEABLE_UNIFORM = False  # True: every AI kind is fully cacheable; the ceiling is CACHE_HIT_MAX
@@ -349,6 +350,7 @@ def set_model_form(
     wu_crud_scale: float | None = None,
     admission_gate: bool | None = None,
     attainment_slo: bool | None = None,
+    replica_scaling_exponent: float | None = None,
 ) -> None:
     """Reset the model form to the published defaults, then apply overrides.
 
@@ -363,7 +365,7 @@ def set_model_form(
     try:
         _set_model_form(congestion_exponent, p95_tail, mixture_p95, wu_tier_factor, replica_capacity_wu,
                         wu_ai_scale, crud_base_scale, cacheable_uniform, tier_latency_ms, agent_latency_ms,
-                        wu_crud_scale, admission_gate, attainment_slo)
+                        wu_crud_scale, admission_gate, attainment_slo, replica_scaling_exponent)
     except Exception:
         _restore_form(before)
         raise
@@ -383,8 +385,9 @@ def _set_model_form(
     wu_crud_scale: float | None = None,
     admission_gate: bool | None = None,
     attainment_slo: bool | None = None,
+    replica_scaling_exponent: float | None = None,
 ) -> None:
-    global CONGESTION_EXPONENT, P95_TAIL, MIXTURE_P95
+    global CONGESTION_EXPONENT, P95_TAIL, MIXTURE_P95, REPLICA_SCALING_EXPONENT
     global REPLICA_CAPACITY_WU, WU_AI_SCALE, CRUD_BASE_SCALE, CACHEABLE_UNIFORM, TIER_LATENCY_FLAT
     global AGENT_LATENCY, WU_CRUD_SCALE, ADMISSION_GATE, ATTAINMENT_SLO
     TIER_LATENCY_FLAT = None
@@ -411,6 +414,12 @@ def _set_model_form(
         if any(float(v) <= 0.0 for v in tier_latency_ms.values()):
             raise ValueError("tier latencies must be positive")
         TIER_LATENCY_FLAT = {k: float(v) for k, v in tier_latency_ms.items()}
+    REPLICA_SCALING_EXPONENT = 1.0
+    if replica_scaling_exponent is not None:
+        beta = float(replica_scaling_exponent)
+        if not 0.0 < beta <= 1.0:  # also refuses NaN
+            raise ValueError("replica_scaling_exponent must be in (0, 1]")
+        REPLICA_SCALING_EXPONENT = beta
     REPLICA_CAPACITY_WU = _DEFAULT_REPLICA_CAPACITY_WU
     if replica_capacity_wu is not None:
         if float(replica_capacity_wu) <= 0.0:
@@ -460,7 +469,8 @@ def _set_model_form(
 # description of the structural form evaluate_step computes with.
 _FORM_GLOBALS = ("CONGESTION_EXPONENT", "P95_TAIL", "MIXTURE_P95", "REPLICA_CAPACITY_WU",
                  "WU_AI_SCALE", "CRUD_BASE_SCALE", "CACHEABLE_UNIFORM", "TIER_LATENCY_FLAT",
-                 "AGENT_LATENCY", "WU_CRUD_SCALE", "ADMISSION_GATE", "ATTAINMENT_SLO")
+                 "AGENT_LATENCY", "WU_CRUD_SCALE", "ADMISSION_GATE", "ATTAINMENT_SLO",
+                 "REPLICA_SCALING_EXPONENT")
 
 
 def form_snapshot() -> tuple:
@@ -636,6 +646,17 @@ def hit_rate(cache_mb: int) -> float:
     return CACHE_HIT_MAX * cache_mb / (cache_mb + CACHE_HALF_MB)
 
 
+def pool_capacity_wu(replicas: int) -> float:
+    """Work units per second a pool of `replicas` serves: linear in replicas in
+    the published form; replicas ** REPLICA_SCALING_EXPONENT under plant 2's
+    measured scaling (programme 2, WP11: on one CPU host the replicas share
+    memory bandwidth, and the testbed's small tier at 2 and 3 pods served 78 %
+    and 63 % of linear). The exponent 1.0 keeps the published arithmetic."""
+    if REPLICA_SCALING_EXPONENT == 1.0:
+        return replicas * REPLICA_CAPACITY_WU
+    return REPLICA_CAPACITY_WU * replicas ** REPLICA_SCALING_EXPONENT
+
+
 def congestion(demand_wu: float, replicas: int) -> float:
     """Latency inflation from utilization: 1/(1-ρ) below saturation, then
     quadratic growth in overload (capped). Overload must stay *graded* —
@@ -643,7 +664,7 @@ def congestion(demand_wu: float, replicas: int) -> float:
     overload would see no reason to add the first replicas."""
     if replicas <= 0:
         return MAX_CONGESTION
-    rho = demand_wu / (replicas * REPLICA_CAPACITY_WU)
+    rho = demand_wu / pool_capacity_wu(replicas)
     a = CONGESTION_EXPONENT
     if rho < SATURATION_RHO:
         if a == 1.0:
@@ -770,7 +791,7 @@ def evaluate_step(
     if P95_TAIL is None:
         tail = P95_FACTOR
     else:
-        rho = wu / (state.replicas * REPLICA_CAPACITY_WU) if state.replicas > 0 else 1.0
+        rho = wu / pool_capacity_wu(state.replicas) if state.replicas > 0 else 1.0
         tail = p95_factor(rho)
 
     crud_rps = sum(demand.rps.get(k, 0.0) for k in CRUD_KINDS)

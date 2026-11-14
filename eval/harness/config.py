@@ -50,6 +50,8 @@ MODEL_FORM_KEYS = {
     # Plant 2 (programme 2, research/plant2): CRUD work on the replicas,
     # the dollar admission gate (0/1) and the attainment SLO metric (0/1).
     "wu_crud_scale", "admission_gate", "attainment_slo",
+    # WP11 (programme 2): pool capacity grows as replicas ** this; absent = 1, linear.
+    "replica_scaling_exponent",
 }
 
 

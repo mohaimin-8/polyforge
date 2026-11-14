@@ -126,6 +126,7 @@ def _apply_model_form(form: tuple) -> None:
         wu_crud_scale=f.get("wu_crud_scale"),
         admission_gate=bool(f.get("admission_gate", 0)),
         attainment_slo=bool(f.get("attainment_slo", 0)),
+        replica_scaling_exponent=f.get("replica_scaling_exponent"),
     )
 
 

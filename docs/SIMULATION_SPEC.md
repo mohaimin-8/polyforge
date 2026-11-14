@@ -310,7 +310,7 @@ def congestion(demand_wu: float, replicas: int) -> float:
     overload would see no reason to add the first replicas."""
     if replicas <= 0:
         return MAX_CONGESTION
-    rho = demand_wu / (replicas * REPLICA_CAPACITY_WU)
+    rho = demand_wu / pool_capacity_wu(replicas)
     a = CONGESTION_EXPONENT
     if rho < SATURATION_RHO:
         if a == 1.0:
@@ -347,7 +347,7 @@ def evaluate_step(
     if P95_TAIL is None:
         tail = P95_FACTOR
     else:
-        rho = wu / (state.replicas * REPLICA_CAPACITY_WU) if state.replicas > 0 else 1.0
+        rho = wu / pool_capacity_wu(state.replicas) if state.replicas > 0 else 1.0
         tail = p95_factor(rho)
 
     crud_rps = sum(demand.rps.get(k, 0.0) for k in CRUD_KINDS)

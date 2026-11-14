@@ -224,3 +224,21 @@ def test_mode_a_reduces_to_the_live_fit_where_the_new_mechanics_do_not_bind():
         assert getattr(m, f) == getattr(ref, f), f
     form, _ = plant.mode_a(tier_cost_small=1e-4, tier_cost_mid=3e-4, tier_cost_large=1e-3)
     assert form["replica_capacity_wu"] == pytest.approx(1122.6, abs=0.05) and form["wu_ai_scale"] == 0.0
+
+
+def test_replica_scaling_is_off_by_default_and_sublinear_when_set():
+    assert model.REPLICA_SCALING_EXPONENT == 1.0 and model.pool_capacity_wu(3) == 3 * model.REPLICA_CAPACITY_WU
+    try:
+        model.set_model_form(replica_scaling_exponent=0.5)
+        assert model.pool_capacity_wu(4) == pytest.approx(2 * model.REPLICA_CAPACITY_WU)
+        wu = 1.5 * model.REPLICA_CAPACITY_WU
+        sublinear = model.congestion(wu, 4)
+        model.set_model_form()
+        assert sublinear == pytest.approx(model.congestion(wu, 2))   # 4 pods at beta 0.5 = 2 linear pods
+        for bad in (0.0, 1.5, float("nan")):
+            with pytest.raises(ValueError):
+                model.set_model_form(replica_scaling_exponent=bad)
+            assert model.REPLICA_SCALING_EXPONENT == 1.0              # a refused form changes nothing
+    finally:
+        model.set_model_form()
+    assert model.REPLICA_SCALING_EXPONENT == 1.0

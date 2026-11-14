@@ -236,7 +236,7 @@ def interference_scores(
     reduces the interference (unlike raw demand, which is exogenous)."""
     served = {
         tid: min(d.work_units(states[tid].cache_mb, states[tid].tier),
-                 states[tid].replicas * model.REPLICA_CAPACITY_WU)
+                 model.pool_capacity_wu(states[tid].replicas))
         for tid, d in demands.items()
     }
     total = sum(served.values())
