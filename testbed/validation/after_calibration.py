@@ -74,6 +74,9 @@ def main() -> int:
             log(f"{n} lost {share:.1%} of its requests: not a measurement; stopping")
             return 4
     py = sys.executable
+    if predictions_committed() and (OUT / "schedules" / "cell19" / "schedule.json").exists():
+        log("predictions already committed and schedules present: resuming at the runs")
+        return run_and_score(py)
     step([py, "cell_schedules.py", "cells", "--curves", str(CURVES), "--out", str(OUT / "schedules")])
     step([py, "predict.py", "--calibration", str(CURVES)])
     for n in NAMES:
@@ -89,6 +92,17 @@ def main() -> int:
           "predictions.json from predict.py on the in-cluster calibration curves (validation/calibration/,\n"
           "latencies and timings only); the cells' request tables (validation/inputs/, no prompt text)."],
          cwd=REPO)
+    return run_and_score(py)
+
+
+def predictions_committed() -> bool:
+    rel = "testbed/validation/predictions.json"
+    tracked = subprocess.call(["git", "ls-files", "--error-unmatch", rel], cwd=REPO,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+    return tracked and subprocess.call(["git", "diff", "--quiet", "HEAD", "--", rel], cwd=REPO) == 0
+
+
+def run_and_score(py: str) -> int:
     runner = [py, "run_cells.py", "--schedules", str(OUT / "schedules"), "--tokens", str(OUT / "tokens.json"),
               "--admin-key-file", str(OUT / "admin-key.txt"), "--out", str(OUT / "validation")]
     step(runner)

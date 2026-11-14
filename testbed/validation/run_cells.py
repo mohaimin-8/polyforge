@@ -135,18 +135,55 @@ def wait_quiet(query: Callable[[str, float], list], sleep: Callable[[float], Non
     raise RuntimeError(f"model servers still busy after {QUIET_TIMEOUT_S:.0f} s")
 
 
+HEALTHY_IN_A_ROW = 3
+GATEWAY_READY_TIMEOUT_S = 180.0
+POSTURE_ATTEMPTS = 5
+
+
+def gateway_answers(get: Callable[[str], int] | None = None, sleep: Callable[[float], None] = time.sleep,
+                    timeout_s: float = GATEWAY_READY_TIMEOUT_S) -> float:
+    """Until the gateway's /healthz answers 200 through the NodePort several
+    times in a row: `rollout status` returns before kube-proxy routes the
+    Service to the new pod (2026-11-14: the first knob writes after a restart
+    met closed connections)."""
+    import urllib.request
+
+    def default_get(url: str) -> int:
+        with urllib.request.urlopen(url, timeout=5) as resp:  # noqa: S310 (the testbed's own NodePort)
+            return resp.status
+
+    get = get or default_get
+    t0, ok = time.time(), 0
+    while time.time() - t0 < timeout_s:
+        try:
+            ok = ok + 1 if get(f"{GATEWAY}/healthz") == 200 else 0
+        except OSError:
+            ok = 0
+        if ok >= HEALTHY_IN_A_ROW:
+            return time.time() - t0
+        sleep(1.0)
+    raise RuntimeError(f"the gateway did not answer through its NodePort within {timeout_s:.0f} s")
+
+
 def fresh_gateway() -> float:
     t0 = time.time()
     kubectl("rollout", "restart", "deployment/ai-gateway")
     kubectl("rollout", "status", "deployment/ai-gateway", "--timeout=300s")
+    gateway_answers()
     return time.time() - t0
 
 
-def set_posture(actuator: actuate.Actuator, pins: dict) -> dict:
+def set_posture(actuator: actuate.Actuator, pins: dict, sleep: Callable[[float], None] = time.sleep) -> dict:
+    """Write and read back every tenant's knobs, retrying a write that met a
+    connection error; the errors of the last attempt are kept."""
     tenants = {t: actuate.Knobs(model_tier=tier, cache_size_mb=int(pins["cache_knob_mb"][t]))
                for t, tier in pins["pins"].items()}
-    record = actuator.apply(actuate.Decision(step=None, t_s=0.0, tenants=tenants))
-    return {"knobs": record["knobs"], "errors": record["errors"]}
+    for attempt in range(1, POSTURE_ATTEMPTS + 1):
+        record = actuator.apply(actuate.Decision(step=None, t_s=0.0, tenants=tenants))
+        if not record["errors"]:
+            break
+        sleep(2.0 * attempt)
+    return {"knobs": record["knobs"], "errors": record["errors"], "attempts": attempt}
 
 
 def k6_lag_p99(summary_path: Path) -> float:

@@ -74,3 +74,35 @@ def test_a_missing_k6_summary_reads_as_infinite_lag(tmp_path):
     assert run_cells.k6_lag_p99(tmp_path / "absent.json") == float("inf")
     (tmp_path / "bad.json").write_text("{not json")
     assert run_cells.k6_lag_p99(tmp_path / "bad.json") == float("inf")
+
+
+def test_the_gateway_must_answer_several_times_in_a_row():
+    answers = iter([OSError("closed"), 200, 503, 200, 200, 200])
+
+    def get(url):
+        a = next(answers)
+        if isinstance(a, Exception):
+            raise a
+        return a
+
+    run_cells.gateway_answers(get=get, sleep=lambda s: None)
+    with pytest.raises(RuntimeError, match="did not answer"):
+        run_cells.gateway_answers(get=lambda u: 503, sleep=lambda s: None, timeout_s=0.0)
+
+
+class FlakyActuator:
+    def __init__(self, failures):
+        self.failures, self.calls = failures, 0
+
+    def apply(self, decision):
+        self.calls += 1
+        errs = ["t00: Remote end closed connection"] if self.calls <= self.failures else []
+        return {"knobs": {"t00": {"ok": not errs}}, "errors": errs}
+
+
+def test_posture_is_retried_after_connection_errors():
+    pins = {"pins": {"t00": "small"}, "cache_knob_mb": {"t00": 1}}
+    ok = run_cells.set_posture(FlakyActuator(2), pins, sleep=lambda s: None)
+    assert ok["errors"] == [] and ok["attempts"] == 3
+    bad = run_cells.set_posture(FlakyActuator(99), pins, sleep=lambda s: None)
+    assert bad["errors"] and bad["attempts"] == run_cells.POSTURE_ATTEMPTS
