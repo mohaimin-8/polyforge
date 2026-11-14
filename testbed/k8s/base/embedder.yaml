@@ -30,6 +30,11 @@ spec:
         prometheus.io/port: "8080"
         prometheus.io/path: /metrics
     spec:
+      # No service-link variables: the namespace's `prometheus` Service would
+      # inject PROMETHEUS_PORT=tcp://<ip>:9090, which TEI reads as its own
+      # --prometheus-port and refuses (exit 2, 2026-11-14 bring-up). Every
+      # address here is a DNS name, so nothing needs the links.
+      enableServiceLinks: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
