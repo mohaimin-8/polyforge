@@ -1,0 +1,4 @@
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 7574.13it/s]
+C:\Users\DARKR\Documents\Thesis Project\polyforge\research\cachereplay\streams.py:118: FutureWarning: The `get_sentence_embedding_dimension` method has been renamed to `get_embedding_dimension`.
+  self.dims = int(self.model.get_sentence_embedding_dimension())
+wrote C:\Users\DARKR\Documents\Thesis Project\polyforge\research\cachereplay\out\full\precision.json: 404276 pairs, AP 0.761, embed 2374.7s for 537346 questions

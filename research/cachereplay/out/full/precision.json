@@ -1,0 +1,142 @@
+{
+ "qqp": {
+  "splits": [
+   "train",
+   "validation"
+  ],
+  "pairs": 404276,
+  "duplicates": 149263,
+  "questions_embedded": 537346,
+  "embed_seconds": 2374.7299862999935,
+  "encoder": "sentence-transformers/all-MiniLM-L6-v2",
+  "key_format": "gateway",
+  "average_precision": 0.7613424275471047,
+  "files": {
+   "train": {
+    "sha256": "4d6f02e643f7c36e9a4f7d4971a5ee9bd74063a319452fe6c87850c739774cd7",
+    "bytes": 33558839
+   },
+   "validation": {
+    "sha256": "efd86a539c412d74874ee451573d7bd142f56c47fe36de033b9f367d8bb0fa71",
+    "bytes": 3729274
+   }
+  },
+  "plot": "qqp_pr_curve.png"
+ },
+ "qqp_wrong_hit_rate": {
+  "0.75": {
+   "tau": 0.75,
+   "pairs_at_or_above": 209637,
+   "precision": 0.628557935860559,
+   "recall": 0.882797478276599,
+   "wrong_hit_rate": 0.37144206413944103,
+   "wrong_hit_ci95": [
+    0.36937604793980117,
+    0.37351279173043983
+   ]
+  },
+  "0.80": {
+   "tau": 0.8,
+   "pairs_at_or_above": 173512,
+   "precision": 0.6716134907095763,
+   "recall": 0.7807226171254765,
+   "wrong_hit_rate": 0.3283865092904237,
+   "wrong_hit_ci95": [
+    0.32618061771733703,
+    0.33059999954916924
+   ]
+  },
+  "0.85": {
+   "tau": 0.85,
+   "pairs_at_or_above": 130953,
+   "precision": 0.7227249471184318,
+   "recall": 0.634068724332219,
+   "wrong_hit_rate": 0.2772750528815682,
+   "wrong_hit_ci95": [
+    0.2748570566113436,
+    0.2797061158799859
+   ]
+  },
+  "0.90": {
+   "tau": 0.9,
+   "pairs_at_or_above": 84335,
+   "precision": 0.7828066638999229,
+   "recall": 0.44229313359640365,
+   "wrong_hit_rate": 0.21719333610007707,
+   "wrong_hit_ci95": [
+    0.21442336966950523,
+    0.21998906504177515
+   ]
+  },
+  "0.95": {
+   "tau": 0.95,
+   "pairs_at_or_above": 38512,
+   "precision": 0.858174075612796,
+   "recall": 0.22142124974039112,
+   "wrong_hit_rate": 0.14182592438720398,
+   "wrong_hit_ci95": [
+    0.138377338072209,
+    0.14534595719962426
+   ]
+  }
+ },
+ "lmsys_wrong_hit_rate": {
+  "by_tau": {
+   "0.70": {
+    "hit_rate": 0.411,
+    "precision_rho_0.60": 0.366,
+    "precision_rho_0.70": 0.249,
+    "precision_rho_0.80": 0.144,
+    "wrong_hit_rate": 0.751,
+    "incorrect_per_1k": 308.6
+   },
+   "0.75": {
+    "hit_rate": 0.347,
+    "precision_rho_0.60": 0.385,
+    "precision_rho_0.70": 0.273,
+    "precision_rho_0.80": 0.164,
+    "wrong_hit_rate": 0.727,
+    "incorrect_per_1k": 252.1
+   },
+   "0.80": {
+    "hit_rate": 0.291,
+    "precision_rho_0.60": 0.401,
+    "precision_rho_0.70": 0.293,
+    "precision_rho_0.80": 0.184,
+    "wrong_hit_rate": 0.707,
+    "incorrect_per_1k": 205.6
+   },
+   "0.85": {
+    "hit_rate": 0.241,
+    "precision_rho_0.60": 0.416,
+    "precision_rho_0.70": 0.313,
+    "precision_rho_0.80": 0.205,
+    "wrong_hit_rate": 0.687,
+    "incorrect_per_1k": 165.5
+   },
+   "0.90": {
+    "hit_rate": 0.197,
+    "precision_rho_0.60": 0.419,
+    "precision_rho_0.70": 0.328,
+    "precision_rho_0.80": 0.224,
+    "wrong_hit_rate": 0.672,
+    "incorrect_per_1k": 132.3
+   },
+   "0.95": {
+    "hit_rate": 0.156,
+    "precision_rho_0.60": 0.417,
+    "precision_rho_0.70": 0.338,
+    "precision_rho_0.80": 0.247,
+    "wrong_hit_rate": 0.662,
+    "incorrect_per_1k": 103.4
+   }
+  },
+  "first_turn_precision_at_0.85": 0.353,
+  "source": "research/analysis/CACHE_PRECISION.md",
+  "protocol": "100k reservoir (prompt, response) pairs, all user turns, raw text, insert first half, query second half, unbounded cache; correct if response cosine >= 0.70"
+ },
+ "notes": [
+  "QQP pairs were sampled to be topically related (about 37% are duplicates), so its precision is not the precision of a cache's hits; it bounds how often a pair at a given cosine is a true paraphrase.",
+  "The LMSYS proxy counts a hit wrong when responses disagree, including stylistic disagreement between models; it is a pessimistic bound (CACHE_PRECISION.md)."
+ ]
+}

@@ -1,0 +1,14 @@
+1000000 first turns (0 embedded in 0.0s); 59 tenant streams of 32768
+Traceback (most recent call last):
+  File "C:\Users\DARKR\Documents\Thesis Project\polyforge\research\cachereplay\replay.py", line 277, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\DARKR\Documents\Thesis Project\polyforge\research\cachereplay\replay.py", line 240, in main
+    rows = pd.DataFrame(run_tasks(tasks, stream.vectors, cfg["workers"], DATA))
+                        ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^wrote C:\Users\DARKR\Documents\Thesis Project\polyforge\research\cachereplay\out\full: replay 77900.3s
+y\replay.py", line 129, in run_tasks
+    np.save(path, vectors, allow_pickle=False)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DARKR\AppData\Local\Programs\Python\Python313\Lib\site-packages\numpy\lib\_npyio_impl.py", line 577, in save
+    file_ctx = open(file, "wb")
+OSError: [Errno 22] Invalid argument: 'C:\\Users\\DARKR\\Documents\\Thesis Project\\polyforge\\research\\cachereplay\\data\\stream_vectors.f32.npy'

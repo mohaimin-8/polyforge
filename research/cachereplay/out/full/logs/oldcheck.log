@@ -1,0 +1,3 @@
+reservoir: 200000 of 2015645 user turns (seed 42)
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 9135.79it/s]
+wrote C:\Users\DARKR\Documents\Thesis Project\polyforge\research\cachereplay\out\full\OLD_CHECK.md: engine identical True, published reproduced True

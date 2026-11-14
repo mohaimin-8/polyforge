@@ -1,0 +1,236 @@
+{
+ "preset": "full",
+ "prompts": 200000,
+ "embed_seconds": 3202.9155215999926,
+ "source": "all six LMSYS parquet files",
+ "ladder": [
+  200,
+  500,
+  2000,
+  8000,
+  10000,
+  32000,
+  64000,
+  100000
+ ],
+ "engine": {
+  "engine_seconds": 155.90081250001094,
+  "by_size": {
+   "200": {
+    "max_abs_score_diff": 1.7763568394002505e-15,
+    "hit_count_diffs": {
+     "0.70": 0,
+     "0.75": 0,
+     "0.80": 0,
+     "0.85": 0,
+     "0.90": 0,
+     "0.95": 0
+    }
+   },
+   "500": {
+    "max_abs_score_diff": 1.5543122344752192e-15,
+    "hit_count_diffs": {
+     "0.70": 0,
+     "0.75": 0,
+     "0.80": 0,
+     "0.85": 0,
+     "0.90": 0,
+     "0.95": 0
+    }
+   },
+   "2000": {
+    "max_abs_score_diff": 1.7763568394002505e-15,
+    "hit_count_diffs": {
+     "0.70": 0,
+     "0.75": 0,
+     "0.80": 0,
+     "0.85": 0,
+     "0.90": 0,
+     "0.95": 0
+    }
+   },
+   "8000": {
+    "max_abs_score_diff": 1.887379141862766e-15,
+    "hit_count_diffs": {
+     "0.70": 0,
+     "0.75": 0,
+     "0.80": 0,
+     "0.85": 0,
+     "0.90": 0,
+     "0.95": 0
+    }
+   },
+   "10000": {
+    "max_abs_score_diff": 1.887379141862766e-15,
+    "hit_count_diffs": {
+     "0.70": 0,
+     "0.75": 0,
+     "0.80": 0,
+     "0.85": 0,
+     "0.90": 0,
+     "0.95": 0
+    }
+   },
+   "32000": {
+    "max_abs_score_diff": 1.887379141862766e-15,
+    "hit_count_diffs": {
+     "0.70": 0,
+     "0.75": 0,
+     "0.80": 0,
+     "0.85": 0,
+     "0.90": 0,
+     "0.95": 0
+    }
+   },
+   "64000": {
+    "max_abs_score_diff": 1.887379141862766e-15,
+    "hit_count_diffs": {
+     "0.70": 0,
+     "0.75": 0,
+     "0.80": 0,
+     "0.85": 0,
+     "0.90": 0,
+     "0.95": 0
+    }
+   },
+   "100000": {
+    "max_abs_score_diff": 1.887379141862766e-15,
+    "hit_count_diffs": {
+     "0.70": 0,
+     "0.75": 0,
+     "0.80": 0,
+     "0.85": 0,
+     "0.90": 0,
+     "0.95": 0
+    }
+   }
+  }
+ },
+ "engine_identical": true,
+ "published": {
+  "rows": [
+   {
+    "what": "adaptive",
+    "tau": "0.70",
+    "published": 0.488,
+    "reproduced": 0.48834
+   },
+   {
+    "what": "fixed200",
+    "tau": "0.70",
+    "published": 0.09,
+    "reproduced": 0.09003
+   },
+   {
+    "what": "adaptive",
+    "tau": "0.75",
+    "published": 0.413,
+    "reproduced": 0.41259
+   },
+   {
+    "what": "fixed200",
+    "tau": "0.75",
+    "published": 0.073,
+    "reproduced": 0.07297
+   },
+   {
+    "what": "adaptive",
+    "tau": "0.80",
+    "published": 0.351,
+    "reproduced": 0.35104
+   },
+   {
+    "what": "fixed200",
+    "tau": "0.80",
+    "published": 0.063,
+    "reproduced": 0.06257
+   },
+   {
+    "what": "adaptive",
+    "tau": "0.85",
+    "published": 0.296,
+    "reproduced": 0.29577
+   },
+   {
+    "what": "fixed200",
+    "tau": "0.85",
+    "published": 0.043,
+    "reproduced": 0.04261
+   },
+   {
+    "what": "adaptive",
+    "tau": "0.90",
+    "published": 0.245,
+    "reproduced": 0.24541
+   },
+   {
+    "what": "fixed200",
+    "tau": "0.90",
+    "published": 0.034,
+    "reproduced": 0.03427
+   },
+   {
+    "what": "adaptive",
+    "tau": "0.95",
+    "published": 0.195,
+    "reproduced": 0.19509
+   },
+   {
+    "what": "fixed200",
+    "tau": "0.95",
+    "published": 0.031,
+    "reproduced": 0.03071
+   },
+   {
+    "what": "ladder K=200",
+    "tau": "0.85",
+    "published": 0.043,
+    "reproduced": 0.04261
+   },
+   {
+    "what": "ladder K=500",
+    "tau": "0.85",
+    "published": 0.064,
+    "reproduced": 0.06357
+   },
+   {
+    "what": "ladder K=2000",
+    "tau": "0.85",
+    "published": 0.099,
+    "reproduced": 0.09899
+   },
+   {
+    "what": "ladder K=8000",
+    "tau": "0.85",
+    "published": 0.143,
+    "reproduced": 0.14332
+   },
+   {
+    "what": "ladder K=10000",
+    "tau": "0.85",
+    "published": 0.153,
+    "reproduced": 0.15262
+   },
+   {
+    "what": "ladder K=32000",
+    "tau": "0.85",
+    "published": 0.212,
+    "reproduced": 0.21242
+   },
+   {
+    "what": "ladder K=64000",
+    "tau": "0.85",
+    "published": 0.26,
+    "reproduced": 0.25969
+   },
+   {
+    "what": "ladder K=100000",
+    "tau": "0.85",
+    "published": 0.296,
+    "reproduced": 0.29577
+   }
+  ],
+  "max_abs_diff_at_3dp": 0.0,
+  "reproduced": true
+ }
+}
