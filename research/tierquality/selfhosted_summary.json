@@ -1,0 +1,48 @@
+{
+ "benchmark": "ARC-Challenge test (allenai/ai2_arc)",
+ "questions": 500,
+ "seed": 20261114,
+ "chance": 0.24980000000000002,
+ "models": {
+  "0.5B": {
+   "file": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+   "correct": 267,
+   "n": 500,
+   "accuracy": 0.534,
+   "wilson95": [
+    0.4901823223055243,
+    0.5772992225430903
+   ]
+  },
+  "1.5B": {
+   "file": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+   "correct": 385,
+   "n": 500,
+   "accuracy": 0.77,
+   "wilson95": [
+    0.7311377813252322,
+    0.8047450748255296
+   ]
+  },
+  "3B": {
+   "file": "qwen2.5-3b-instruct-q4_k_m.gguf",
+   "correct": 411,
+   "n": 500,
+   "accuracy": 0.822,
+   "wilson95": [
+    0.7860548114500956,
+    0.8530351132926648
+   ]
+  },
+  "7B": {
+   "file": "qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf",
+   "correct": 442,
+   "n": 500,
+   "accuracy": 0.884,
+   "wilson95": [
+    0.8529581630365658,
+    0.9091863434889621
+   ]
+  }
+ }
+}

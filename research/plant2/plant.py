@@ -101,11 +101,22 @@ def _cache_constants() -> list[Constant]:
     ]
 
 
-def _qwen_quality() -> dict:
-    sys.path.insert(0, str(HERE.parents[0] / "jcac_sim"))
-    import model
+MODE_B_MODELS = {"small": "0.5B", "mid": "3B", "large": "7B"}   # the tiers of calibration/TIER_BENCH.md
 
-    return {t: model._DEFAULT_TIER_QUALITY[t] for t in ("small", "mid", "large")}
+
+def _selfhosted_quality() -> list[Constant]:
+    """Mode B's answer quality, measured (WP7 mode B): ARC-Challenge accuracy
+    of each tier's quantised model, its Wilson interval the WP5 range."""
+    s = json.loads((HERE.parents[0] / "tierquality" / "selfhosted_summary.json").read_text(encoding="utf-8"))
+    out = []
+    for tier, size in MODE_B_MODELS.items():
+        m = s["models"][size]
+        lo, hi = m["wilson95"]
+        out.append(Constant(f"tier_quality_{tier}", round(m["accuracy"], 4), "share", "measured",
+                            f"research/tierquality/SELFHOSTED.md: Qwen2.5-{size}-Instruct Q4_K_M, ARC-Challenge, "
+                            f"{m['correct']}/{m['n']}", (round(lo, 4), round(hi, 4)), "B",
+                            "range = Wilson 95% interval; quantised CPU model, not the published fp16 score"))
+    return out
 
 
 def constants() -> list[Constant]:
@@ -195,10 +206,7 @@ def constants() -> list[Constant]:
         Constant("tier_cost_small", 0.0, "USD/request", "structural", "self-hosted: no per-request bill", None, "B"),
         Constant("tier_cost_mid", 0.0, "USD/request", "structural", "self-hosted: no per-request bill", None, "B"),
         Constant("tier_cost_large", 0.0, "USD/request", "structural", "self-hosted: no per-request bill", None, "B"),
-        *[Constant(f"tier_quality_{t}", round(q, 4), "share", "published",
-                   "Qwen2.5 model-card benchmark means (model.py TIER_BENCHMARKS)", None, "B",
-                   "own measurement pending (WP7, mode B)")
-          for t, q in _qwen_quality().items()],
+        *_selfhosted_quality(),
         Constant("replica_cost_usd_hr", 0.526, "USD/hour", "price",
                  "AWS g4dn.xlarge (one T4, the measured GPU), us-east-1 on-demand; third-party price "
                  "aggregators DevZero, DoiT and Holori agree; retrieved 2026-11-12, AWS's own page not checked",
