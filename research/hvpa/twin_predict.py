@@ -65,7 +65,7 @@ def predict(plant, widths=tp.WIDTHS, sigmas=workloads.VOLATILITIES) -> dict:
             "index_gain_spearman": spearman([r["mean_index"] for r in regimes], [r["gain_vs_A3"] for r in regimes]),
             "plant": {k: getattr(plant, k) for k in ("cpu_per_request_s", "congestion_exponent", "tail_f0", "tail_b",
                                                       "slo_s", "status")},
-            "draws": {"shapes": list(workloads.SHAPES), "seeds": tp.SEEDS, "tuning_seeds": list(tp.TUNING_SEEDS)}}
+            "draws": {"shapes": list(workloads.all_shapes()), "seeds": tp.SEEDS, "tuning_seeds": list(tp.TUNING_SEEDS)}}
 
 
 def main(argv: list[str] | None = None) -> int:

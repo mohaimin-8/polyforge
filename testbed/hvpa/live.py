@@ -55,7 +55,7 @@ def schedule(shape: str, sigma: float, seed: int, slo_s: float, plant) -> dict:
 
     import workloads
 
-    rng = np.random.default_rng([20261114, int(sigma * 100), workloads.SHAPES.index(shape), seed])
+    rng = np.random.default_rng([20261114, int(sigma * 100), workloads.all_shapes().index(shape), seed])
     rates = workloads.noisy(workloads.shape(shape, workloads.base_rps(plant)), sigma, rng)
     return {"step_s": STEP_S, "rates": [round(float(r), 4) for r in rates], "slo_s": slo_s,
             "shape": shape, "sigma": sigma, "seed": seed}

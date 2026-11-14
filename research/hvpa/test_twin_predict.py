@@ -9,7 +9,7 @@ def test_a_tiny_grid_gives_regimes_live_choices_and_targets(monkeypatch):
     monkeypatch.setattr(tp, "SEEDS", 1)
     monkeypatch.setattr(tp, "TUNING_SEEDS", (100,))
     monkeypatch.setattr(tp, "TARGETS", (0.3, 0.6))
-    monkeypatch.setattr(tp.workloads, "SHAPES", ("step_up",))
+    monkeypatch.setattr(tp.workloads, "all_shapes", lambda: ("step_up",))
     out = twin_predict.predict(Plant(), widths=(1, 2), sigmas=(0.05,))
     assert len(out["regimes"]) == 2 and len(out["live_regimes"]) == 3
     gains = sorted(r["gain_vs_A3"] for r in out["regimes"])

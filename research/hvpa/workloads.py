@@ -6,14 +6,19 @@ Rates are per 10 s step, relative to BASE_RPS, the rate the initial allocation
   step_down    3 x BASE for the first third, then BASE
   ramp         BASE rising linearly to 4 x BASE
   burst_train  BASE with 2-minute bursts of 3 x BASE every 10 minutes
+  azure_app1   the two Azure Functions 2019 peak hours azure_workloads.py
+  azure_app2   extracts (data/azure_functions_2019.csv), each minute's count
+               spread evenly over its six steps, scaled to a mean of 2 x BASE
 Volatility multiplies a shape by exp(x) with x an AR(1) (coefficient 0.7) of
 stationary standard deviation sigma, mean-corrected so the mean stays the
-shape's: sigma 0.05, 0.2, 0.4. The plan's two Azure Functions per-minute
-workloads join when that trace is downloaded (research/traces/
-etl_azure_functions.py reads it); they are not part of the a-priori run.
+shape's: sigma 0.05, 0.2, 0.4. The Azure shapes join `all_shapes()` once
+their file exists, after the four synthetic ones, so earlier draws keep their
+seeds.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import numpy as np
 
@@ -21,6 +26,8 @@ STEP_S = 10.0
 DURATION_S = 3600.0
 STEPS = int(DURATION_S / STEP_S)
 SHAPES = ("step_up", "step_down", "ramp", "burst_train")
+AZURE_SHAPES = ("azure_app1", "azure_app2")
+AZURE_FILE = Path(__file__).resolve().parent / "data" / "azure_functions_2019.csv"
 VOLATILITIES = (0.05, 0.2, 0.4)
 AR = 0.7
 
@@ -39,7 +46,17 @@ def shape(name: str, base: float, steps: int = STEPS) -> np.ndarray:
         return base * (1 + 3 * t / t[-1])
     if name == "burst_train":
         return np.where((t % 600) < 120, 3 * base, base)
+    if name in AZURE_SHAPES:
+        import pandas as pd
+
+        per_minute = pd.read_csv(AZURE_FILE)[name.removeprefix("azure_")].to_numpy(dtype=float)
+        per_step = np.repeat(per_minute, int(60 / STEP_S))[:steps]
+        return per_step / per_step.mean() * 2 * base
     raise ValueError(f"unknown shape {name!r}")
+
+
+def all_shapes() -> tuple[str, ...]:
+    return SHAPES + (AZURE_SHAPES if AZURE_FILE.exists() else ())
 
 
 def noisy(rates: np.ndarray, sigma: float, rng: np.random.Generator) -> np.ndarray:
