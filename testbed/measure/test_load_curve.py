@@ -84,6 +84,18 @@ def test_capacity_only_and_trace_capacity(tmp_path):
     assert all("max_tokens" not in c[1] for c in chats)
 
 
+def test_full_run_with_prompts_adds_a_trace_baseline(tmp_path):
+    schedule = tmp_path / "schedule.json"
+    schedule.write_text(json.dumps({"meta": {}, "requests": [{"prompt": "a"}, {"prompt": "b"}]}))
+    server = FakeServer(delay=0.02)
+    meta = lc.run(args_for(tmp_path, prompts=str(schedule)), post=server, pause=lambda s: None, timing=TINY)
+    rows = list(csv.DictReader((tmp_path / "out" / "load_curve_requests.csv").open(encoding="utf-8")))
+    trace_base = [r for r in rows if r["phase"] == "baseline_trace"]
+    assert len(trace_base) == TINY["baseline_n"] and meta["l0_trace_s"] > 0 and meta["mu_trace_rps"] > 0
+    # the protocol's own baseline is untouched: same count, protocol payloads
+    assert len([r for r in rows if r["phase"] == "baseline"]) == TINY["baseline_n"]
+
+
 def test_open_loop_draws_poisson_arrivals_from_the_seed():
     rec = lc.Recorder()
     proto = lc.Protocol(post=FakeServer(), replicas=1, rec=rec)

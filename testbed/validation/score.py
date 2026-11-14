@@ -1,17 +1,22 @@
 """Score the simulator's committed predictions against the testbed's runs (WP11).
 
-Per cell, the measured value of each metric is the mean over its runs:
+Per cell, the measured value of each metric is the mean over its valid runs
+(run_cells.py marks a run invalid when the load generator fell behind or the
+posture did not read back):
   mean_latency_s, p95_latency_s  answered (status 200), scored (not warm-up) requests
   attainment                      answered within the cell's SLO over ALL scored requests
                                   (check_run.summarise's definition: a failure is a miss)
   throughput_rps                  answered requests / scored seconds
   cost                            pod-cores x price x duration, as predicted (fixed pools)
 Per metric across cells: median absolute percentage error, Spearman rank
-correlation, and Bland-Altman (mean difference, 95% limits of agreement; plot).
-Targets (cells.json, fixed before any run): rank correlation >= 0.8 and median
-absolute error <= 25% on attainment and cost.
+correlation, and Bland-Altman (mean difference, 95% limits of agreement;
+validation_bland_altman.png). Targets (cells.json, fixed before any run):
+rank correlation >= 0.8 and median absolute error <= 25% on attainment and
+cost. Reported beside them, without targets: the cache hit rate (predicted
+by the replay of each cell's prompts against the gateway's own count) and
+the declared secondary prediction `steady_cache`.
 
-    python score.py --runs ../out/validation      # cellNN/runK/k6-samples.csv.gz
+    python score.py --runs ../out/validation      # cellNN/runK/{run.json, k6-samples.csv.gz}
 """
 
 from __future__ import annotations
@@ -38,12 +43,79 @@ def measure_run(path: Path, slo_ms: float, scored_s: float) -> dict:
     ok = [r["latency_ms"] for r in reqs if not r["warmup"] and r["status"] == "200"]
     return {"mean_latency_s": float(np.mean(ok)) / 1000 if ok else math.nan,
             "p95_latency_s": quantile(ok, 0.95) / 1000 if ok else math.nan,
-            "attainment": s["attainment"], "throughput_rps": len(ok) / scored_s}
+            "attainment": s["attainment"], "throughput_rps": len(ok) / scored_s, "hit_rate": s["hit_rate"],
+            "failed_rate": s["failed_rate"]}
 
 
 def spearman(a, b) -> float:
     ra, rb = np.argsort(np.argsort(a)), np.argsort(np.argsort(b))
     return float(np.corrcoef(ra, rb)[0, 1])
+
+
+def valid_runs(cell_dir: Path) -> list[Path]:
+    out = []
+    for run in sorted(cell_dir.glob("run*")):
+        info = run / "run.json"
+        if info.exists() and json.loads(info.read_text(encoding="utf-8")).get("valid") and \
+                (run / "k6-samples.csv.gz").exists():
+            out.append(run / "k6-samples.csv.gz")
+    return out
+
+
+def agreement(xy: list[tuple[float, float]]) -> dict:
+    pred, obs = np.array(xy, dtype=float).T
+    keep = ~(np.isnan(pred) | np.isnan(obs))
+    pred, obs = pred[keep], obs[keep]
+    ape = np.abs(pred - obs) / np.maximum(np.abs(obs), 1e-12)
+    d = pred - obs
+    sd = d.std(ddof=1) if len(d) > 1 else math.nan
+    rho = spearman(pred, obs) if len(d) > 2 and np.ptp(obs) > 0 and np.ptp(pred) > 0 else math.nan
+    return {"cells": int(len(d)), "mape_median": float(np.median(ape)) if len(d) else math.nan, "spearman": rho,
+            "mean_diff": float(d.mean()) if len(d) else math.nan, "loa": (float(d.mean() - 1.96 * sd),
+                                                                       float(d.mean() + 1.96 * sd)),
+            "pred": pred.tolist(), "obs": obs.tolist()}
+
+
+def table_rows(results: dict, targets: dict) -> list[str]:
+    rows = ["| metric | cells | median abs. % error | Spearman | Bland-Altman mean diff [95% limits] | target met |",
+            "|---|---:|---:|---:|---|---|"]
+    for m, a in results.items():
+        if a["cells"] < 3:
+            continue
+        met = ""
+        if m in targets["metrics_with_targets"]:
+            met = "yes" if (a["mape_median"] <= targets["median_abs_pct_error_max"]
+                            and (math.isnan(a["spearman"]) or a["spearman"] >= targets["rank_correlation_min"])) \
+                else "NO"
+        rows.append(f"| {m} | {a['cells']} | {a['mape_median']:.1%} | {a['spearman']:+.2f} | {a['mean_diff']:+.4g} "
+                    f"[{a['loa'][0]:+.4g}, {a['loa'][1]:+.4g}] | {met} |")
+    return rows
+
+
+def plot(results: dict, path: Path) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    shown = [m for m in METRICS if m != "cost" and results[m]["cells"] >= 3]
+    if not shown:
+        return
+    fig, axes = plt.subplots(1, len(shown), figsize=(3.4 * len(shown), 3.0), squeeze=False)
+    for ax, m in zip(axes[0], shown):
+        a = results[m]
+        pred, obs = np.array(a["pred"]), np.array(a["obs"])
+        mean, diff = (pred + obs) / 2, pred - obs
+        ax.scatter(mean, diff, s=14, color="#2f5d8a")
+        for y, style in ((a["mean_diff"], "-"), (a["loa"][0], "--"), (a["loa"][1], "--")):
+            ax.axhline(y, color="#555555", linestyle=style, linewidth=0.8)
+        ax.set_title(m.replace("_", " "), fontsize=9)
+        ax.set_xlabel("mean of predicted and measured", fontsize=8)
+        ax.set_ylabel("predicted - measured", fontsize=8)
+        ax.tick_params(labelsize=7)
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
 
 
 def main() -> int:
@@ -53,40 +125,44 @@ def main() -> int:
     args = ap.parse_args()
     design = json.loads((HERE / "cells.json").read_text(encoding="utf-8"))
     preds = {p["cell"]: p for p in json.loads(args.predictions.read_text(encoding="utf-8"))["predictions"]}
-    pairs = {m: [] for m in METRICS}
+    pairs = {m: [] for m in (*METRICS, "hit_rate")}
+    steady = {m: [] for m in METRICS}
+    per_cell = []
     for cell in design["cells"]:
         p = preds[cell["cell"]]
-        runs = sorted((args.runs / f"cell{cell['cell']:02d}").glob("run*/k6-samples.csv.gz"))
+        runs = valid_runs(args.runs / f"cell{cell['cell']:02d}")
         if not runs:
             continue
-        scored_s = p["requests"] / p["throughput_rps"] if p["throughput_rps"] else math.nan
-        meas = [measure_run(r, p["slo_ms"], scored_s) for r in runs]
-        for m in METRICS:
-            obs = p["cost"] if m == "cost" else float(np.nanmean([x[m] for x in meas]))
-            pairs[m].append((p[m], obs))
+        meas = [measure_run(r, p["slo_ms"], p["scored_s"]) for r in runs]
+        obs = {m: (p["cost"] if m == "cost" else float(np.nanmean([x[m] for x in meas])))
+               for m in (*METRICS, "hit_rate")}
+        for m in pairs:
+            pairs[m].append((p[m], obs[m]))
+        for m in steady:
+            steady[m].append((p["steady_cache"][m], obs[m]))
+        per_cell.append(f"| {cell['cell']} | {len(runs)} | {p['attainment']:.3f} | {obs['attainment']:.3f} | "
+                        f"{p['mean_latency_s']:.2f} | {obs['mean_latency_s']:.2f} | {p['hit_rate']:.3f} | "
+                        f"{obs['hit_rate']:.3f} | {np.nanmean([x['failed_rate'] for x in meas]):.3f} |")
     t = design["targets"]
+    primary = {m: agreement(xy) for m, xy in pairs.items() if xy}
+    secondary = {m: agreement(xy) for m, xy in steady.items() if xy}
     L = ["# WP11: the simulator against the testbed", "",
          f"Generated by `testbed/validation/score.py`. Predictions committed before the runs; "
-         f"{len(pairs['attainment'])} cells scored. Targets: rank correlation >= {t['rank_correlation_min']} and "
-         f"median absolute error <= {t['median_abs_pct_error_max']:.0%} on {', '.join(t['metrics_with_targets'])}.", "",
-         "| metric | cells | median abs. % error | Spearman | Bland-Altman mean diff [95% limits] | target met |",
-         "|---|---:|---:|---:|---|---|"]
-    for m, xy in pairs.items():
-        if len(xy) < 3:
-            continue
-        pred, obs = np.array(xy).T
-        ape = np.abs(pred - obs) / np.maximum(np.abs(obs), 1e-12)
-        d = pred - obs
-        rho = spearman(pred, obs) if np.ptp(obs) > 0 and np.ptp(pred) > 0 else math.nan
-        met = ""
-        if m in t["metrics_with_targets"]:
-            met = "yes" if (np.median(ape) <= t["median_abs_pct_error_max"]
-                            and (math.isnan(rho) or rho >= t["rank_correlation_min"])) else "NO"
-        L.append(f"| {m} | {len(xy)} | {np.median(ape):.1%} | {rho:+.2f} | {d.mean():+.4g} "
-                 f"[{d.mean() - 1.96 * d.std(ddof=1):+.4g}, {d.mean() + 1.96 * d.std(ddof=1):+.4g}] | {met} |")
+         f"{len(per_cell)} cells scored over their valid runs. Targets: rank correlation >= "
+         f"{t['rank_correlation_min']} and median absolute error <= {t['median_abs_pct_error_max']:.0%} on "
+         f"{', '.join(t['metrics_with_targets'])}.", "", "## Primary prediction (cache hits replayed)", ""]
+    L += table_rows(primary, t)
     L += ["", "Cost is not a model output in fixed-pool cells (pods x cores x price x time on both sides), "
-          "so its agreement is by construction; the informative rows are latency, attainment and throughput.", ""]
+          "so its agreement is by construction; the informative rows are latency, attainment and throughput. "
+          "hit_rate compares the replay's predicted hits with the gateway's own X-PolyForge-Cache count.", "",
+          "## Declared secondary: steady-state cache curve", ""]
+    L += table_rows({m: a for m, a in secondary.items()}, {**t, "metrics_with_targets": []})
+    L += ["", "## Per cell", "",
+          "| cell | valid runs | attainment pred | attainment meas | mean s pred | mean s meas | hit pred | "
+          "hit meas | failed share |", "|---:|---:|---:|---:|---:|---:|---:|---:|---:|", *per_cell, ""]
     (HERE / "VALIDATION.md").write_text("\n".join(L), encoding="utf-8")
+    if primary:
+        plot(primary, HERE / "validation_bland_altman.png")
     print("\n".join(L))
     return 0
 

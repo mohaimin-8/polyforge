@@ -17,7 +17,10 @@ changes only what the testbed forces:
   3. optionally (--prompts schedule.json) a second capacity, `capacity_trace`:
      the same closed loop with the schedule's real prompts as chat requests
      (no forced length; the server caps at 48 tokens), the rate a trace replay
-     should be scaled against (make_schedule.py --capacity-from).
+     should be scaled against (make_schedule.py --capacity-from); with
+     --phases all, also `baseline_trace`, the unloaded baseline repeated
+     with those prompts (l0_trace_s), so a prediction for real prompts need
+     not assume their service time scales like the protocol's.
 
 Outputs keep the original's file names and columns, so research/plant2/fits.py
 reads them unchanged:  load_curve_requests.csv, load_curve_meta.json.
@@ -105,12 +108,15 @@ class Protocol:
     def completion(self, nonce: str) -> tuple[float, dict]:
         return self.post("/completion", protocol_payload(nonce), self.timeout_s)
 
-    def baseline(self, n: int) -> float:
+    def baseline(self, n: int, request: Callable[[str], tuple[float, dict]] | None = None,
+                 phase: str = "baseline") -> float:
+        """Mean latency of n sequential requests (the protocol's, or `request`'s)."""
+        send = request or self.completion
         lat = []
         for i in range(n):
-            s, body = self.completion(f"base-{i}")
+            s, body = send(f"base-{i}")
             lat.append(s)
-            self.rec.add(phase="baseline", seq=i, latency_s=s, **timing_fields(body))
+            self.rec.add(phase=phase, seq=i, latency_s=s, **timing_fields(body))
         return statistics.fmean(lat)
 
     def capacity(self, seconds: float, tag: str, request: Callable[[str], tuple[float, dict]] | None = None) -> float:
@@ -267,6 +273,8 @@ def run(args: argparse.Namespace, post: PostFn | None = None, pause: Callable[[f
         meta["mu_post_rps"] = meta["mu_pre_rps"]
     if args.prompts:
         send = trace_requester(post, schedule_prompts(args.prompts), proto.timeout_s)
+        if args.phases == "all":
+            meta["l0_trace_s"] = proto.baseline(timing["baseline_n"], request=send, phase="baseline_trace")
         meta["mu_trace_rps"] = proto.capacity(timing["capacity_s"], "trace", request=send)
         meta["trace_prompts"] = args.prompts
     meta["failed_requests"] = sum(1 for r in rec.rows if r["error"])

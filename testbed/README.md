@@ -17,6 +17,7 @@ run** (no image pulled, no cluster created).
 | `load/` | `make_schedule.py` (a population workload's native-replay arrivals as a schedule) and `replay.js` (k6) |
 | `measure/load_curve.py` | the congestion protocol (`research/plant2/measure_load_curve.py`) against a tier through its NodePort |
 | `actuator/actuate.py` | applies replica decisions to the Deployments (`apply`, `replay`, `status`) |
+| `validation/` | WP11: the 20 cells, their schedules (`cell_schedules.py`), the cache replay (`cell_hits.py`), the predictions (`predict.py`), the runs (`run_cells.py`), the score (`score.py`) |
 
 Load and measurements go through NodePorts, never `kubectl port-forward`: in session 48 a
 port-forward pinned all load to one pod and dropped 127-220 connections per run at about 100 rps.
@@ -39,9 +40,34 @@ python ../load/make_schedule.py --help   # e.g. native --workload pop007 --steps
 python check_run.py --help               # checks a finished run (k6 samples, SLO, CPU from Prometheus)
 ```
 
+`python bringup.py` runs the cluster, image and apply steps in order, plus the gateway admin
+Secret the manifests do not carry (a random key in `out/admin-key.txt`); logs in `out/bringup/`.
+
+## WP11: the simulator against this testbed (`validation/`)
+
+The cells (`cells.json`) were fixed before any run; the predictions are committed before the
+first cell runs, and `run_cells.py` refuses to start otherwise.
+
+```bash
+cd testbed/scripts
+python ../validation/cell_schedules.py calibration-prompts --out ../out/calibration_prompts.json
+# each tier at one replica, full protocol plus real-prompt baseline and capacity
+python ../measure/load_curve.py --tier small --replicas 1 --base-url http://127.0.0.1:30091 \
+    --prompts ../out/calibration_prompts.json --out ../out/curves/small_r1 --deployment llama-small
+python ../measure/load_curve.py --tier mid --replicas 1 --base-url http://127.0.0.1:30092 \
+    --prompts ../out/calibration_prompts.json --out ../out/curves/mid_r1 --deployment llama-mid
+# small at 2 and 3 replicas, mid at 2: --phases capacity (the cells' load targets)
+python ../validation/cell_schedules.py cells --curves ../out/curves --out ../out/schedules
+python ../validation/predict.py --calibration ../out/curves      # commit predictions.json + inputs/ now
+python provision.py --meta ../out/schedules/cell00/schedule.meta.json --admin-key-file ../out/admin-key.txt --out-dir ../out
+python ../validation/run_cells.py --schedules ../out/schedules --tokens ../out/tokens.json \
+    --admin-key-file ../out/admin-key.txt --out ../out/validation
+python ../validation/score.py --runs ../out/validation           # VALIDATION.md
+```
+
 Scale-out in a public CI runner (the plan's option) is not set up; check the provider's
 acceptable-use terms before using it.
 
 ```bash
-python -m pytest -q        # 116 unit tests of the helpers (no cluster needed)
+python -m pytest -q        # 152 unit tests of the helpers (no cluster needed)
 ```
