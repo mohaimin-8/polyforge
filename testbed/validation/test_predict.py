@@ -136,3 +136,16 @@ def test_calibration_without_the_real_prompt_phases_is_refused(tmp_path):
     (d / "load_curve_meta.json").write_text(json.dumps(meta))
     with pytest.raises(ValueError, match="l0_trace_s"):
         predict.calibrate(d)
+
+
+def test_measured_capacity_uses_the_rate_at_the_cells_own_pool_size(tmp_path):
+    for name, mu in (("small_r1", 0.5), ("small_r3", 0.9), ("mid_r2", 0.6)):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "load_curve_meta.json").write_text(json.dumps({"mu_trace_rps": mu}))
+    cal = predict.with_measured_capacity(CAL, tmp_path, [3, 2])
+    assert cal["small"]["capacity_per_replica_rps"] == pytest.approx(0.3)
+    assert cal["mid"]["capacity_per_replica_rps"] == pytest.approx(0.3)
+    assert cal["small"]["l0_s"] == CAL["small"]["l0_s"] and CAL["small"]["capacity_per_replica_rps"] == 0.4
+    slow = predict.predict_cell(_cell(pools=[3, 2]), _demand(0.5), PINS, None, cal, 0.1)
+    fast = predict.predict_cell(_cell(pools=[3, 2]), _demand(0.5), PINS, None, CAL, 0.1)
+    assert slow["attainment"] < fast["attainment"]

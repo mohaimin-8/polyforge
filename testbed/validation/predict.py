@@ -17,7 +17,13 @@ format), the prompts being calibration prompts that are not the cells'
           (unloaded means, real prompts over the protocol's), f0 = p95 / mean
           of the real-prompt baseline, capacity per replica = mu_trace (the
           closed loop on real prompts).
-Capacity grows linearly with replicas, as in the simulator.
+Capacity grows linearly with replicas, as in the simulator. Second declared
+secondary (`measured_capacity`), fixed before any run once the curves showed
+the small tier's capacity at 2 and 3 pods well below linear: the same, with
+each pool's capacity per replica = the closed-loop rate measured at the
+cell's own replica count / that count (calibrate.py measures small at 1-3,
+mid at 1-2 replicas), so the cells separate the replica-scaling error from
+the rest of the model.
 
 Cache: whether each request hits, from cell_hits.py (the cell's own prompts
 through the gateway's cache logic), its stores timed by a first pass without
@@ -226,6 +232,20 @@ def steady_hit_rate(knob_mb: float, path: Path = WP6_CACHE) -> float:
     return float(np.interp(math.log(knob_mb), np.log([p["knob_mb"] for p in pts]), [p["hit_rate"] for p in pts]))
 
 
+def measured_capacity(calibration: Path, tier: str, replicas: int) -> float:
+    """Closed-loop rate on real prompts measured at `replicas` (its curve's mu_trace_rps)."""
+    meta = json.loads((calibration / f"{tier}_r{replicas}" / "load_curve_meta.json").read_text(encoding="utf-8"))
+    return float(meta["mu_trace_rps"])
+
+
+def with_measured_capacity(cal: dict, calibration: Path, pools: list[int]) -> dict:
+    """The calibration with each tier's capacity per replica at the cell's own pool size."""
+    out = {}
+    for tier, n in (("small", pools[0]), ("mid", pools[1])):
+        out[tier] = {**cal[tier], "capacity_per_replica_rps": measured_capacity(calibration, tier, n) / n}
+    return out
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -253,12 +273,15 @@ def predict_all(calibration: Path, inputs: Path, price_core_hr: float) -> dict:
         p["cache_replay"] = {"evictions": replay.evictions, "max_used_bytes": replay.max_used_bytes,
                              "max_entries": replay.max_entries, "knob_mb": knob}
         p["steady_cache"] = predict_cell(cell, demand, cs.PINS, steady, cal, price_core_hr)
+        p["measured_capacity"] = predict_cell(cell, demand, cs.PINS, hits,
+                                              with_measured_capacity(cal, calibration, cell["pools"]), price_core_hr)
         p["input_sha256"] = _sha256(path)
         preds.append(p)
     return {"rules": {"slo_factor": SLO_FACTOR, "warmup_steps": WARMUP_STEPS, "bin_s": BIN_S,
                       "cache_knob_mb": cs.CACHE_KNOB_MB, "pins": cs.PINS, "threshold": float(TESTBED_TAU),
                       "price_core_hr": price_core_hr, "primary": "cache hits from the replay of each cell's prompts",
-                      "secondary": "steady_cache: WP6's steady-state hit rate at the cell's knob"},
+                      "secondary": "steady_cache: WP6's steady-state hit rate at the cell's knob",
+                      "secondary_2": "measured_capacity: each pool's capacity measured at its own replica count"},
             "calibration": cal, "predictions": preds}
 
 
