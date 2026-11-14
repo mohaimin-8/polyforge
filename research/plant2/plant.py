@@ -80,6 +80,27 @@ def _routerbench_tiers() -> list[Constant]:
     return out
 
 
+def _cache_constants() -> list[Constant]:
+    """The semantic cache's hit curve measured by WP6 (research/cachereplay): LMSYS
+    first turns per tenant replayed through the gateway's own cache logic. Default:
+    class all, the gateway's cost-aware eviction, tau 0.85; ranges over both eviction
+    policies and every tau (0.75-0.95) of class all, so WP5 sweeps the threshold."""
+    path = HERE.parents[0] / "cachereplay" / "out" / "full" / "plant2_cache.json"
+    d = json.loads(path.read_text(encoding="utf-8"))
+    p = d["plant2"]
+    fits = [c["mb"] for policy in d["curves"]["all"].values() for c in policy.values()]
+    src = "research/cachereplay/out/full (WP6: class all, cost-aware eviction, tau 0.85)"
+    return [
+        Constant("cache_hit_max", round(p["cache_hit_max"], 4), "", "fitted", src,
+                 (round(min(f["cache_hit_max"] for f in fits), 3), round(max(f["cache_hit_max"] for f in fits), 3)),
+                 "A,B", "interval {:.3f}-{:.3f}; range = every tau and both policies".format(*p["cache_hit_max_ci95"])),
+        Constant("cache_half_mb", round(p["cache_half_mb"], 3), "MiB heap", "fitted", src,
+                 (round(min(f["half"] for f in fits), 3), round(max(f["half"] for f in fits), 3)),
+                 "A,B", "interval {:.3f}-{:.3f}; gateway heap per tenant, measured bytes per entry".format(
+                     *p["cache_half_mb_ci95"])),
+    ]
+
+
 def _qwen_quality() -> dict:
     sys.path.insert(0, str(HERE.parents[0] / "jcac_sim"))
     import model
@@ -105,8 +126,6 @@ def constants() -> list[Constant]:
     tail_new = fits["cpu_remeasured"]["tail"]
     crud_scales = sorted(c["crud_base_scale"] for c in live["cells"].values())
     crud_median = 0.5 * (crud_scales[1] + crud_scales[2])
-    k_half_entries, bytes_per_entry_kb = 6569, 3.0
-    half_mb = k_half_entries * bytes_per_entry_kb / 1024.0
     cap_small_64, cap_mid_64 = rps("small", 64), rps("mid", 64)
     cap_small_32, cap_mid_32 = rps("small", 32), rps("mid", 32)
     wu_mid = cap_small_64 / cap_mid_64
@@ -130,12 +149,7 @@ def constants() -> list[Constant]:
                  "research/plant2/FITS.md: November b = {:.2f} [{:.2f}, {:.2f}], July {:.2f} [{:.2f}, {:.2f}]".format(
                      tail_new["params"]["b"], *tail_new["ci95"]["b"], tail["params"]["b"], *tail["ci95"]["b"]),
                  (0.0, round(tail["ci95"]["b"][1], 3)), "A,B", "the rising tail did not replicate; the model requires b >= 0"),
-        Constant("cache_hit_max", 0.285, "", "fitted", "research/analysis/SEMANTIC_CACHE.md (LMSYS replay)",
-                 _half(0.285), "A,B", "no interval reported; +/-50% rule; WP6 re-measures"),
-        Constant("cache_half_mb", round(half_mb, 2), "MB", "derived",
-                 "SEMANTIC_CACHE.md: K_half 6,569 entries x ~3 KB per entry (assumed)",
-                 (round(k_half_entries * 1.5 / 1024, 2), round(k_half_entries * 6.0 / 1024, 2)), "A,B",
-                 "range = 1.5 to 6 KB per entry; WP6 measures bytes per entry"),
+        *_cache_constants(),
         Constant("cacheable_uniform", 1, "", "structural", "the LMSYS curve is over all prompts", None, "A,B"),
         Constant("mixture_p95", 1, "", "structural", "hit/miss mixture percentile", None, "A,B"),
         Constant("admission_gate", 1, "", "structural", "plan WP2: token bucket in dollars", None, "A,B"),

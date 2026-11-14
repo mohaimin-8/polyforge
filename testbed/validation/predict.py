@@ -15,8 +15,11 @@ fitted and the p95/mean tail (research/plant2/fits.py), capacity per replica
 Rules fixed here, before any cell runs:
   SLO        a request is on time when its latency <= SLO_FACTOR x the small
              tier's unloaded mean latency (L0 of its calibration)
-  cache      off = 0 MB; small = 64 MB; large = 512 MB, on plant 2's cache curve
-             (research/plant2/plant.py) until WP6's measured curve replaces it
+  cache      off = 0; small = 1 MiB; large = 16 MiB of gateway heap per tenant, on
+             plant 2's cache curve (research/plant2/plant.py, measured by WP6:
+             half-saturation 1.19 MiB), so small sits near the knee and large near
+             saturation; the testbed sets the gateway's per-tenant knob to the
+             equivalent completion bytes (WP6: knob MiB = heap MiB x 0.346)
   hit        a cache hit answers in CACHE_HIT_LATENCY_MS (the plant's constant)
   cost       pods x cores per pod x price per core-hour x duration
 Run-level p95 is the 0.95 quantile of the request-weighted mixture of every
@@ -46,7 +49,17 @@ import model  # noqa: E402
 from model import Demand, TenantConfig, TenantState  # noqa: E402
 
 SLO_FACTOR = 3.0
-CACHE_MB = {"off": 0, "small": 64, "large": 512}
+
+
+def _cache_curve() -> dict:
+    import plant
+
+    table = {c.name: c.value for c in plant.constants() if "B" in c.modes.split(",")}
+    return {"cache_hit_max": table["cache_hit_max"], "cache_half_mb": table["cache_half_mb"]}
+
+
+CACHE_CURVE = _cache_curve()
+CACHE_MB = {"off": 0, "small": 1, "large": 16}
 TIER = {"small": "small", "mid": "mid"}
 BIN_S = 10
 Z95 = model._Z95
@@ -77,7 +90,7 @@ def tier_form(cal: dict, slo_ms: float, cache_mb: int):
         wu_ai_scale=1.0 / model.WORK_UNITS["chat"], wu_crud_scale=0.0, cacheable_uniform=True,
         tier_latency_ms={"small": cal["l0_s"] * 1000, "mid": cal["l0_s"] * 1000, "large": cal["l0_s"] * 1000})
     model.set_economy(tier_cost_usd_per_req={"small": 0.0, "mid": 0.0, "large": 0.0},
-                      cache_hit_max=0.285, cache_half_mb=19.25)
+                      cache_hit_max=CACHE_CURVE["cache_hit_max"], cache_half_mb=CACHE_CURVE["cache_half_mb"])
     model.SLO_BASE_MS["ai"] = slo_ms  # a 'premium' tenant: class factor 1
     try:
         yield
