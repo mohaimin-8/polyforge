@@ -19,8 +19,9 @@ the recommender sampling every ready pod each minute, the updater each minute,
 in place; new pods are admitted at the current target. KEDA polls the rate
 every 30 s (its default pollingInterval).
 Planners: every PLAN_S, the next interval's rate is predicted as the last one
-seen and every lattice point is scored by the plant: J = cost + KAPPA x late
-requests, the objective all arms are scored on. Lattice: replicas +-1 ... +-w
+seen and every lattice point is scored by the plant (lattice.py, shared with
+the planner pod): J = cost + KAPPA x late requests, the objective all arms
+are scored on. Lattice: replicas +-1 ... +-w
 (w = 1, 2 or 4), CPU one level down, same or up (plant.cpu_levels), within
 [RMIN, RMAX], each point fitting the node. Each decision logs the interaction
 index (oscillation of the remainder over the box's feasible points) and the
@@ -49,21 +50,18 @@ for p in (HERE, HERE.parents[0] / "comparators"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
+import lattice  # noqa: E402
 import vpa  # noqa: E402
+from lattice import EPS, KAPPA, NODE_CPU, PLAN_S, RMAX, RMIN, fits, lattice_j  # noqa: E402,F401
 from service_plant import Plant  # noqa: E402
 
 DT_S = 10.0
-PLAN_S = 30.0
 HPA_SYNC_S = 15.0
 KEDA_POLL_S = 30.0
 STARTUP_S = 20.0
 RESIZE_DEFER_LIMIT_S = 300.0
-NODE_CPU = 6.0
-RMIN, RMAX = 1, 8
-KAPPA = 1e-4           # USD per late request
 HPA_CPU_TARGET = 0.8
 INITIAL = (2, 0.5)     # replicas, CPU per pod
-EPS = 1e-9
 
 
 def ticks(now: float, period: float) -> bool:
@@ -189,15 +187,6 @@ class HpaVpa:
             cl.scale_to(n, rec.target if rec else INITIAL[1], now)
 
 
-def lattice_j(plant: Plant, rate: float, r: int, c: float, seconds: float = PLAN_S) -> float:
-    out = plant.step(rate, [c] * r, seconds)
-    return out["cost"] + KAPPA * out["late"]
-
-
-def fits(r: int, c: float) -> bool:
-    return r * c <= NODE_CPU + EPS
-
-
 class Planner:
     def __init__(self, joint: bool, width: int) -> None:
         self.joint, self.width = joint, width
@@ -208,26 +197,10 @@ class Planner:
         cl.start(*INITIAL)
 
     def box(self, plant: Plant, r: int, c: float) -> tuple[list[int], list[float]]:
-        levels = list(plant.cpu_levels)
-        i = min(range(len(levels)), key=lambda k: abs(levels[k] - c))
-        rs = [x for x in range(r - self.width, r + self.width + 1) if RMIN <= x <= RMAX]
-        return rs, levels[max(0, i - 1):i + 2]
+        return lattice.box(plant, r, c, self.width)
 
     def decide(self, plant: Plant, rate: float, r: int, c: float) -> tuple[tuple, dict]:
-        rs, cs = self.box(plant, r, c)
-        J = {(rr, cc): lattice_j(plant, rate, rr, cc) for rr in rs for cc in cs if fits(rr, cc)}
-        if (r, c) not in J:
-            J[(r, c)] = lattice_j(plant, rate, r, c)   # the current state is scored even if a resize left it over
-        key = lambda rc: (J[rc], rc != (r, c), rc[0] * rc[1])  # noqa: E731 - ties: stay, then cheaper
-        joint = min(J, key=key)
-        best_r = min((k for k in J if k[1] == c), key=key)[0]
-        best_c = min((k for k in J if k[0] == r), key=key)[1]
-        perknob = (best_r, best_c)
-        rem = [J[(rr, cc)] - J[(rr, c)] - J[(r, cc)] + J[(r, c)] for rr in rs for cc in cs
-               if (rr, cc) in J and (rr, c) in J and (r, cc) in J]
-        info = {"index": max(rem) - min(rem) if rem else math.nan, "perknob_fits": perknob in J,
-                "loss": (J[perknob] - J[joint]) if perknob in J else math.nan}
-        return (joint if self.joint else perknob), info
+        return lattice.decide(plant, rate, r, c, self.width, self.joint)
 
     def act(self, cl: Cluster, now: float, seen_rate: float, usage: dict, plant: Plant) -> None:
         if not ticks(now, PLAN_S) or not cl.pods:

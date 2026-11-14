@@ -29,12 +29,24 @@ def test_a2_scales_on_the_request_rate_through_keda():
     assert so["spec"]["pollingInterval"] == 30 and v["kind"] == "VerticalPodAutoscaler"
 
 
-def test_planner_arms_install_no_autoscaler_and_bad_targets_are_refused():
-    assert arms.render("A3", 1) == [] and arms.render("A4", 1) == []
+def test_planner_arms_install_the_planner_pod_with_least_privilege():
+    sa, role, binding, deploy = arms.render("A4", 2)
+    cmd = deploy["spec"]["template"]["spec"]["containers"][0]["command"]
+    assert cmd[cmd.index("--mode") + 1] == "joint" and cmd[cmd.index("--width") + 1] == "2"
+    assert arms.render("A3", 1)[3]["spec"]["template"]["spec"]["containers"][0]["command"][4] == "perknob"
+    verbs = {(r["resources"][0], tuple(r["verbs"])) for r in role["rules"]}
+    assert verbs == {("deployments", ("get",)), ("deployments/scale", ("get", "patch")),
+                     ("pods", ("get", "list")), ("pods/resize", ("patch",))}
+    assert binding["subjects"][0]["name"] == sa["metadata"]["name"] == "planner"
+
+
+def test_bad_targets_are_refused():
     with pytest.raises(ValueError):
         arms.hpa_cpu(1.5)
     with pytest.raises(ValueError):
         arms.keda_rate(0)
+    with pytest.raises(ValueError):
+        arms.planner("joint", 3)
 
 
 def test_the_cli_emits_valid_yaml(capsys):

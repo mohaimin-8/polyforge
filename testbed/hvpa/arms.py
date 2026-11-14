@@ -62,13 +62,55 @@ def keda_rate(target_rps: float) -> dict:
                                                 "threshold": f"{target_rps:g}"}}]}}
 
 
+PYTHON_IMAGE = "docker.io/library/python:3.13.17-slim-bookworm"   # WP10's, side-loaded
+
+
+def planner(mode: str, width: int) -> list[dict]:
+    """The planner pod (planner/planner_pod.py) and the least it may do: read
+    the Deployment and its pods, scale it, resize its pods in place. Its code
+    and the fitted plant come from the ConfigMap wp17-planner."""
+    if mode not in ("joint", "perknob") or width not in (1, 2, 4):
+        raise ValueError("mode joint|perknob, width 1, 2 or 4")
+    meta = {"name": "planner", "namespace": NAMESPACE}
+    role = {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "Role", "metadata": meta, "rules": [
+        {"apiGroups": ["apps"], "resources": ["deployments"], "resourceNames": ["cpuburn"], "verbs": ["get"]},
+        {"apiGroups": ["apps"], "resources": ["deployments/scale"], "resourceNames": ["cpuburn"],
+         "verbs": ["get", "patch"]},
+        {"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list"]},
+        {"apiGroups": [""], "resources": ["pods/resize"], "verbs": ["patch"]}]}
+    binding = {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding", "metadata": meta,
+               "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": "planner"},
+               "subjects": [{"kind": "ServiceAccount", "name": "planner", "namespace": NAMESPACE}]}
+    deploy = {"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {**meta, "labels": {"app.kubernetes.io/name": "planner"}},
+              "spec": {"replicas": 1, "strategy": {"type": "Recreate"},
+                       "selector": {"matchLabels": {"app.kubernetes.io/name": "planner"}},
+                       "template": {"metadata": {"labels": {"app.kubernetes.io/name": "planner"}}, "spec": {
+                           "serviceAccountName": "planner", "enableServiceLinks": False,
+                           "securityContext": {"runAsNonRoot": True, "runAsUser": 65532,
+                                               "seccompProfile": {"type": "RuntimeDefault"}},
+                           "containers": [{
+                               "name": "planner", "image": PYTHON_IMAGE, "imagePullPolicy": "Never",
+                               "command": ["python", "-u", "/m/planner_pod.py", "--mode", mode, "--width", str(width),
+                                           "--calibration", "/m/calibration.json"],
+                               "workingDir": "/m",
+                               "resources": {"requests": {"cpu": "250m", "memory": "128Mi"},
+                                             "limits": {"cpu": "250m", "memory": "128Mi"}},
+                               "securityContext": {"allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,
+                                                   "capabilities": {"drop": ["ALL"]}},
+                               "volumeMounts": [{"name": "m", "mountPath": "/m", "readOnly": True}]}],
+                           "volumes": [{"name": "m", "configMap": {"name": "wp17-planner"}}]}}}}
+    sa = {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": meta}
+    return [sa, role, binding, deploy]
+
+
 def render(arm: str, target: float) -> list[dict]:
+    """`target`: A1 utilisation share, A2 requests/s per pod, A3/A4 the lattice width."""
     if arm == "A1":
         return [hpa_cpu(target), vpa()]
     if arm == "A2":
         return [keda_rate(target), vpa()]
     if arm in ("A3", "A4"):
-        return []
+        return planner("perknob" if arm == "A3" else "joint", int(target))
     raise ValueError(f"unknown arm {arm!r}")
 
 
