@@ -13,7 +13,12 @@ Mode B has no quality price yet (WP7), so its tier knob has no trade-off
 (the smaller tier is both faster and cheaper); the coupling left is cache x
 replicas, through the load a hit removes from the model-server pool.
 
-    python morris_pilot.py [--trajectories 10] [--workers 6]
+    python morris_pilot.py [--trajectories 10] [--workers 6] [--crn]
+
+The pilot (10 trajectories, no --crn) writes MORRIS_PILOT.md and
+data/morris_runs.csv.gz; any other screen writes its own files, e.g.
+--trajectories 20 --crn (the plan's screen) MORRIS_r20_crn.md and
+data/morris_runs_r20_crn.csv.gz, which sobol.py reads.
 """
 
 from __future__ import annotations
@@ -143,7 +148,7 @@ def main() -> int:
     ap.add_argument("--trajectories", type=int, default=10)
     ap.add_argument("--workers", type=int, default=max(1, min(6, (os.cpu_count() or 2) - 2)))
     ap.add_argument("--report-only", action="store_true",
-                    help="rebuild the report from data/morris_runs.csv.gz without running anything")
+                    help="rebuild the report from the screen's runs file (outputs()) without running anything")
     ap.add_argument("--crn", action="store_true",
                     help="common random numbers: every plant draws the same demand per workload")
     args = ap.parse_args()
@@ -154,8 +159,9 @@ def main() -> int:
     print(f"{len(fac)} factors, {traj.shape[0] * traj.shape[1]} plants, {len(todo)} runs", flush=True)
     t0 = time.time()
     (HERE / "data").mkdir(exist_ok=True)
+    paths = outputs(args.trajectories, args.crn)
     if args.report_only:
-        saved = pd.read_csv(HERE / "data" / "morris_runs.csv.gz")
+        saved = pd.read_csv(paths["runs"])
         names = factor_names_of(saved)
         traj = trajectories(len(names), args.trajectories, np.random.default_rng(SEED))
         return write_report(saved, traj, names, names, args, t0)
@@ -177,8 +183,19 @@ def main() -> int:
     expected = {(j[0], j[2].system, j[2].workload) for j in todo}
     if set(zip(runs.plant, runs.system, runs.workload)) != expected:
         raise RuntimeError("the partial file does not hold exactly the design's runs")
-    runs.to_csv(HERE / "data" / "morris_runs.csv.gz", index=False)
+    runs.to_csv(paths["runs"], index=False)
     return write_report(runs, traj, names, fac, args, t0)
+
+
+def outputs(trajectories: int, crn: bool) -> dict[str, Path]:
+    """Where a screen's runs, report and design go. The committed pilot (10
+    trajectories, each plant its own demand draw) keeps its original names; any
+    other screen gets its own, so a new screen never overwrites the pilot that
+    scripts/reproduce_programme2.py rebuilds."""
+    tag = "" if (trajectories, crn) == (10, False) else f"_r{trajectories}{'_crn' if crn else ''}"
+    return {"runs": HERE / "data" / f"morris_runs{tag}.csv.gz",
+            "report": HERE / (f"MORRIS{tag}.md" if tag else "MORRIS_PILOT.md"),
+            "design": HERE / "data" / f"morris_design{tag}.json"}
 
 
 SCORED_STEPS = 120  # every run scores all 120 steps (checked: metrics["steps"]); 8 tenants
@@ -197,7 +214,8 @@ def write_report(runs: pd.DataFrame, traj, names, fac, args, t0) -> int:
          f"{len(fac)} factors (every mode-B constant with a WP5 range), {args.trajectories} trajectories, "
          f"{LEVELS}-level grid; {per_plant.shape[0]} plants x {N_WORKLOADS} population workloads (tuning half) "
          "x joint and per-knob planners, large cluster. mu* = mean absolute elementary effect over the "
-         "factor's full range (scaled to [0, 1]); sigma = its spread (interaction or non-linearity).", "",
+         "factor's full range (scaled to [0, 1]); sigma = its spread (interaction or non-linearity)."
+         + (" Common random numbers: every plant draws the same demand per workload." if args.crn else ""), "",
          f"Across plants: gain (per-knob J minus joint J) mean {per_plant.gain.mean():+.4f}, "
          f"range {per_plant.gain.min():+.4f} to {per_plant.gain.max():+.4f}; joint J mean "
          f"{per_plant.J_joint.mean():.4f}.", ""]
@@ -208,8 +226,9 @@ def write_report(runs: pd.DataFrame, traj, names, fac, args, t0) -> int:
         L.append("")
     L += ["Caveats: exploratory; one replication; no quality price, so the tier knob is degenerate in "
           "mode B; the per-layer comparators of WP9 are not in this screen.", ""]
-    (HERE / "MORRIS_PILOT.md").write_text("\n".join(L), encoding="utf-8")
-    (HERE / "data" / "morris_design.json").write_text(
+    paths = outputs(args.trajectories, args.crn)
+    paths["report"].write_text("\n".join(L), encoding="utf-8")
+    paths["design"].write_text(
         json.dumps({"factors": names, "trajectories": traj.tolist()}), encoding="utf-8")
     print("\n".join(L))
     print(f"done in {time.time() - t0:.0f}s")
