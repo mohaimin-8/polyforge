@@ -49,3 +49,6 @@ eval/
 scripts/
 infra/
 deploy/
+# The WP10/WP11 testbed: no Go image needs it, and its out/ holds LMSYS prompt
+# text (licence: no transfer) and the gateway admin key.
+testbed/
