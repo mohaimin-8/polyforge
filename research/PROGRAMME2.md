@@ -40,3 +40,6 @@ What the pilots say so far, in one line each (details in the files above):
   Blind, on 40 fresh regimes, a rule fixed beforehand (one-step loss and index) ranks the gains at
   Spearman +0.39 (one-sided p = 0.006).
 - On RouteBalance's decision the index is large and the per-knob loss 4-30 times ours (WP15).
+- The semantic cache, replayed on 1,000,000 real first turns through the gateway's own logic,
+  saturates at about 300 entries (1.19 MiB of heap) with a ceiling of 0.21 at tau 0.85 (WP6); plant 2
+  now uses that curve, which makes the cache knob close to on/off at the simulator's sizes.
