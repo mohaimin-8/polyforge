@@ -11,7 +11,7 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP3, WP18 index theory and property checks | `research/theory/` | `python property_check.py ...`, `python t4_check.py ...` | `INDEX_THEORY.md`, `PROPERTY_CHECKS.md` |
 | WP3 index on the planner's decisions | `research/theory/` | `python index_pilot.py` | `INDEX_PILOT.md` |
 | WP4 dose-response (step width x coupling) | `research/theory/`, `research/control2/` | `python dose_response_pilot.py` | `DOSE_RESPONSE_PILOT.md` |
-| WP5 Morris screen of plant 2 | `research/sensitivity/` | `python morris_pilot.py` (`--crn` for common random numbers) | `MORRIS_PILOT.md` |
+| WP5 Morris screen of plant 2 | `research/sensitivity/` | `python morris_pilot.py` (`--crn` for common random numbers) | `MORRIS_PILOT.md` (10 trajectories); `MORRIS_r20_crn.md` (the plan's screen) once run |
 | WP5 Sobol indices of the gain | `research/sensitivity/` | `python sobol.py` (after a Morris screen) | `SOBOL.md` once run |
 | WP5 specification curve | `research/speccurve/` | `python pilot_curve.py` | `SPEC_CURVE_PILOT.md`, `spec_curve_pilot.png` |
 | WP6 cache replay of real prompts (Go-verified) | `research/cachereplay/` | `python run_all.py --preset full --workers 6` | `out/full/` |
@@ -27,6 +27,9 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP23 the index as a tool | `tools/index-probe/` | `python index_probe.py log|box ...` | `README.md` |
 
 Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (16 steps; those needing downloaded inputs or not-yet-committed run data are skipped without them).
+
+The long CPU campaigns (WP9's full protocol, WP5's Morris and Sobol stages) run one after another once the
+testbed is free, resumable: `python research/run_queue.py --list`.
 
 Tests: `python -m pytest research/theory research/control2 research/plant2 research/population
 research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark research/sensitivity tools/index-probe -q`
