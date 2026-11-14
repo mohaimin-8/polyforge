@@ -54,6 +54,16 @@ STEPS = [
     ("WP5 Sobol indices", R / "sensitivity", ["sobol.py", "--report-only"], ["SOBOL.md"], ["data/sobol_runs.csv.gz"]),
     ("WP5 specification curve, arms re-selected", R / "speccurve", ["full_curve.py", "curve"],
      ["FULL_SPEC_CURVE.md"], ["full/curve_effects.csv.gz"]),
+    ("WP12 regimes (a light simulation)", T / "wp12", ["plans.py", "regimes", "--calibration",
+                                                        "../validation/calibration", "--scaling", "recorded"],
+     ["regimes.json"], ["regimes.json"]),
+    ("WP12 tuning selection", T / "wp12", ["plans.py", "tune", "--calibration", "../validation/calibration",
+                                           "--scaling", "recorded", "--workers", "1"],
+     ["tuning/tuned.json"], ["tuning/journal.csv"]),
+    ("WP12 plans (a light simulation)", T / "wp12", ["plans.py", "plans", "--calibration",
+                                                      "../validation/calibration", "--scaling", "recorded"],
+     ["plans.json"], ["plans.json"]),
+    ("WP12 pilot report", T / "wp12", ["after_wp11b.py", "--report-only"], ["PILOT.md", "pilot.json"], ["runs"]),
 ]
 
 

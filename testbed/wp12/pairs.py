@@ -394,44 +394,66 @@ def report(plans: dict, runs: dict, left_out: list[str]) -> tuple[dict, str]:
     return out, "\n".join(lines) + "\n"
 
 
+def sequence_of(plans: dict) -> list[tuple[str, int]]:
+    return run_order(tuple(plans["summary"]), 1 + max(p["k"] for p in plans["plans"]))
+
+
+def collect(plans: dict, out: Path) -> tuple[dict, list[str]]:
+    """Every pair whose two arms have a valid run under `out` (live runs or
+    the kept records), and the pairs left out."""
+    runs, left_out = {}, []
+    for regime, k in sequence_of(plans):
+        got = {arm: valid_run(out, regime, k, arm) for arm in order(k)}
+        if all(got.values()):
+            runs[(regime, k)] = {arm: rec["measured"] for arm, rec in got.items()}
+        else:
+            left_out.append(f"{regime} pair {k}")
+    return runs, left_out
+
+
+def plans_commit(path: Path) -> str:
+    return rc.git("log", "-1", "--format=%H", "--", path.resolve().relative_to(rc.REPO).as_posix()).stdout.strip()
+
+
+def write_report(plans: dict, out: Path, commit: str, dest: Path = HERE) -> str:
+    runs, left_out = collect(plans, out)
+    summary, text = report(plans, runs, left_out)
+    (dest / "pilot.json").write_text(json.dumps({"plans_commit": commit, "summary": summary,
+                                                 "runs": {f"{r}/{k}": v for (r, k), v in runs.items()},
+                                                 "left_out": left_out}, indent=1), encoding="utf-8")
+    (dest / "PILOT.md").write_text(text, encoding="utf-8")
+    return text
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--schedules", type=Path, required=True)
-    ap.add_argument("--tokens", type=Path, required=True)
-    ap.add_argument("--admin-key-file", required=True)
-    ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--schedules", type=Path)
+    ap.add_argument("--tokens", type=Path)
+    ap.add_argument("--admin-key-file")
+    ap.add_argument("--out", type=Path, required=True, help="the runs (live) or the kept records (--report-only)")
     ap.add_argument("--plans", type=Path, default=PLANS)
     ap.add_argument("--dry-run", action="store_true", help="print the run order and stop")
+    ap.add_argument("--report-only", action="store_true", help="PILOT.md and pilot.json from the runs under --out")
     args = ap.parse_args(argv)
     plans = json.loads(args.plans.read_text(encoding="utf-8"))
     by = {(p["regime"], p["k"], p["arm"]): p for p in plans["plans"]}
-    regimes = tuple(plans["summary"])
-    pairs = 1 + max(p["k"] for p in plans["plans"])
-    sequence = run_order(regimes, pairs)
     if args.dry_run:
-        print(" ".join(f"{r}/{k}:{'/'.join(order(k))}" for r, k in sequence))
+        print(" ".join(f"{r}/{k}:{'/'.join(order(k))}" for r, k in sequence_of(plans)))
         return 0
+    if args.report_only:
+        print(write_report(plans, args.out, plans_commit(args.plans)))
+        return 0
+    if not (args.schedules and args.tokens and args.admin_key_file):
+        ap.error("live runs need --schedules, --tokens and --admin-key-file")
     commit = rc.predictions_committed(args.plans.resolve())
     admin_key = actuate.admin_key(args.admin_key_file)
-    runs, left_out = {}, []
-    for regime, k in sequence:
-        got = {}
+    for regime, k in sequence_of(plans):
         for arm in order(k):
             rec = run_pair_arm({**by[(regime, k, arm)], "plans_commit": commit}, plans["testbed"], args.schedules,
                                args.tokens, admin_key, args.out)
             if rec is None:
                 break
-            got[arm] = rec["measured"]
-        if len(got) == 2:
-            runs[(regime, k)] = got
-        else:
-            left_out.append(f"{regime} pair {k}")
-    summary, text = report(plans, runs, left_out)
-    (HERE / "pilot.json").write_text(json.dumps({"plans_commit": commit, "summary": summary,
-                                                 "runs": {f"{r}/{k}": v for (r, k), v in runs.items()},
-                                                 "left_out": left_out}, indent=1), encoding="utf-8")
-    (HERE / "PILOT.md").write_text(text, encoding="utf-8")
-    print(text)
+    print(write_report(plans, args.out, commit))
     return 0
 
 

@@ -132,15 +132,26 @@ def main() -> int:
     step([py, "pairs.py", "--schedules", str(OUT / "schedules"), "--tokens", str(out / "tokens.json"),
           "--admin-key-file", str(out / "admin-key.txt"), "--out", str(OUT / "runs")])
     log(f"kept {keep_runs(OUT / 'runs', HERE / 'runs')} run records")
-    pilot = json.loads((HERE / "pilot.json").read_text(encoding="utf-8"))
-    contrast = json.loads((HERE / "regimes.json").read_text(encoding="utf-8")).get("index_contrast")
-    with (HERE / "PILOT.md").open("a", encoding="utf-8") as fh:
-        fh.write(g3_section(pilot, validated, source, contrast))
+    report_from_kept(py, validated, source)
     commit(["testbed/wp12/PILOT.md", "testbed/wp12/pilot.json", "testbed/wp12/runs"],
            "results(testbed): WP12 live pilot, sigma_d and the pairs needed per regime, gate G3")
     log("done")
     return 0
 
 
+def report_from_kept(py: str, validated: bool | None, source: str) -> None:
+    """PILOT.md and pilot.json from the kept records alone, then the G3
+    section: what the reproduce gate reruns."""
+    step([py, "pairs.py", "--report-only", "--out", str(HERE / "runs")])
+    pilot = json.loads((HERE / "pilot.json").read_text(encoding="utf-8"))
+    contrast = json.loads((HERE / "regimes.json").read_text(encoding="utf-8")).get("index_contrast")
+    with (HERE / "PILOT.md").open("a", encoding="utf-8") as fh:
+        fh.write(g3_section(pilot, validated, source, contrast))
+
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--report-only"]:
+        _, ok, where = form_rule(wp11_primary_met(VALIDATION), wp11_primary_met(VALIDATION_V2))
+        report_from_kept(sys.executable, ok, where)
+        sys.exit(0)
     sys.exit(main())

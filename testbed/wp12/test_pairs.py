@@ -193,6 +193,29 @@ def test_a_pair_arm_retries_an_invalid_run_and_a_rerun_repeats_nothing(tmp_path,
     assert len(calls) == pairs.ATTEMPTS
 
 
+def test_the_report_is_collected_from_the_kept_records(tmp_path):
+    plans = {"rules": {"scaling": "fitted"},
+             "summary": {r: {"joint_mean_index": 0.02, "predicted_mean_diff": {"J": 0.0, "cost_per_1k": 0.0,
+                                                                               "attainment": 0.0}}
+                         for r in ("low", "high")},
+             "plans": [{"regime": r, "k": k, "arm": a} for r in ("low", "high") for k in range(2)
+                       for a in ("joint", "per_knob")]}
+    for r in ("low", "high"):
+        for k in range(2):
+            for a in ("joint", "per_knob"):
+                d = pairs.attempt_dir(tmp_path / "runs", r, k, a, 1)
+                d.mkdir(parents=True)
+                valid = not (r == "high" and k == 1 and a == "per_knob")
+                (d / "run.json").write_text(json.dumps({"valid": valid, "measured": {
+                    "J": 0.5 + 0.01 * k, "cost_per_1k": 0.3, "attainment": 0.6}}))
+    runs, left_out = pairs.collect(plans, tmp_path / "runs")
+    assert sorted(runs) == [("high", 0), ("low", 0), ("low", 1)] and left_out == ["high pair 1"]
+    text = pairs.write_report(plans, tmp_path / "runs", "abc", dest=tmp_path)
+    saved = json.loads((tmp_path / "pilot.json").read_text())
+    assert saved["plans_commit"] == "abc" and saved["left_out"] == ["high pair 1"]
+    assert (tmp_path / "PILOT.md").read_text() == text
+
+
 def test_the_report_has_a_row_per_regime_and_metric():
     plans = {"rules": {"scaling": "fitted"},
              "summary": {r: {"joint_mean_index": 0.02, "predicted_mean_diff": {"J": -0.01, "cost_per_1k": 0.01,

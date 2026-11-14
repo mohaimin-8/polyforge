@@ -151,7 +151,7 @@ def choose_regimes(rows: Sequence[dict]) -> dict[str, float]:
     return {"low": min(c["pool"]), "high": max(c["pool"])}
 
 
-def probe_regimes(tb: tbp.Testbed, curves: Path, out_file: Path | None = None) -> dict:
+def probe_regimes(tb: tbp.Testbed, curves: Path, out_file: Path | None = None, scaling: str = "") -> dict:
     """Plan WP12's regimes: every candidate load level, PROBES schedules
     each, both arms at their declared defaults; the joint planner's index."""
     population, counts, day_bins = load_sources()
@@ -173,7 +173,7 @@ def probe_regimes(tb: tbp.Testbed, curves: Path, out_file: Path | None = None) -
                    f"largest is at least {MIN_INDEX_RATIO:g} x the smallest; otherwise there is no high-index regime "
                    "and the regimes are the lightest and the heaviest operating points; both arms at their "
                    "declared defaults",
-           "levels": {str(u): s for u, s in level_summary(rows).items()},
+           "scaling": scaling, "levels": {str(u): s for u, s in level_summary(rows).items()},
            "index_contrast": index_contrast(rows), "candidates": rows, "chosen": choose_regimes(rows)}
     (out_file or REGIMES_FILE).write_text(json.dumps(out, indent=1), encoding="utf-8")
     return out
@@ -370,6 +370,18 @@ def plans(tb: tbp.Testbed, tuned: dict, scaling: str, design_path: Path | None =
     return result
 
 
+def recorded_scaling(base: Path = HERE) -> str:
+    """The replica scaling the committed WP12 files were made with (the gate's replay)."""
+    for rel, keys in (("plans.json", ("rules", "scaling")), ("tuning/tuned.json", ("settings", "scaling")),
+                      ("regimes.json", ("scaling",))):
+        if (base / rel).exists():
+            value = json.loads((base / rel).read_text(encoding="utf-8"))
+            for k in keys:
+                value = value[k]
+            return value
+    raise SystemExit("no recorded replica scaling: run regimes, tune or plans with linear or fitted first")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -379,7 +391,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     for name in ("regimes", "tune", "plans"):
         p = sub.add_parser(name)
         p.add_argument("--calibration", type=Path, required=True)
-        p.add_argument("--scaling", choices=("linear", "fitted"), required=True)
+        p.add_argument("--scaling", choices=("linear", "fitted", "recorded"), required=True,
+                       help="recorded: the scaling plans.json, tuned.json or regimes.json was made with")
         p.add_argument("--price-core-hr", type=float, default=PRICE_CORE_HR)
         if name == "tune":
             p.add_argument("--workers", type=int, default=4)
@@ -389,9 +402,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         for e in out["schedules"]:
             print(f"{e['cell']} {e['regime']:4s} {e['role']:6s} {e['stream']:22s} {e['requests']:5d} requests")
         return 0
+    if args.scaling == "recorded":
+        args.scaling = recorded_scaling()
     tb = tbp.testbed_from(args.calibration, BOUNDS, args.scaling, args.price_core_hr)
     if args.cmd == "regimes":
-        r = probe_regimes(tb, args.calibration)
+        r = probe_regimes(tb, args.calibration, scaling=args.scaling)
         for row in r["candidates"]:
             print(f"util {row['util']:.2f} {row['stream']:22s} index {row['mean_index']:.4f} "
                   f"predicted per_knob - joint J {row['predicted_diff_J']:+.5f}")
