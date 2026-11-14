@@ -3,7 +3,9 @@ committed predictions (programme 2). Launched now, it waits.
 
   0. wait     until testbed/out/validation/after_calibration.log ends with
               "done" (WP11 scored and committed); stop if that chain died;
-  1. free     scale the WP10 workloads (namespace pf-testbed) to 0: their CPU
+  1. keep     WP11's run data into testbed/validation/runs/ and commit it
+              (score.py --runs testbed/validation/runs reproduces the score);
+     free     scale the WP10 workloads (namespace pf-testbed) to 0: their CPU
               requests and idle load are not part of WP17's node (restore for
               WP12: `kubectl -n pf-testbed scale deploy --all --replicas=1`);
   2. pilot    rerun research/hvpa/twin_pilot.py (the VPA updater's in-place
@@ -74,6 +76,29 @@ def wp11_state() -> str:
     return "running"
 
 
+RUN_FILES = ("k6-samples.csv.gz", "k6-summary.json", "check.json", "run.json")
+
+
+def keep_wp11_runs(src: Path = TESTBED / "out" / "validation", dst: Path = TESTBED / "validation" / "runs") -> int:
+    """Copy each WP11 run's data into the repository (the k6 progress log stays
+    out): per request latency, status, tenant, cache outcome; no prompt text
+    (k6 records no bodies) and no API key (no headers)."""
+    n = 0
+    for run in sorted(src.glob("cell*/run*")):
+        if not (run / "run.json").exists():
+            continue
+        out = dst / run.parent.name / run.name
+        out.mkdir(parents=True, exist_ok=True)
+        for f in RUN_FILES:
+            if (run / f).exists():
+                shutil.copyfile(run / f, out / f)
+        n += 1
+    if (src / "actuator.jsonl").exists():
+        shutil.copyfile(src / "actuator.jsonl", dst / "actuator.jsonl")
+    log(f"kept {n} WP11 runs in {dst}")
+    return n
+
+
 def commit(paths: list[str], message: str) -> None:
     step(["git", "add", *paths])
     if subprocess.call(["git", "diff", "--cached", "--quiet"], cwd=REPO) != 0:
@@ -90,6 +115,10 @@ def main() -> int:
         log("the WP11 chain stopped before its end: not starting (see after_calibration.log)")
         return 5
     py, kc = sys.executable, ["kubectl", "--context", CONTEXT]
+    keep_wp11_runs()
+    commit(["testbed/validation/runs"],
+           "results(testbed): WP11 run data (k6 samples, summaries, checks, run records)\n\n"
+           "score.py --runs testbed/validation/runs reproduces VALIDATION.md; no prompt text, no keys.")
     step(kc + ["-n", "pf-testbed", "scale", "deployment", "--all", "--replicas=0"])
     step([py, "twin_pilot.py"], cwd=RESEARCH)
     commit(["research/hvpa/TWIN_PILOT.md", "research/hvpa/out/twin_pilot.csv"],
