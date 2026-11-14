@@ -22,6 +22,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 R = REPO / "research"
+T = REPO / "testbed"
 
 # (name, working directory, command, reports checked, files required beyond the repository)
 STEPS = [
@@ -39,6 +40,14 @@ STEPS = [
      ["data/routerbench_0shot.pkl", "data/routerbench_5shot.pkl"]),
     ("RouteBalance results", R / "external" / "routebalance", ["-I", "analyse.py", "report"], ["RESULTS.md"],
      ["upstream/route-balance-ac49feb0e46662223ed6cb0b638bf2bbe705deb2/data/labels/qwen_eval.jsonl"]),
+    ("WP7 self-hosted quality", R / "tierquality", ["selfhosted.py", "report"],
+     ["SELFHOSTED.md", "selfhosted_summary.json"], ["data/selfhosted_answers.csv", "data/arc_challenge_test.parquet"]),
+    ("WP17 twin pilot report", R / "hvpa", ["twin_pilot.py", "--report-only"], ["TWIN_PILOT.md"], []),
+    ("WP11 predictions", T / "validation", ["predict.py", "--calibration", "calibration"], ["predictions.json"],
+     ["../../research/cachereplay/data/vectors/gateway/train-00000-of-00006-4feeb3f83346a0e9.f32.npy"]),
+    ("WP11 score", T / "validation", ["score.py", "--runs", "runs"], ["VALIDATION.md"], ["runs/actuator.jsonl"]),
+    ("WP11 error breakdown", T / "validation", ["diagnose.py", "--runs", "runs"], ["DIAGNOSE.md"],
+     ["runs/actuator.jsonl"]),
 ]
 
 
