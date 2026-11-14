@@ -91,16 +91,19 @@ def tenant_objective(ctl: JCACController, tid: str):
     return phi, base, (anchor_state.replicas, anchor_state.cache_mb, anchor_state.tier)
 
 
-def analyse_plan(ctl: JCACController) -> list[dict]:
-    """One row per tenant of the controller's last plan."""
+def analyse_plan(ctl: JCACController, box_of=None) -> list[dict]:
+    """One row per tenant of the controller's last plan. `box_of(ctl, tid,
+    base)` gives the analysed box (default `tenant_box`, the published
+    lattice); a planner that searches a smaller set passes its own."""
     if ctl._last_plan_ctx is None:
         return []
+    box_of = box_of or tenant_box
     chosen = ctl._last_plan_ctx[0]
     rows = []
     with ctl._believed():
         for tid in sorted(chosen):
             phi, base, anchor = tenant_objective(ctl, tid)
-            box = tenant_box(ctl, tid, base)
+            box = box_of(ctl, tid, base)
             table = remainder_table(box, phi, anchor)
             a = analyse_table(box, table)
             rep_x, rep_phi = (a.per_knob, a.phi_per_knob)

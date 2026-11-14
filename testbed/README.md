@@ -18,6 +18,7 @@ run** (no image pulled, no cluster created).
 | `measure/load_curve.py` | the congestion protocol (`research/plant2/measure_load_curve.py`) against a tier through its NodePort |
 | `actuator/actuate.py` | applies replica decisions to the Deployments (`apply`, `replay`, `status`) |
 | `validation/` | WP11: the 20 cells, their schedules (`cell_schedules.py`), the cache replay (`cell_hits.py`), the predictions (`predict.py`), the runs (`run_cells.py`), the score (`score.py`) |
+| `wp12/` | WP12: the joint and per-knob planners on the testbed's exact knobs and calibrated form (`tb_planner.py`), the regimes, design, tuning and plans committed before any live run (`plans.py`), the ABBA live pairs and pairs needed (`pairs.py`), run end to end by `after_wp11b.py` from the post-WP11 chain |
 
 Load and measurements go through NodePorts, never `kubectl port-forward`: in session 48 a
 port-forward pinned all load to one pod and dropped 127-220 connections per run at about 100 rps.

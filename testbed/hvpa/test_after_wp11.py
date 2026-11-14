@@ -77,13 +77,23 @@ def test_wp11b_runs_first_and_its_failure_does_not_stop_wp17(tmp_path, monkeypat
         raise SystemExit(1)
 
     def step(cmd, cwd=None, fatal=True):
-        order.append(next((w for w in ("diagnose", "twin_pilot", "reproduce", "scale") if any(w in c for c in cmd)),
-                          cmd[0]))
-        return 0
+        order.append(next((w for w in ("diagnose", "wp12", "twin_pilot", "reproduce", "scale")
+                           if any(w in c for c in cmd)), cmd[0]))
+        return 2 if order[-1] == "wp12" else 0
 
     monkeypatch.setattr(after_wp11, "wp11b", wp11b)
     monkeypatch.setattr(after_wp11, "step", step)
     monkeypatch.setattr(after_wp11, "wp17", lambda py, kc: order.append("wp17") or 0)
+    script = tmp_path / "wp12" / "after_wp11b.py"
+    script.parent.mkdir()
+    script.write_text("")
+    monkeypatch.setattr(after_wp11, "WP12", script)
     assert after_wp11.main() == 0
-    assert order == ["keep", "diagnose", "commit", "wp11b", "twin_pilot", "commit", "reproduce", "scale", "wp17"]
-    assert "WP11b stopped (exit 1); WP17 goes on" in (tmp_path / "log.txt").read_text()
+    assert order == ["keep", "diagnose", "commit", "wp11b", "wp12", "twin_pilot", "commit", "reproduce", "scale",
+                     "wp17"]
+    log = (tmp_path / "log.txt").read_text()
+    assert "WP11b stopped (exit 1); WP17 goes on" in log and "WP12 stopped; WP17 goes on" in log
+    order.clear()
+    script.unlink()
+    assert after_wp11.main() == 0
+    assert "wp12" not in order and "no after_wp11b.py: WP12 not run here" in (tmp_path / "log.txt").read_text()

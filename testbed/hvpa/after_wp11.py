@@ -65,6 +65,7 @@ LOG = OUT / "after_wp11.log"
 WP11_LOG = TESTBED / "out" / "validation" / "after_calibration.log"
 CONTEXT = "kind-polyforge-testbed"
 RESEARCH = REPO / "research" / "hvpa"
+WP12 = TESTBED / "wp12" / "after_wp11b.py"  # read when it runs, so it can be finished while WP11b runs
 
 
 def log(msg: str) -> None:
@@ -161,6 +162,12 @@ def main() -> int:
             wp11b(py)
         except SystemExit as stop:
             log(f"WP11b stopped (exit {stop.code}); WP17 goes on and WP11b is looked at after")
+    if WP12.exists():
+        log("WP12: the live pilot of the main contrast, on the cluster WP11 left")
+        if step([py, str(WP12)], cwd=WP12.parent, fatal=False) != 0:
+            log("WP12 stopped; WP17 goes on and WP12 is looked at after")
+    else:
+        log(f"no {WP12.name}: WP12 not run here")
     if step([py, "twin_pilot.py"], cwd=RESEARCH, fatal=False) == 0:
         commit(["research/hvpa/TWIN_PILOT.md", "research/hvpa/out/twin_pilot.csv"],
                "results(hvpa): twin pilot rerun (in-place updater rule, Azure workloads)\n\n"

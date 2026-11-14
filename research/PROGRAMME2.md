@@ -20,6 +20,7 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP9 comparators and tuning | `research/comparators/` | `python tune.py --plant B ...` | `pilot/*/report.md`, `SAMPLE_SIZE.md` |
 | WP10 testbed | `testbed/` | runbook in `testbed/README.md`; `python scripts/bringup.py` | built and up on kind (2026-11-14) |
 | WP11 simulator against the testbed | `testbed/validation/` | `cell_schedules.py`, `predict.py`, `run_cells.py`, `score.py`, `diagnose.py` | `predictions.json` (committed before the runs), `VALIDATION.md`, `DIAGNOSE.md` once the cells have run; WP11b by the rule in `testbed/hvpa/after_wp11.py` |
+| WP12 live pilot of the main contrast | `testbed/wp12/` | `tb_planner.py`, `plans.py`, `pairs.py`, `after_wp11b.py` | `regimes.json`, `design.json`, `tuning/`, `plans.json` (all committed before any live run), then `PILOT.md` with gate G3 and `pilot.json`; started by `testbed/hvpa/after_wp11.py` after WP11b |
 | WP15 external check (RouteBalance) | `research/external/routebalance/` | `python -I analyse.py report` | `REPORT.md`, `RESULTS.md` |
 | WP16 benchmark: any controller scored by regret | `research/benchmark/` | `python bench.py --controller module:Class --plant B` | per-workload CSV, summary JSON |
 | WP17 horizontal with vertical autoscaling | `research/hvpa/`, `testbed/hvpa/` | `python twin_pilot.py`; cluster: `install.py`, `calibrate_service.py`, `twin_predict.py`, `pilot.py` | `VPA_MODEL.md`, `TWIN_PILOT.md` (a-priori plant); calibration and predictions once measured |
