@@ -48,3 +48,42 @@ def test_the_wp11b_trigger_reads_the_primary_attainment_verdict(tmp_path):
     assert after_wp11.wp11_primary_met(report) is False      # the secondary's 'yes' does not count
     report.write_text(table.format(v="yes"))
     assert after_wp11.wp11_primary_met(report) is True
+
+
+def test_commit_adds_only_the_paths_that_exist(tmp_path, monkeypatch):
+    monkeypatch.setattr(after_wp11, "LOG", tmp_path / "log.txt")
+    (tmp_path / "VALIDATION_V2.md").write_text("x")
+    calls = []
+    monkeypatch.setattr(after_wp11, "step", lambda cmd, cwd=None, fatal=True: calls.append(cmd) or 0)
+    monkeypatch.setattr(after_wp11.subprocess, "call", lambda cmd, cwd=None: 1)   # something is staged
+    after_wp11.commit(["VALIDATION_V2.md", "DIAGNOSE_V2.md"], "msg", repo=tmp_path)
+    assert calls == [["git", "add", "VALIDATION_V2.md"], ["git", "commit", "-q", "-m", "msg"]]
+    assert "not committed, missing: DIAGNOSE_V2.md" in (tmp_path / "log.txt").read_text()
+    calls.clear()
+    after_wp11.commit(["DIAGNOSE_V2.md"], "msg", repo=tmp_path)
+    assert calls == []                                       # nothing to add: no git call at all
+
+
+def test_wp11b_runs_first_and_its_failure_does_not_stop_wp17(tmp_path, monkeypatch):
+    monkeypatch.setattr(after_wp11, "LOG", tmp_path / "log.txt")
+    order = []
+    monkeypatch.setattr(after_wp11, "wp11_state", lambda: "done")
+    monkeypatch.setattr(after_wp11, "keep_wp11_runs", lambda *a: order.append("keep") or 0)
+    monkeypatch.setattr(after_wp11, "commit", lambda paths, msg, repo=None: order.append("commit"))
+    monkeypatch.setattr(after_wp11, "wp11_primary_met", lambda *a: False)
+
+    def wp11b(py):
+        order.append("wp11b")
+        raise SystemExit(1)
+
+    def step(cmd, cwd=None, fatal=True):
+        order.append(next((w for w in ("diagnose", "twin_pilot", "reproduce", "scale") if any(w in c for c in cmd)),
+                          cmd[0]))
+        return 0
+
+    monkeypatch.setattr(after_wp11, "wp11b", wp11b)
+    monkeypatch.setattr(after_wp11, "step", step)
+    monkeypatch.setattr(after_wp11, "wp17", lambda py, kc: order.append("wp17") or 0)
+    assert after_wp11.main() == 0
+    assert order == ["keep", "diagnose", "commit", "wp11b", "twin_pilot", "commit", "reproduce", "scale", "wp17"]
+    assert "WP11b stopped (exit 1); WP17 goes on" in (tmp_path / "log.txt").read_text()

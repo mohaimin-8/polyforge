@@ -1,37 +1,47 @@
-"""After WP11, unattended: the post-campaign CPU work and WP17 up to its
-committed predictions (programme 2). Launched now, it waits.
+"""After WP11, unattended: WP11b when its rule says so, the post-campaign CPU
+work, and WP17 up to its committed predictions (programme 2). Launched now,
+it waits.
 
   0. wait     until testbed/out/validation/after_calibration.log ends with
               "done" (WP11 scored and committed); stop if that chain died;
-  1. keep     WP11's run data into testbed/validation/runs/ and commit it
-              (score.py --runs testbed/validation/runs reproduces the score);
-     free     scale the WP10 workloads (namespace pf-testbed) to 0: their CPU
-              requests and idle load are not part of WP17's node (restore for
-              WP12: `kubectl -n pf-testbed scale deploy --all --replicas=1`);
-  2. pilot    rerun research/hvpa/twin_pilot.py (the VPA updater's in-place
-              rule changed after the committed pilot) and commit it;
-  3. gate     scripts/reproduce_programme2.py, logged (a failure is reported,
-              not fatal);
-  4. images   WP17's images pulled by digest, the service built, side-loaded
-              into kind, verified on the node;
-  5. install  metrics-server, KEDA, the VPA (default flags), the service and
-              WP17's Prometheus; every Deployment available;
-  6. measure  the service at 0.25, 0.5, 1 and 2 cores and the node's free CPU
-              (calibrate_service.py);
-  7. fit      research/hvpa/calibration.py; STOP if capacity is not linear in
-              CPU within 10 % (the twin's form must change first);
-  8. predict  research/hvpa/twin_predict.py on the measured plant; commit the
-              calibration, its curves and the predictions before any live run.
-  9. WP11b    the rule, fixed on 2026-11-14 while WP11's cells were still
+  1. keep     WP11's run data into testbed/validation/runs/ and commit it with
+              DIAGNOSE.md (score.py --runs testbed/validation/runs reproduces
+              the score);
+  2. WP11b    the rule, fixed on 2026-11-14 while WP11's cells were still
               running: if the WP11 primary prediction misses its attainment
               target (VALIDATION.md), the revised simulator (capacity ~ n **
               beta per tier, beta fitted on the calibration curves:
               predict.py --replica-scaling fitted) is validated on a NEW design
               (cells.py --seed 20261115) with the same protocol: predictions
               committed before any run, three runs per cell, score, run data
-              committed. The WP17 service is scaled to 0 for it, WP10's
-              workloads come back (Postgres starts empty, so the tenants are
-              provisioned again), and they are scaled to 0 again after.
+              committed. It starts as soon as WP11 ends, on the cluster as WP11
+              left it: the same node, the same tenants, nothing of WP17's
+              installed beside it;
+  3. pilot    rerun research/hvpa/twin_pilot.py (the VPA updater's in-place
+              rule changed after the committed pilot) and commit it;
+  4. gate     scripts/reproduce_programme2.py, logged;
+  5. free     scale the WP10 workloads (namespace pf-testbed) to 0: their CPU
+              requests and idle load are not part of WP17's node (restore for
+              WP12: `kubectl -n pf-testbed scale deploy --all --replicas=1`;
+              Postgres starts empty, so provision the tenants again);
+  6. images   WP17's images pulled by digest, the service built, side-loaded
+              into kind, verified on the node;
+  7. install  metrics-server, KEDA, the VPA (default flags), the service and
+              WP17's Prometheus; every Deployment available;
+  8. measure  the service at 0.25, 0.5, 1 and 2 cores and the node's free CPU
+              (calibrate_service.py);
+  9. fit      research/hvpa/calibration.py; STOP if capacity is not linear in
+              CPU within 10 % (the twin's form must change first);
+ 10. predict  research/hvpa/twin_predict.py on the measured plant; commit the
+              calibration, its curves and the predictions before any live run.
+
+The first version of this chain (dda7b6f) ran WP11b after WP17's install,
+with WP10 scaled down and back up and its tenants provisioned again. On
+2026-11-15, before WP11 ended, WP11b moved first so that it measures the node
+WP11 measured (no KEDA, VPA, metrics-server or second Prometheus beside it, no
+fresh Postgres); the rule itself did not change. Steps 2-4 failing is logged
+and WP17 goes on; WP17's own steps stop the chain.
+
 The live pilots are not started here: their regimes and arms come from the
 predictions, and a person reads those first. Log:
 testbed/out/hvpa/after_wp11.log.
@@ -109,10 +119,19 @@ def keep_wp11_runs(src: Path = TESTBED / "out" / "validation", dst: Path = TESTB
     return n
 
 
-def commit(paths: list[str], message: str) -> None:
-    step(["git", "add", *paths])
-    if subprocess.call(["git", "diff", "--cached", "--quiet"], cwd=REPO) != 0:
-        step(["git", "commit", "-q", "-m", message])
+def commit(paths: list[str], message: str, repo: Path = REPO) -> None:
+    """Commit the paths that exist (a report a non-fatal step did not write is
+    logged, not a reason to stop the chain)."""
+    present = [p for p in paths if (repo / p).exists()]
+    for p in paths:
+        if p not in present:
+            log(f"not committed, missing: {p}")
+    if not present:
+        log("nothing to commit")
+        return
+    step(["git", "add", *present], cwd=repo)
+    if subprocess.call(["git", "diff", "--cached", "--quiet"], cwd=repo) != 0:
+        step(["git", "commit", "-q", "-m", message], cwd=repo)
     else:
         log("nothing changed to commit")
 
@@ -132,11 +151,32 @@ def main() -> int:
            "results(testbed): WP11 run data and the error breakdown by cell factor\n\n"
            "score.py --runs testbed/validation/runs reproduces VALIDATION.md; diagnose.py wrote DIAGNOSE.md\n"
            "(descriptive). No prompt text, no keys.")
-    step(kc + ["-n", "pf-testbed", "scale", "deployment", "--all", "--replicas=0"])
-    step([py, "twin_pilot.py"], cwd=RESEARCH)
-    commit(["research/hvpa/TWIN_PILOT.md", "research/hvpa/out/twin_pilot.csv"],
-           "results(hvpa): twin pilot rerun (in-place updater rule, Azure workloads)\n\nExploratory, the a-priori plant.")
+    met = wp11_primary_met()
+    if met is None:
+        log("VALIDATION.md has no readable attainment verdict: WP11b not started")
+    elif met:
+        log("the WP11 primary met its attainment target: WP11b not needed")
+    else:
+        try:
+            wp11b(py)
+        except SystemExit as stop:
+            log(f"WP11b stopped (exit {stop.code}); WP17 goes on and WP11b is looked at after")
+    if step([py, "twin_pilot.py"], cwd=RESEARCH, fatal=False) == 0:
+        commit(["research/hvpa/TWIN_PILOT.md", "research/hvpa/out/twin_pilot.csv"],
+               "results(hvpa): twin pilot rerun (in-place updater rule, Azure workloads)\n\n"
+               "Exploratory, the a-priori plant.")
     step([py, "scripts/reproduce_programme2.py"], fatal=False)
+    step(kc + ["-n", "pf-testbed", "scale", "deployment", "--all", "--replicas=0"])
+    rc = wp17(py, kc)
+    if rc:
+        return rc
+    log("done")
+    return 0
+
+
+def wp17(py: str, kc: list[str]) -> int:
+    """Steps 6-10: WP17's cluster side up to its committed predictions; 3 when
+    the fit says the twin's plant form must change first."""
     lock = ["--lock", str(HERE / "images.lock")]
     for action in ("pull", "build", "load", "verify"):
         step([py, str(TESTBED / "scripts" / "images.py"), action, *lock])
@@ -162,14 +202,6 @@ def main() -> int:
            "The service measured at 0.25, 0.5, 1 and 2 cores in the cluster, the node's free CPU, the fitted\n"
            "plant, and twin_predict.py's regimes, gains, live choices and tuned targets.")
     log("WP17 is ready for its live pilots, which start after the predictions are read")
-    met = wp11_primary_met()
-    if met is None:
-        log("VALIDATION.md has no readable attainment verdict: WP11b not started")
-    elif met:
-        log("the WP11 primary met its attainment target: WP11b not needed")
-    else:
-        wp11b(py, kc)
-    log("done")
     return 0
 
 
@@ -188,14 +220,10 @@ def wp11_primary_met(report: Path = TESTBED / "validation" / "VALIDATION.md") ->
     return None
 
 
-def wp11b(py: str, kc: list[str]) -> None:
+def wp11b(py: str) -> None:
+    """Step 2 on the cluster as WP11 left it (WP10 up, tenants provisioned)."""
     val, out = TESTBED / "validation", TESTBED / "out"
     log("WP11 primary missed its attainment target: WP11b, the fitted-scaling simulator on a new design")
-    step(kc + ["-n", "pf-hvpa", "scale", "deployment", "cpuburn", "--replicas=0"])
-    step(kc + ["-n", "pf-testbed", "scale", "deployment", "--all", "--replicas=1"])
-    step(kc + ["-n", "pf-testbed", "wait", "--for=condition=available", "deployment", "--all", "--timeout=900s"])
-    step([py, "scripts/provision.py", "--meta", "out/tenants.meta.json", "--admin-key-file", "out/admin-key.txt",
-          "--out-dir", "out"], cwd=TESTBED)
     step([py, "cells.py", "--seed", "20261115", "--out", "cells_v2.json"], cwd=val)
     step([py, "cell_schedules.py", "cells", "--cells", "cells_v2.json", "--curves", "calibration",
           "--out", str(out / "schedules_v2"), "--inputs", "inputs_v2"], cwd=val)
@@ -218,7 +246,6 @@ def wp11b(py: str, kc: list[str]) -> None:
     commit(["testbed/validation/VALIDATION_V2.md", "testbed/validation/validation_v2_bland_altman.png",
             "testbed/validation/runs_v2", "testbed/validation/DIAGNOSE_V2.md"],
            "results(testbed): WP11b scored, the revised simulator against the testbed on new cells")
-    step(kc + ["-n", "pf-testbed", "scale", "deployment", "--all", "--replicas=0"])
 
 
 if __name__ == "__main__":
