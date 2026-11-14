@@ -68,3 +68,9 @@ def test_k6_never_reports_usage_and_does_not_abort_on_failures():
 def test_a_missing_prediction_file_refuses_to_run(tmp_path):
     with pytest.raises((SystemExit, ValueError)):
         run_cells.predictions_committed(run_cells.REPO / "testbed" / "validation" / "no_such_file.json")
+
+
+def test_a_missing_k6_summary_reads_as_infinite_lag(tmp_path):
+    assert run_cells.k6_lag_p99(tmp_path / "absent.json") == float("inf")
+    (tmp_path / "bad.json").write_text("{not json")
+    assert run_cells.k6_lag_p99(tmp_path / "bad.json") == float("inf")

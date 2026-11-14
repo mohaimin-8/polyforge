@@ -150,10 +150,14 @@ def set_posture(actuator: actuate.Actuator, pins: dict) -> dict:
 
 
 def k6_lag_p99(summary_path: Path) -> float:
-    data = json.loads(summary_path.read_text(encoding="utf-8"))
-    lag = data["metrics"]["wp10_schedule_lag"]
-    values = lag.get("values", lag)
-    return float(values["p(99)"])
+    """k6's p99 schedule lag; inf when the summary is missing or unreadable
+    (k6 died first), which marks the run invalid rather than stopping."""
+    try:
+        data = json.loads(summary_path.read_text(encoding="utf-8"))
+        lag = data["metrics"]["wp10_schedule_lag"]
+        return float(lag.get("values", lag)["p(99)"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return float("inf")
 
 
 def run_one(cell: dict, run: int, schedule_dir: Path, tokens: Path, out: Path, actuator: actuate.Actuator,
@@ -229,8 +233,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             prev = json.loads(done.read_text(encoding="utf-8"))
             if prev.get("complete") and (prev.get("valid") or not args.redo_invalid):
                 continue
-        rec = run_one(cells[c], r, args.schedules / f"cell{c:02d}", args.tokens, run_dir, actuator,
-                      preds[c]["slo_ms"], commit, i)
+        try:
+            rec = run_one(cells[c], r, args.schedules / f"cell{c:02d}", args.tokens, run_dir, actuator,
+                          preds[c]["slo_ms"], commit, i)
+        except Exception as err:  # one run's trouble (a timeout, a kubectl error) must not end the campaign
+            rec = {"cell": c, "run": r, "order": i, "complete": True, "valid": False, "k6_exit": None,
+                   "lag_p99_ms": float("nan"), "problems": [f"{type(err).__name__}: {err}"[:400]]}
+            run_dir.mkdir(parents=True, exist_ok=True)
+            done.write_text(json.dumps(rec, indent=1), encoding="utf-8")
         print(f"[{i + 1}/{len(order)}] cell {c} run {r}: k6 {rec['k6_exit']}, lag p99 {rec['lag_p99_ms']:.0f} ms, "
               f"{'valid' if rec['valid'] else 'INVALID: ' + '; '.join(rec['problems'])}", flush=True)
     return 0
