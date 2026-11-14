@@ -1,0 +1,87 @@
+{
+  "started": "2026-11-14T19:03:38+0600",
+  "tier": "small",
+  "replicas": 1,
+  "base_url": "http://127.0.0.1:30091",
+  "slots": 4,
+  "threads": 1,
+  "n_predict": 48,
+  "seed": 20261112,
+  "quick": false,
+  "phases": "all",
+  "capacity_workers": 8,
+  "capacity_seconds": 90.0,
+  "host": {
+    "platform": "Windows-11-10.0.26300-SP0",
+    "processor": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "python": "3.13.5",
+    "power_scheme": "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)"
+  },
+  "cluster": {
+    "deployment": "llama-small",
+    "spec_replicas": 1,
+    "ready_replicas": 1,
+    "image": "ghcr.io/ggml-org/llama.cpp:server-b9967",
+    "args": [
+      "--model",
+      "/models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+      "--alias",
+      "tier-small",
+      "--host",
+      "0.0.0.0",
+      "--port",
+      "8080",
+      "--threads",
+      "1",
+      "--threads-batch",
+      "1",
+      "--parallel",
+      "4",
+      "--no-kv-unified",
+      "--ctx-size",
+      "4096",
+      "--n-predict",
+      "48",
+      "--no-cache-prompt",
+      "--cache-ram",
+      "0",
+      "--metrics",
+      "--no-slots",
+      "--no-webui"
+    ],
+    "resources": {
+      "limits": {
+        "cpu": "1",
+        "memory": "1Gi"
+      },
+      "requests": {
+        "cpu": "1",
+        "memory": "1Gi"
+      }
+    }
+  },
+  "protocol": "research/plant2/measure_load_curve.py, ported (see this file's docstring)",
+  "l0_s": 2.7968288900020224,
+  "baseline_requests": 30,
+  "mu_pre_rps": 0.6109348641369404,
+  "levels": [
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.85,
+    0.9
+  ],
+  "level_seconds": 120.0,
+  "rho_offered_against": "mu_pre",
+  "mu_post_rps": 0.6868060973270812,
+  "l0_trace_s": 2.906479569998919,
+  "mu_trace_rps": 0.47342040826726567,
+  "trace_prompts": "C:\\Users\\DARKR\\Documents\\Thesis Project\\polyforge\\testbed\\out\\calibration_prompts.json",
+  "failed_requests": 0,
+  "finished": "2026-11-14T19:54:12+0600"
+}

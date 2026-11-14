@@ -1,0 +1,70 @@
+{
+  "started": "2026-11-14T20:55:08+0600",
+  "tier": "mid",
+  "replicas": 2,
+  "base_url": "http://127.0.0.1:30092",
+  "slots": 4,
+  "threads": 2,
+  "n_predict": 48,
+  "seed": 20261112,
+  "quick": false,
+  "phases": "capacity",
+  "capacity_workers": 16,
+  "capacity_seconds": 90.0,
+  "host": {
+    "platform": "Windows-11-10.0.26300-SP0",
+    "processor": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "python": "3.13.5",
+    "power_scheme": "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)"
+  },
+  "cluster": {
+    "deployment": "llama-mid",
+    "spec_replicas": 2,
+    "ready_replicas": 2,
+    "image": "ghcr.io/ggml-org/llama.cpp:server-b9967",
+    "args": [
+      "--model",
+      "/models/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+      "--alias",
+      "tier-mid",
+      "--host",
+      "0.0.0.0",
+      "--port",
+      "8080",
+      "--threads",
+      "2",
+      "--threads-batch",
+      "2",
+      "--parallel",
+      "4",
+      "--no-kv-unified",
+      "--ctx-size",
+      "4096",
+      "--n-predict",
+      "48",
+      "--no-cache-prompt",
+      "--cache-ram",
+      "0",
+      "--metrics",
+      "--no-slots",
+      "--no-webui"
+    ],
+    "resources": {
+      "limits": {
+        "cpu": "2",
+        "memory": "2Gi"
+      },
+      "requests": {
+        "cpu": "2",
+        "memory": "2Gi"
+      }
+    }
+  },
+  "protocol": "research/plant2/measure_load_curve.py, ported (see this file's docstring)",
+  "mu_pre_rps": 0.5128064021915244,
+  "mu_post_rps": 0.5128064021915244,
+  "mu_trace_rps": 0.3967129758601865,
+  "trace_prompts": "C:\\Users\\DARKR\\Documents\\Thesis Project\\polyforge\\testbed\\out\\calibration_prompts.json",
+  "failed_requests": 0,
+  "finished": "2026-11-14T20:59:33+0600"
+}
