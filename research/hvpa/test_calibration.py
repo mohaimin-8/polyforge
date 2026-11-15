@@ -58,3 +58,52 @@ def test_the_node_size_is_carried_into_the_plant(tmp_path):
     out = tmp_path / "cal.json"
     out.write_text(json.dumps(cal))
     assert cal["node_cpu"] == 4.75 and plant.from_calibration(out).node_cpu == 4.75
+
+
+def _point(curves, r, c, mu, gen=0.2):
+    d = curves / "replicas" / f"r{r}c{int(c * 1000)}m"
+    d.mkdir(parents=True)
+    meta = {"replicas": r, "cpu": c, "mu_pre_rps": mu, "mu_post_rps": mu}
+    if gen is not None:
+        meta["generator_cpu_cores"] = gen
+    (d / "load_curve_meta.json").write_text(json.dumps(meta))
+
+
+def _levels(curves):
+    for c in (0.25, 0.5, 1.0, 2.0):
+        _curve(curves / f"c{int(c * 1000)}m", c)
+
+
+def test_pods_within_ten_percent_of_linear_keep_the_linear_plant(tmp_path):
+    _levels(tmp_path)
+    _point(tmp_path, 2, 1.0, 2 / 0.05 * 0.97)
+    _point(tmp_path, 4, 1.0, 4 / 0.05 * 0.92)
+    cal = calibration.fit(tmp_path)
+    assert cal["linear_in_replicas_within_10pct"] and "efficiency" not in cal
+    assert [round(e, 3) for _, e in cal["efficiency_measured"]] == [0.97, 0.92]
+    assert cal["linear_within_10pct"] and len(cal["levels"]) == 4    # the points are not CPU levels
+
+
+def test_sublinear_pods_give_the_plant_the_measured_table(tmp_path):
+    _levels(tmp_path)
+    _point(tmp_path, 2, 1.0, 2 / 0.05 * 0.9)
+    _point(tmp_path, 6, 1.0, 6 / 0.05 * 0.6)
+    _point(tmp_path, 3, 2.0, 6 / 0.05 * 0.7)       # the same total: the mean is used
+    _point(tmp_path, 4, 1.0, 4 / 0.05 * 0.5, gen=0.6)   # the generator was the bottleneck: kept out
+    _point(tmp_path, 8, 0.5, 4 / 0.05 * 0.5, gen=None)  # no generator record: kept out
+    cal = calibration.fit(tmp_path)
+    assert not cal["linear_in_replicas_within_10pct"]
+    assert cal["efficiency"] == [[2.0, pytest.approx(0.9)], [6.0, pytest.approx(0.65)]]
+    out_of = {(p["replicas"], p["cpu"]): p for p in cal["replica_points"] if not p["used"]}
+    assert set(out_of) == {(4, 1.0), (8, 0.5)} and "half its core" in out_of[(4, 1.0)]["why"]
+    out = tmp_path / "cal.json"
+    out.write_text(json.dumps(cal))
+    p = plant.from_calibration(out)
+    assert p.efficiency == ((2.0, pytest.approx(0.9)), (6.0, pytest.approx(0.65)))
+    assert p.eta(6.0) == pytest.approx(0.65)
+
+
+def test_without_horizontal_points_there_is_no_replica_record(tmp_path):
+    _levels(tmp_path)
+    cal = calibration.fit(tmp_path)
+    assert not any(k.startswith(("replica", "efficiency", "linear_in_replicas")) for k in cal)

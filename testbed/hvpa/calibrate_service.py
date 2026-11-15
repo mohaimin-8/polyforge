@@ -8,6 +8,13 @@ generator held to 1 core, so it is not the bottleneck at these rates), and
 its log is parsed into the two files research/plant2/fits.py reads, under
 --out/c<level>/. research/hvpa/calibration.py fits the plant from them.
 
+Then the horizontal points (added before any WP17 measurement: WP11 found
+pods sub-linear and tiers coupled on this one host): the closed-loop rate
+alone (cpu_curve.py --phases capacity) at r pods of c cores each, for every
+REPLICA_POINTS pair whose r x c fits the node's free CPU, under
+--out/replicas/r<R>c<M>m/. A Job that fails stops the calibration at once
+with its log (it would otherwise be waited on to the timeout).
+
     python calibrate_service.py --out ../out/hvpa/curves [--level-seconds 60]
 """
 
@@ -17,8 +24,9 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
 import yaml
 
@@ -26,6 +34,9 @@ HERE = Path(__file__).resolve().parent
 TESTBED = HERE.parent
 CONTEXT, NAMESPACE = "kind-polyforge-testbed", "pf-hvpa"
 LEVELS = (0.25, 0.5, 1.0, 2.0)
+REPLICA_POINTS = ((2, 1.0), (4, 1.0), (5, 1.0), (6, 1.0), (8, 0.5), (2, 2.0), (3, 2.0))   # (pods, cores per pod)
+RMAX = 8                       # research/hvpa/lattice.py
+JOB_TIMEOUT_S, JOB_POLL_S = 5400.0, 10.0
 PYTHON_IMAGE = "docker.io/library/python:3.13.17-slim-bookworm"
 sys.path.insert(0, str(HERE / "measure"))
 
@@ -40,8 +51,14 @@ def kubectl(*args: str, stdin: str | None = None, timeout: float = 3600) -> str:
     return proc.stdout
 
 
-def job(cpu: float, level_seconds: float) -> dict:
-    name = f"wp17-curve-c{int(cpu * 1000)}m"
+def job_name(cpu: float, replicas: int = 1) -> str:
+    return f"wp17-curve-c{int(cpu * 1000)}m" if replicas == 1 else f"wp17-cap-r{replicas}-c{int(cpu * 1000)}m"
+
+
+def job(cpu: float, level_seconds: float, replicas: int = 1) -> dict:
+    """The curve Job: the full protocol at one pod, the closed-loop rate alone at more."""
+    name = job_name(cpu, replicas)
+    extra = [] if replicas == 1 else ["--replicas", str(replicas), "--phases", "capacity"]
     return {"apiVersion": "batch/v1", "kind": "Job", "metadata": {"name": name, "namespace": NAMESPACE},
             "spec": {"backoffLimit": 0, "ttlSecondsAfterFinished": 86400, "template": {"spec": {
                 "restartPolicy": "Never", "enableServiceLinks": False,
@@ -49,7 +66,7 @@ def job(cpu: float, level_seconds: float) -> dict:
                 "containers": [{
                     "name": "curve", "image": PYTHON_IMAGE, "imagePullPolicy": "Never",
                     "command": ["python", "-u", "/m/cpu_curve.py", "--base-url", f"http://cpuburn.{NAMESPACE}",
-                                "--cpu", f"{cpu:g}", "--level-seconds", f"{level_seconds:g}"],
+                                "--cpu", f"{cpu:g}", "--level-seconds", f"{level_seconds:g}", *extra],
                     "resources": {"requests": {"cpu": "1", "memory": "256Mi"}, "limits": {"cpu": "1", "memory": "256Mi"}},
                     "securityContext": {"allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,
                                         "capabilities": {"drop": ["ALL"]}},
@@ -70,7 +87,7 @@ def free_cpu(node: dict, pods: list[dict]) -> dict:
     for p in pods:
         labels = p["metadata"].get("labels") or {}
         if p.get("status", {}).get("phase") in ("Succeeded", "Failed") or labels.get("app.kubernetes.io/name") == "cpuburn" \
-                or str(labels.get("job-name", "")).startswith("wp17-curve"):
+                or str(labels.get("job-name", "")).startswith(("wp17-curve", "wp17-cap")):
             continue
         req = sum(cpu_cores(c.get("resources", {}).get("requests", {}).get("cpu", "0")) for c in p["spec"]["containers"])
         if req:
@@ -85,22 +102,47 @@ def cpu_cores(q: str) -> float:
     return float(q[:-1]) / 1000.0 if q.endswith("m") else float(q)
 
 
-def set_level(cpu: float) -> None:
-    patch = {"spec": {"replicas": 1, "template": {"spec": {"containers": [{
+def set_level(cpu: float, replicas: int = 1) -> None:
+    patch = {"spec": {"replicas": replicas, "template": {"spec": {"containers": [{
         "name": "cpuburn", "resources": {"requests": {"cpu": f"{cpu:g}"}, "limits": {"cpu": f"{cpu:g}"}}}]}}}}
     kubectl("patch", "deployment", "cpuburn", "--type", "strategic", "-p", json.dumps(patch))
     kubectl("rollout", "status", "deployment/cpuburn", "--timeout=300s")
 
 
-def measure(cpu: float, level_seconds: float, out: Path) -> Path:
-    j = job(cpu, level_seconds)
+def replica_points(node_cpu: float) -> list[tuple[int, float]]:
+    """The horizontal points that fit the node's free CPU and the lattice."""
+    return [(r, c) for r, c in REPLICA_POINTS if r <= RMAX and r * c <= node_cpu + 1e-9]
+
+
+def wait_job(name: str, timeout_s: float = JOB_TIMEOUT_S, poll_s: float = JOB_POLL_S,
+             sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic) -> None:
+    """Until the Job succeeds; a failed Job raises at once with its log's tail."""
+    deadline = clock() + timeout_s
+    while clock() < deadline:
+        status = json.loads(kubectl("get", f"job/{name}", "-o", "json")).get("status", {})
+        if status.get("succeeded"):
+            return
+        if status.get("failed"):
+            logs = subprocess.run(["kubectl", "--context", CONTEXT, "-n", NAMESPACE, "logs", f"job/{name}",
+                                   "--tail", "20"], capture_output=True, text=True).stdout
+            raise RuntimeError(f"job {name} failed: {logs.strip()[-1200:]}")
+        sleep(poll_s)
+    raise TimeoutError(f"job {name} did not finish within {timeout_s:.0f} s")
+
+
+def curve_dir(out: Path, cpu: float, replicas: int = 1) -> Path:
+    return out / f"c{int(cpu * 1000)}m" if replicas == 1 else out / "replicas" / f"r{replicas}c{int(cpu * 1000)}m"
+
+
+def measure(cpu: float, level_seconds: float, out: Path, replicas: int = 1) -> Path:
+    j = job(cpu, level_seconds, replicas)
     name = j["metadata"]["name"]
     subprocess.run(["kubectl", "--context", CONTEXT, "-n", NAMESPACE, "delete", "job", name, "--ignore-not-found"],
                    capture_output=True, text=True)
     kubectl("apply", "-f", "-", stdin=yaml.safe_dump(j))
-    kubectl("wait", "--for=condition=complete", f"job/{name}", "--timeout=5400s", timeout=5500)
+    wait_job(name)
     meta, body = cpu_curve.parse(kubectl("logs", f"job/{name}"))
-    d = out / f"c{int(cpu * 1000)}m"
+    d = curve_dir(out, cpu, replicas)
     d.mkdir(parents=True, exist_ok=True)
     (d / "load_curve_requests.csv").write_text(body, encoding="utf-8")
     (d / "load_curve_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
@@ -124,10 +166,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     (args.out / "node_cpu.json").write_text(json.dumps(rec, indent=1), encoding="utf-8")
     print(f"node leaves {rec['node_cpu']:.2f} cores for the service", flush=True)
     for cpu in LEVELS:
-        if (args.out / f"c{int(cpu * 1000)}m" / "load_curve_meta.json").exists():
+        if (curve_dir(args.out, cpu) / "load_curve_meta.json").exists():
             continue
         set_level(cpu)
         print(f"{cpu} cores -> {measure(cpu, args.level_seconds, args.out)}", flush=True)
+    points = replica_points(rec["node_cpu"])
+    skipped = [p for p in REPLICA_POINTS if p not in points]
+    if skipped:
+        print(f"horizontal points that do not fit {rec['node_cpu']:.2f} cores, not measured: {skipped}", flush=True)
+    for r, cpu in points:
+        if (curve_dir(args.out, cpu, r) / "load_curve_meta.json").exists():
+            continue
+        set_level(cpu, r)
+        print(f"{r} x {cpu} cores -> {measure(cpu, args.level_seconds, args.out, r)}", flush=True)
     return 0
 
 

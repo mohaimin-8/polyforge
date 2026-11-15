@@ -51,3 +51,28 @@ def test_usage_saturates_at_the_limit_and_no_pods_is_all_late():
     assert p.pod(100.0, 0.5)[2] == 0.5
     out = p.step(3.0, [], 10.0)
     assert out["late"] == out["requests"] == 30.0 and math.isinf(out["mean_s"])
+
+
+def test_without_an_efficiency_table_the_plant_is_exactly_the_linear_one():
+    p = plant.Plant()
+    for c in p.cpu_levels:
+        assert p.capacity_rps(c) == c / p.cpu_per_request_s == p.capacity_rps(c, total_cpu=6.0)
+        assert p.pod(3.0, c) == p.pod(3.0, c, total_cpu=6.0)
+    assert p.eta(6.0) == 1.0
+
+
+def test_the_efficiency_is_one_to_a_core_then_through_the_points_then_held():
+    p = plant.Plant(efficiency=((6.0, 0.6), (2.0, 0.9)))
+    for total, eta in ((0.5, 1.0), (1.0, 1.0), (1.5, 0.95), (2.0, 0.9), (4.0, 0.75), (6.0, 0.6), (8.0, 0.6)):
+        assert p.eta(total) == pytest.approx(eta)
+    assert p.capacity_rps(1.0, total_cpu=4.0) == pytest.approx(1.0 / p.cpu_per_request_s * 0.75)
+    assert p.unloaded_s(1.0, total_cpu=4.0) == pytest.approx(p.cpu_per_request_s / 0.75)
+
+
+def test_a_deployment_on_a_crowded_node_is_slower_and_uses_more_cpu_per_request():
+    linear, crowded = plant.Plant(), plant.Plant(efficiency=((6.0, 0.6),))
+    rate = 0.7 * 6 * linear.capacity_rps(1.0)
+    a, b = linear.step(rate, [1.0] * 6, 30.0), crowded.step(rate, [1.0] * 6, 30.0)
+    assert b["late"] > a["late"] and b["mean_s"] > a["mean_s"]
+    assert b["usage"][0] == pytest.approx(min(rate / 6 * linear.cpu_per_request_s / 0.6, 1.0))
+    assert crowded.step(rate / 6, [1.0], 30.0) == linear.step(rate / 6, [1.0], 30.0)   # one core: eta 1

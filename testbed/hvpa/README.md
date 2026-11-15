@@ -31,8 +31,11 @@ python ../hvpa/install.py --vpa-setting default --dry-run && python ../hvpa/inst
 
 Step 3, the service's calibration at 0.25, 0.5, 1 and 2 cores: `python ../hvpa/calibrate_service.py --out
 ../out/hvpa/curves` (a Job per level runs `measure/cpu_curve.py`, the WP2 protocol on `GET /work`, inside
-the cluster), then `python research/hvpa/calibration.py --curves testbed/out/hvpa/curves` fits the twin's
-plant and checks that capacity is linear in CPU within 10 %.
+the cluster), then the closed-loop rate alone at the horizontal points that fit the node (2, 4, 5 and 6 pods
+of 1 core, 8 of 0.5, 2 and 3 of 2: WP11 found pods sub-linear on this one host), then `python
+research/hvpa/calibration.py --curves testbed/out/hvpa/curves` fits the twin's plant, checks that capacity
+is linear in CPU within 10 %, and gives the plant the measured efficiency per total of requested cores when
+pods are not linear within 10 %.
 
 Live runs: `python ../hvpa/live.py run --arm A4 --target 2 --regime step_up:0.2:7 --calibration
 research/hvpa/calibration.json --out ../out/hvpa/live` resets the cluster (arm objects, VPA checkpoints,

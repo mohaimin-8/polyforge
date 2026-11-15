@@ -15,6 +15,13 @@ spreads them evenly):
               0.95))^-b, the plant-2 tail; attainment = its CDF at the SLO;
   usage       min(lambda / r x w, c) cores, what metrics-server reports;
   cost        requested core-seconds x price (the plan's cost measure).
+Horizontal efficiency (WP11 found sub-linear pods and coupled tiers on this
+one host): with a measured table `efficiency` of (total requested cores x,
+eta) points, every pod of a Deployment requesting x cores in all runs at eta(x)
+of its nominal speed: capacity x eta, unloaded latency / eta and CPU per
+request / eta. eta is 1 up to one core, piecewise linear through the measured
+points, and held at the last one beyond them; without a table (the a-priori
+plant) the form is exactly the linear one above.
 Every constant here is an a-priori placeholder until WP17 step 3 measures
 the real service; `from_calibration` reads those measurements.
 """
@@ -63,19 +70,39 @@ class Plant:
     cpu_levels: tuple = (0.25, 0.5, 1.0, 2.0)
     node_cpu: float = 6.0          # cores the node leaves for the service (measured with the calibration)
     status: str = "a-priori placeholder"
+    efficiency: tuple = ()         # ((total cores, eta), ...) measured; () = the linear form
 
-    def capacity_rps(self, cpu: float) -> float:
-        return cpu / self.cpu_per_request_s
+    def eta(self, total_cpu: float | None) -> float:
+        """The speed of every pod when the Deployment requests total_cpu cores."""
+        if not self.efficiency or total_cpu is None:
+            return 1.0
+        pts = [(1.0, 1.0)] + sorted((float(x), float(e)) for x, e in self.efficiency if float(x) > 1.0)
+        if total_cpu <= pts[0][0]:
+            return 1.0
+        for (x0, e0), (x1, e1) in zip(pts, pts[1:]):
+            if total_cpu <= x1:
+                return e0 + (e1 - e0) * (total_cpu - x0) / (x1 - x0)
+        return pts[-1][1]
 
-    def unloaded_s(self, cpu: float) -> float:
-        return self.cpu_per_request_s / min(1.0, cpu)
+    def capacity_rps(self, cpu: float, total_cpu: float | None = None) -> float:
+        if not self.efficiency or total_cpu is None:
+            return cpu / self.cpu_per_request_s
+        return cpu / self.cpu_per_request_s * self.eta(total_cpu)
 
-    def pod(self, rate_rps: float, cpu: float) -> tuple[float, float, float]:
-        """(mean latency s, share on time, CPU usage cores) of one pod."""
-        rho = rate_rps / self.capacity_rps(cpu)
-        mean = self.unloaded_s(cpu) * congestion(rho, self.congestion_exponent)
+    def unloaded_s(self, cpu: float, total_cpu: float | None = None) -> float:
+        if not self.efficiency or total_cpu is None:
+            return self.cpu_per_request_s / min(1.0, cpu)
+        return self.cpu_per_request_s / min(1.0, cpu) / self.eta(total_cpu)
+
+    def pod(self, rate_rps: float, cpu: float, total_cpu: float | None = None) -> tuple[float, float, float]:
+        """(mean latency s, share on time, CPU usage cores) of one pod; total_cpu,
+        the Deployment's requested cores, sets the horizontal efficiency."""
+        rho = rate_rps / self.capacity_rps(cpu, total_cpu)
+        mean = self.unloaded_s(cpu, total_cpu) * congestion(rho, self.congestion_exponent)
         tail = self.tail_f0 * (1.0 - min(rho, SATURATION_RHO)) ** (-self.tail_b)
-        return mean, lognormal_cdf(self.slo_s, mean, tail), min(rate_rps * self.cpu_per_request_s, cpu)
+        work = self.cpu_per_request_s if not self.efficiency or total_cpu is None else \
+            self.cpu_per_request_s / self.eta(total_cpu)
+        return mean, lognormal_cdf(self.slo_s, mean, tail), min(rate_rps * work, cpu)
 
     def step(self, rate_rps: float, cpus: list[float], dt_s: float) -> dict:
         """One interval of the whole Deployment: requests, late ones, cost, usage per pod."""
@@ -83,7 +110,8 @@ class Plant:
             n = rate_rps * dt_s
             return {"requests": n, "late": n, "mean_s": math.inf, "cost": 0.0, "usage": []}
         per = rate_rps / len(cpus)
-        pods = [self.pod(per, c) for c in cpus]
+        total = sum(cpus) if self.efficiency else None
+        pods = [self.pod(per, c, total) for c in cpus]
         n = rate_rps * dt_s
         on_time = sum(p[1] for p in pods) / len(pods)
         return {"requests": n, "late": n * (1.0 - on_time),
@@ -97,4 +125,5 @@ def from_calibration(path: Path) -> Plant:
     return replace(Plant(), cpu_per_request_s=cal["cpu_per_request_s"],
                    congestion_exponent=cal["congestion_exponent"], tail_f0=cal["tail_f0"],
                    tail_b=cal["tail_b"], slo_s=cal["slo_s"], node_cpu=float(cal.get("node_cpu", 6.0)),
+                   efficiency=tuple((float(x), float(e)) for x, e in cal.get("efficiency", ())),
                    status=f"measured: {path.name}")

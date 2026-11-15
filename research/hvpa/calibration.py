@@ -15,6 +15,15 @@ SLO_FACTOR x s(1 core), the twin's choice (10 x the CPU per request). With
 --node-cpu-file, the node's free CPU (calibrate_service.py measures it) is
 the twin's node size.
 
+Horizontal scaling (added before any WP17 measurement, after WP11 found the
+testbed's pods sub-linear and its tiers coupled through the one host): the
+capacity-only points under curves/replicas/ (r pods at c cores each) give
+eta = mu(r, c) / (r x c / w). The same rule as for CPU, applied to replicas:
+when every eta lies within +-10 % of 1 the plant stays linear, otherwise
+the measured table (mean eta per total of requested cores) becomes the
+plant's `efficiency`. A point whose load generator used half its core or
+more is kept out (the plan's check that the generator is not the bottleneck).
+
     python calibration.py --curves ../../testbed/out/hvpa/curves --out calibration.json
 """
 
@@ -35,6 +44,7 @@ import fits  # noqa: E402
 
 SLO_FACTOR = 10.0
 LINEAR_TOLERANCE = 0.10
+GENERATOR_CPU_MAX = 0.5   # cores: the load generator holds one core and must stay below half of it
 
 
 def level(curve_dir: Path) -> dict:
@@ -48,6 +58,45 @@ def level(curve_dir: Path) -> dict:
             "l0_fitted_s": power["l0"], "f0": tail["f0"], "b": tail["b"]}
 
 
+def replica_points(curves: Path, w: float) -> list[dict]:
+    """The capacity-only points (curves/replicas/r<R>c<M>m) and their eta."""
+    root, out = curves / "replicas", []
+    if not root.is_dir():
+        return out
+    for d in sorted(root.iterdir()):
+        if not (d / "load_curve_meta.json").exists():
+            continue
+        meta = json.loads((d / "load_curve_meta.json").read_text(encoding="utf-8"))
+        r, c, mu = int(meta["replicas"]), float(meta["cpu"]), float(meta["mu_pre_rps"])
+        gen = meta.get("generator_cpu_cores")
+        used = gen is not None and float(gen) < GENERATOR_CPU_MAX
+        out.append({"replicas": r, "cpu": c, "total_cpu": r * c, "mu_rps": mu, "eta": mu / (r * c / w),
+                    "generator_cpu_cores": gen, "used": used,
+                    **({} if used else {"why": "no generator CPU recorded" if gen is None
+                                        else "the load generator used half its core or more"})})
+    return out
+
+
+def efficiency_table(points: list[dict]) -> list[list[float]]:
+    """[total requested cores, mean eta] over the used points, by total."""
+    by: dict[float, list[float]] = {}
+    for p in points:
+        if p["used"]:
+            by.setdefault(p["total_cpu"], []).append(p["eta"])
+    return [[x, statistics.fmean(v)] for x, v in sorted(by.items())]
+
+
+def horizontal(curves: Path, w: float) -> dict:
+    """The replica check and, when it fails, the plant's efficiency table."""
+    points = replica_points(curves, w)
+    table = efficiency_table(points)
+    if not table:
+        return {"replica_points": points} if points else {}
+    linear = all(abs(e - 1.0) <= LINEAR_TOLERANCE for _, e in table)
+    return {"replica_points": points, "efficiency_measured": table, "linear_in_replicas_within_10pct": linear,
+            **({} if linear else {"efficiency": table})}
+
+
 def fit(curves: Path, node_cpu_file: Path | None = None) -> dict:
     rows = sorted((level(d) for d in curves.iterdir() if (d / "load_curve_meta.json").exists()),
                   key=lambda r: r["cpu"])
@@ -56,7 +105,8 @@ def fit(curves: Path, node_cpu_file: Path | None = None) -> dict:
     w = statistics.median(r["w_s"] for r in rows)
     worst = max(abs(r["w_s"] / w - 1) for r in rows)
     one_core = min(rows, key=lambda r: abs(r["cpu"] - 1.0))
-    return {"cpu_per_request_s": w, "congestion_exponent": statistics.median(r["a"] for r in rows),
+    return {**horizontal(curves, w),
+            "cpu_per_request_s": w, "congestion_exponent": statistics.median(r["a"] for r in rows),
             "tail_f0": max(1.0, statistics.median(r["f0"] for r in rows)),
             "tail_b": max(0.0, statistics.median(r["b"] for r in rows)),
             "slo_s": SLO_FACTOR * one_core["s_s"], "linear_within_10pct": worst <= LINEAR_TOLERANCE,
@@ -77,6 +127,10 @@ def main(argv: list[str] | None = None) -> int:
     args.out.write_text(json.dumps(cal, indent=1), encoding="utf-8")
     print(f"w {cal['cpu_per_request_s'] * 1000:.1f} ms, a {cal['congestion_exponent']:.2f}, SLO {cal['slo_s']:.3f} s; "
           f"linear within 10 %: {cal['linear_within_10pct']} (worst {cal['worst_w_deviation']:.1%})")
+    if "efficiency_measured" in cal:
+        print("eta by total cores: " + ", ".join(f"{x:g}: {e:.3f}" for x, e in cal["efficiency_measured"]) +
+              f"; linear in replicas within 10 %: {cal['linear_in_replicas_within_10pct']}"
+              + ("" if cal["linear_in_replicas_within_10pct"] else " -> the plant uses the measured table"))
     return 0 if cal["linear_within_10pct"] else 3
 
 

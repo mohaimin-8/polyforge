@@ -207,8 +207,10 @@ def wp17(py: str, kc: list[str]) -> int:
     step([py, "twin_predict.py", "--calibration", "calibration.json", "--out", "predictions.json"], cwd=RESEARCH)
     commit(["research/hvpa/calibration.json", "research/hvpa/calibration_curves", "research/hvpa/predictions.json"],
            "results(hvpa): WP17 calibration and the twin's predictions, before any live run\n\n"
-           "The service measured at 0.25, 0.5, 1 and 2 cores in the cluster, the node's free CPU, the fitted\n"
-           "plant, and twin_predict.py's regimes, gains, live choices and tuned targets.")
+           "The service measured at 0.25, 0.5, 1 and 2 cores in the cluster and its closed-loop rate at the\n"
+           "horizontal points that fit the node, the node's free CPU, the fitted plant (with its measured\n"
+           "efficiency when pods are not linear within 10 %), and twin_predict.py's regimes, gains, live\n"
+           "choices and tuned targets.")
     log("WP17 is ready for its live pilots, which start after the predictions are read")
     return 0
 

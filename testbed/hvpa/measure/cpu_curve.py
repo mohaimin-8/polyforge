@@ -8,9 +8,13 @@ after (2 x 4 x replicas workers: more than enough to saturate a pod of up to
 2 cores with requests of tens of CPU-milliseconds), and ten open-loop Poisson
 levels in two passes. The results go to stdout between markers, as the two
 files research/plant2/fits.py reads, for the host to collect with
-`kubectl logs` (kind maps no host port for this service).
+`kubectl logs` (kind maps no host port for this service). With --phases
+capacity only the closed-loop rate is measured (the horizontal points: r
+pods at c cores each). The load generator's own CPU over the run is recorded
+(`generator_cpu_cores`): the plan's check that it is not the bottleneck.
 
     python cpu_curve.py --base-url http://cpuburn.pf-hvpa --cpu 0.5 --level-seconds 60
+    python cpu_curve.py --base-url http://cpuburn.pf-hvpa --cpu 1 --replicas 4 --phases capacity
 """
 
 from __future__ import annotations
@@ -55,17 +59,24 @@ def parse(text: str) -> tuple[dict, str]:
     return json.loads(meta_line), body
 
 
+def protocol_args(args: argparse.Namespace) -> list[str]:
+    """load_curve.py's arguments for this run (its --threads is an integer
+    thread count of a model server, not a CPU limit: the CPU goes in the meta)."""
+    return (["--tier", "small", "--replicas", str(args.replicas), "--base-url", args.base_url, "--out",
+             "/tmp/unused", "--level-seconds", str(args.level_seconds), "--phases", args.phases]
+            + (["--quick"] if args.quick else []))
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--base-url", required=True)
     ap.add_argument("--cpu", type=float, required=True, help="the pod's CPU limit, for the record")
     ap.add_argument("--replicas", type=int, default=1)
     ap.add_argument("--level-seconds", type=float, default=60.0)
+    ap.add_argument("--phases", choices=("all", "capacity"), default="all")
     ap.add_argument("--quick", action="store_true")
     args = ap.parse_args(argv)
-    lc_args = lc.parse_args(["--tier", "small", "--replicas", str(args.replicas), "--threads", str(args.cpu),
-                             "--base-url", args.base_url, "--out", "/tmp/unused", "--level-seconds",
-                             str(args.level_seconds)] + (["--quick"] if args.quick else []))
+    lc_args = lc.parse_args(protocol_args(args))
     captured = {}
 
     def keep(out_dir, rows, meta) -> None:   # load_curve.run writes files; here they go to stdout
@@ -73,11 +84,14 @@ def main(argv: list[str] | None = None) -> int:
 
     original = lc.write_outputs
     lc.write_outputs = keep
+    wall0, cpu0 = time.monotonic(), time.process_time()
     try:
         meta = lc.run(lc_args, post=get_work(args.base_url))
     finally:
         lc.write_outputs = original
-    meta.update(service="cpuburn", cpu=args.cpu, tier=None, protocol="WP2 protocol on GET /work (WP17 step 3)")
+    wall, cpu = time.monotonic() - wall0, time.process_time() - cpu0
+    meta.update(service="cpuburn", cpu=args.cpu, tier=None, protocol="WP2 protocol on GET /work (WP17 step 3)",
+                generator_cpu_cores=cpu / wall if wall > 0 else None)
     emit(captured["rows"], meta)
     return 0
 
