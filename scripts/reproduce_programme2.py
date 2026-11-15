@@ -48,6 +48,8 @@ STEPS = [
     ("WP11 score", T / "validation", ["score.py", "--runs", "runs"], ["VALIDATION.md"], ["runs/actuator.jsonl"]),
     ("WP11 error breakdown", T / "validation", ["diagnose.py", "--runs", "runs"], ["DIAGNOSE.md"],
      ["runs/actuator.jsonl"]),
+    ("WP11 host coupling (exploratory)", T / "validation", ["coupling.py", "--runs", "runs"], ["COUPLING.md"],
+     ["runs/actuator.jsonl"]),
     ("WP5 Morris screen, r = 20", R / "sensitivity", ["morris_pilot.py", "--trajectories", "20", "--crn",
                                                      "--report-only"], ["MORRIS_r20_crn.md"],
      ["data/morris_runs_r20_crn.csv.gz"]),

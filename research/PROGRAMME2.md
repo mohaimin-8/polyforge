@@ -19,7 +19,7 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP8 workload population, native replay | `research/population/` | `python features.py`, `python native.py`, `python population.py` | `FEATURES.md`, `POPULATION.md` |
 | WP9 comparators and tuning | `research/comparators/` | `python tune.py --plant B ...` | `pilot/*/report.md`, `SAMPLE_SIZE.md` |
 | WP10 testbed | `testbed/` | runbook in `testbed/README.md`; `python scripts/bringup.py` | built and up on kind (2026-11-14) |
-| WP11 simulator against the testbed | `testbed/validation/` | `cell_schedules.py`, `predict.py`, `run_cells.py`, `score.py`, `diagnose.py` | `predictions.json` (committed before the runs), `VALIDATION.md`, `DIAGNOSE.md` once the cells have run; WP11b by the rule in `testbed/hvpa/after_wp11.py` |
+| WP11 simulator against the testbed | `testbed/validation/` | `cell_schedules.py`, `predict.py`, `run_cells.py`, `score.py`, `diagnose.py`, `coupling.py` | `predictions.json` (committed before the runs), `VALIDATION.md`, `DIAGNOSE.md`, `COUPLING.md` (exploratory: the two tiers share one host); WP11b by the rule in `testbed/hvpa/after_wp11.py` |
 | WP12 live pilot of the main contrast | `testbed/wp12/` | `tb_planner.py`, `plans.py`, `pairs.py`, `after_wp11b.py` | `regimes.json`, `design.json`, `tuning/`, `plans.json` (all committed before any live run), then `PILOT.md` with gate G3 and `pilot.json`; started by `testbed/hvpa/after_wp11.py` after WP11b |
 | WP15 external check (RouteBalance) | `research/external/routebalance/` | `python -I analyse.py report` | `REPORT.md`, `RESULTS.md` |
 | WP16 benchmark: any controller scored by regret | `research/benchmark/` | `python bench.py --controller module:Class --plant B` | per-workload CSV, summary JSON |
@@ -27,7 +27,7 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP22 controls, adversarial search, blind predictions | `research/controls/` | `python negative_control.py`, `adversarial_search.py`, `blind_predictions.py` | `NEGATIVE_CONTROL.md`, `ADVERSARIAL_SEARCH.md`, `DIAGNOSE_158.md`, `RANDOM_SAMPLE_CHECK.md`, `GATE_REACH.md` |
 | WP23 the index as a tool | `tools/index-probe/` | `python index_probe.py log|box ...` | `README.md` |
 
-Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (23 steps; those needing downloaded inputs or not-yet-committed run data are skipped without them).
+Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (24 steps; those needing downloaded inputs or not-yet-committed run data are skipped without them).
 
 The long CPU campaigns (WP9's full protocol, WP5's Morris and Sobol stages) run one after another once the
 testbed is free, resumable: `python research/run_queue.py --list`.
@@ -48,6 +48,9 @@ What the pilots say so far, in one line each (details in the files above):
   Blind, on 40 fresh regimes, a rule fixed beforehand (one-step loss and index) ranks the gains at
   Spearman +0.39 (one-sided p = 0.006).
 - On RouteBalance's decision the index is large and the per-knob loss 4-30 times ours (WP15).
+- The simulator misses the testbed's attainment (WP11: median error 65% against the 25% target,
+  optimistic in most cells): capacity grows sub-linearly with pods, and on the one-host testbed each
+  busy core of the other tier slows a request by about 23% (COUPLING.md, exploratory).
 - The semantic cache, replayed on 1,000,000 real first turns through the gateway's own logic,
   saturates at about 300 entries (1.19 MiB of heap) with a ceiling of 0.21 at tau 0.85 (WP6); plant 2
   now uses that curve, which makes the cache knob close to on/off at the simulator's sizes.
