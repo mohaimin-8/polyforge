@@ -11,11 +11,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_queue as rq  # noqa: E402
 
 
-def test_wp9_runs_first_and_start_skips_to_a_named_campaign():
+def test_the_smoke_then_wp9_run_first_and_start_skips_to_a_named_campaign():
     names = [c.name for c in rq.CAMPAIGNS]
-    assert names == ["wp9-B-own", "wp9-A-own", "wp9-B-own-plant", "wp9-A-own-plant", "speccurve-runs",
-                     "speccurve", "morris-r20", "sobol", "wp9-B-native", "wp9-A-native", "wp17-pilot",
-                     "reproduce"]
+    assert names == ["wp17-smoke", "wp9-B-own", "wp9-A-own", "wp9-B-own-plant", "wp9-A-own-plant",
+                     "speccurve-runs", "speccurve", "morris-r20", "sobol", "wp9-B-native", "wp9-A-native",
+                     "wp17-pilot", "reproduce"]
+    smoke = rq.CAMPAIGNS[0]
+    assert (smoke.cwd / smoke.args[0]).exists() and smoke.ok == (0, 1)
     assert [c.name for c in rq.selected("sobol")] == ["sobol", "wp9-B-native", "wp9-A-native", "wp17-pilot",
                                                       "reproduce"]
     pilot, last = rq.CAMPAIGNS[-2], rq.CAMPAIGNS[-1]

@@ -5,6 +5,10 @@ would change what the testbed measures. The queue waits until a given
 process has exited (the post-WP11 chain, testbed/hvpa/after_wp11.py), then
 runs, in this order:
 
+  wp17-smoke       WP17's live machinery checked end to end, one 7-minute run
+                   per pilot arm (testbed/hvpa/smoke_live.py; not a
+                   measurement), while the cluster is as the chain left it:
+                   a fault shows now, not after the CPU campaigns
   wp9-B-own        WP9's full tuning protocol, plant B, own mix, budget
                    enforced, with the WP1 reference lines
                    (research/comparators/full/)
@@ -28,7 +32,7 @@ runs, in this order:
                    from the data now committed and compared with git (a
                    drift is left in the working tree; nothing is committed)
 
-WP9 comes first because its tuned comparators feed the registration (WP13);
+Of the CPU campaigns, WP9 comes first because its tuned comparators feed the registration (WP13);
 the specification curve then decides how RQ1 can be stated; WP5's
 sensitivity indices are a robustness report. Each campaign resumes from its own
 journal or partial file, so the queue can be stopped for testbed work and
@@ -81,6 +85,11 @@ def wp9(plant: str, mix: str, budget: str = "enforced") -> Campaign:
 
 
 CAMPAIGNS = (
+    Campaign("wp17-smoke", REPO / "testbed" / "hvpa", ("smoke_live.py",), ("testbed/hvpa/smoke_runs/*",),
+             "test(hvpa): WP17 live smoke, one short run per pilot arm before the CPU campaigns\n\n"
+             "Not a measurement: the machinery checked end to end (load, planner decisions and acts, the\n"
+             "HPA's reading, a VPA recommendation, growth under load) after the predictions were committed.",
+             ok=(0, 1)),   # 1: a check failed, SMOKE.md says which; 3: no committed predictions, nothing ran
     wp9("B", "own"),
     wp9("A", "own"),
     wp9("B", "own", "plant"),
