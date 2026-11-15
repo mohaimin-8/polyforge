@@ -1,0 +1,263 @@
+{
+ "protocol": "plan WP11; testbed/validation/cells.py",
+ "seed": 20261115,
+ "targets": {
+  "rank_correlation_min": 0.8,
+  "median_abs_pct_error_max": 0.25,
+  "metrics_with_targets": [
+   "attainment",
+   "cost"
+  ],
+  "metrics_reported": [
+   "mean_latency",
+   "p95_latency",
+   "attainment",
+   "throughput",
+   "cost"
+  ]
+ },
+ "runs_per_cell": 3,
+ "predictions": "written and committed after the in-cluster tier measurements, before any cell runs",
+ "cells": [
+  {
+   "cell": 0,
+   "target_util": 0.5625,
+   "small_share": 0.8161,
+   "stream": "burstgpt/ChatGPT/api",
+   "pools": [
+    2,
+    1
+   ],
+   "cache": "off",
+   "cores": 4
+  },
+  {
+   "cell": 1,
+   "target_util": 0.5883,
+   "small_share": 0.9304,
+   "stream": "azure2024/conv",
+   "pools": [
+    2,
+    1
+   ],
+   "cache": "large",
+   "cores": 4
+  },
+  {
+   "cell": 2,
+   "target_util": 0.7573,
+   "small_share": 0.9549,
+   "stream": "azure2024/conv",
+   "pools": [
+    1,
+    1
+   ],
+   "cache": "small",
+   "cores": 3
+  },
+  {
+   "cell": 3,
+   "target_util": 0.7954,
+   "small_share": 0.6546,
+   "stream": "burstgpt/ChatGPT/api",
+   "pools": [
+    3,
+    1
+   ],
+   "cache": "off",
+   "cores": 5
+  },
+  {
+   "cell": 4,
+   "target_util": 0.6823,
+   "small_share": 0.648,
+   "stream": "azure2024/conv",
+   "pools": [
+    2,
+    1
+   ],
+   "cache": "off",
+   "cores": 4
+  },
+  {
+   "cell": 5,
+   "target_util": 0.3806,
+   "small_share": 0.8296,
+   "stream": "azure2024/conv",
+   "pools": [
+    1,
+    2
+   ],
+   "cache": "small",
+   "cores": 5
+  },
+  {
+   "cell": 6,
+   "target_util": 0.5073,
+   "small_share": 0.5375,
+   "stream": "burstgpt/ChatGPT/conv",
+   "pools": [
+    3,
+    1
+   ],
+   "cache": "large",
+   "cores": 5
+  },
+  {
+   "cell": 7,
+   "target_util": 0.8998,
+   "small_share": 0.6941,
+   "stream": "burstgpt/ChatGPT/api",
+   "pools": [
+    3,
+    1
+   ],
+   "cache": "large",
+   "cores": 5
+  },
+  {
+   "cell": 8,
+   "target_util": 0.7024,
+   "small_share": 0.797,
+   "stream": "burstgpt/ChatGPT/conv",
+   "pools": [
+    2,
+    1
+   ],
+   "cache": "small",
+   "cores": 4
+  },
+  {
+   "cell": 9,
+   "target_util": 0.6364,
+   "small_share": 0.762,
+   "stream": "azure2024/conv",
+   "pools": [
+    1,
+    1
+   ],
+   "cache": "small",
+   "cores": 3
+  },
+  {
+   "cell": 10,
+   "target_util": 0.8526,
+   "small_share": 0.7338,
+   "stream": "azure2024/conv",
+   "pools": [
+    1,
+    1
+   ],
+   "cache": "off",
+   "cores": 3
+  },
+  {
+   "cell": 11,
+   "target_util": 0.3321,
+   "small_share": 0.6048,
+   "stream": "burstgpt/ChatGPT/conv",
+   "pools": [
+    1,
+    1
+   ],
+   "cache": "small",
+   "cores": 3
+  },
+  {
+   "cell": 12,
+   "target_util": 0.7369,
+   "small_share": 0.9066,
+   "stream": "burstgpt/ChatGPT/conv",
+   "pools": [
+    3,
+    1
+   ],
+   "cache": "off",
+   "cores": 5
+  },
+  {
+   "cell": 13,
+   "target_util": 0.3203,
+   "small_share": 0.8693,
+   "stream": "burstgpt/ChatGPT/api",
+   "pools": [
+    1,
+    2
+   ],
+   "cache": "large",
+   "cores": 5
+  },
+  {
+   "cell": 14,
+   "target_util": 0.6034,
+   "small_share": 0.9908,
+   "stream": "burstgpt/ChatGPT/conv",
+   "pools": [
+    1,
+    2
+   ],
+   "cache": "small",
+   "cores": 5
+  },
+  {
+   "cell": 15,
+   "target_util": 0.4013,
+   "small_share": 0.8856,
+   "stream": "burstgpt/ChatGPT/api",
+   "pools": [
+    1,
+    2
+   ],
+   "cache": "large",
+   "cores": 5
+  },
+  {
+   "cell": 16,
+   "target_util": 0.8102,
+   "small_share": 0.5732,
+   "stream": "azure2024/conv",
+   "pools": [
+    3,
+    1
+   ],
+   "cache": "large",
+   "cores": 5
+  },
+  {
+   "cell": 17,
+   "target_util": 0.4704,
+   "small_share": 0.708,
+   "stream": "burstgpt/ChatGPT/conv",
+   "pools": [
+    1,
+    1
+   ],
+   "cache": "off",
+   "cores": 3
+  },
+  {
+   "cell": 18,
+   "target_util": 0.446,
+   "small_share": 0.506,
+   "stream": "burstgpt/ChatGPT/api",
+   "pools": [
+    1,
+    2
+   ],
+   "cache": "small",
+   "cores": 5
+  },
+  {
+   "cell": 19,
+   "target_util": 0.5212,
+   "small_share": 0.5796,
+   "stream": "burstgpt/ChatGPT/conv",
+   "pools": [
+    2,
+    1
+   ],
+   "cache": "off",
+   "cores": 4
+  }
+ ]
+}
