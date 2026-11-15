@@ -38,6 +38,7 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "scripts"))
 import predict as pr  # noqa: E402
+import score  # noqa: E402
 from check_run import METRIC, open_text, read_k6_requests, summarise  # noqa: E402
 
 cs = pr.cs
@@ -69,6 +70,12 @@ def run_requests(run: Path, table: dict[int, dict]) -> list[dict]:
     return reqs
 
 
+def scored_run(run: Path) -> bool:
+    """The runs score.py scores: valid, and on AC power at start and end."""
+    info = json.loads((run / "run.json").read_text(encoding="utf-8"))
+    return bool(info.get("valid")) and score.on_mains(info)
+
+
 def mean_inflight(starts: np.ndarray, ends: np.ndarray, a: float, b: float, exclude: int | None = None) -> float:
     """Time-averaged number of the intervals overlapping [a, b]."""
     overlap = np.clip(np.minimum(ends, b) - np.maximum(starts, a), 0.0, None)
@@ -91,7 +98,7 @@ def within_run_rows(cell: dict, runs: Path, inputs: Path, cal: dict) -> dict[str
     table = {int(r["seq"]): r for r in cs.read_table(inputs / f"cell{k:02d}.csv.gz")}
     rows: dict[str, list[tuple]] = {"small": [], "mid": []}
     for run in sorted((runs / f"cell{k:02d}").glob("run*")):
-        if not json.loads((run / "run.json").read_text(encoding="utf-8")).get("valid"):
+        if not scored_run(run):
             continue
         misses = [r for r in run_requests(run, table) if not r["hit"]]
         if not misses:
@@ -137,8 +144,7 @@ def measured(cell: dict, runs: Path, inputs: Path, slo_ms: float) -> tuple[float
     """Mean attainment over the valid runs (score.py's rule) and their mean hits per (step, tenant)."""
     k = cell["cell"]
     table = {int(r["seq"]): r for r in cs.read_table(inputs / f"cell{k:02d}.csv.gz")}
-    valid = [r for r in sorted((runs / f"cell{k:02d}").glob("run*"))
-             if json.loads((r / "run.json").read_text(encoding="utf-8")).get("valid")]
+    valid = [r for r in sorted((runs / f"cell{k:02d}").glob("run*")) if scored_run(r)]
     atts, hits = [], {}
     for run in valid:
         atts.append(summarise(read_k6_requests(run / "k6-samples.csv.gz"), slo_ms)["attainment"])

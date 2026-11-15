@@ -52,12 +52,19 @@ def spearman(a, b) -> float:
     return float(np.corrcoef(ra, rb)[0, 1])
 
 
+def on_mains(info: dict) -> bool:
+    """As run_cells.power_problem: on AC power at the run's start and end (unknown counts as AC)."""
+    return info.get("ac_power") is not False and info.get("ac_power_end") is not False
+
+
 def valid_runs(cell_dir: Path) -> list[Path]:
     out = []
     for run in sorted(cell_dir.glob("run*")):
-        info = run / "run.json"
-        if info.exists() and json.loads(info.read_text(encoding="utf-8")).get("valid") and \
-                (run / "k6-samples.csv.gz").exists():
+        path = run / "run.json"
+        if not path.exists() or not (run / "k6-samples.csv.gz").exists():
+            continue
+        info = json.loads(path.read_text(encoding="utf-8"))
+        if info.get("valid") and on_mains(info):
             out.append(run / "k6-samples.csv.gz")
     return out
 

@@ -33,3 +33,13 @@ def test_only_valid_complete_runs_are_scored(tmp_path):
         if name != "run2":
             (d / "k6-samples.csv.gz").write_bytes(b"")
     assert [p.parent.name for p in score.valid_runs(tmp_path)] == ["run0"]
+
+
+def test_a_run_off_the_mains_at_its_start_or_end_is_not_scored(tmp_path):
+    for name, start, end in (("run0", True, True), ("run1", True, False), ("run2", False, True), ("run3", None, None)):
+        d = tmp_path / name
+        d.mkdir()
+        (d / "run.json").write_text(json.dumps({"valid": True, "complete": True, "ac_power": start,
+                                                "ac_power_end": end}))
+        (d / "k6-samples.csv.gz").write_bytes(b"")
+    assert [p.parent.name for p in score.valid_runs(tmp_path)] == ["run0", "run3"]   # unknown counts as the mains

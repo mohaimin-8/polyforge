@@ -106,3 +106,33 @@ def test_posture_is_retried_after_connection_errors():
     assert ok["errors"] == [] and ok["attempts"] == 3
     bad = run_cells.set_posture(FlakyActuator(99), pins, sleep=lambda s: None)
     assert bad["errors"] and bad["attempts"] == run_cells.POSTURE_ATTEMPTS
+
+
+def test_a_run_is_a_measurement_only_on_the_mains_at_both_ends():
+    assert run_cells.power_problem({"ac_power": True, "ac_power_end": True}) is None
+    assert run_cells.power_problem({"ac_power": None, "ac_power_end": None}) is None
+    assert "not on AC power" in run_cells.power_problem({"ac_power": True, "ac_power_end": False})
+    assert "not on AC power" in run_cells.power_problem({"ac_power": False, "ac_power_end": True})
+
+
+def test_the_redo_pass_reruns_invalid_and_off_mains_runs_and_skips_measurements():
+    ok = {"complete": True, "valid": True, "ac_power": True, "ac_power_end": True}
+    battery = {**ok, "ac_power_end": False}
+    bad = {**ok, "valid": False}
+    for prev in (ok, battery, bad):
+        assert run_cells.should_skip(prev, redo_invalid=False)          # the first pass never repeats a run
+    assert run_cells.should_skip(ok, redo_invalid=True)
+    assert not run_cells.should_skip(battery, redo_invalid=True) and not run_cells.should_skip(bad, redo_invalid=True)
+    assert not run_cells.should_skip({"complete": False}, redo_invalid=False)
+
+
+def test_a_redone_run_keeps_its_earlier_record_outside_the_scored_globs(tmp_path):
+    run = tmp_path / "cell03" / "run0"
+    run.mkdir(parents=True)
+    (run / "run.json").write_text("{}")
+    first = run_cells.keep_replaced(run)
+    run.mkdir()
+    second = run_cells.keep_replaced(run)
+    assert first == tmp_path / "cell03" / "replaced" / "run0.1" and second.name == "run0.2"
+    assert (first / "run.json").exists() and not run.exists()
+    assert [p.name for p in (tmp_path / "cell03").glob("run*")] == []

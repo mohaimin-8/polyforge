@@ -86,6 +86,36 @@ def predictions_committed(path: Path = PREDICTIONS) -> str:
     return git("log", "-1", "--format=%H", "--", rel).stdout.strip()
 
 
+def power_problem(rec: dict) -> str | None:
+    """A run is a measurement only on the mains at its start and at its end: a
+    laptop on battery throttles, sleeps when low (WP11b, 15 Nov 14:49), and a
+    power-source change stalls the scheduler (WP14). Rule added during WP11b,
+    outcome-blind; WP11's 60 runs were all on the mains. Unknown (not Windows)
+    counts as the mains."""
+    if rec.get("ac_power") is False or rec.get("ac_power_end") is False:
+        return f"not on AC power (start {rec.get('ac_power')}, end {rec.get('ac_power_end')})"
+    return None
+
+
+def should_skip(prev: dict, redo_invalid: bool) -> bool:
+    """A finished run is skipped unless the redo pass finds it is not a measurement."""
+    measured = bool(prev.get("valid")) and power_problem(prev) is None
+    return bool(prev.get("complete")) and (measured or not redo_invalid)
+
+
+def keep_replaced(run_dir: Path) -> Path:
+    """Move a run about to be redone to <cell>/replaced/<run>.<k> (outside the
+    run* globs the scorers use), so its record is kept."""
+    dest_root = run_dir.parent / "replaced"
+    dest_root.mkdir(parents=True, exist_ok=True)
+    k = 1
+    while (dest_root / f"{run_dir.name}.{k}").exists():
+        k += 1
+    dest = dest_root / f"{run_dir.name}.{k}"
+    run_dir.rename(dest)
+    return dest
+
+
 def on_ac_power() -> bool | None:
     """Windows GetSystemPowerStatus: True on the mains, False on battery, None unknown."""
     if os.name != "nt":
@@ -235,6 +265,8 @@ def run_one(cell: dict, run: int, schedule_dir: Path, tokens: Path, out: Path, a
         problems.append(f"schedule lag p99 {rec['lag_p99_ms']:.0f} ms")
     if not (out / "k6-samples.csv.gz").exists():
         problems.append("no k6 samples")
+    if (power := power_problem(rec)) is not None:
+        problems.append(power)
     rec.update(problems=problems, valid=not problems, complete=True)
     (out / "run.json").write_text(json.dumps(rec, indent=1), encoding="utf-8")
     return rec
@@ -270,8 +302,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         done = run_dir / "run.json"
         if done.exists():
             prev = json.loads(done.read_text(encoding="utf-8"))
-            if prev.get("complete") and (prev.get("valid") or not args.redo_invalid):
+            if should_skip(prev, args.redo_invalid):
                 continue
+            if prev.get("complete"):
+                print(f"cell {c} run {r}: redone, the earlier record kept in {keep_replaced(run_dir)}", flush=True)
         try:
             rec = run_one(cells[c], r, args.schedules / f"cell{c:02d}", args.tokens, run_dir, actuator,
                           preds[c]["slo_ms"], commit, i)
