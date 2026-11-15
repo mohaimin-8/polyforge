@@ -27,7 +27,7 @@ Cost is not a model output in fixed-pool cells (pods x cores x price x time on b
 
 ## Declared secondary: capacity measured at each pool size
 
-The primary prediction keeps the simulator's capacity, linear in replicas; this one takes each pool's measured closed-loop rate at the cell's own replica count, so the difference between the two tables is the replica-scaling part of the error.
+The primary prediction scales each tier's capacity with replicas as n ** beta, beta fitted to the calibration's curves (small 0.598, mid 0.359); this one takes each pool's measured closed-loop rate at the cell's own replica count, so the difference between the two tables is the replica-scaling part of the error.
 
 | metric | cells | median abs. % error | Spearman | Bland-Altman mean diff [95% limits] | target met |
 |---|---:|---:|---:|---|---|

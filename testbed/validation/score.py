@@ -125,6 +125,15 @@ def plot(results: dict, path: Path) -> None:
     plt.close(fig)
 
 
+def scaling_note(doc: dict) -> str:
+    """How the primary prediction scaled each tier's capacity with replicas, read from its own rules."""
+    if doc["rules"].get("replica_scaling", "linear") == "linear":
+        return "The primary prediction keeps the simulator's capacity, linear in replicas"
+    betas = ", ".join(f"{tier} {c['replica_scaling_exponent']:.3f}" for tier, c in doc["calibration"].items())
+    return ("The primary prediction scales each tier's capacity with replicas as n ** beta, beta fitted to the "
+            f"calibration's curves ({betas})")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--runs", type=Path, required=True)
@@ -134,7 +143,8 @@ def main() -> int:
     ap.add_argument("--plot", type=Path, default=HERE / "validation_bland_altman.png")
     args = ap.parse_args()
     design = json.loads(args.cells.read_text(encoding="utf-8"))
-    preds = {p["cell"]: p for p in json.loads(args.predictions.read_text(encoding="utf-8"))["predictions"]}
+    doc = json.loads(args.predictions.read_text(encoding="utf-8"))
+    preds = {p["cell"]: p for p in doc["predictions"]}
     pairs = {m: [] for m in (*METRICS, "hit_rate")}
     steady = {m: [] for m in METRICS}
     measured = {m: [] for m in METRICS}
@@ -173,9 +183,9 @@ def main() -> int:
     L += table_rows({m: a for m, a in secondary.items()}, {**t, "metrics_with_targets": []})
     if secondary_2:
         L += ["", "## Declared secondary: capacity measured at each pool size", "",
-              "The primary prediction keeps the simulator's capacity, linear in replicas; this one takes each "
-              "pool's measured closed-loop rate at the cell's own replica count, so the difference between the "
-              "two tables is the replica-scaling part of the error.", ""]
+              f"{scaling_note(doc)}; this one takes each pool's measured closed-loop rate at the cell's own "
+              "replica count, so the difference between the two tables is the replica-scaling part of the error.",
+              ""]
         L += table_rows(secondary_2, {**t, "metrics_with_targets": []})
     L += ["", "## Per cell", "",
           "| cell | valid runs | attainment pred | attainment meas | mean s pred | mean s meas | hit pred | "

@@ -43,3 +43,12 @@ def test_a_run_off_the_mains_at_its_start_or_end_is_not_scored(tmp_path):
                                                 "ac_power_end": end}))
         (d / "k6-samples.csv.gz").write_bytes(b"")
     assert [p.parent.name for p in score.valid_runs(tmp_path)] == ["run0", "run3"]   # unknown counts as the mains
+
+
+def test_the_report_names_the_replica_scaling_the_primary_prediction_used():
+    linear = {"rules": {"slo_factor": 3.0}, "calibration": {"small": {}, "mid": {}}}
+    assert score.scaling_note(linear) == "The primary prediction keeps the simulator's capacity, linear in replicas"
+    fitted = {"rules": {"replica_scaling": "fitted"},
+              "calibration": {"small": {"replica_scaling_exponent": 0.5975}, "mid": {"replica_scaling_exponent": 0.359}}}
+    assert score.scaling_note(fitted) == ("The primary prediction scales each tier's capacity with replicas as "
+                                          "n ** beta, beta fitted to the calibration's curves (small 0.598, mid 0.359)")
