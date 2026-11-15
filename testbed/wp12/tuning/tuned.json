@@ -1,0 +1,77 @@
+{
+ "settings": {
+  "scaling": "fitted",
+  "configs": 64,
+  "seed": 20261112,
+  "tuning_schedules": 40,
+  "testbed": {
+   "tiers": {
+    "small": {
+     "cores_per_pod": 1,
+     "pod_min": 1,
+     "pod_max": 3,
+     "a": 0.8217402174580213,
+     "b": 0.0,
+     "f0": 1.8457579593467939,
+     "l0_s": 3.241344198828696,
+     "capacity_per_pod_rps": 0.47342040826726567,
+     "scaling": 0.597542975956419
+    },
+    "mid": {
+     "cores_per_pod": 2,
+     "pod_min": 1,
+     "pod_max": 2,
+     "a": 0.631651121851879,
+     "b": 0.05222274995308836,
+     "f0": 1.9356232722565596,
+     "l0_s": 4.020036240358872,
+     "capacity_per_pod_rps": 0.3093174175179288,
+     "scaling": 0.35900751335849235
+    }
+   },
+   "pins": {
+    "t00": "small",
+    "t01": "mid"
+   },
+   "slo_ms": 9724.032596486088,
+   "price_core_hr": 0.1315,
+   "core_budget": 5,
+   "hit_max": 0.17430862267696642,
+   "hit_half_mb": 1.9275249131909367,
+   "cache_levels_mb": [
+    0,
+    1,
+    2,
+    4,
+    8,
+    16
+   ]
+  }
+ },
+ "arms": {
+  "joint": {
+   "config": 36,
+   "mean_J": 0.2035102622390335,
+   "configs_scored": 64,
+   "params": {
+    "switch_penalty": 0.0474866,
+    "horizon_steps": 1,
+    "forecast_method": "persistence",
+    "weight_beta": 5.75235,
+    "weight_gamma": 0.250491
+   }
+  },
+  "per_knob": {
+   "config": 61,
+   "mean_J": 0.2005276811293643,
+   "configs_scored": 64,
+   "params": {
+    "switch_penalty": 0.0547647,
+    "horizon_steps": 2,
+    "forecast_method": "persistence",
+    "weight_beta": 2.59779,
+    "weight_gamma": 0.323801
+   }
+  }
+ }
+}
