@@ -1,0 +1,48 @@
+{
+ "cell": 11,
+ "run": 0,
+ "order": 7,
+ "pools": [
+  1,
+  2
+ ],
+ "predictions_commit": "b1a1b6c751c05d07dea23a1b3e46da0e5d82486a",
+ "ac_power": true,
+ "complete": true,
+ "pools_applied": {
+  "small": 1,
+  "mid": 2
+ },
+ "ready_wait_s": 10.732535123825073,
+ "gateway_restart_s": 4.712899684906006,
+ "posture": {
+  "knobs": {
+   "t00": {
+    "ok": true,
+    "model_tier": "small",
+    "cache_size_mb": 1
+   },
+   "t01": {
+    "ok": true,
+    "model_tier": "mid",
+    "cache_size_mb": 1
+   }
+  },
+  "errors": [],
+  "attempts": 1
+ },
+ "quiet_wait_s": 5.0284717082977295,
+ "start_unix": 1794673280.8756168,
+ "k6_exit": 0,
+ "end_unix": 1794673896.3226626,
+ "ac_power_end": true,
+ "lag_p99_ms": 1.5540429687500001,
+ "check_exit": 0,
+ "problems": [],
+ "valid": true,
+ "problems_first_check": [
+  "load distribution over pods: see check.json"
+ ],
+ "rechecked_unix": 1794675409.9508398,
+ "recheck_reason": "check_run.py judges live pods only and skips tiers with too little work (2026-11-14)"
+}

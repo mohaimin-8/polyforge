@@ -1,0 +1,43 @@
+{
+ "cell": 15,
+ "run": 2,
+ "order": 59,
+ "pools": [
+  3,
+  1
+ ],
+ "predictions_commit": "b1a1b6c751c05d07dea23a1b3e46da0e5d82486a",
+ "ac_power": true,
+ "complete": true,
+ "pools_applied": {
+  "small": 3,
+  "mid": 1
+ },
+ "ready_wait_s": 5.408524990081787,
+ "gateway_restart_s": 25.4962637424469,
+ "posture": {
+  "knobs": {
+   "t00": {
+    "ok": true,
+    "model_tier": "small",
+    "cache_size_mb": 0
+   },
+   "t01": {
+    "ok": true,
+    "model_tier": "mid",
+    "cache_size_mb": 0
+   }
+  },
+  "errors": [],
+  "attempts": 1
+ },
+ "quiet_wait_s": 5.023218870162964,
+ "start_unix": 1794708171.5753436,
+ "k6_exit": 0,
+ "end_unix": 1794708797.1351526,
+ "ac_power_end": true,
+ "lag_p99_ms": 1.42214111328125,
+ "check_exit": 0,
+ "problems": [],
+ "valid": true
+}

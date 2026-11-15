@@ -1,0 +1,69 @@
+{
+ "k6": {
+  "attainment": 0.8723404255319149,
+  "by_tenant": {
+   "t00": 93,
+   "t01": 1
+  },
+  "failed": 0,
+  "failed_rate": 0.0,
+  "hit_rate": 0.05319148936170213,
+  "latency_ms": {
+   "mid/miss": {
+    "mean": 3150.407959,
+    "n": 1,
+    "p50": 3150.407959,
+    "p95": 3150.407959,
+    "p99": 3150.407959
+   },
+   "none/hit": {
+    "mean": 14.943408199999999,
+    "n": 5,
+    "p50": 15.281006,
+    "p95": 17.5994142,
+    "p99": 17.76949244
+   },
+   "small/miss": {
+    "mean": 5069.754497227273,
+    "n": 88,
+    "p50": 3268.5355225,
+    "p95": 13758.100964199994,
+    "p99": 16245.310282889985
+   }
+  },
+  "requests": 94,
+  "slo_ms": 9724.032596486088
+ },
+ "prometheus": {
+  "cpu_cores_used": {
+   "llama-mid-bd8f8fbf-5m547": 0.024138113583660813,
+   "llama-mid-bd8f8fbf-m6cmw": 0.00347948004781062,
+   "llama-small-6787f6c8cf-mjp9c": 0.45965313336868036
+  },
+  "distribution_findings": [],
+  "distribution_skipped": {
+   "mid": "61 tokens over 2 pods: too few to judge the spread"
+  },
+  "pods_not_live": [],
+  "throttled_period_share": {
+   "llama-mid-bd8f8fbf-5m547": 0.0037121644774414622,
+   "llama-mid-bd8f8fbf-m6cmw": 0.0,
+   "llama-small-6787f6c8cf-mjp9c": 0.07875708422904046
+  },
+  "token_shares": {
+   "small": {
+    "llama-small-6787f6c8cf-mjp9c": 1.0
+   }
+  },
+  "token_shares_all_series": {
+   "mid": {
+    "llama-mid-bd8f8fbf-5m547": 1.0,
+    "llama-mid-bd8f8fbf-m6cmw": 0.0
+   },
+   "small": {
+    "llama-small-6787f6c8cf-mjp9c": 1.0
+   }
+  },
+  "window": "612s"
+ }
+}
