@@ -160,12 +160,29 @@ def test_a_closed_run_actuator_refuses_every_late_decision():
 
 def test_sample_sizes_are_the_plans_formulas():
     diffs = [0.01, 0.03, -0.01, 0.02, 0.00, 0.01]
-    s = pairs.sample_sizes(diffs, comparator_mean=0.5, predicted_diff=-0.02)
+    s = pairs.sample_sizes(diffs, comparator_mean=0.5, predicted_diff=-0.02, predicted_comparator_mean=0.4)
     sd = np.std(diffs, ddof=1)
     assert s["sigma_d"] == pytest.approx(sd)
     assert s["n_superiority"] == math.ceil(((1.645 + 1.282) * sd / 0.02) ** 2)
-    assert s["n_equivalence"] == math.ceil(((1.645 + 1.645) * sd / (0.02 * 0.5)) ** 2)
+    assert s["n_superiority_min_live_effect"] == math.ceil(((1.645 + 1.282) * sd / (0.10 * 0.5)) ** 2)
+    assert s["n_equivalence"] == math.ceil(((1.645 + 1.645) * sd / (0.05 * 0.5)) ** 2)
+    assert s["n_equivalence_sim_margin"] == math.ceil(((1.645 + 1.645) * sd / (0.02 * 0.5)) ** 2)
+    assert s["predicted_relative_effect"] == pytest.approx(0.05)
     assert pairs.sample_sizes(diffs, 0.5, 0.0)["n_superiority"] is None
+    assert math.isnan(pairs.sample_sizes(diffs, 0.5, -0.02)["predicted_relative_effect"])
+
+
+def test_the_margins_are_the_plans_live_ones():
+    assert (pairs.EQUIVALENCE, pairs.EQUIVALENCE_SIM, pairs.MIN_LIVE_EFFECT) == (0.05, 0.02, 0.10)
+
+
+def test_the_predicted_mean_is_over_one_regime_and_arm():
+    plans = {"plans": [{"regime": "low", "arm": "joint", "predicted": {"J": 0.2}},
+                       {"regime": "low", "arm": "joint", "predicted": {"J": 0.4}},
+                       {"regime": "low", "arm": "per_knob", "predicted": {"J": 9.0}},
+                       {"regime": "high", "arm": "joint", "predicted": {"J": 9.0}}]}
+    assert pairs.predicted_mean(plans, "low", "joint", "J") == pytest.approx(0.3)
+    assert math.isnan(pairs.predicted_mean({}, "low", "joint", "J"))
 
 
 def test_a_pair_arm_retries_an_invalid_run_and_a_rerun_repeats_nothing(tmp_path, monkeypatch):

@@ -38,7 +38,8 @@ VALIDATION = TESTBED / "validation" / "VALIDATION.md"
 VALIDATION_V2 = TESTBED / "validation" / "VALIDATION_V2.md"
 RUN_FILES = ("run.json", "k6-summary.json", "actuator.jsonl", "k6-samples.csv.gz")
 TUNE_WORKERS = 4
-G3_MAX_PAIRS = 40
+G3_MAX_PAIRS = 40  # as pairs.G3_MAX_PAIRS
+MIN_LIVE_EFFECT = 0.10  # as pairs.MIN_LIVE_EFFECT (plan Part F: a live H4 regime's predicted effect)
 
 sys.path.append(str(TESTBED / "hvpa"))  # appended: testbed/hvpa has its own arms.py
 from after_wp11 import wp11_primary_met  # noqa: E402
@@ -93,22 +94,32 @@ def keep_runs(src: Path, dst: Path) -> int:
 
 def g3_section(pilot: dict, validated: bool | None, source: str, contrast: dict | None = None) -> str:
     """Gate G3 (plan WP12): the simulator validated, and the pairs needed per
-    regime feasible; judged on J, equivalence in the low regime and
-    superiority in the high one, every other number beside it in PILOT.md."""
+    regime feasible; judged on J, equivalence (the plan's live margin) in the
+    low regime and superiority at the predicted difference in the high one,
+    which also needs a predicted effect of at least MIN_LIVE_EFFECT (plan
+    Part F); every other number beside it in PILOT.md."""
     if contrast is not None:
         source += (f"; highest over lowest mean index among the operating points {contrast['ratio']:.2f}x "
                    f"({'an index contrast' if contrast['contrast'] else 'no index contrast: the testbed has no high-index regime, the regimes span the operating points'})")
     rows, feasible = [], []
     for regime, test in (("low", "n_equivalence"), ("high", "n_superiority")):
-        n = pilot["summary"].get(regime, {}).get("J", {}).get(test)
-        ok = n is not None and n <= G3_MAX_PAIRS
+        j = pilot["summary"].get(regime, {}).get("J", {})
+        n = j.get(test)
+        ok, why = n is not None and n <= G3_MAX_PAIRS, ""
+        if regime == "high":
+            effect = j.get("predicted_relative_effect")
+            if not (isinstance(effect, (int, float)) and effect >= MIN_LIVE_EFFECT):
+                ok = False
+                shown = f"{effect:.2%}" if isinstance(effect, (int, float)) else "unknown"
+                why = f" (predicted effect {shown}, below the {MIN_LIVE_EFFECT:.0%} a live H4 regime needs)"
         feasible.append(ok)
-        rows.append(f"| {regime} | {test.split('_')[1]} | {n} | {'yes' if ok else 'NO'} |")
+        rows.append(f"| {regime} | {test.split('_')[1]} | {n} | {'yes' if ok else 'NO' + why} |")
     verdict = "met" if validated and all(feasible) else "NOT met"
     return "\n".join(["", "## Gate G3", "",
                       f"Simulator validated: {validated} ({source}). Pairs needed on J, at most {G3_MAX_PAIRS} per "
-                      "regime:", "", "| regime | test | pairs needed | feasible |", "|---|---|---:|---|", *rows, "",
-                      f"G3 {verdict}.", ""])
+                      f"regime; the high regime also needs a predicted effect on J of at least {MIN_LIVE_EFFECT:.0%} "
+                      "(plan Part F):", "", "| regime | test | pairs needed | feasible |", "|---|---|---:|---|", *rows,
+                      "", f"G3 {verdict}.", ""])
 
 
 def main() -> int:
