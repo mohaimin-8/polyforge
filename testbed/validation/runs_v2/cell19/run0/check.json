@@ -1,0 +1,64 @@
+{
+ "k6": {
+  "attainment": 0.1981981981981982,
+  "by_tenant": {
+   "t00": 195,
+   "t01": 138
+  },
+  "failed": 7,
+  "failed_rate": 0.021021021021021023,
+  "hit_rate": 0.0,
+  "latency_ms": {
+   "mid/miss": {
+    "mean": 75275.62588344274,
+    "n": 131,
+    "p50": 82066.845947,
+    "p95": 107484.4555665,
+    "p99": 113961.5998538
+   },
+   "small/miss": {
+    "mean": 14278.753863656411,
+    "n": 195,
+    "p50": 12647.336914,
+    "p95": 31659.728905999986,
+    "p99": 39261.1558157
+   }
+  },
+  "requests": 333,
+  "slo_ms": 9724.032596486088
+ },
+ "prometheus": {
+  "cpu_cores_used": {
+   "llama-mid-bd8f8fbf-m6cmw": 1.8993957372421304,
+   "llama-small-6787f6c8cf-4m6sd": 0.7209759012699715,
+   "llama-small-6787f6c8cf-mjp9c": 0.6769902589518063
+  },
+  "distribution_findings": [],
+  "distribution_skipped": {},
+  "pods_not_live": [],
+  "throttled_period_share": {
+   "llama-mid-bd8f8fbf-m6cmw": 0.2540014958863126,
+   "llama-small-6787f6c8cf-4m6sd": 0.24694533762057877,
+   "llama-small-6787f6c8cf-mjp9c": 0.11597729115977291
+  },
+  "token_shares": {
+   "mid": {
+    "llama-mid-bd8f8fbf-m6cmw": 1.0
+   },
+   "small": {
+    "llama-small-6787f6c8cf-4m6sd": 0.5307822151816635,
+    "llama-small-6787f6c8cf-mjp9c": 0.4692177848183366
+   }
+  },
+  "token_shares_all_series": {
+   "mid": {
+    "llama-mid-bd8f8fbf-m6cmw": 1.0
+   },
+   "small": {
+    "llama-small-6787f6c8cf-4m6sd": 0.5307822151816635,
+    "llama-small-6787f6c8cf-mjp9c": 0.4692177848183366
+   }
+  },
+  "window": "704s"
+ }
+}
