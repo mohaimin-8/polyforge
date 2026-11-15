@@ -101,7 +101,7 @@ CAMPAIGNS = (
     wp9("A", "native"),
     Campaign("wp17-pilot", REPO / "testbed" / "hvpa", ("run_pilot.py",),
              ("research/hvpa/PILOT_LIVE.md", "testbed/hvpa/pilot_runs"),
-             "results(hvpa): WP17 live pilot, ABBA pairs per regime and contrast, sigma_d and the pairs needed\n\n"
+             "results(hvpa): WP17 live pilot, three-arm schedules per regime, sigma_d and the pairs needed\n\n"
              "Run last (plan priority: Parts C/D before Part I), on the committed predictions; run_pilot.py\n"
              "refuses predictions that are uncommitted or not sane."),
 )

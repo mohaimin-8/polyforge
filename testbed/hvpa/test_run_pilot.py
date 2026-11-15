@@ -39,12 +39,12 @@ def test_each_defect_is_named():
 
 def test_keep_copies_every_record_and_the_report(tmp_path, monkeypatch):
     src, dst, research = tmp_path / "pilot", tmp_path / "kept", tmp_path / "research"
-    (src / "w1_s0.05" / "A4_vs_A3" / "pair0").mkdir(parents=True)
-    (src / "w1_s0.05" / "A4_vs_A3" / "pair0" / "A4.json").write_text(json.dumps({"arm": "A4"}))
-    (src / "w1_s0.05" / "A4_vs_A3" / "pair0" / "A3.attempt1.invalid.json").write_text("{}")
+    (src / "w1_s0.05" / "schedule0").mkdir(parents=True)
+    (src / "w1_s0.05" / "schedule0" / "A4.json").write_text(json.dumps({"arm": "A4"}))
+    (src / "w1_s0.05" / "schedule0" / "A3.attempt1.invalid.json").write_text("{}")
     (src / "PILOT.md").write_text("# WP17 live pilot\n")
     research.mkdir()
     monkeypatch.setattr(run_pilot, "RESEARCH", research)
     assert run_pilot.keep(src, dst) == 2
-    assert (dst / "w1_s0.05" / "A4_vs_A3" / "pair0" / "A4.json").exists()
+    assert (dst / "w1_s0.05" / "schedule0" / "A4.json").exists()
     assert (research / "PILOT_LIVE.md").read_text() == "# WP17 live pilot\n"

@@ -5,8 +5,9 @@
               are sane (`problems`): exit 3 before anything runs when not;
   2. cluster  pf-testbed held at zero replicas, every pf-hvpa deployment
               available;
-  3. pilot    pilot.py, 6 ABBA pairs per regime and contrast (about 72 hours),
-              resumable from its own records;
+  3. pilot    pilot.py, 6 schedules per regime, each run once by A4, A3 and A1
+              (54 one-hour runs for three regimes, about 58 hours), resumable
+              from its own records;
   4. keep     PILOT.md as research/hvpa/PILOT_LIVE.md and every run record
               (JSON: arm, target, k6 summary, cost watch, planner decisions; no
               key, no prompt) into testbed/hvpa/pilot_runs/, which the queue
