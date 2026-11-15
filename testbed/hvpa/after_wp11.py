@@ -51,6 +51,7 @@ testbed/out/hvpa/after_wp11.log.
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
@@ -227,19 +228,39 @@ def wp11_primary_met(report: Path = TESTBED / "validation" / "VALIDATION.md") ->
     return None
 
 
+WP11B_INPUTS = ("testbed/validation/cells_v2.json", "testbed/validation/inputs_v2",
+                "testbed/validation/predictions_v2.json")
+
+
+def wp11b_prepared(schedules: Path, repo: Path = REPO) -> bool:
+    """WP11b's design, request tables and predictions committed and unchanged,
+    and a schedule for every cell: a restart resumes at the runs and never
+    regenerates the predictions earlier runs were made against."""
+    for p in WP11B_INPUTS:
+        if subprocess.run(["git", "ls-files", "--error-unmatch", p], cwd=repo, capture_output=True).returncode != 0:
+            return False
+    if subprocess.call(["git", "diff", "--quiet", "HEAD", "--", *WP11B_INPUTS], cwd=repo) != 0:
+        return False
+    cells = json.loads((repo / WP11B_INPUTS[0]).read_text(encoding="utf-8"))["cells"]
+    return all((schedules / f"cell{c['cell']:02d}").is_dir() for c in cells)
+
+
 def wp11b(py: str) -> None:
     """Step 2 on the cluster as WP11 left it (WP10 up, tenants provisioned)."""
     val, out = TESTBED / "validation", TESTBED / "out"
     log("WP11 primary missed its attainment target: WP11b, the fitted-scaling simulator on a new design")
-    step([py, "cells.py", "--seed", "20261115", "--out", "cells_v2.json"], cwd=val)
-    step([py, "cell_schedules.py", "cells", "--cells", "cells_v2.json", "--curves", "calibration",
-          "--out", str(out / "schedules_v2"), "--inputs", "inputs_v2"], cwd=val)
-    step([py, "predict.py", "--calibration", "calibration", "--cells", "cells_v2.json", "--inputs", "inputs_v2",
-          "--replica-scaling", "fitted", "--out", "predictions_v2.json"], cwd=val)
-    commit(["testbed/validation/cells_v2.json", "testbed/validation/inputs_v2", "testbed/validation/predictions_v2.json"],
-           "results(testbed): WP11b predictions, committed before any of its cells runs\n\n"
-           "The simulator with capacity ~ n ** beta per tier (beta fitted on the calibration curves) on a new\n"
-           "design (seed 20261115), by the rule fixed while WP11 ran (testbed/hvpa/after_wp11.py).")
+    if wp11b_prepared(out / "schedules_v2"):
+        log("WP11b predictions already committed and schedules present: resuming at the runs")
+    else:
+        step([py, "cells.py", "--seed", "20261115", "--out", "cells_v2.json"], cwd=val)
+        step([py, "cell_schedules.py", "cells", "--cells", "cells_v2.json", "--curves", "calibration",
+              "--out", str(out / "schedules_v2"), "--inputs", "inputs_v2"], cwd=val)
+        step([py, "predict.py", "--calibration", "calibration", "--cells", "cells_v2.json", "--inputs", "inputs_v2",
+              "--replica-scaling", "fitted", "--out", "predictions_v2.json"], cwd=val)
+        commit(list(WP11B_INPUTS),
+               "results(testbed): WP11b predictions, committed before any of its cells runs\n\n"
+               "The simulator with capacity ~ n ** beta per tier (beta fitted on the calibration curves) on a new\n"
+               "design (seed 20261115), by the rule fixed while WP11 ran (testbed/hvpa/after_wp11.py).")
     runner = [py, "run_cells.py", "--cells", "cells_v2.json", "--predictions", "predictions_v2.json",
               "--schedules", str(out / "schedules_v2"), "--tokens", str(out / "tokens.json"),
               "--admin-key-file", str(out / "admin-key.txt"), "--out", str(out / "validation_v2")]

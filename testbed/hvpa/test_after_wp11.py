@@ -97,3 +97,42 @@ def test_wp11b_runs_first_and_its_failure_does_not_stop_wp17(tmp_path, monkeypat
     script.unlink()
     assert after_wp11.main() == 0
     assert "wp12" not in order and "no after_wp11b.py: WP12 not run here" in (tmp_path / "log.txt").read_text()
+
+
+def _wp11b_steps(monkeypatch, tmp_path, prepared: bool) -> list[str]:
+    monkeypatch.setattr(after_wp11, "LOG", tmp_path / "log.txt")
+    monkeypatch.setattr(after_wp11, "wp11b_prepared", lambda schedules: prepared)
+    monkeypatch.setattr(after_wp11, "commit", lambda paths, msg, repo=None: None)
+    monkeypatch.setattr(after_wp11, "keep_wp11_runs", lambda *a: 0)
+    seen = []
+    monkeypatch.setattr(after_wp11, "step", lambda cmd, cwd=None, fatal=True: seen.append(cmd[1]) or 0)
+    after_wp11.wp11b("python")
+    return seen
+
+
+def test_a_restarted_wp11b_resumes_at_the_runs_and_regenerates_nothing(tmp_path, monkeypatch):
+    assert _wp11b_steps(monkeypatch, tmp_path, prepared=True)[0] == "run_cells.py"
+    assert "resuming at the runs" in (tmp_path / "log.txt").read_text()
+    assert _wp11b_steps(monkeypatch, tmp_path, prepared=False)[:4] == ["cells.py", "cell_schedules.py", "predict.py",
+                                                                       "run_cells.py"]
+
+
+def test_wp11b_is_prepared_only_with_its_inputs_committed_unchanged_and_every_schedule(tmp_path):
+    import subprocess
+    repo = tmp_path / "repo"
+    val = repo / "testbed" / "validation"
+    (val / "inputs_v2").mkdir(parents=True)
+    (val / "cells_v2.json").write_text('{"cells": [{"cell": 0}, {"cell": 1}]}')
+    (val / "inputs_v2" / "cell00.csv.gz").write_text("x")
+    (val / "predictions_v2.json").write_text("{}")
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(git + ["commit", "-q", "-m", "x"], cwd=repo, check=True)
+    schedules = tmp_path / "schedules_v2"
+    (schedules / "cell00").mkdir(parents=True)
+    assert not after_wp11.wp11b_prepared(schedules, repo)            # cell 1 has no schedule
+    (schedules / "cell01").mkdir()
+    assert after_wp11.wp11b_prepared(schedules, repo)
+    (val / "predictions_v2.json").write_text('{"changed": 1}')
+    assert not after_wp11.wp11b_prepared(schedules, repo)            # predictions differ from the commit
