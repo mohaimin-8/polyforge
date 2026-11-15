@@ -22,6 +22,11 @@ runs, in this order:
                    N = 128 (research/sensitivity/SOBOL.md)
   wp9-B-native     WP9, plant B, native (real-arrival) mix
   wp9-A-native     WP9, plant A, native mix
+  wp17-pilot       WP17's live pilot (testbed/hvpa/run_pilot.py), the only
+                   live campaign, last
+  reproduce        scripts/reproduce_programme2.py: every report regenerated
+                   from the data now committed and compared with git (a
+                   drift is left in the working tree; nothing is committed)
 
 WP9 comes first because its tuned comparators feed the registration (WP13);
 the specification curve then decides how RQ1 can be stated; WP5's
@@ -104,6 +109,8 @@ CAMPAIGNS = (
              "results(hvpa): WP17 live pilot, three-arm schedules per regime, sigma_d and the pairs needed\n\n"
              "Run last (plan priority: Parts C/D before Part I), on the committed predictions; run_pilot.py\n"
              "refuses predictions that are uncommitted or not sane."),
+    Campaign("reproduce", REPO, ("scripts/reproduce_programme2.py",), (),
+             "programme 2's reports regenerated from the committed data after every campaign (no commit)"),
 )
 
 
