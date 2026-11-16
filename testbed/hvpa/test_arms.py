@@ -25,7 +25,7 @@ def test_a2_scales_on_the_request_rate_through_keda():
     so, v = arms.render("A2", 12.5)
     trig = so["spec"]["triggers"][0]
     assert trig["type"] == "prometheus" and trig["metricType"] == "AverageValue"
-    assert trig["metadata"]["threshold"] == "12.5" and "cpuburn_requests_total" in trig["metadata"]["query"]
+    assert trig["metadata"]["threshold"] == "12.5" and "cpuburn_arrivals_total" in trig["metadata"]["query"]
     assert so["spec"]["pollingInterval"] == 30 and v["kind"] == "VerticalPodAutoscaler"
 
 

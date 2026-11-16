@@ -45,9 +45,9 @@ class FakeKube:
         return 200
 
 
-def _pod(kube, rate, joint=True, width=2):
+def _pod(kube, rate, joint=True, width=2, warmup_s=0.0):
     logs = []
-    return pp.PlannerPod(kube, Plant(), width, joint, lambda: rate, logs.append), logs
+    return pp.PlannerPod(kube, Plant(), width, joint, lambda: rate, logs.append, warmup_s=warmup_s), logs
 
 
 def test_a_decision_is_the_shared_lattice_decision_and_is_logged():
@@ -61,7 +61,7 @@ def test_a_decision_is_the_shared_lattice_decision_and_is_logged():
 
 def test_cpu_is_freed_first_when_shrinking_pods_and_scaling_out():
     kube = FakeKube(2, 2.0)
-    pod, _ = _pod(kube, 0.0)
+    pod, _ = _pod(kube, 1.0)      # load seen (a zero rate holds); the move itself is forced below
     pod.target_cpu = 2.0
     pod.kube.calls.clear()
     # force a move that lowers CPU and adds pods: resizes must come before the scale
@@ -86,3 +86,21 @@ def test_reconcile_brings_new_pods_to_the_target():
     assert kube.cpu["p2"] == 1.0 and logs[-1]["event"] == "reconcile"
     pod.reconcile(10.0)            # nothing left to do: no log
     assert logs[-1]["t"] == 5.0
+
+
+def test_the_rate_is_the_offered_one_counted_as_requests_arrive():
+    assert "cpuburn_arrivals_total" in pp.RATE_QUERY and f"[{pp.RATE_WINDOW_S:g}s]" in pp.RATE_QUERY
+
+
+def test_the_initial_allocation_holds_until_a_full_window_of_load_was_seen():
+    """The twin's first decision sees the first interval's rate; live, the load
+    starts after the planner, so a zero or part-window rate is not acted on."""
+    kube, rates = FakeKube(2, 0.5), iter([0.0, 2.0, 9.0, 10.0])
+    logs = []
+    pod = pp.PlannerPod(kube, Plant(), 2, True, lambda: next(rates), logs.append)
+    assert pod.warmup_s == pp.RATE_WINDOW_S
+    for t in (0.0, 30.0):                     # no load yet, then load for part of the window
+        assert pod.decide_and_act(t)["event"] == "hold"
+    assert kube.calls == [] and [r["rate_rps"] for r in logs] == [0.0, 2.0]
+    assert pod.decide_and_act(60.0)["event"] == "decision"   # a full window since the load was seen
+    assert pod.decide_and_act(90.0)["event"] == "decision"

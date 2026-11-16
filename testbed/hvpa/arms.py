@@ -26,7 +26,7 @@ TARGET = {"apiVersion": "apps/v1", "kind": "Deployment", "name": "cpuburn"}
 RMIN, RMAX = 1, 8
 CPU_MIN, CPU_MAX = "250m", "2"
 PROMETHEUS = f"http://prometheus.{NAMESPACE}:9090"
-RATE_QUERY = "sum(rate(cpuburn_requests_total[30s]))"
+RATE_QUERY = "sum(rate(cpuburn_arrivals_total[30s]))"   # offered requests, as the planner reads them
 
 
 def vpa() -> dict:

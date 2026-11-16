@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBurnIsDeterministic(t *testing.T) {
@@ -41,7 +42,8 @@ func TestWorkCountsAndReportsItsTime(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if !strings.Contains(string(body), "cpuburn_requests_total 3\n") || !strings.Contains(string(body), "cpuburn_in_flight 0\n") {
+	if !strings.Contains(string(body), "cpuburn_requests_total 3\n") || !strings.Contains(string(body), "cpuburn_in_flight 0\n") ||
+		!strings.Contains(string(body), "cpuburn_arrivals_total 3\n") {
 		t.Fatalf("metrics: %q", body)
 	}
 }
@@ -67,5 +69,43 @@ func TestRoundsFromTheEnvironment(t *testing.T) {
 	t.Setenv("WORK_ROUNDS", "nonsense")
 	if rounds() != defaultRounds {
 		t.Fatal("a bad WORK_ROUNDS must fall back to the default")
+	}
+}
+
+// A request is an arrival as it starts and a completion as it ends: the planner
+// and KEDA read arrivals, the offered rate, which completions under-read when
+// the pods are saturated.
+func TestArrivalIsCountedBeforeTheWork(t *testing.T) {
+	ts := httptest.NewServer(newMux(&server{rounds: 400000}))
+	defer ts.Close()
+	done := make(chan error, 1)
+	go func() {
+		resp, err := http.Get(ts.URL + "/work")
+		if err == nil {
+			resp.Body.Close()
+		}
+		done <- err
+	}()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		resp, err := http.Get(ts.URL + "/metrics")
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if strings.Contains(string(body), "cpuburn_arrivals_total 1") {
+			if !strings.Contains(string(body), "cpuburn_requests_total 0") {
+				t.Fatalf("the request finished before it was seen in flight: %q", body)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no arrival counted: %q", body)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }

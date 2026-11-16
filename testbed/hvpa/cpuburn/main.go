@@ -8,7 +8,10 @@
 //
 //	GET /work     burn, then 200 with the wall time in X-Work-Seconds
 //	GET /healthz  200 "ok"
-//	GET /metrics  Prometheus text: cpuburn_requests_total, cpuburn_in_flight
+//	GET /metrics  Prometheus text: cpuburn_arrivals_total (counted as a
+//	              request starts: the offered rate, what the planner and KEDA
+//	              read), cpuburn_requests_total (counted as it ends: the
+//	              throughput, which saturated pods cap), cpuburn_in_flight
 package main
 
 import (
@@ -26,6 +29,7 @@ const defaultRounds = 20000
 
 type server struct {
 	rounds   int
+	arrivals atomic.Int64
 	requests atomic.Int64
 	inFlight atomic.Int64
 	sink     atomic.Uint32 // keeps the compiler from dropping the work
@@ -43,6 +47,7 @@ func burn(rounds int) uint32 {
 }
 
 func (s *server) work(w http.ResponseWriter, _ *http.Request) {
+	s.arrivals.Add(1)
 	s.inFlight.Add(1)
 	defer s.inFlight.Add(-1)
 	start := time.Now()
@@ -54,6 +59,7 @@ func (s *server) work(w http.ResponseWriter, _ *http.Request) {
 
 func (s *server) metrics(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+	fmt.Fprintf(w, "# TYPE cpuburn_arrivals_total counter\ncpuburn_arrivals_total %d\n", s.arrivals.Load())
 	fmt.Fprintf(w, "# TYPE cpuburn_requests_total counter\ncpuburn_requests_total %d\n", s.requests.Load())
 	fmt.Fprintf(w, "# TYPE cpuburn_in_flight gauge\ncpuburn_in_flight %d\n", s.inFlight.Load())
 }

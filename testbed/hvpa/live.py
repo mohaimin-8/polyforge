@@ -219,6 +219,7 @@ def run(arm: str, target: float, regime: dict, calibration: Path, out: Path,
         decisions = [json.loads(line) for line in kubectl("-n", NAMESPACE, "logs", "deployment/planner").splitlines()
                      if line.startswith("{")]
         rec["decisions"] = [d for d in decisions if d.get("event") == "decision"]
+        rec["holds"] = [d for d in decisions if d.get("event") == "hold"]   # before a full window of load
     out.mkdir(parents=True, exist_ok=True)
     (out / f"{arm}_{int(t0)}.json").write_text(json.dumps(rec, indent=1), encoding="utf-8")
     return rec

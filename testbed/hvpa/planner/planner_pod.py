@@ -5,7 +5,12 @@ calibration.py fitted (all mounted from a ConfigMap).
 
 Every PLAN_S seconds: the request rate of the last 30 s from WP17's
 Prometheus, the Deployment's replica count and its pods' CPU from the
-Kubernetes API, then lattice.decide. Acting frees CPU first, as the twin does:
+Kubernetes API, then lattice.decide. The rate is the offered one, requests
+counted as they arrive (the twin's planner sees the offered rate; completed
+requests would cap at what saturated pods serve). Until a full rate window of
+load has been seen, the initial allocation holds: the twin's first decision
+sees the first interval's rate, while a live run's load starts after the
+planner, so a zero or part-window reading is logged as a hold, not acted on. Acting frees CPU first, as the twin does:
 scale in before growing pods, shrink pods before scaling out. Replicas
 through the Deployment's scale subresource; CPU through each pod's resize
 subresource (in place, requests = limits). Between decisions, every
@@ -34,7 +39,8 @@ import service_plant
 SA = Path("/var/run/secrets/kubernetes.io/serviceaccount")
 API = "https://kubernetes.default.svc"
 DEPLOYMENT, CONTAINER, SELECTOR = "cpuburn", "cpuburn", "app.kubernetes.io/name=cpuburn"
-RATE_QUERY = "sum(rate(cpuburn_requests_total[30s]))"
+RATE_WINDOW_S = 30.0
+RATE_QUERY = f"sum(rate(cpuburn_arrivals_total[{RATE_WINDOW_S:g}s]))"
 RECONCILE_S = 5.0
 
 
@@ -108,19 +114,31 @@ def prometheus_rate(base: str, opener: Callable = urllib.request.urlopen) -> flo
 
 class PlannerPod:
     def __init__(self, kube: Kube, plant, width: int, joint: bool, rate: Callable[[], float],
-                 log: Callable[[dict], None]) -> None:
+                 log: Callable[[dict], None], warmup_s: float = RATE_WINDOW_S) -> None:
         self.kube, self.plant, self.width, self.joint, self.rate, self.log = kube, plant, width, joint, rate, log
         self.target_cpu: float | None = None
+        self.warmup_s = warmup_s
+        self.load_seen_at: float | None = None
+
+    def holding(self, now: float, rate: float) -> bool:
+        """True until warmup_s have passed since the first reading with load in it."""
+        if self.load_seen_at is None and rate > 0:
+            self.load_seen_at = now
+        return self.load_seen_at is None or now - self.load_seen_at < self.warmup_s
 
     def resize_all(self, cores: float, pods: list[dict]) -> list[tuple[str, int]]:
         return [(p["metadata"]["name"], self.kube.resize(p["metadata"]["name"], cores))
                 for p in pods if abs(pod_cpu(p) - cores) > 1e-9]
 
     def decide_and_act(self, now: float) -> dict:
+        rate = self.rate()
+        if self.holding(now, rate):
+            rec = {"event": "hold", "t": now, "rate_rps": rate}
+            self.log(rec)
+            return rec
         pods = self.kube.pods()
         r = self.kube.replicas()
         c = self.target_cpu if self.target_cpu is not None else (pod_cpu(pods[0]) if pods else 0.5)
-        rate = self.rate()
         (nr, nc), info = lattice.decide(self.plant, rate, r, c, self.width, self.joint)
         acts = []
         if nr < r:
