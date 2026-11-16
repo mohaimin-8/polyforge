@@ -107,3 +107,37 @@ def test_without_horizontal_points_there_is_no_replica_record(tmp_path):
     _levels(tmp_path)
     cal = calibration.fit(tmp_path)
     assert not any(k.startswith(("replica", "efficiency", "linear_in_replicas")) for k in cal)
+
+
+def _sublinear_levels(curves):
+    for c in (0.25, 0.5, 1.0):
+        _curve(curves / f"c{int(c * 1000)}m", c)
+    _curve(curves / "c2000m", 2.0, slow=0.7)    # one pod at 2 cores: 28 rps, not 40
+
+
+def test_a_sublinear_level_gives_the_plant_the_measured_curve(tmp_path, capsys):
+    _sublinear_levels(tmp_path)
+    out = tmp_path / "cal.json"
+    assert calibration.main(["--curves", str(tmp_path), "--out", str(out)]) == 0
+    assert "the plant uses the measured curve" in capsys.readouterr().out
+    cal = json.loads(out.read_text())
+    assert cal["capacity_curve"] == [[0.25, pytest.approx(5.0)], [0.5, pytest.approx(10.0)],
+                                     [1.0, pytest.approx(20.0)], [2.0, pytest.approx(28.0)]]
+    p = plant.from_calibration(out)
+    assert p.capacity_rps(2.0) == pytest.approx(28.0) and p.capacity_rps(0.5) == pytest.approx(10.0)
+
+
+def test_a_linear_service_has_no_measured_curve(tmp_path):
+    _levels(tmp_path)
+    assert "capacity_curve" not in calibration.fit(tmp_path)
+
+
+def test_on_the_measured_curve_pods_are_measured_against_one_pod_at_the_curve(tmp_path):
+    _sublinear_levels(tmp_path)
+    _point(tmp_path, 2, 2.0, 2 * 28.0 * 0.8)    # two pods at 2 cores: 80 % of two on the curve
+    _point(tmp_path, 4, 1.0, 4 * 20.0 * 0.6)    # the same 4 cores in all: the mean, 0.7
+    cal = calibration.fit(tmp_path)
+    assert cal["efficiency"] == [[4.0, pytest.approx(0.7)]]
+    out = tmp_path / "cal.json"
+    out.write_text(json.dumps(cal))
+    assert plant.from_calibration(out).capacity_rps(2.0, total_cpu=4.0) == pytest.approx(28.0 * 0.7)

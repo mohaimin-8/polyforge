@@ -8,17 +8,23 @@ with research/plant2's two files. Per level c:
   a, f0, b  the power form (L0 fitted) and the tail, research/plant2/fits.py.
 The plan's check: capacity is linear in CPU when every w(c) lies within
 +-10 % of their median; then the plant uses w = that median (service_plant.Plant's
-form), otherwise the check fails and is reported (the measured curve must
-then replace the linear form before the twin predicts). a, f0 and b are the
-medians over levels. Rule fixed here, before any live run: the SLO is
-SLO_FACTOR x s(1 core), the twin's choice (10 x the CPU per request). With
+form), otherwise the check fails, is reported, and the plant takes the
+measured curve instead (the plan's "if not, use the measured curve"):
+`capacity_curve`, each level's (c, mu(c)), so a pod's CPU per request is
+c / mu(c) at its own CPU (service_plant.Plant.work_s). This branch was written
+on 2026-11-16, after the first WP17 fit failed the check (0.25 core 13.4 %
+above the median) and before any prediction; until then the chain stopped
+here. a, f0 and b are the medians over levels. Rule fixed here, before any
+live run: the SLO is SLO_FACTOR x s(1 core), the twin's choice (10 x the CPU
+per request). With
 --node-cpu-file, the node's free CPU (calibrate_service.py measures it) is
 the twin's node size.
 
 Horizontal scaling (added before any WP17 measurement, after WP11 found the
 testbed's pods sub-linear and its tiers coupled through the one host): the
 capacity-only points under curves/replicas/ (r pods at c cores each) give
-eta = mu(r, c) / (r x c / w). The same rule as for CPU, applied to replicas:
+eta = mu(r, c) / (r x c / w), with w = w(c) on the measured curve (r pods
+against r single pods at that CPU). The same rule as for CPU, applied to replicas:
 when every eta lies within +-10 % of 1 the plant stays linear, otherwise
 the measured table (mean eta per total of requested cores) becomes the
 plant's `efficiency`. A point whose load generator used half its core or
@@ -34,13 +40,16 @@ import json
 import statistics
 import sys
 from pathlib import Path
+from typing import Callable
 
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[0] / "plant2"))
+sys.path.insert(1, str(HERE))
 
 import fits  # noqa: E402
+from service_plant import Plant  # noqa: E402
 
 SLO_FACTOR = 10.0
 LINEAR_TOLERANCE = 0.10
@@ -58,8 +67,9 @@ def level(curve_dir: Path) -> dict:
             "l0_fitted_s": power["l0"], "f0": tail["f0"], "b": tail["b"]}
 
 
-def replica_points(curves: Path, w: float) -> list[dict]:
-    """The capacity-only points (curves/replicas/r<R>c<M>m) and their eta."""
+def replica_points(curves: Path, work: Callable[[float], float]) -> list[dict]:
+    """The capacity-only points (curves/replicas/r<R>c<M>m) and their eta; work(c) is
+    the plant's CPU-seconds per request of one pod at c cores."""
     root, out = curves / "replicas", []
     if not root.is_dir():
         return out
@@ -70,7 +80,7 @@ def replica_points(curves: Path, w: float) -> list[dict]:
         r, c, mu = int(meta["replicas"]), float(meta["cpu"]), float(meta["mu_pre_rps"])
         gen = meta.get("generator_cpu_cores")
         used = gen is not None and float(gen) < GENERATOR_CPU_MAX
-        out.append({"replicas": r, "cpu": c, "total_cpu": r * c, "mu_rps": mu, "eta": mu / (r * c / w),
+        out.append({"replicas": r, "cpu": c, "total_cpu": r * c, "mu_rps": mu, "eta": mu / (r * c / work(c)),
                     "generator_cpu_cores": gen, "used": used,
                     **({} if used else {"why": "no generator CPU recorded" if gen is None
                                         else "the load generator used half its core or more"})})
@@ -86,9 +96,9 @@ def efficiency_table(points: list[dict]) -> list[list[float]]:
     return [[x, statistics.fmean(v)] for x, v in sorted(by.items())]
 
 
-def horizontal(curves: Path, w: float) -> dict:
+def horizontal(curves: Path, work: Callable[[float], float]) -> dict:
     """The replica check and, when it fails, the plant's efficiency table."""
-    points = replica_points(curves, w)
+    points = replica_points(curves, work)
     table = efficiency_table(points)
     if not table:
         return {"replica_points": points} if points else {}
@@ -104,13 +114,16 @@ def fit(curves: Path, node_cpu_file: Path | None = None) -> dict:
         raise ValueError(f"no curves under {curves}")
     w = statistics.median(r["w_s"] for r in rows)
     worst = max(abs(r["w_s"] / w - 1) for r in rows)
+    linear = worst <= LINEAR_TOLERANCE
+    curve = [] if linear else [[r["cpu"], r["mu_rps"]] for r in rows]
+    work = Plant(cpu_per_request_s=w, capacity_curve=tuple(map(tuple, curve))).work_s
     one_core = min(rows, key=lambda r: abs(r["cpu"] - 1.0))
-    return {**horizontal(curves, w),
+    return {**horizontal(curves, work),
             "cpu_per_request_s": w, "congestion_exponent": statistics.median(r["a"] for r in rows),
             "tail_f0": max(1.0, statistics.median(r["f0"] for r in rows)),
             "tail_b": max(0.0, statistics.median(r["b"] for r in rows)),
-            "slo_s": SLO_FACTOR * one_core["s_s"], "linear_within_10pct": worst <= LINEAR_TOLERANCE,
-            "worst_w_deviation": worst, "levels": rows,
+            "slo_s": SLO_FACTOR * one_core["s_s"], "linear_within_10pct": linear,
+            "worst_w_deviation": worst, **({"capacity_curve": curve} if curve else {}), "levels": rows,
             "rule": f"SLO = {SLO_FACTOR:g} x the unloaded latency at {one_core['cpu']:g} core",
             **({"node_cpu": json.loads(node_cpu_file.read_text(encoding="utf-8"))["node_cpu"]}
                if node_cpu_file else {})}
@@ -126,12 +139,13 @@ def main(argv: list[str] | None = None) -> int:
     cal = fit(args.curves, args.node_cpu_file)
     args.out.write_text(json.dumps(cal, indent=1), encoding="utf-8")
     print(f"w {cal['cpu_per_request_s'] * 1000:.1f} ms, a {cal['congestion_exponent']:.2f}, SLO {cal['slo_s']:.3f} s; "
-          f"linear within 10 %: {cal['linear_within_10pct']} (worst {cal['worst_w_deviation']:.1%})")
+          f"linear within 10 %: {cal['linear_within_10pct']} (worst {cal['worst_w_deviation']:.1%})"
+          + ("" if cal["linear_within_10pct"] else " -> the plant uses the measured curve"))
     if "efficiency_measured" in cal:
         print("eta by total cores: " + ", ".join(f"{x:g}: {e:.3f}" for x, e in cal["efficiency_measured"]) +
               f"; linear in replicas within 10 %: {cal['linear_in_replicas_within_10pct']}"
               + ("" if cal["linear_in_replicas_within_10pct"] else " -> the plant uses the measured table"))
-    return 0 if cal["linear_within_10pct"] else 3
+    return 0
 
 
 if __name__ == "__main__":

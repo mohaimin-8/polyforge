@@ -76,3 +76,27 @@ def test_a_deployment_on_a_crowded_node_is_slower_and_uses_more_cpu_per_request(
     assert b["late"] > a["late"] and b["mean_s"] > a["mean_s"]
     assert b["usage"][0] == pytest.approx(min(rate / 6 * linear.cpu_per_request_s / 0.6, 1.0))
     assert crowded.step(rate / 6, [1.0], 30.0) == linear.step(rate / 6, [1.0], 30.0)   # one core: eta 1
+
+
+CURVE = ((1.0, 20.0), (0.25, 3.0), (2.0, 30.0), (0.5, 8.0))    # (cores, one pod's rate), unsorted on purpose
+
+
+def test_on_the_measured_curve_a_pod_serves_at_the_curves_rate_for_its_cpu():
+    p = plant.Plant(capacity_curve=CURVE)
+    for c, mu in CURVE:
+        assert p.capacity_rps(c) == pytest.approx(mu) and p.work_s(c) == pytest.approx(c / mu)
+        assert p.unloaded_s(c) == pytest.approx(c / mu / min(c, 1.0))
+        assert p.pod(1e6, c)[2] == c                                 # saturated: its whole CPU
+        assert p.pod(0.5 * mu, c)[2] == pytest.approx(0.5 * c)       # half its rate: half its CPU
+    assert p.capacity_rps(1.5) == pytest.approx(25.0)                # linear in c between the points
+    assert p.capacity_rps(4.0) == pytest.approx(60.0)                # CPU per request held beyond them
+    assert p.capacity_rps(0.125) == pytest.approx(1.5)
+
+
+def test_on_the_measured_curve_one_pod_is_the_curve_and_the_table_applies_from_two_pods():
+    p = plant.Plant(capacity_curve=CURVE, efficiency=((2.0, 0.8),))
+    assert p.step(15.0, [2.0], 30.0)["mean_s"] == pytest.approx(p.pod(15.0, 2.0)[0])
+    assert p.step(15.0, [1.0, 1.0], 30.0)["mean_s"] == pytest.approx(p.pod(7.5, 1.0, total_cpu=2.0)[0])
+    assert p.capacity_rps(1.0, total_cpu=2.0) == pytest.approx(20.0 * 0.8)
+    linear = plant.Plant(efficiency=((2.0, 0.8),))                   # the linear form is unchanged:
+    assert linear.step(15.0, [2.0], 30.0)["mean_s"] == pytest.approx(linear.pod(15.0, 2.0, total_cpu=2.0)[0])

@@ -30,8 +30,11 @@ it waits.
               WP17's Prometheus; every Deployment available;
   8. measure  the service at 0.25, 0.5, 1 and 2 cores and the node's free CPU
               (calibrate_service.py);
-  9. fit      research/hvpa/calibration.py; STOP if capacity is not linear in
-              CPU within 10 % (the twin's form must change first);
+  9. fit      research/hvpa/calibration.py; when capacity is not linear in
+              CPU within 10 % the plant takes the measured curve (the plan's
+              rule; until 2026-11-16, when the first fit failed the check, the
+              chain stopped here for that form to be written; a fit that
+              still returns 3 stops it);
  10. predict  research/hvpa/twin_predict.py on the measured plant; commit the
               calibration, its curves and the predictions before any live run.
 
@@ -210,8 +213,8 @@ def wp17(py: str, kc: list[str]) -> int:
            "results(hvpa): WP17 calibration and the twin's predictions, before any live run\n\n"
            "The service measured at 0.25, 0.5, 1 and 2 cores in the cluster and its closed-loop rate at the\n"
            "horizontal points that fit the node, the node's free CPU, the fitted plant (with its measured\n"
-           "efficiency when pods are not linear within 10 %), and twin_predict.py's regimes, gains, live\n"
-           "choices and tuned targets.")
+           "curve when capacity is not linear in CPU within 10 %, and its measured efficiency when pods are\n"
+           "not), and twin_predict.py's regimes, gains, live choices and tuned targets.")
     log("WP17 is ready for its live pilots, which start after the predictions are read")
     return 0
 
