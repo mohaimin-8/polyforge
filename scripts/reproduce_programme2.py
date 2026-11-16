@@ -49,6 +49,8 @@ STEPS = [
     ("WP17 twin predictions (a simulation)", R / "hvpa", ["twin_predict.py", "--calibration", "calibration.json",
                                                           "--out", "predictions.json"],
      ["predictions.json"], ["calibration_curves/node_cpu.json", "predictions.json"]),
+    ("WP17 tuning-grid edge (a light simulation)", R / "hvpa", ["grid_edge.py"], ["GRID_EDGE.md"],
+     ["predictions.json"]),
     ("WP11 predictions", T / "validation", ["predict.py", "--calibration", "calibration"], ["predictions.json"],
      ["../../research/cachereplay/data/vectors/gateway/train-00000-of-00006-4feeb3f83346a0e9.f32.npy"]),
     ("WP11 score", T / "validation", ["score.py", "--runs", "runs"], ["VALIDATION.md"], ["runs/actuator.jsonl"]),
