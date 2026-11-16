@@ -1,0 +1,78 @@
+{
+ "schedule": 12100,
+ "regime": "high",
+ "k": 0,
+ "arm": "joint",
+ "ac_power": true,
+ "complete": true,
+ "initial": {
+  "small": 1,
+  "mid": 1
+ },
+ "ready_wait_s": 0.1979377269744873,
+ "gateway_restart_s": 25.1749529838562,
+ "posture": {
+  "knobs": {
+   "t00": {
+    "ok": true,
+    "model_tier": "small",
+    "cache_size_mb": 0
+   },
+   "t01": {
+    "ok": true,
+    "model_tier": "mid",
+    "cache_size_mb": 0
+   }
+  },
+  "errors": [],
+  "attempts": 1
+ },
+ "quiet_wait_s": 5.0292441844940186,
+ "k6_exit": 0,
+ "start_unix": 1794773141.3614733,
+ "end_unix": 1794773639.3880277,
+ "ac_power_end": true,
+ "lag_p99_ms": 1.5947949218750013,
+ "replay_failed": 0,
+ "replay_alive": false,
+ "replay_error": null,
+ "measured": {
+  "total_cost_usd": 0.06239725577116013,
+  "steps": 48,
+  "mean_violation": 0.1839284387997623,
+  "mean_jain": 0.9199386377124258,
+  "mean_quality_loss": 0.0,
+  "J": 0.47288470017160356,
+  "cost_term": 0.0649971414282918,
+  "violation_term": 0.3678568775995246,
+  "unfairness_term": 0.040030681143787106,
+  "quality_term": 0.0,
+  "requests": 177.0,
+  "late": 139.0,
+  "missing_samples": 0,
+  "attainment": 0.21468926553672318,
+  "cost_per_1k": 0.35252686876361655,
+  "mean_latency_s": 29.021801899858755,
+  "hit_rate": 0.03954802259887006
+ },
+ "spread": {
+  "windows": [],
+  "findings": []
+ },
+ "ready_after_s": [
+  4.675351858139038,
+  5.816629886627197,
+  5.549865007400513,
+  4.827555894851685,
+  4.44966983795166,
+  16.500900983810425,
+  5.736154556274414,
+  6.170189619064331,
+  15.435234069824219,
+  15.381775140762329,
+  5.013655662536621,
+  4.923777341842651
+ ],
+ "problems": [],
+ "valid": true
+}
