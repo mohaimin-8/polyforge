@@ -1,0 +1,3401 @@
+{
+ "protocol": "WP9 random search (research/comparators/tune.py)",
+ "settings": {
+  "plant": "B",
+  "plant_digest": "565d559a55a6",
+  "mix": "own",
+  "cluster_size": "large",
+  "steps": 120,
+  "arms": [
+   "joint",
+   "per_knob",
+   "one_knob",
+   "layers",
+   "rules"
+  ],
+  "configs": 64,
+  "include_default": true,
+  "seed": 20261112,
+  "budget": "enforced",
+  "quality_weight": 0.0,
+  "granularity": "both",
+  "granularities": [
+   "overall",
+   "per_class"
+  ],
+  "references_requested": true,
+  "reference_iterations": 120,
+  "tuning_n": 120,
+  "evaluation_n": 120,
+  "tuning_workloads": [
+   "pop005",
+   "pop006",
+   "pop007",
+   "pop009",
+   "pop010",
+   "pop011",
+   "pop013",
+   "pop014",
+   "pop015",
+   "pop018",
+   "pop021",
+   "pop022",
+   "pop024",
+   "pop025",
+   "pop027",
+   "pop030",
+   "pop031",
+   "pop034",
+   "pop035",
+   "pop036",
+   "pop037",
+   "pop038",
+   "pop040",
+   "pop042",
+   "pop045",
+   "pop046",
+   "pop047",
+   "pop051",
+   "pop052",
+   "pop054",
+   "pop058",
+   "pop061",
+   "pop062",
+   "pop063",
+   "pop065",
+   "pop068",
+   "pop069",
+   "pop072",
+   "pop074",
+   "pop076",
+   "pop078",
+   "pop079",
+   "pop080",
+   "pop083",
+   "pop085",
+   "pop086",
+   "pop087",
+   "pop089",
+   "pop090",
+   "pop091",
+   "pop093",
+   "pop094",
+   "pop097",
+   "pop098",
+   "pop099",
+   "pop103",
+   "pop104",
+   "pop105",
+   "pop106",
+   "pop107",
+   "pop109",
+   "pop110",
+   "pop114",
+   "pop119",
+   "pop120",
+   "pop123",
+   "pop125",
+   "pop131",
+   "pop132",
+   "pop134",
+   "pop137",
+   "pop138",
+   "pop139",
+   "pop145",
+   "pop148",
+   "pop149",
+   "pop150",
+   "pop153",
+   "pop154",
+   "pop155",
+   "pop156",
+   "pop158",
+   "pop160",
+   "pop161",
+   "pop162",
+   "pop163",
+   "pop165",
+   "pop166",
+   "pop167",
+   "pop169",
+   "pop171",
+   "pop173",
+   "pop174",
+   "pop175",
+   "pop177",
+   "pop181",
+   "pop186",
+   "pop190",
+   "pop191",
+   "pop192",
+   "pop194",
+   "pop196",
+   "pop200",
+   "pop201",
+   "pop203",
+   "pop204",
+   "pop205",
+   "pop207",
+   "pop208",
+   "pop213",
+   "pop216",
+   "pop217",
+   "pop221",
+   "pop222",
+   "pop224",
+   "pop226",
+   "pop229",
+   "pop231",
+   "pop232",
+   "pop235"
+  ],
+  "evaluation_workloads": [
+   "pop000",
+   "pop001",
+   "pop002",
+   "pop003",
+   "pop004",
+   "pop008",
+   "pop012",
+   "pop016",
+   "pop017",
+   "pop019",
+   "pop020",
+   "pop023",
+   "pop026",
+   "pop028",
+   "pop029",
+   "pop032",
+   "pop033",
+   "pop039",
+   "pop041",
+   "pop043",
+   "pop044",
+   "pop048",
+   "pop049",
+   "pop050",
+   "pop053",
+   "pop055",
+   "pop056",
+   "pop057",
+   "pop059",
+   "pop060",
+   "pop064",
+   "pop066",
+   "pop067",
+   "pop070",
+   "pop071",
+   "pop073",
+   "pop075",
+   "pop077",
+   "pop081",
+   "pop082",
+   "pop084",
+   "pop088",
+   "pop092",
+   "pop095",
+   "pop096",
+   "pop100",
+   "pop101",
+   "pop102",
+   "pop108",
+   "pop111",
+   "pop112",
+   "pop113",
+   "pop115",
+   "pop116",
+   "pop117",
+   "pop118",
+   "pop121",
+   "pop122",
+   "pop124",
+   "pop126",
+   "pop127",
+   "pop128",
+   "pop129",
+   "pop130",
+   "pop133",
+   "pop135",
+   "pop136",
+   "pop140",
+   "pop141",
+   "pop142",
+   "pop143",
+   "pop144",
+   "pop146",
+   "pop147",
+   "pop151",
+   "pop152",
+   "pop157",
+   "pop159",
+   "pop164",
+   "pop168",
+   "pop170",
+   "pop172",
+   "pop176",
+   "pop178",
+   "pop179",
+   "pop180",
+   "pop182",
+   "pop183",
+   "pop184",
+   "pop185",
+   "pop187",
+   "pop188",
+   "pop189",
+   "pop193",
+   "pop195",
+   "pop197",
+   "pop198",
+   "pop199",
+   "pop202",
+   "pop206",
+   "pop209",
+   "pop210",
+   "pop211",
+   "pop212",
+   "pop214",
+   "pop215",
+   "pop218",
+   "pop219",
+   "pop220",
+   "pop223",
+   "pop225",
+   "pop227",
+   "pop228",
+   "pop230",
+   "pop233",
+   "pop234",
+   "pop236",
+   "pop237",
+   "pop238",
+   "pop239"
+  ],
+  "tuning_total": 120,
+  "evaluation_total": 120,
+  "class_counts": {
+   "tuning": {
+    "api_or_code": 64,
+    "conversation": 56
+   },
+   "evaluation": {
+    "api_or_code": 56,
+    "conversation": 64
+   }
+  },
+  "generated": "2026-11-16"
+ },
+ "class_rule": "the stream family carrying the larger share of the workload's demand (sum of its tenants' rate_rps); conversation = azure2024/conv, burstgpt/ChatGPT/conv, burstgpt/GPT-4/conv; api_or_code = burstgpt/ChatGPT/api, burstgpt/GPT-4/api, azure2024/code; ties to the alphabetically first family",
+ "classes": {
+  "tuning": {
+   "api_or_code": [
+    "pop005",
+    "pop006",
+    "pop009",
+    "pop011",
+    "pop025",
+    "pop031",
+    "pop035",
+    "pop036",
+    "pop038",
+    "pop042",
+    "pop054",
+    "pop058",
+    "pop061",
+    "pop062",
+    "pop065",
+    "pop069",
+    "pop076",
+    "pop078",
+    "pop080",
+    "pop083",
+    "pop085",
+    "pop086",
+    "pop089",
+    "pop090",
+    "pop093",
+    "pop094",
+    "pop097",
+    "pop099",
+    "pop103",
+    "pop105",
+    "pop107",
+    "pop109",
+    "pop114",
+    "pop120",
+    "pop123",
+    "pop137",
+    "pop138",
+    "pop145",
+    "pop149",
+    "pop150",
+    "pop153",
+    "pop154",
+    "pop158",
+    "pop160",
+    "pop163",
+    "pop165",
+    "pop169",
+    "pop174",
+    "pop177",
+    "pop190",
+    "pop191",
+    "pop200",
+    "pop201",
+    "pop203",
+    "pop204",
+    "pop205",
+    "pop207",
+    "pop208",
+    "pop213",
+    "pop216",
+    "pop222",
+    "pop226",
+    "pop231",
+    "pop232"
+   ],
+   "conversation": [
+    "pop007",
+    "pop010",
+    "pop013",
+    "pop014",
+    "pop015",
+    "pop018",
+    "pop021",
+    "pop022",
+    "pop024",
+    "pop027",
+    "pop030",
+    "pop034",
+    "pop037",
+    "pop040",
+    "pop045",
+    "pop046",
+    "pop047",
+    "pop051",
+    "pop052",
+    "pop063",
+    "pop068",
+    "pop072",
+    "pop074",
+    "pop079",
+    "pop087",
+    "pop091",
+    "pop098",
+    "pop104",
+    "pop106",
+    "pop110",
+    "pop119",
+    "pop125",
+    "pop131",
+    "pop132",
+    "pop134",
+    "pop139",
+    "pop148",
+    "pop155",
+    "pop156",
+    "pop161",
+    "pop162",
+    "pop166",
+    "pop167",
+    "pop171",
+    "pop173",
+    "pop175",
+    "pop181",
+    "pop186",
+    "pop192",
+    "pop194",
+    "pop196",
+    "pop217",
+    "pop221",
+    "pop224",
+    "pop229",
+    "pop235"
+   ]
+  },
+  "evaluation": {
+   "api_or_code": [
+    "pop000",
+    "pop002",
+    "pop004",
+    "pop016",
+    "pop017",
+    "pop019",
+    "pop020",
+    "pop023",
+    "pop026",
+    "pop028",
+    "pop032",
+    "pop033",
+    "pop041",
+    "pop043",
+    "pop050",
+    "pop056",
+    "pop057",
+    "pop064",
+    "pop067",
+    "pop071",
+    "pop077",
+    "pop082",
+    "pop092",
+    "pop095",
+    "pop112",
+    "pop116",
+    "pop117",
+    "pop118",
+    "pop122",
+    "pop129",
+    "pop133",
+    "pop135",
+    "pop136",
+    "pop142",
+    "pop144",
+    "pop151",
+    "pop157",
+    "pop168",
+    "pop170",
+    "pop172",
+    "pop176",
+    "pop178",
+    "pop179",
+    "pop180",
+    "pop188",
+    "pop193",
+    "pop197",
+    "pop198",
+    "pop202",
+    "pop206",
+    "pop215",
+    "pop219",
+    "pop220",
+    "pop233",
+    "pop236",
+    "pop237"
+   ],
+   "conversation": [
+    "pop001",
+    "pop003",
+    "pop008",
+    "pop012",
+    "pop029",
+    "pop039",
+    "pop044",
+    "pop048",
+    "pop049",
+    "pop053",
+    "pop055",
+    "pop059",
+    "pop060",
+    "pop066",
+    "pop070",
+    "pop073",
+    "pop075",
+    "pop081",
+    "pop084",
+    "pop088",
+    "pop096",
+    "pop100",
+    "pop101",
+    "pop102",
+    "pop108",
+    "pop111",
+    "pop113",
+    "pop115",
+    "pop121",
+    "pop124",
+    "pop126",
+    "pop127",
+    "pop128",
+    "pop130",
+    "pop140",
+    "pop141",
+    "pop143",
+    "pop146",
+    "pop147",
+    "pop152",
+    "pop159",
+    "pop164",
+    "pop182",
+    "pop183",
+    "pop184",
+    "pop185",
+    "pop187",
+    "pop189",
+    "pop195",
+    "pop199",
+    "pop209",
+    "pop210",
+    "pop211",
+    "pop212",
+    "pop214",
+    "pop218",
+    "pop223",
+    "pop225",
+    "pop227",
+    "pop228",
+    "pop230",
+    "pop234",
+    "pop238",
+    "pop239"
+   ]
+  }
+ },
+ "arms": {
+  "joint": {
+   "maps_to": "controller.JCACController, knob_search 'joint' (registered arm jcac_converged), via tunable_planner.TunablePlanner",
+   "description": "the joint planner: one tenant's three knobs searched together on the move lattice, tenants coordinated by convergent sweeps on one shared objective",
+   "fixed": {
+    "anchor_moves": true,
+    "converge_sweeps": true,
+    "knob_search": "joint"
+   },
+   "space": [
+    {
+     "name": "switch_penalty",
+     "range": "log-uniform [0.001, 0.2]",
+     "default": 0.05,
+     "doc": "objective units charged per changed knob (hysteresis); published 0.05"
+    },
+    {
+     "name": "horizon_steps",
+     "range": "integer 1..6",
+     "default": 6,
+     "doc": "forecast steps of 10 s the plan is judged on"
+    },
+    {
+     "name": "forecast_method",
+     "range": "{persistence, trend, holt, seasonal}",
+     "default": "trend",
+     "doc": "demand forecaster"
+    },
+    {
+     "name": "weight_beta",
+     "range": "log-uniform [0.25, 32]",
+     "default": 2.0,
+     "doc": "SLO weight beta; the cost weight alpha is fixed at 1 (the objective's scale)"
+    },
+    {
+     "name": "weight_gamma",
+     "range": "uniform [0, 2]",
+     "default": 0.5,
+     "doc": "fairness weight gamma"
+    }
+   ],
+   "configs": [
+    {
+     "switch_penalty": 0.05,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 2.0,
+     "weight_gamma": 0.5
+    },
+    {
+     "switch_penalty": 0.00184755,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 2.30681,
+     "weight_gamma": 1.59174
+    },
+    {
+     "switch_penalty": 0.0256268,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.779789,
+     "weight_gamma": 1.46805
+    },
+    {
+     "switch_penalty": 0.0190052,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 7.06859,
+     "weight_gamma": 1.82602
+    },
+    {
+     "switch_penalty": 0.0270944,
+     "horizon_steps": 1,
+     "forecast_method": "trend",
+     "weight_beta": 0.259807,
+     "weight_gamma": 0.859487
+    },
+    {
+     "switch_penalty": 0.0681166,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 4.17007,
+     "weight_gamma": 1.82784
+    },
+    {
+     "switch_penalty": 0.00267478,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 6.17912,
+     "weight_gamma": 1.49091
+    },
+    {
+     "switch_penalty": 0.00273897,
+     "horizon_steps": 4,
+     "forecast_method": "seasonal",
+     "weight_beta": 7.01781,
+     "weight_gamma": 0.353943
+    },
+    {
+     "switch_penalty": 0.00813778,
+     "horizon_steps": 2,
+     "forecast_method": "holt",
+     "weight_beta": 1.02991,
+     "weight_gamma": 0.0628482
+    },
+    {
+     "switch_penalty": 0.0853004,
+     "horizon_steps": 1,
+     "forecast_method": "holt",
+     "weight_beta": 2.56952,
+     "weight_gamma": 1.15964
+    },
+    {
+     "switch_penalty": 0.0747281,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.91877,
+     "weight_gamma": 1.1492
+    },
+    {
+     "switch_penalty": 0.0422914,
+     "horizon_steps": 3,
+     "forecast_method": "trend",
+     "weight_beta": 6.42555,
+     "weight_gamma": 1.48189
+    },
+    {
+     "switch_penalty": 0.00419018,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 4.36774,
+     "weight_gamma": 1.15108
+    },
+    {
+     "switch_penalty": 0.0143744,
+     "horizon_steps": 4,
+     "forecast_method": "persistence",
+     "weight_beta": 2.25844,
+     "weight_gamma": 0.332205
+    },
+    {
+     "switch_penalty": 0.00839399,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 6.81235,
+     "weight_gamma": 1.23628
+    },
+    {
+     "switch_penalty": 0.0421271,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 24.2549,
+     "weight_gamma": 1.58454
+    },
+    {
+     "switch_penalty": 0.00442465,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 8.92592,
+     "weight_gamma": 0.364072
+    },
+    {
+     "switch_penalty": 0.00937494,
+     "horizon_steps": 3,
+     "forecast_method": "trend",
+     "weight_beta": 12.4187,
+     "weight_gamma": 0.615383
+    },
+    {
+     "switch_penalty": 0.0247051,
+     "horizon_steps": 2,
+     "forecast_method": "seasonal",
+     "weight_beta": 3.43079,
+     "weight_gamma": 0.549026
+    },
+    {
+     "switch_penalty": 0.0108917,
+     "horizon_steps": 3,
+     "forecast_method": "trend",
+     "weight_beta": 4.83123,
+     "weight_gamma": 1.45568
+    },
+    {
+     "switch_penalty": 0.00342981,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 8.95267,
+     "weight_gamma": 1.55149
+    },
+    {
+     "switch_penalty": 0.0120415,
+     "horizon_steps": 4,
+     "forecast_method": "seasonal",
+     "weight_beta": 21.8478,
+     "weight_gamma": 0.594447
+    },
+    {
+     "switch_penalty": 0.0554687,
+     "horizon_steps": 2,
+     "forecast_method": "holt",
+     "weight_beta": 4.41115,
+     "weight_gamma": 1.12555
+    },
+    {
+     "switch_penalty": 0.0010974,
+     "horizon_steps": 1,
+     "forecast_method": "trend",
+     "weight_beta": 0.336689,
+     "weight_gamma": 0.0646819
+    },
+    {
+     "switch_penalty": 0.0259255,
+     "horizon_steps": 5,
+     "forecast_method": "holt",
+     "weight_beta": 0.83887,
+     "weight_gamma": 0.396264
+    },
+    {
+     "switch_penalty": 0.00253831,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 6.20184,
+     "weight_gamma": 1.78881
+    },
+    {
+     "switch_penalty": 0.143541,
+     "horizon_steps": 3,
+     "forecast_method": "holt",
+     "weight_beta": 6.5599,
+     "weight_gamma": 1.40599
+    },
+    {
+     "switch_penalty": 0.139336,
+     "horizon_steps": 4,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.39914,
+     "weight_gamma": 1.05584
+    },
+    {
+     "switch_penalty": 0.0115565,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.309369,
+     "weight_gamma": 1.16232
+    },
+    {
+     "switch_penalty": 0.0702732,
+     "horizon_steps": 4,
+     "forecast_method": "holt",
+     "weight_beta": 15.1913,
+     "weight_gamma": 1.66384
+    },
+    {
+     "switch_penalty": 0.0340229,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 1.49933,
+     "weight_gamma": 1.41573
+    },
+    {
+     "switch_penalty": 0.00116928,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.294071,
+     "weight_gamma": 1.3752
+    },
+    {
+     "switch_penalty": 0.00740697,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 0.312913,
+     "weight_gamma": 1.50612
+    },
+    {
+     "switch_penalty": 0.00736178,
+     "horizon_steps": 2,
+     "forecast_method": "trend",
+     "weight_beta": 20.7099,
+     "weight_gamma": 0.829839
+    },
+    {
+     "switch_penalty": 0.0886716,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 20.7693,
+     "weight_gamma": 0.0950201
+    },
+    {
+     "switch_penalty": 0.0194648,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 25.2399,
+     "weight_gamma": 0.0236068
+    },
+    {
+     "switch_penalty": 0.0474866,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 5.75235,
+     "weight_gamma": 0.250491
+    },
+    {
+     "switch_penalty": 0.0303032,
+     "horizon_steps": 4,
+     "forecast_method": "holt",
+     "weight_beta": 24.1219,
+     "weight_gamma": 1.00807
+    },
+    {
+     "switch_penalty": 0.0833365,
+     "horizon_steps": 3,
+     "forecast_method": "trend",
+     "weight_beta": 0.951275,
+     "weight_gamma": 1.26864
+    },
+    {
+     "switch_penalty": 0.003397,
+     "horizon_steps": 5,
+     "forecast_method": "trend",
+     "weight_beta": 10.7773,
+     "weight_gamma": 0.735896
+    },
+    {
+     "switch_penalty": 0.117056,
+     "horizon_steps": 3,
+     "forecast_method": "persistence",
+     "weight_beta": 0.284353,
+     "weight_gamma": 1.53467
+    },
+    {
+     "switch_penalty": 0.00196343,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 0.304123,
+     "weight_gamma": 1.41258
+    },
+    {
+     "switch_penalty": 0.00599802,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 22.0226,
+     "weight_gamma": 0.580995
+    },
+    {
+     "switch_penalty": 0.0435048,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 15.8067,
+     "weight_gamma": 1.38085
+    },
+    {
+     "switch_penalty": 0.0271226,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 20.9477,
+     "weight_gamma": 0.949851
+    },
+    {
+     "switch_penalty": 0.00801615,
+     "horizon_steps": 1,
+     "forecast_method": "seasonal",
+     "weight_beta": 2.47727,
+     "weight_gamma": 1.3569
+    },
+    {
+     "switch_penalty": 0.0030083,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 23.1966,
+     "weight_gamma": 0.243758
+    },
+    {
+     "switch_penalty": 0.100239,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 11.1905,
+     "weight_gamma": 0.934255
+    },
+    {
+     "switch_penalty": 0.0802529,
+     "horizon_steps": 4,
+     "forecast_method": "seasonal",
+     "weight_beta": 2.35351,
+     "weight_gamma": 1.58632
+    },
+    {
+     "switch_penalty": 0.00554744,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 8.70088,
+     "weight_gamma": 0.501573
+    },
+    {
+     "switch_penalty": 0.00301682,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 0.304185,
+     "weight_gamma": 1.33609
+    },
+    {
+     "switch_penalty": 0.0134268,
+     "horizon_steps": 4,
+     "forecast_method": "trend",
+     "weight_beta": 0.723866,
+     "weight_gamma": 1.55139
+    },
+    {
+     "switch_penalty": 0.00437393,
+     "horizon_steps": 5,
+     "forecast_method": "holt",
+     "weight_beta": 0.931567,
+     "weight_gamma": 0.954509
+    },
+    {
+     "switch_penalty": 0.0582465,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 26.3536,
+     "weight_gamma": 1.68629
+    },
+    {
+     "switch_penalty": 0.00181622,
+     "horizon_steps": 2,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.934835,
+     "weight_gamma": 1.32381
+    },
+    {
+     "switch_penalty": 0.0881568,
+     "horizon_steps": 5,
+     "forecast_method": "trend",
+     "weight_beta": 0.848035,
+     "weight_gamma": 0.98518
+    },
+    {
+     "switch_penalty": 0.0279634,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 3.84646,
+     "weight_gamma": 0.831451
+    },
+    {
+     "switch_penalty": 0.00137296,
+     "horizon_steps": 3,
+     "forecast_method": "holt",
+     "weight_beta": 4.24055,
+     "weight_gamma": 1.34624
+    },
+    {
+     "switch_penalty": 0.154021,
+     "horizon_steps": 4,
+     "forecast_method": "trend",
+     "weight_beta": 0.457194,
+     "weight_gamma": 1.15004
+    },
+    {
+     "switch_penalty": 0.0581381,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 1.0121,
+     "weight_gamma": 0.460699
+    },
+    {
+     "switch_penalty": 0.0128089,
+     "horizon_steps": 2,
+     "forecast_method": "trend",
+     "weight_beta": 11.9579,
+     "weight_gamma": 0.466695
+    },
+    {
+     "switch_penalty": 0.00163564,
+     "horizon_steps": 4,
+     "forecast_method": "trend",
+     "weight_beta": 7.14695,
+     "weight_gamma": 1.81141
+    },
+    {
+     "switch_penalty": 0.141149,
+     "horizon_steps": 5,
+     "forecast_method": "trend",
+     "weight_beta": 14.742,
+     "weight_gamma": 1.85542
+    },
+    {
+     "switch_penalty": 0.042444,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 0.520044,
+     "weight_gamma": 0.901209
+    }
+   ],
+   "overall": {
+    "config": 8,
+    "tuning_J": 0.20084419798034253,
+    "n": 120,
+    "params": {
+     "switch_penalty": 0.00813778,
+     "horizon_steps": 2,
+     "forecast_method": "holt",
+     "weight_beta": 1.02991,
+     "weight_gamma": 0.0628482
+    }
+   },
+   "per_class": {
+    "api_or_code": {
+     "config": 8,
+     "tuning_J": 0.20360863262419399,
+     "n": 64,
+     "params": {
+      "switch_penalty": 0.00813778,
+      "horizon_steps": 2,
+      "forecast_method": "holt",
+      "weight_beta": 1.02991,
+      "weight_gamma": 0.0628482
+     }
+    },
+    "conversation": {
+     "config": 40,
+     "tuning_J": 0.19760220886491484,
+     "n": 56,
+     "params": {
+      "switch_penalty": 0.117056,
+      "horizon_steps": 3,
+      "forecast_method": "persistence",
+      "weight_beta": 0.284353,
+      "weight_gamma": 1.53467
+     }
+    }
+   }
+  },
+  "per_knob": {
+   "maps_to": "knob_search 'decoupled' (registered arm jcac_decoupled)",
+   "description": "the per-knob planner: each knob best-responded alone on the shared objective, winners combined",
+   "fixed": {
+    "anchor_moves": true,
+    "converge_sweeps": true,
+    "knob_search": "decoupled"
+   },
+   "space": [
+    {
+     "name": "switch_penalty",
+     "range": "log-uniform [0.001, 0.2]",
+     "default": 0.05,
+     "doc": "objective units charged per changed knob (hysteresis); published 0.05"
+    },
+    {
+     "name": "horizon_steps",
+     "range": "integer 1..6",
+     "default": 6,
+     "doc": "forecast steps of 10 s the plan is judged on"
+    },
+    {
+     "name": "forecast_method",
+     "range": "{persistence, trend, holt, seasonal}",
+     "default": "trend",
+     "doc": "demand forecaster"
+    },
+    {
+     "name": "weight_beta",
+     "range": "log-uniform [0.25, 32]",
+     "default": 2.0,
+     "doc": "SLO weight beta; the cost weight alpha is fixed at 1 (the objective's scale)"
+    },
+    {
+     "name": "weight_gamma",
+     "range": "uniform [0, 2]",
+     "default": 0.5,
+     "doc": "fairness weight gamma"
+    }
+   ],
+   "configs": [
+    {
+     "switch_penalty": 0.05,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 2.0,
+     "weight_gamma": 0.5
+    },
+    {
+     "switch_penalty": 0.00153212,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 1.26499,
+     "weight_gamma": 1.88366
+    },
+    {
+     "switch_penalty": 0.028533,
+     "horizon_steps": 3,
+     "forecast_method": "persistence",
+     "weight_beta": 6.17552,
+     "weight_gamma": 0.721032
+    },
+    {
+     "switch_penalty": 0.00110052,
+     "horizon_steps": 1,
+     "forecast_method": "seasonal",
+     "weight_beta": 3.02736,
+     "weight_gamma": 0.449323
+    },
+    {
+     "switch_penalty": 0.00596759,
+     "horizon_steps": 3,
+     "forecast_method": "persistence",
+     "weight_beta": 6.93862,
+     "weight_gamma": 1.5347
+    },
+    {
+     "switch_penalty": 0.00296389,
+     "horizon_steps": 2,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.419,
+     "weight_gamma": 0.997348
+    },
+    {
+     "switch_penalty": 0.102859,
+     "horizon_steps": 5,
+     "forecast_method": "trend",
+     "weight_beta": 14.2757,
+     "weight_gamma": 0.842961
+    },
+    {
+     "switch_penalty": 0.0335046,
+     "horizon_steps": 1,
+     "forecast_method": "trend",
+     "weight_beta": 4.33917,
+     "weight_gamma": 0.0595687
+    },
+    {
+     "switch_penalty": 0.00854133,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 1.09829,
+     "weight_gamma": 1.9138
+    },
+    {
+     "switch_penalty": 0.136389,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 3.5741,
+     "weight_gamma": 1.51194
+    },
+    {
+     "switch_penalty": 0.109541,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 0.33901,
+     "weight_gamma": 1.39507
+    },
+    {
+     "switch_penalty": 0.0567575,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.331983,
+     "weight_gamma": 1.26029
+    },
+    {
+     "switch_penalty": 0.00391232,
+     "horizon_steps": 2,
+     "forecast_method": "trend",
+     "weight_beta": 3.21328,
+     "weight_gamma": 0.358827
+    },
+    {
+     "switch_penalty": 0.00444632,
+     "horizon_steps": 4,
+     "forecast_method": "holt",
+     "weight_beta": 1.73499,
+     "weight_gamma": 1.56552
+    },
+    {
+     "switch_penalty": 0.0766737,
+     "horizon_steps": 3,
+     "forecast_method": "persistence",
+     "weight_beta": 2.53617,
+     "weight_gamma": 1.16355
+    },
+    {
+     "switch_penalty": 0.0190203,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 0.650986,
+     "weight_gamma": 0.11628
+    },
+    {
+     "switch_penalty": 0.18871,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 1.08299,
+     "weight_gamma": 0.294772
+    },
+    {
+     "switch_penalty": 0.0807219,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.403803,
+     "weight_gamma": 0.348048
+    },
+    {
+     "switch_penalty": 0.00514514,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 0.267211,
+     "weight_gamma": 1.5772
+    },
+    {
+     "switch_penalty": 0.0529708,
+     "horizon_steps": 2,
+     "forecast_method": "trend",
+     "weight_beta": 1.3314,
+     "weight_gamma": 0.387607
+    },
+    {
+     "switch_penalty": 0.00444166,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 2.57742,
+     "weight_gamma": 0.288708
+    },
+    {
+     "switch_penalty": 0.00333165,
+     "horizon_steps": 1,
+     "forecast_method": "holt",
+     "weight_beta": 3.74769,
+     "weight_gamma": 0.258623
+    },
+    {
+     "switch_penalty": 0.0134947,
+     "horizon_steps": 3,
+     "forecast_method": "trend",
+     "weight_beta": 0.880494,
+     "weight_gamma": 1.5654
+    },
+    {
+     "switch_penalty": 0.072111,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 1.35175,
+     "weight_gamma": 0.912811
+    },
+    {
+     "switch_penalty": 0.0392714,
+     "horizon_steps": 3,
+     "forecast_method": "holt",
+     "weight_beta": 0.342979,
+     "weight_gamma": 0.0817942
+    },
+    {
+     "switch_penalty": 0.0431363,
+     "horizon_steps": 4,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.272606,
+     "weight_gamma": 1.29239
+    },
+    {
+     "switch_penalty": 0.00372841,
+     "horizon_steps": 2,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.426911,
+     "weight_gamma": 0.420767
+    },
+    {
+     "switch_penalty": 0.01161,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.06448,
+     "weight_gamma": 1.38878
+    },
+    {
+     "switch_penalty": 0.0184176,
+     "horizon_steps": 4,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.20146,
+     "weight_gamma": 0.778771
+    },
+    {
+     "switch_penalty": 0.0162227,
+     "horizon_steps": 2,
+     "forecast_method": "trend",
+     "weight_beta": 1.88083,
+     "weight_gamma": 1.0548
+    },
+    {
+     "switch_penalty": 0.00245912,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 6.07639,
+     "weight_gamma": 1.92645
+    },
+    {
+     "switch_penalty": 0.0354493,
+     "horizon_steps": 4,
+     "forecast_method": "trend",
+     "weight_beta": 16.2683,
+     "weight_gamma": 1.34766
+    },
+    {
+     "switch_penalty": 0.018446,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 0.601375,
+     "weight_gamma": 0.657461
+    },
+    {
+     "switch_penalty": 0.00842549,
+     "horizon_steps": 3,
+     "forecast_method": "persistence",
+     "weight_beta": 2.56063,
+     "weight_gamma": 0.611937
+    },
+    {
+     "switch_penalty": 0.0448278,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 16.7532,
+     "weight_gamma": 0.748116
+    },
+    {
+     "switch_penalty": 0.0195142,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.20109,
+     "weight_gamma": 1.77963
+    },
+    {
+     "switch_penalty": 0.0911439,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 7.46534,
+     "weight_gamma": 1.93253
+    },
+    {
+     "switch_penalty": 0.0843768,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 0.660995,
+     "weight_gamma": 1.66046
+    },
+    {
+     "switch_penalty": 0.149534,
+     "horizon_steps": 2,
+     "forecast_method": "holt",
+     "weight_beta": 0.821402,
+     "weight_gamma": 0.307179
+    },
+    {
+     "switch_penalty": 0.0587824,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 3.26145,
+     "weight_gamma": 0.540766
+    },
+    {
+     "switch_penalty": 0.00540651,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.366262,
+     "weight_gamma": 0.356333
+    },
+    {
+     "switch_penalty": 0.00225406,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.964095,
+     "weight_gamma": 1.20808
+    },
+    {
+     "switch_penalty": 0.00102355,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.63584,
+     "weight_gamma": 1.66657
+    },
+    {
+     "switch_penalty": 0.0346301,
+     "horizon_steps": 1,
+     "forecast_method": "trend",
+     "weight_beta": 0.537748,
+     "weight_gamma": 0.27917
+    },
+    {
+     "switch_penalty": 0.108593,
+     "horizon_steps": 5,
+     "forecast_method": "holt",
+     "weight_beta": 0.55183,
+     "weight_gamma": 1.2502
+    },
+    {
+     "switch_penalty": 0.00387876,
+     "horizon_steps": 4,
+     "forecast_method": "seasonal",
+     "weight_beta": 28.754,
+     "weight_gamma": 0.277991
+    },
+    {
+     "switch_penalty": 0.0311229,
+     "horizon_steps": 4,
+     "forecast_method": "trend",
+     "weight_beta": 1.25671,
+     "weight_gamma": 1.12283
+    },
+    {
+     "switch_penalty": 0.0108115,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 0.27894,
+     "weight_gamma": 0.325184
+    },
+    {
+     "switch_penalty": 0.142548,
+     "horizon_steps": 4,
+     "forecast_method": "persistence",
+     "weight_beta": 17.2894,
+     "weight_gamma": 0.48902
+    },
+    {
+     "switch_penalty": 0.139328,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 6.82171,
+     "weight_gamma": 0.39349
+    },
+    {
+     "switch_penalty": 0.0837283,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 21.9732,
+     "weight_gamma": 0.820597
+    },
+    {
+     "switch_penalty": 0.00136837,
+     "horizon_steps": 3,
+     "forecast_method": "holt",
+     "weight_beta": 0.844041,
+     "weight_gamma": 0.815886
+    },
+    {
+     "switch_penalty": 0.00396219,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 8.78697,
+     "weight_gamma": 0.469374
+    },
+    {
+     "switch_penalty": 0.0269721,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 31.2464,
+     "weight_gamma": 0.897381
+    },
+    {
+     "switch_penalty": 0.00207696,
+     "horizon_steps": 3,
+     "forecast_method": "holt",
+     "weight_beta": 2.3772,
+     "weight_gamma": 1.5203
+    },
+    {
+     "switch_penalty": 0.00107651,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 0.323171,
+     "weight_gamma": 1.80234
+    },
+    {
+     "switch_penalty": 0.016863,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 0.332116,
+     "weight_gamma": 0.169603
+    },
+    {
+     "switch_penalty": 0.151339,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 19.3964,
+     "weight_gamma": 0.95986
+    },
+    {
+     "switch_penalty": 0.162433,
+     "horizon_steps": 3,
+     "forecast_method": "persistence",
+     "weight_beta": 1.54585,
+     "weight_gamma": 1.13689
+    },
+    {
+     "switch_penalty": 0.136682,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 0.769124,
+     "weight_gamma": 1.32635
+    },
+    {
+     "switch_penalty": 0.0618093,
+     "horizon_steps": 1,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.815874,
+     "weight_gamma": 1.79637
+    },
+    {
+     "switch_penalty": 0.0547647,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 2.59779,
+     "weight_gamma": 0.323801
+    },
+    {
+     "switch_penalty": 0.0136122,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 0.562018,
+     "weight_gamma": 0.608041
+    },
+    {
+     "switch_penalty": 0.00103411,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 18.0839,
+     "weight_gamma": 0.326654
+    }
+   ],
+   "overall": {
+    "config": 10,
+    "tuning_J": 0.20102510269457763,
+    "n": 120,
+    "params": {
+     "switch_penalty": 0.109541,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 0.33901,
+     "weight_gamma": 1.39507
+    }
+   },
+   "per_class": {
+    "api_or_code": {
+     "config": 51,
+     "tuning_J": 0.20382100377095796,
+     "n": 64,
+     "params": {
+      "switch_penalty": 0.00136837,
+      "horizon_steps": 3,
+      "forecast_method": "holt",
+      "weight_beta": 0.844041,
+      "weight_gamma": 0.815886
+     }
+    },
+    "conversation": {
+     "config": 10,
+     "tuning_J": 0.19752756545957492,
+     "n": 56,
+     "params": {
+      "switch_penalty": 0.109541,
+      "horizon_steps": 6,
+      "forecast_method": "persistence",
+      "weight_beta": 0.33901,
+      "weight_gamma": 1.39507
+     }
+    }
+   }
+  },
+  "one_knob": {
+   "maps_to": "knob_search 'knobwise' (registered arm jcac_knobwise)",
+   "description": "the iterated one-knob planner: one knob at a time to a fixed point, never a two-knob move",
+   "fixed": {
+    "anchor_moves": true,
+    "converge_sweeps": true,
+    "knob_search": "knobwise"
+   },
+   "space": [
+    {
+     "name": "switch_penalty",
+     "range": "log-uniform [0.001, 0.2]",
+     "default": 0.05,
+     "doc": "objective units charged per changed knob (hysteresis); published 0.05"
+    },
+    {
+     "name": "horizon_steps",
+     "range": "integer 1..6",
+     "default": 6,
+     "doc": "forecast steps of 10 s the plan is judged on"
+    },
+    {
+     "name": "forecast_method",
+     "range": "{persistence, trend, holt, seasonal}",
+     "default": "trend",
+     "doc": "demand forecaster"
+    },
+    {
+     "name": "weight_beta",
+     "range": "log-uniform [0.25, 32]",
+     "default": 2.0,
+     "doc": "SLO weight beta; the cost weight alpha is fixed at 1 (the objective's scale)"
+    },
+    {
+     "name": "weight_gamma",
+     "range": "uniform [0, 2]",
+     "default": 0.5,
+     "doc": "fairness weight gamma"
+    }
+   ],
+   "configs": [
+    {
+     "switch_penalty": 0.05,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 2.0,
+     "weight_gamma": 0.5
+    },
+    {
+     "switch_penalty": 0.0184437,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 4.21226,
+     "weight_gamma": 0.389862
+    },
+    {
+     "switch_penalty": 0.0478712,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 8.32376,
+     "weight_gamma": 0.345485
+    },
+    {
+     "switch_penalty": 0.0113111,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 2.44437,
+     "weight_gamma": 1.25659
+    },
+    {
+     "switch_penalty": 0.00314513,
+     "horizon_steps": 5,
+     "forecast_method": "trend",
+     "weight_beta": 1.18094,
+     "weight_gamma": 0.388577
+    },
+    {
+     "switch_penalty": 0.00991179,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 9.7261,
+     "weight_gamma": 0.441776
+    },
+    {
+     "switch_penalty": 0.0888775,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.84477,
+     "weight_gamma": 1.28694
+    },
+    {
+     "switch_penalty": 0.0249538,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 0.477667,
+     "weight_gamma": 1.03407
+    },
+    {
+     "switch_penalty": 0.00169312,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 6.00916,
+     "weight_gamma": 1.55914
+    },
+    {
+     "switch_penalty": 0.00758274,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 11.7285,
+     "weight_gamma": 0.173469
+    },
+    {
+     "switch_penalty": 0.0589714,
+     "horizon_steps": 5,
+     "forecast_method": "holt",
+     "weight_beta": 20.8713,
+     "weight_gamma": 0.170253
+    },
+    {
+     "switch_penalty": 0.00227213,
+     "horizon_steps": 5,
+     "forecast_method": "holt",
+     "weight_beta": 2.58055,
+     "weight_gamma": 0.303509
+    },
+    {
+     "switch_penalty": 0.0637706,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.990974,
+     "weight_gamma": 1.85103
+    },
+    {
+     "switch_penalty": 0.010706,
+     "horizon_steps": 2,
+     "forecast_method": "holt",
+     "weight_beta": 7.97115,
+     "weight_gamma": 0.71971
+    },
+    {
+     "switch_penalty": 0.014177,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 4.51345,
+     "weight_gamma": 0.867669
+    },
+    {
+     "switch_penalty": 0.00231366,
+     "horizon_steps": 2,
+     "forecast_method": "seasonal",
+     "weight_beta": 9.81266,
+     "weight_gamma": 1.87127
+    },
+    {
+     "switch_penalty": 0.00359049,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 2.00357,
+     "weight_gamma": 0.377096
+    },
+    {
+     "switch_penalty": 0.00172118,
+     "horizon_steps": 1,
+     "forecast_method": "holt",
+     "weight_beta": 0.925185,
+     "weight_gamma": 1.86765
+    },
+    {
+     "switch_penalty": 0.00946214,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 10.7954,
+     "weight_gamma": 1.19091
+    },
+    {
+     "switch_penalty": 0.0156423,
+     "horizon_steps": 2,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.00602,
+     "weight_gamma": 1.28085
+    },
+    {
+     "switch_penalty": 0.00287364,
+     "horizon_steps": 1,
+     "forecast_method": "holt",
+     "weight_beta": 7.9908,
+     "weight_gamma": 0.276476
+    },
+    {
+     "switch_penalty": 0.0165442,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 0.281139,
+     "weight_gamma": 0.289226
+    },
+    {
+     "switch_penalty": 0.00271632,
+     "horizon_steps": 1,
+     "forecast_method": "persistence",
+     "weight_beta": 0.284895,
+     "weight_gamma": 0.0180992
+    },
+    {
+     "switch_penalty": 0.164542,
+     "horizon_steps": 2,
+     "forecast_method": "trend",
+     "weight_beta": 26.7422,
+     "weight_gamma": 0.280548
+    },
+    {
+     "switch_penalty": 0.00160542,
+     "horizon_steps": 1,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.368384,
+     "weight_gamma": 1.71977
+    },
+    {
+     "switch_penalty": 0.00240926,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 10.781,
+     "weight_gamma": 0.718223
+    },
+    {
+     "switch_penalty": 0.00633266,
+     "horizon_steps": 2,
+     "forecast_method": "holt",
+     "weight_beta": 1.63756,
+     "weight_gamma": 1.49372
+    },
+    {
+     "switch_penalty": 0.00141091,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 12.6105,
+     "weight_gamma": 0.931162
+    },
+    {
+     "switch_penalty": 0.0195671,
+     "horizon_steps": 2,
+     "forecast_method": "trend",
+     "weight_beta": 0.279047,
+     "weight_gamma": 1.94112
+    },
+    {
+     "switch_penalty": 0.0651478,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 6.12352,
+     "weight_gamma": 0.328265
+    },
+    {
+     "switch_penalty": 0.00555689,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 4.26674,
+     "weight_gamma": 0.456912
+    },
+    {
+     "switch_penalty": 0.00347854,
+     "horizon_steps": 5,
+     "forecast_method": "persistence",
+     "weight_beta": 0.629189,
+     "weight_gamma": 1.88554
+    },
+    {
+     "switch_penalty": 0.00132004,
+     "horizon_steps": 5,
+     "forecast_method": "seasonal",
+     "weight_beta": 10.5683,
+     "weight_gamma": 1.25436
+    },
+    {
+     "switch_penalty": 0.00127041,
+     "horizon_steps": 5,
+     "forecast_method": "holt",
+     "weight_beta": 1.45158,
+     "weight_gamma": 0.105479
+    },
+    {
+     "switch_penalty": 0.00747258,
+     "horizon_steps": 3,
+     "forecast_method": "holt",
+     "weight_beta": 2.86882,
+     "weight_gamma": 1.54581
+    },
+    {
+     "switch_penalty": 0.00340607,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.469118,
+     "weight_gamma": 1.28721
+    },
+    {
+     "switch_penalty": 0.0328413,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 3.12869,
+     "weight_gamma": 1.77269
+    },
+    {
+     "switch_penalty": 0.00611625,
+     "horizon_steps": 2,
+     "forecast_method": "persistence",
+     "weight_beta": 0.786386,
+     "weight_gamma": 1.99602
+    },
+    {
+     "switch_penalty": 0.0113371,
+     "horizon_steps": 2,
+     "forecast_method": "trend",
+     "weight_beta": 2.92681,
+     "weight_gamma": 1.6569
+    },
+    {
+     "switch_penalty": 0.00806496,
+     "horizon_steps": 3,
+     "forecast_method": "persistence",
+     "weight_beta": 1.45432,
+     "weight_gamma": 0.15852
+    },
+    {
+     "switch_penalty": 0.151062,
+     "horizon_steps": 3,
+     "forecast_method": "holt",
+     "weight_beta": 0.285918,
+     "weight_gamma": 0.0165889
+    },
+    {
+     "switch_penalty": 0.0016677,
+     "horizon_steps": 2,
+     "forecast_method": "trend",
+     "weight_beta": 1.08288,
+     "weight_gamma": 1.56407
+    },
+    {
+     "switch_penalty": 0.0918827,
+     "horizon_steps": 4,
+     "forecast_method": "persistence",
+     "weight_beta": 1.82852,
+     "weight_gamma": 1.65742
+    },
+    {
+     "switch_penalty": 0.0146791,
+     "horizon_steps": 2,
+     "forecast_method": "seasonal",
+     "weight_beta": 0.62995,
+     "weight_gamma": 0.121197
+    },
+    {
+     "switch_penalty": 0.00672361,
+     "horizon_steps": 6,
+     "forecast_method": "holt",
+     "weight_beta": 0.581127,
+     "weight_gamma": 0.19103
+    },
+    {
+     "switch_penalty": 0.00640967,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 5.58701,
+     "weight_gamma": 0.0636872
+    },
+    {
+     "switch_penalty": 0.0151741,
+     "horizon_steps": 4,
+     "forecast_method": "trend",
+     "weight_beta": 0.600253,
+     "weight_gamma": 1.79221
+    },
+    {
+     "switch_penalty": 0.00102005,
+     "horizon_steps": 1,
+     "forecast_method": "holt",
+     "weight_beta": 0.999666,
+     "weight_gamma": 0.270714
+    },
+    {
+     "switch_penalty": 0.00192071,
+     "horizon_steps": 4,
+     "forecast_method": "persistence",
+     "weight_beta": 0.703006,
+     "weight_gamma": 1.21808
+    },
+    {
+     "switch_penalty": 0.0714698,
+     "horizon_steps": 2,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.52273,
+     "weight_gamma": 0.997927
+    },
+    {
+     "switch_penalty": 0.0022583,
+     "horizon_steps": 3,
+     "forecast_method": "holt",
+     "weight_beta": 0.387317,
+     "weight_gamma": 1.14335
+    },
+    {
+     "switch_penalty": 0.0101828,
+     "horizon_steps": 3,
+     "forecast_method": "holt",
+     "weight_beta": 0.962929,
+     "weight_gamma": 0.914937
+    },
+    {
+     "switch_penalty": 0.0741064,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 1.42497,
+     "weight_gamma": 1.446
+    },
+    {
+     "switch_penalty": 0.141506,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 7.64273,
+     "weight_gamma": 1.75089
+    },
+    {
+     "switch_penalty": 0.168253,
+     "horizon_steps": 5,
+     "forecast_method": "trend",
+     "weight_beta": 17.4246,
+     "weight_gamma": 0.167201
+    },
+    {
+     "switch_penalty": 0.0438477,
+     "horizon_steps": 4,
+     "forecast_method": "persistence",
+     "weight_beta": 20.572,
+     "weight_gamma": 1.85316
+    },
+    {
+     "switch_penalty": 0.00277594,
+     "horizon_steps": 6,
+     "forecast_method": "trend",
+     "weight_beta": 1.22173,
+     "weight_gamma": 0.320099
+    },
+    {
+     "switch_penalty": 0.0435789,
+     "horizon_steps": 6,
+     "forecast_method": "seasonal",
+     "weight_beta": 8.26228,
+     "weight_gamma": 1.86233
+    },
+    {
+     "switch_penalty": 0.0029651,
+     "horizon_steps": 6,
+     "forecast_method": "persistence",
+     "weight_beta": 0.429785,
+     "weight_gamma": 0.883337
+    },
+    {
+     "switch_penalty": 0.0164538,
+     "horizon_steps": 3,
+     "forecast_method": "holt",
+     "weight_beta": 15.2238,
+     "weight_gamma": 1.58874
+    },
+    {
+     "switch_penalty": 0.00564429,
+     "horizon_steps": 1,
+     "forecast_method": "holt",
+     "weight_beta": 2.05,
+     "weight_gamma": 1.5436
+    },
+    {
+     "switch_penalty": 0.0036725,
+     "horizon_steps": 3,
+     "forecast_method": "seasonal",
+     "weight_beta": 1.05526,
+     "weight_gamma": 1.82054
+    },
+    {
+     "switch_penalty": 0.0475174,
+     "horizon_steps": 1,
+     "forecast_method": "trend",
+     "weight_beta": 0.280796,
+     "weight_gamma": 1.7985
+    },
+    {
+     "switch_penalty": 0.00226596,
+     "horizon_steps": 2,
+     "forecast_method": "holt",
+     "weight_beta": 3.97782,
+     "weight_gamma": 1.05465
+    }
+   ],
+   "overall": {
+    "config": 47,
+    "tuning_J": 0.20079244035599916,
+    "n": 120,
+    "params": {
+     "switch_penalty": 0.00102005,
+     "horizon_steps": 1,
+     "forecast_method": "holt",
+     "weight_beta": 0.999666,
+     "weight_gamma": 0.270714
+    }
+   },
+   "per_class": {
+    "api_or_code": {
+     "config": 51,
+     "tuning_J": 0.20369028271958964,
+     "n": 64,
+     "params": {
+      "switch_penalty": 0.0101828,
+      "horizon_steps": 3,
+      "forecast_method": "holt",
+      "weight_beta": 0.962929,
+      "weight_gamma": 0.914937
+     }
+    },
+    "conversation": {
+     "config": 47,
+     "tuning_J": 0.1974637369461322,
+     "n": 56,
+     "params": {
+      "switch_penalty": 0.00102005,
+      "horizon_steps": 1,
+      "forecast_method": "holt",
+      "weight_beta": 0.999666,
+      "weight_gamma": 0.270714
+     }
+    }
+   }
+  },
+  "layers": {
+   "maps_to": "new: layer_control.IndependentLayersController (router objective has the form of baselines.quality_aware_tier, with its own weights); caps baselines.CapEnforced",
+   "description": "independent per-layer planners: pool on utilisation or queue, cache on hit rate, router on latency and price; each its own local objective, no shared one",
+   "fixed": {},
+   "space": [
+    {
+     "name": "forecast_method",
+     "range": "{persistence, trend, holt, seasonal}",
+     "default": "trend",
+     "doc": "demand forecaster, every layer"
+    },
+    {
+     "name": "horizon_steps",
+     "range": "integer 1..6",
+     "default": 6,
+     "doc": "forecast steps each layer averages over"
+    },
+    {
+     "name": "pool_signal",
+     "range": "{utilisation, queue}",
+     "default": "utilisation",
+     "doc": "the pool planner's signal"
+    },
+    {
+     "name": "pool_target_utilisation",
+     "range": "log-uniform [0.05, 1]",
+     "default": 0.6,
+     "doc": "target when the signal is utilisation"
+    },
+    {
+     "name": "pool_target_queue",
+     "range": "log-uniform [0.25, 8]",
+     "default": 1.5,
+     "doc": "target work in flight per replica when the signal is queue"
+    },
+    {
+     "name": "pool_weight",
+     "range": "log-uniform [0.01, 100]",
+     "default": 1.0,
+     "doc": "price of signal overshoot against replica cost"
+    },
+    {
+     "name": "hit_value_usd",
+     "range": "log-uniform [1e-08, 0.01]",
+     "default": 0.0001,
+     "doc": "the cache planner's value of one hit, USD"
+    },
+    {
+     "name": "router_latency_weight",
+     "range": "log-uniform [0.1, 100]",
+     "default": 2.0,
+     "doc": "price of AI p95 overshoot against per-request spend"
+    }
+   ],
+   "configs": [
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 6,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.6,
+     "pool_target_queue": 1.5,
+     "pool_weight": 1.0,
+     "hit_value_usd": 0.0001,
+     "router_latency_weight": 2.0
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 2,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.0772877,
+     "pool_target_queue": 1.23182,
+     "pool_weight": 1.93792,
+     "hit_value_usd": 2.55433e-06,
+     "router_latency_weight": 2.79427
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 2,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.0664655,
+     "pool_target_queue": 0.26396,
+     "pool_weight": 0.0426756,
+     "hit_value_usd": 1.60683e-05,
+     "router_latency_weight": 3.16411
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 2,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.600035,
+     "pool_target_queue": 0.356315,
+     "pool_weight": 13.513,
+     "hit_value_usd": 3.66055e-07,
+     "router_latency_weight": 8.94182
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 1,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.398315,
+     "pool_target_queue": 0.276375,
+     "pool_weight": 26.3502,
+     "hit_value_usd": 0.00195827,
+     "router_latency_weight": 36.6851
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 4,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.928984,
+     "pool_target_queue": 7.469,
+     "pool_weight": 0.0305491,
+     "hit_value_usd": 2.81472e-07,
+     "router_latency_weight": 6.88356
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 6,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.350481,
+     "pool_target_queue": 1.56068,
+     "pool_weight": 0.259636,
+     "hit_value_usd": 4.7652e-08,
+     "router_latency_weight": 0.308043
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 2,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.11972,
+     "pool_target_queue": 0.69326,
+     "pool_weight": 0.141243,
+     "hit_value_usd": 4.31807e-07,
+     "router_latency_weight": 14.6629
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 5,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.942224,
+     "pool_target_queue": 1.1692,
+     "pool_weight": 0.960252,
+     "hit_value_usd": 1.83316e-08,
+     "router_latency_weight": 56.9378
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 5,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.265242,
+     "pool_target_queue": 0.727207,
+     "pool_weight": 3.87645,
+     "hit_value_usd": 0.0076814,
+     "router_latency_weight": 62.5888
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 5,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.284049,
+     "pool_target_queue": 0.437702,
+     "pool_weight": 0.978523,
+     "hit_value_usd": 7.4854e-08,
+     "router_latency_weight": 22.4609
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 6,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.101697,
+     "pool_target_queue": 0.607179,
+     "pool_weight": 0.139082,
+     "hit_value_usd": 0.00126303,
+     "router_latency_weight": 0.248137
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 4,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.413625,
+     "pool_target_queue": 0.491625,
+     "pool_weight": 1.00161,
+     "hit_value_usd": 2.20524e-06,
+     "router_latency_weight": 0.17207
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 4,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.354989,
+     "pool_target_queue": 0.439862,
+     "pool_weight": 29.3906,
+     "hit_value_usd": 1.05575e-05,
+     "router_latency_weight": 0.460929
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 1,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.766398,
+     "pool_target_queue": 0.462176,
+     "pool_weight": 22.5914,
+     "hit_value_usd": 2.39164e-08,
+     "router_latency_weight": 18.7956
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 4,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.611802,
+     "pool_target_queue": 2.3215,
+     "pool_weight": 0.0358065,
+     "hit_value_usd": 3.28822e-08,
+     "router_latency_weight": 92.8294
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 1,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.652657,
+     "pool_target_queue": 6.04794,
+     "pool_weight": 0.06358,
+     "hit_value_usd": 1.63447e-05,
+     "router_latency_weight": 7.378
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 2,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.999596,
+     "pool_target_queue": 1.24168,
+     "pool_weight": 84.5118,
+     "hit_value_usd": 0.00059843,
+     "router_latency_weight": 7.10772
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 4,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.0785376,
+     "pool_target_queue": 0.597395,
+     "pool_weight": 0.315237,
+     "hit_value_usd": 0.00071109,
+     "router_latency_weight": 2.84002
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 5,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.28931,
+     "pool_target_queue": 7.77849,
+     "pool_weight": 0.342953,
+     "hit_value_usd": 0.000875755,
+     "router_latency_weight": 10.8723
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 3,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.244071,
+     "pool_target_queue": 0.477601,
+     "pool_weight": 0.0210724,
+     "hit_value_usd": 9.18766e-06,
+     "router_latency_weight": 21.0058
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 4,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.101745,
+     "pool_target_queue": 0.624997,
+     "pool_weight": 0.342672,
+     "hit_value_usd": 0.000143142,
+     "router_latency_weight": 17.0548
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 4,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.214075,
+     "pool_target_queue": 0.665319,
+     "pool_weight": 0.380401,
+     "hit_value_usd": 2.08561e-06,
+     "router_latency_weight": 82.8759
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 2,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.389302,
+     "pool_target_queue": 0.688908,
+     "pool_weight": 0.173153,
+     "hit_value_usd": 6.03419e-07,
+     "router_latency_weight": 22.5241
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 2,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.0526088,
+     "pool_target_queue": 0.429636,
+     "pool_weight": 26.5089,
+     "hit_value_usd": 3.68919e-06,
+     "router_latency_weight": 0.200275
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 5,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.160831,
+     "pool_target_queue": 5.25857,
+     "pool_weight": 2.62448,
+     "hit_value_usd": 0.00226072,
+     "router_latency_weight": 2.87264
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 2,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.069942,
+     "pool_target_queue": 0.674067,
+     "pool_weight": 16.59,
+     "hit_value_usd": 1.39551e-06,
+     "router_latency_weight": 3.71338
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 3,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.110442,
+     "pool_target_queue": 1.03474,
+     "pool_weight": 0.069322,
+     "hit_value_usd": 4.0722e-07,
+     "router_latency_weight": 0.321049
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 1,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.509638,
+     "pool_target_queue": 0.502369,
+     "pool_weight": 13.9865,
+     "hit_value_usd": 6.01091e-08,
+     "router_latency_weight": 61.8605
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 6,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.230972,
+     "pool_target_queue": 0.452548,
+     "pool_weight": 7.38537,
+     "hit_value_usd": 1.83649e-07,
+     "router_latency_weight": 15.3019
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 1,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.104664,
+     "pool_target_queue": 1.98298,
+     "pool_weight": 72.5466,
+     "hit_value_usd": 0.00766605,
+     "router_latency_weight": 4.05452
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 6,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.220337,
+     "pool_target_queue": 2.35269,
+     "pool_weight": 26.575,
+     "hit_value_usd": 1.39762e-08,
+     "router_latency_weight": 0.675043
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 3,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.121542,
+     "pool_target_queue": 0.772204,
+     "pool_weight": 0.0131347,
+     "hit_value_usd": 2.82686e-05,
+     "router_latency_weight": 9.30816
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 1,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.687079,
+     "pool_target_queue": 0.786488,
+     "pool_weight": 0.862431,
+     "hit_value_usd": 0.000555581,
+     "router_latency_weight": 19.6293
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 5,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.454112,
+     "pool_target_queue": 1.46197,
+     "pool_weight": 0.554025,
+     "hit_value_usd": 0.000469523,
+     "router_latency_weight": 1.17479
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 4,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.170618,
+     "pool_target_queue": 5.93457,
+     "pool_weight": 0.0193031,
+     "hit_value_usd": 5.64574e-08,
+     "router_latency_weight": 0.287676
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 5,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.948076,
+     "pool_target_queue": 2.66241,
+     "pool_weight": 0.0551536,
+     "hit_value_usd": 1.21804e-08,
+     "router_latency_weight": 1.32372
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 3,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.505329,
+     "pool_target_queue": 2.01118,
+     "pool_weight": 4.89124,
+     "hit_value_usd": 0.00189001,
+     "router_latency_weight": 2.16986
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 2,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.145396,
+     "pool_target_queue": 1.97048,
+     "pool_weight": 0.701247,
+     "hit_value_usd": 0.00613015,
+     "router_latency_weight": 0.102954
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 3,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.408576,
+     "pool_target_queue": 1.58698,
+     "pool_weight": 47.5645,
+     "hit_value_usd": 0.00316386,
+     "router_latency_weight": 10.8895
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 3,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.0910527,
+     "pool_target_queue": 0.469117,
+     "pool_weight": 69.0772,
+     "hit_value_usd": 0.000107241,
+     "router_latency_weight": 6.38989
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 1,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.524868,
+     "pool_target_queue": 3.88633,
+     "pool_weight": 70.3545,
+     "hit_value_usd": 1.73642e-06,
+     "router_latency_weight": 0.104669
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 5,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.496978,
+     "pool_target_queue": 1.57361,
+     "pool_weight": 1.21292,
+     "hit_value_usd": 1.72072e-06,
+     "router_latency_weight": 0.627462
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 6,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.106751,
+     "pool_target_queue": 0.602897,
+     "pool_weight": 3.70446,
+     "hit_value_usd": 1.92398e-05,
+     "router_latency_weight": 56.4247
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 4,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.308141,
+     "pool_target_queue": 5.01467,
+     "pool_weight": 0.109997,
+     "hit_value_usd": 5.34833e-06,
+     "router_latency_weight": 55.8458
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 3,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.0891758,
+     "pool_target_queue": 0.398499,
+     "pool_weight": 17.3376,
+     "hit_value_usd": 9.16311e-07,
+     "router_latency_weight": 57.5825
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 1,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.712444,
+     "pool_target_queue": 0.554815,
+     "pool_weight": 0.0682026,
+     "hit_value_usd": 0.000108233,
+     "router_latency_weight": 0.222173
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 1,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.0547988,
+     "pool_target_queue": 7.48129,
+     "pool_weight": 0.18692,
+     "hit_value_usd": 6.2399e-07,
+     "router_latency_weight": 0.229385
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 6,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.246003,
+     "pool_target_queue": 2.61527,
+     "pool_weight": 58.3776,
+     "hit_value_usd": 7.76923e-05,
+     "router_latency_weight": 45.5295
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 6,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.313212,
+     "pool_target_queue": 6.72966,
+     "pool_weight": 6.37916,
+     "hit_value_usd": 2.53107e-07,
+     "router_latency_weight": 15.1668
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 2,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.952875,
+     "pool_target_queue": 5.04162,
+     "pool_weight": 1.22805,
+     "hit_value_usd": 0.000281291,
+     "router_latency_weight": 13.7339
+    },
+    {
+     "forecast_method": "persistence",
+     "horizon_steps": 6,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.24489,
+     "pool_target_queue": 4.01282,
+     "pool_weight": 1.47029,
+     "hit_value_usd": 2.30624e-05,
+     "router_latency_weight": 28.1067
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 3,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.442623,
+     "pool_target_queue": 0.504085,
+     "pool_weight": 3.81412,
+     "hit_value_usd": 7.69268e-07,
+     "router_latency_weight": 31.2394
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 3,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.985291,
+     "pool_target_queue": 7.46826,
+     "pool_weight": 8.48122,
+     "hit_value_usd": 0.00542199,
+     "router_latency_weight": 0.22329
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 3,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.078451,
+     "pool_target_queue": 0.692123,
+     "pool_weight": 0.086042,
+     "hit_value_usd": 3.48464e-05,
+     "router_latency_weight": 0.675471
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 6,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.0699525,
+     "pool_target_queue": 1.18235,
+     "pool_weight": 5.22407,
+     "hit_value_usd": 1.8824e-07,
+     "router_latency_weight": 0.121942
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 1,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.549736,
+     "pool_target_queue": 1.04634,
+     "pool_weight": 3.45396,
+     "hit_value_usd": 0.000327398,
+     "router_latency_weight": 8.51919
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 2,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.234593,
+     "pool_target_queue": 1.50419,
+     "pool_weight": 23.611,
+     "hit_value_usd": 0.00163694,
+     "router_latency_weight": 0.174639
+    },
+    {
+     "forecast_method": "trend",
+     "horizon_steps": 1,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.177203,
+     "pool_target_queue": 2.21628,
+     "pool_weight": 5.44862,
+     "hit_value_usd": 6.86637e-05,
+     "router_latency_weight": 3.48077
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 3,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.0591869,
+     "pool_target_queue": 0.926985,
+     "pool_weight": 0.0140152,
+     "hit_value_usd": 5.62807e-08,
+     "router_latency_weight": 1.97745
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 3,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.0979944,
+     "pool_target_queue": 0.429306,
+     "pool_weight": 2.41701,
+     "hit_value_usd": 6.4053e-07,
+     "router_latency_weight": 10.1784
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 4,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.202882,
+     "pool_target_queue": 0.28764,
+     "pool_weight": 11.1809,
+     "hit_value_usd": 0.000683447,
+     "router_latency_weight": 6.84119
+    },
+    {
+     "forecast_method": "seasonal",
+     "horizon_steps": 1,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.0606982,
+     "pool_target_queue": 0.264081,
+     "pool_weight": 0.0401978,
+     "hit_value_usd": 4.93265e-08,
+     "router_latency_weight": 3.08063
+    },
+    {
+     "forecast_method": "holt",
+     "horizon_steps": 3,
+     "pool_signal": "utilisation",
+     "pool_target_utilisation": 0.125529,
+     "pool_target_queue": 2.32353,
+     "pool_weight": 63.4623,
+     "hit_value_usd": 3.16325e-08,
+     "router_latency_weight": 1.36869
+    }
+   ],
+   "overall": {
+    "config": 48,
+    "tuning_J": 0.20120616224797924,
+    "n": 120,
+    "params": {
+     "forecast_method": "persistence",
+     "horizon_steps": 6,
+     "pool_signal": "queue",
+     "pool_target_utilisation": 0.246003,
+     "pool_target_queue": 2.61527,
+     "pool_weight": 58.3776,
+     "hit_value_usd": 7.76923e-05,
+     "router_latency_weight": 45.5295
+    }
+   },
+   "per_class": {
+    "api_or_code": {
+     "config": 21,
+     "tuning_J": 0.2047147031700754,
+     "n": 64,
+     "params": {
+      "forecast_method": "persistence",
+      "horizon_steps": 4,
+      "pool_signal": "queue",
+      "pool_target_utilisation": 0.101745,
+      "pool_target_queue": 0.624997,
+      "pool_weight": 0.342672,
+      "hit_value_usd": 0.000143142,
+      "router_latency_weight": 17.0548
+     }
+    },
+    "conversation": {
+     "config": 48,
+     "tuning_J": 0.19703033886877402,
+     "n": 56,
+     "params": {
+      "forecast_method": "persistence",
+      "horizon_steps": 6,
+      "pool_signal": "queue",
+      "pool_target_utilisation": 0.246003,
+      "pool_target_queue": 2.61527,
+      "pool_weight": 58.3776,
+      "hit_value_usd": 7.76923e-05,
+      "router_latency_weight": 45.5295
+     }
+    }
+   }
+  },
+  "rules": {
+   "maps_to": "new: layer_control.RulesStackController; pool k8s_hpa.K8sReplicaLayer (in place of baselines.HPAController(policy='k8s_default'), see k8s_hpa.py); router fallback baselines.cheapest_meeting_tier; caps baselines.CapEnforced",
+   "description": "per-layer stack of rules: Kubernetes default-behaviour HPA on each pool, a cache-sizing rule, a router rule, the budget gate",
+   "fixed": {},
+   "space": [
+    {
+     "name": "hpa_metric",
+     "range": "{utilisation, queue}",
+     "default": "utilisation",
+     "doc": "HPA metric: utilisation (Resource) or queue (Pods, work in flight per replica)"
+    },
+    {
+     "name": "hpa_target_utilisation",
+     "range": "log-uniform [0.05, 1]",
+     "default": 0.6,
+     "doc": "averageUtilization target"
+    },
+    {
+     "name": "hpa_target_queue",
+     "range": "log-uniform [0.25, 8]",
+     "default": 1.5,
+     "doc": "averageValue target, work in flight per pod"
+    },
+    {
+     "name": "cache_hits_per_mb_s",
+     "range": "log-uniform [1e-05, 0.1]",
+     "default": 0.001,
+     "doc": "cache-sizing rule: grow while a level buys this many hits/s per MB"
+    },
+    {
+     "name": "router_tier",
+     "range": "{small, mid, large}",
+     "default": "small",
+     "doc": "router rule: preferred tier (latency fallback)"
+    }
+   ],
+   "configs": [
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.6,
+     "hpa_target_queue": 1.5,
+     "cache_hits_per_mb_s": 0.001,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.154327,
+     "hpa_target_queue": 4.56455,
+     "cache_hits_per_mb_s": 0.0113397,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.209558,
+     "hpa_target_queue": 1.00637,
+     "cache_hits_per_mb_s": 1.82378e-05,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0782558,
+     "hpa_target_queue": 0.448496,
+     "cache_hits_per_mb_s": 0.0805023,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.859613,
+     "hpa_target_queue": 2.34154,
+     "cache_hits_per_mb_s": 0.00570935,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.274967,
+     "hpa_target_queue": 6.79692,
+     "cache_hits_per_mb_s": 0.000979979,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.555806,
+     "hpa_target_queue": 1.30449,
+     "cache_hits_per_mb_s": 0.00194245,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.0828895,
+     "hpa_target_queue": 3.537,
+     "cache_hits_per_mb_s": 0.00572265,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.441581,
+     "hpa_target_queue": 0.854438,
+     "cache_hits_per_mb_s": 0.000457149,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.688863,
+     "hpa_target_queue": 7.9055,
+     "cache_hits_per_mb_s": 0.000131025,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.124838,
+     "hpa_target_queue": 0.5248,
+     "cache_hits_per_mb_s": 0.0227337,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0870421,
+     "hpa_target_queue": 6.50326,
+     "cache_hits_per_mb_s": 0.00754343,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.15574,
+     "hpa_target_queue": 4.12597,
+     "cache_hits_per_mb_s": 1.79043e-05,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.725649,
+     "hpa_target_queue": 2.15178,
+     "cache_hits_per_mb_s": 0.00925905,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.164431,
+     "hpa_target_queue": 3.8889,
+     "cache_hits_per_mb_s": 0.000306856,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.847045,
+     "hpa_target_queue": 0.463466,
+     "cache_hits_per_mb_s": 0.000536887,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.698636,
+     "hpa_target_queue": 4.00737,
+     "cache_hits_per_mb_s": 0.00309937,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.715218,
+     "hpa_target_queue": 2.67548,
+     "cache_hits_per_mb_s": 5.00826e-05,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.179703,
+     "hpa_target_queue": 0.588572,
+     "cache_hits_per_mb_s": 0.000226186,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0655272,
+     "hpa_target_queue": 6.76918,
+     "cache_hits_per_mb_s": 0.0012186,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.247328,
+     "hpa_target_queue": 0.528967,
+     "cache_hits_per_mb_s": 4.71586e-05,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0515441,
+     "hpa_target_queue": 4.51909,
+     "cache_hits_per_mb_s": 0.000151328,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.948163,
+     "hpa_target_queue": 0.257685,
+     "cache_hits_per_mb_s": 0.000377901,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0803029,
+     "hpa_target_queue": 0.703191,
+     "cache_hits_per_mb_s": 0.000231283,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.249265,
+     "hpa_target_queue": 1.02361,
+     "cache_hits_per_mb_s": 0.000154957,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.732397,
+     "hpa_target_queue": 0.664016,
+     "cache_hits_per_mb_s": 0.0486157,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.499325,
+     "hpa_target_queue": 1.40706,
+     "cache_hits_per_mb_s": 7.68461e-05,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.901445,
+     "hpa_target_queue": 4.34025,
+     "cache_hits_per_mb_s": 0.0452558,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.851991,
+     "hpa_target_queue": 1.56107,
+     "cache_hits_per_mb_s": 0.000262749,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0832308,
+     "hpa_target_queue": 4.73978,
+     "cache_hits_per_mb_s": 0.0546091,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.101354,
+     "hpa_target_queue": 0.588465,
+     "cache_hits_per_mb_s": 0.0263942,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.21323,
+     "hpa_target_queue": 0.300868,
+     "cache_hits_per_mb_s": 0.00316622,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.555355,
+     "hpa_target_queue": 0.712472,
+     "cache_hits_per_mb_s": 0.000148751,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.587561,
+     "hpa_target_queue": 6.81716,
+     "cache_hits_per_mb_s": 0.0120149,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.232836,
+     "hpa_target_queue": 2.73616,
+     "cache_hits_per_mb_s": 6.85502e-05,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.679968,
+     "hpa_target_queue": 2.50508,
+     "cache_hits_per_mb_s": 9.43158e-05,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0918877,
+     "hpa_target_queue": 0.376534,
+     "cache_hits_per_mb_s": 0.000966033,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0654512,
+     "hpa_target_queue": 1.90387,
+     "cache_hits_per_mb_s": 0.00789792,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.0901379,
+     "hpa_target_queue": 7.59871,
+     "cache_hits_per_mb_s": 4.7907e-05,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.189765,
+     "hpa_target_queue": 2.83259,
+     "cache_hits_per_mb_s": 0.0491042,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.0506308,
+     "hpa_target_queue": 2.4466,
+     "cache_hits_per_mb_s": 0.000112763,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.11483,
+     "hpa_target_queue": 1.87474,
+     "cache_hits_per_mb_s": 3.89048e-05,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.799298,
+     "hpa_target_queue": 2.14867,
+     "cache_hits_per_mb_s": 0.00212367,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.175118,
+     "hpa_target_queue": 1.14848,
+     "cache_hits_per_mb_s": 0.000302313,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.15686,
+     "hpa_target_queue": 0.870625,
+     "cache_hits_per_mb_s": 0.00109329,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.596826,
+     "hpa_target_queue": 4.53488,
+     "cache_hits_per_mb_s": 1.42541e-05,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.0536971,
+     "hpa_target_queue": 0.792231,
+     "cache_hits_per_mb_s": 0.00211247,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.843998,
+     "hpa_target_queue": 3.33871,
+     "cache_hits_per_mb_s": 0.000102561,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.729797,
+     "hpa_target_queue": 0.903139,
+     "cache_hits_per_mb_s": 0.000393853,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.340023,
+     "hpa_target_queue": 5.12973,
+     "cache_hits_per_mb_s": 0.0415513,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.260192,
+     "hpa_target_queue": 3.96154,
+     "cache_hits_per_mb_s": 0.0280518,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.490277,
+     "hpa_target_queue": 5.01612,
+     "cache_hits_per_mb_s": 0.059596,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.190491,
+     "hpa_target_queue": 0.85317,
+     "cache_hits_per_mb_s": 0.0681585,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0567894,
+     "hpa_target_queue": 0.383785,
+     "cache_hits_per_mb_s": 0.00013433,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0653863,
+     "hpa_target_queue": 0.925919,
+     "cache_hits_per_mb_s": 0.0372791,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.622162,
+     "hpa_target_queue": 3.5003,
+     "cache_hits_per_mb_s": 6.20923e-05,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.145497,
+     "hpa_target_queue": 2.73745,
+     "cache_hits_per_mb_s": 0.000997514,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.120107,
+     "hpa_target_queue": 0.547366,
+     "cache_hits_per_mb_s": 0.00465324,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.119232,
+     "hpa_target_queue": 1.06708,
+     "cache_hits_per_mb_s": 6.79922e-05,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.225486,
+     "hpa_target_queue": 1.35213,
+     "cache_hits_per_mb_s": 0.0603304,
+     "router_tier": "small"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.0759366,
+     "hpa_target_queue": 1.46129,
+     "cache_hits_per_mb_s": 0.0740437,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "utilisation",
+     "hpa_target_utilisation": 0.0936786,
+     "hpa_target_queue": 0.480421,
+     "cache_hits_per_mb_s": 0.00029501,
+     "router_tier": "mid"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.136609,
+     "hpa_target_queue": 1.91423,
+     "cache_hits_per_mb_s": 0.00701885,
+     "router_tier": "large"
+    },
+    {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.497951,
+     "hpa_target_queue": 6.52236,
+     "cache_hits_per_mb_s": 7.02663e-05,
+     "router_tier": "small"
+    }
+   ],
+   "overall": {
+    "config": 63,
+    "tuning_J": 0.20135621007610574,
+    "n": 120,
+    "params": {
+     "hpa_metric": "queue",
+     "hpa_target_utilisation": 0.497951,
+     "hpa_target_queue": 6.52236,
+     "cache_hits_per_mb_s": 7.02663e-05,
+     "router_tier": "small"
+    }
+   },
+   "per_class": {
+    "api_or_code": {
+     "config": 63,
+     "tuning_J": 0.20476347233696807,
+     "n": 64,
+     "params": {
+      "hpa_metric": "queue",
+      "hpa_target_utilisation": 0.497951,
+      "hpa_target_queue": 6.52236,
+      "cache_hits_per_mb_s": 7.02663e-05,
+      "router_tier": "small"
+     }
+    },
+    "conversation": {
+     "config": 12,
+     "tuning_J": 0.19743627982846096,
+     "n": 56,
+     "params": {
+      "hpa_metric": "queue",
+      "hpa_target_utilisation": 0.15574,
+      "hpa_target_queue": 4.12597,
+      "cache_hits_per_mb_s": 1.79043e-05,
+      "router_tier": "small"
+     }
+    }
+   }
+  }
+ }
+}
