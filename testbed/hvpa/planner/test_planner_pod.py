@@ -104,3 +104,14 @@ def test_the_initial_allocation_holds_until_a_full_window_of_load_was_seen():
     assert kube.calls == [] and [r["rate_rps"] for r in logs] == [0.0, 2.0]
     assert pod.decide_and_act(60.0)["event"] == "decision"   # a full window since the load was seen
     assert pod.decide_and_act(90.0)["event"] == "decision"
+
+
+def test_the_hold_ends_one_period_after_the_load_whatever_the_loops_jitter():
+    """Decision times drift by milliseconds; the hold must not last one period
+    or two depending on which side of 30 s the difference falls."""
+    for seen, then in ((33.004, 63.001), (33.001, 63.004)):
+        kube, rates = FakeKube(2, 0.5), iter([10.0, 10.0])
+        pod, _ = _pod(kube, 0.0, warmup_s=pp.RATE_WINDOW_S)
+        pod.rate = lambda: next(rates)
+        assert pod.decide_and_act(seen)["event"] == "hold"
+        assert pod.decide_and_act(then)["event"] == "decision"

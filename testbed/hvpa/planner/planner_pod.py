@@ -41,6 +41,7 @@ API = "https://kubernetes.default.svc"
 DEPLOYMENT, CONTAINER, SELECTOR = "cpuburn", "cpuburn", "app.kubernetes.io/name=cpuburn"
 RATE_WINDOW_S = 30.0
 RATE_QUERY = f"sum(rate(cpuburn_arrivals_total[{RATE_WINDOW_S:g}s]))"
+HOLD_TOLERANCE_S = 1.0   # decision times drift by ms: the hold ends one period after the load, not two
 RECONCILE_S = 5.0
 
 
@@ -124,7 +125,7 @@ class PlannerPod:
         """True until warmup_s have passed since the first reading with load in it."""
         if self.load_seen_at is None and rate > 0:
             self.load_seen_at = now
-        return self.load_seen_at is None or now - self.load_seen_at < self.warmup_s
+        return self.load_seen_at is None or now - self.load_seen_at < self.warmup_s - HOLD_TOLERANCE_S
 
     def resize_all(self, cores: float, pods: list[dict]) -> list[tuple[str, int]]:
         return [(p["metadata"]["name"], self.kube.resize(p["metadata"]["name"], cores))
