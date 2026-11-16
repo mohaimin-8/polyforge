@@ -58,7 +58,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 LOG = HERE / "out" / "run_queue.log"
-WORKERS = "6"
+WORKERS = "8"   # every logical CPU: ~120 MB per worker; no testbed work runs beside the CPU campaigns
 
 
 @dataclass(frozen=True)
