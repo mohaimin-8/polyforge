@@ -8,33 +8,45 @@
   "sigma": 0.0,
   "seed": 0
  },
- "start_unix": 1794801409.648997,
- "end_unix": 1794801420.1762123,
- "k6_job": "failed",
- "k6": null,
- "k6_error": "ValueError: substring not found",
+ "start_unix": 1794802191.171122,
+ "end_unix": 1794802621.4755661,
+ "k6_job": "succeeded",
+ "k6": {
+  "requests": 7916,
+  "dropped": 205,
+  "on_time": 6366,
+  "attainment": 0.8041940373926225,
+  "latency_ms": {
+   "avg": 888.5385199470867,
+   "med": 64.11204,
+   "p(95)": 6409.7861555,
+   "p(99)": 8873.757796299991,
+   "max": 12782.440787
+  }
+ },
+ "k6_error": "",
  "power": {
   "start": true,
   "end": true
  },
  "watch": {
-  "cost": 0.00018653500729136997,
-  "resizes": 0,
-  "reversals": 0,
-  "max_replicas": 2,
-  "polls": 2,
-  "max_gap_s": 10.213323593139648
+  "cost": 0.0389576173423562,
+  "resizes": 6,
+  "reversals": 6,
+  "max_replicas": 3,
+  "polls": 43,
+  "max_gap_s": 10.375681638717651
  },
  "decisions": [
   {
    "event": "decision",
-   "t": 1794801383.3474283,
-   "rate_rps": 0.0,
+   "t": 1794802193.0984285,
+   "rate_rps": 3.17081791435382,
    "replicas": 2,
-   "cpu": 0.5,
+   "cpu": 1.0,
    "next": [
     1,
-    0.25
+    0.5
    ],
    "acts": [
     [
@@ -44,41 +56,320 @@
     ],
     [
      "resize",
-     "cpuburn-5647568bdb-9txz4",
+     "cpuburn-66b68b65f5-7mlpx",
      200
     ],
     [
      "resize",
-     "cpuburn-5647568bdb-wl6p6",
+     "cpuburn-66b68b65f5-vlwst",
      200
     ]
    ],
-   "index": 0.0016437500000000002,
+   "index": 0.001729512234946347,
    "perknob_fits": true,
    "loss": 0.0
   },
   {
    "event": "decision",
-   "t": 1794801413.3477006,
-   "rate_rps": 0.0,
+   "t": 1794802223.098562,
+   "rate_rps": 8.840353614144565,
    "replicas": 1,
-   "cpu": 0.25,
+   "cpu": 0.5,
+   "next": [
+    3,
+    1.0
+   ],
+   "acts": [
+    [
+     "scale",
+     3,
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-66b68b65f5-7mlpx",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-66b68b65f5-2c5mn",
+     200
+    ]
+   ],
+   "index": 0.015018458602463423,
+   "perknob_fits": true,
+   "loss": 0.00217672258955956
+  },
+  {
+   "event": "decision",
+   "t": 1794802253.0987096,
+   "rate_rps": 10.009685870655762,
+   "replicas": 3,
+   "cpu": 1.0,
    "next": [
     1,
-    0.25
+    0.5
+   ],
+   "acts": [
+    [
+     "scale",
+     1,
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-66b68b65f5-2c5mn",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-66b68b65f5-7mlpx",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-66b68b65f5-vjf2n",
+     200
+    ]
+   ],
+   "index": 0.019563897214935573,
+   "perknob_fits": true,
+   "loss": 0.017596740605166906
+  },
+  {
+   "event": "decision",
+   "t": 1794802283.0985208,
+   "rate_rps": 8.240329613184526,
+   "replicas": 1,
+   "cpu": 0.5,
+   "next": [
+    2,
+    1.0
+   ],
+   "acts": [
+    [
+     "scale",
+     2,
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-66b68b65f5-7mlpx",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-66b68b65f5-s88n6",
+     200
+    ]
+   ],
+   "index": 0.013370153094861528,
+   "perknob_fits": true,
+   "loss": 0.0010900838901394853
+  },
+  {
+   "event": "decision",
+   "t": 1794802313.0986705,
+   "rate_rps": 11.036478105741168,
+   "replicas": 2,
+   "cpu": 1.0,
+   "next": [
+    1,
+    1.0
+   ],
+   "acts": [
+    [
+     "scale",
+     1,
+     200
+    ]
+   ],
+   "index": 0.02132489760396514,
+   "perknob_fits": true,
+   "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794802343.0985413,
+   "rate_rps": 17.081366509320745,
+   "replicas": 1,
+   "cpu": 1.0,
+   "next": [
+    2,
+    2.0
+   ],
+   "acts": [
+    [
+     "scale",
+     2,
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-66b68b65f5-s88n6",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-66b68b65f5-86lqf",
+     200
+    ]
+   ],
+   "index": 0.02191767185150919,
+   "perknob_fits": true,
+   "loss": 0.0023694623951223607
+  },
+  {
+   "event": "decision",
+   "t": 1794802373.0985327,
+   "rate_rps": 34.16346243449738,
+   "replicas": 2,
+   "cpu": 2.0,
+   "next": [
+    2,
+    2.0
    ],
    "acts": [],
-   "index": 0.0005479166666666668,
+   "index": 0.0051996709295089455,
+   "perknob_fits": true,
+   "loss": 0.022386509554454707
+  },
+  {
+   "event": "decision",
+   "t": 1794802403.0985904,
+   "rate_rps": 30.68185932493704,
+   "replicas": 2,
+   "cpu": 2.0,
+   "next": [
+    2,
+    2.0
+   ],
+   "acts": [],
+   "index": 0.0003407092479127162,
+   "perknob_fits": true,
+   "loss": 0.012567100899552586
+  },
+  {
+   "event": "decision",
+   "t": 1794802433.0985382,
+   "rate_rps": 30.241833723272922,
+   "replicas": 2,
+   "cpu": 2.0,
+   "next": [
+    2,
+    2.0
+   ],
+   "acts": [],
+   "index": 0.003810035215096711,
+   "perknob_fits": true,
+   "loss": 0.01152426832292498
+  },
+  {
+   "event": "decision",
+   "t": 1794802463.0985355,
+   "rate_rps": 30.16179691911254,
+   "replicas": 2,
+   "cpu": 2.0,
+   "next": [
+    2,
+    2.0
+   ],
+   "acts": [],
+   "index": 0.00439046308955322,
+   "perknob_fits": true,
+   "loss": 0.011340664780948076
+  },
+  {
+   "event": "decision",
+   "t": 1794802493.0987592,
+   "rate_rps": 30.44303711516988,
+   "replicas": 2,
+   "cpu": 2.0,
+   "next": [
+    2,
+    2.0
+   ],
+   "acts": [],
+   "index": 0.00047945791642853286,
+   "perknob_fits": true,
+   "loss": 0.011994130181302494
+  },
+  {
+   "event": "decision",
+   "t": 1794802523.098565,
+   "rate_rps": 10.12059523904278,
+   "replicas": 2,
+   "cpu": 2.0,
+   "next": [
+    1,
+    1.0
+   ],
+   "acts": [
+    [
+     "scale",
+     1,
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-66b68b65f5-86lqf",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-66b68b65f5-s88n6",
+     200
+    ]
+   ],
+   "index": 0.0011733795082901734,
+   "perknob_fits": true,
+   "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794802553.098506,
+   "rate_rps": 10.08080646451716,
+   "replicas": 1,
+   "cpu": 1.0,
+   "next": [
+    1,
+    1.0
+   ],
+   "acts": [],
+   "index": 0.019510962516972246,
+   "perknob_fits": true,
+   "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794802583.0986078,
+   "rate_rps": 10.16040641625665,
+   "replicas": 1,
+   "cpu": 1.0,
+   "next": [
+    1,
+    1.0
+   ],
+   "acts": [],
+   "index": 0.019721369970949365,
+   "perknob_fits": true,
+   "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794802613.0987246,
+   "rate_rps": 10.120000000000001,
+   "replicas": 1,
+   "cpu": 1.0,
+   "next": [
+    1,
+    1.0
+   ],
+   "acts": [],
+   "index": 0.019614698254596538,
    "perknob_fits": true,
    "loss": 0.0
   }
  ],
- "problems": [
-  "k6 job failed",
-  "no k6 summary (ValueError: substring not found)",
-  "k6 sent no request",
-  "the service never grew: no pod added and none resized under three times the base rate",
-  "2 planner decisions, fewer than 6",
-  "the planner read no rate near the load from Prometheus (at most 0.00/s, base 10.15/s)"
- ]
+ "problems": []
 }

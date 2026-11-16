@@ -8,27 +8,39 @@
   "sigma": 0.0,
   "seed": 0
  },
- "start_unix": 1794801380.9901786,
- "end_unix": 1794801391.6998916,
- "k6_job": "failed",
- "k6": null,
- "k6_error": "ValueError: substring not found",
+ "start_unix": 1794801753.535447,
+ "end_unix": 1794802183.6239033,
+ "k6_job": "succeeded",
+ "k6": {
+  "requests": 7916,
+  "dropped": 258,
+  "on_time": 5047,
+  "attainment": 0.6375694795351188,
+  "latency_ms": {
+   "avg": 2136.0056946551313,
+   "med": 94.258072,
+   "p(95)": 11372.824414399998,
+   "p(99)": 17318.793383500008,
+   "max": 24482.52087
+  }
+ },
+ "k6_error": "",
  "power": {
   "start": true,
   "end": true
  },
  "watch": {
-  "cost": 0.0003759028981129329,
-  "resizes": 1,
-  "reversals": 0,
-  "max_replicas": 2,
-  "polls": 2,
-  "max_gap_s": 10.29087781906128
+  "cost": 0.034539464641089236,
+  "resizes": 12,
+  "reversals": 2,
+  "max_replicas": 5,
+  "polls": 43,
+  "max_gap_s": 10.327671766281128
  },
  "decisions": [
   {
    "event": "decision",
-   "t": 1794801383.3474283,
+   "t": 1794801755.723072,
    "rate_rps": 0.0,
    "replicas": 2,
    "cpu": 0.5,
@@ -44,25 +56,349 @@
     ],
     [
      "resize",
-     "cpuburn-5647568bdb-9txz4",
+     "cpuburn-7588fc7f46-7fmgz",
      200
     ],
     [
      "resize",
-     "cpuburn-5647568bdb-wl6p6",
+     "cpuburn-7588fc7f46-kj7kv",
      200
     ]
    ],
    "index": 0.0016437500000000002,
    "perknob_fits": true,
    "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794801785.7232716,
+   "rate_rps": 2.0359494336659485,
+   "replicas": 1,
+   "cpu": 0.25,
+   "next": [
+    1,
+    0.5
+   ],
+   "acts": [
+    [
+     "resize",
+     "cpuburn-7588fc7f46-7fmgz",
+     200
+    ]
+   ],
+   "index": 0.0028232687275753245,
+   "perknob_fits": true,
+   "loss": 0.0010883247713311143
+  },
+  {
+   "event": "decision",
+   "t": 1794801815.723227,
+   "rate_rps": 7.320878505420651,
+   "replicas": 1,
+   "cpu": 0.5,
+   "next": [
+    1,
+    1.0
+   ],
+   "acts": [
+    [
+     "resize",
+     "cpuburn-7588fc7f46-7fmgz",
+     200
+    ]
+   ],
+   "index": 0.011699670489408818,
+   "perknob_fits": true,
+   "loss": 0.0010944117215324004
+  },
+  {
+   "event": "decision",
+   "t": 1794801845.72317,
+   "rate_rps": 13.881110488839106,
+   "replicas": 1,
+   "cpu": 1.0,
+   "next": [
+    1,
+    2.0
+   ],
+   "acts": [
+    [
+     "resize",
+     "cpuburn-7588fc7f46-7fmgz",
+     200
+    ]
+   ],
+   "index": 0.026982039932268744,
+   "perknob_fits": true,
+   "loss": 0.0022608473298688825
+  },
+  {
+   "event": "decision",
+   "t": 1794801875.723179,
+   "rate_rps": 10.120809664773182,
+   "replicas": 1,
+   "cpu": 2.0,
+   "next": [
+    1,
+    1.0
+   ],
+   "acts": [
+    [
+     "resize",
+     "cpuburn-7588fc7f46-7fmgz",
+     200
+    ]
+   ],
+   "index": 0.0011733967205519317,
+   "perknob_fits": true,
+   "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794801905.723166,
+   "rate_rps": 17.360694427777112,
+   "replicas": 1,
+   "cpu": 1.0,
+   "next": [
+    1,
+    2.0
+   ],
+   "acts": [
+    [
+     "resize",
+     "cpuburn-7588fc7f46-7fmgz",
+     200
+    ]
+   ],
+   "index": 0.020991200704041188,
+   "perknob_fits": true,
+   "loss": 0.002379486366772336
+  },
+  {
+   "event": "decision",
+   "t": 1794801935.7231152,
+   "rate_rps": 37.883030642451395,
+   "replicas": 1,
+   "cpu": 2.0,
+   "next": [
+    3,
+    1.0
+   ],
+   "acts": [
+    [
+     "resize",
+     "cpuburn-7588fc7f46-7fmgz",
+     200
+    ],
+    [
+     "scale",
+     3,
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-7588fc7f46-bx9kd",
+     200
+    ]
+   ],
+   "index": 0.012781151458902996,
+   "perknob_fits": true,
+   "loss": 0.0025101549474880816
+  },
+  {
+   "event": "decision",
+   "t": 1794801965.72321,
+   "rate_rps": 28.537910811931617,
+   "replicas": 3,
+   "cpu": 1.0,
+   "next": [
+    4,
+    1.0
+   ],
+   "acts": [
+    [
+     "scale",
+     4,
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-7588fc7f46-7bhhd",
+     200
+    ]
+   ],
+   "index": 0.03687435224023316,
+   "perknob_fits": true,
+   "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794801995.7233443,
+   "rate_rps": 29.71819646119178,
+   "replicas": 4,
+   "cpu": 1.0,
+   "next": [
+    4,
+    1.0
+   ],
+   "acts": [],
+   "index": 0.02335397737202192,
+   "perknob_fits": true,
+   "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794802025.7235072,
+   "rate_rps": 30.081526486917543,
+   "replicas": 4,
+   "cpu": 1.0,
+   "next": [
+    5,
+    1.0
+   ],
+   "acts": [
+    [
+     "scale",
+     5,
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-7588fc7f46-wdxmn",
+     200
+    ]
+   ],
+   "index": 0.024221292549909873,
+   "perknob_fits": true,
+   "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794802055.7231672,
+   "rate_rps": 29.725674259615044,
+   "replicas": 5,
+   "cpu": 1.0,
+   "next": [
+    5,
+    1.0
+   ],
+   "acts": [],
+   "index": 0.005921839349277501,
+   "perknob_fits": true,
+   "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794802085.7231662,
+   "rate_rps": 10.240982504715772,
+   "replicas": 5,
+   "cpu": 1.0,
+   "next": [
+    3,
+    0.5
+   ],
+   "acts": [
+    [
+     "scale",
+     3,
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-7588fc7f46-7bhhd",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-7588fc7f46-7fmgz",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-7588fc7f46-bx9kd",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-7588fc7f46-d7qpm",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-7588fc7f46-wdxmn",
+     200
+    ]
+   ],
+   "index": 0.0014704216386058865,
+   "perknob_fits": true,
+   "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794802115.7231665,
+   "rate_rps": 10.080558434754384,
+   "replicas": 3,
+   "cpu": 0.5,
+   "next": [
+    1,
+    1.0
+   ],
+   "acts": [
+    [
+     "scale",
+     1,
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-7588fc7f46-7fmgz",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-7588fc7f46-bx9kd",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-7588fc7f46-d7qpm",
+     200
+    ]
+   ],
+   "index": 0.019765478424026716,
+   "perknob_fits": true,
+   "loss": 0.0016052732138942725
+  },
+  {
+   "event": "decision",
+   "t": 1794802145.7231765,
+   "rate_rps": 10.160812865029202,
+   "replicas": 1,
+   "cpu": 1.0,
+   "next": [
+    1,
+    1.0
+   ],
+   "acts": [],
+   "index": 0.019722441541337964,
+   "perknob_fits": true,
+   "loss": 0.0
+  },
+  {
+   "event": "decision",
+   "t": 1794802175.7231767,
+   "rate_rps": 10.120404816192647,
+   "replicas": 1,
+   "cpu": 1.0,
+   "next": [
+    1,
+    1.0
+   ],
+   "acts": [],
+   "index": 0.019615768351118543,
+   "perknob_fits": true,
+   "loss": 0.0
   }
  ],
- "problems": [
-  "k6 job failed",
-  "no k6 summary (ValueError: substring not found)",
-  "k6 sent no request",
-  "1 planner decisions, fewer than 6",
-  "the planner read no rate near the load from Prometheus (at most 0.00/s, base 10.15/s)"
- ]
+ "problems": []
 }

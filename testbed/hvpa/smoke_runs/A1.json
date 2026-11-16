@@ -8,40 +8,109 @@
   "sigma": 0.0,
   "seed": 0
  },
- "start_unix": 1794801427.9159045,
- "end_unix": 1794801438.5565813,
- "k6_job": "failed",
- "k6": null,
- "k6_error": "ValueError: substring not found",
+ "start_unix": 1794802628.683015,
+ "end_unix": 1794803057.5278916,
+ "k6_job": "succeeded",
+ "k6": {
+  "requests": 7916,
+  "dropped": 3508,
+  "on_time": 1323,
+  "attainment": 0.16712986356745832,
+  "latency_ms": {
+   "avg": 16245.80759308236,
+   "med": 6965.0864385,
+   "p(95)": 47482.891950850004,
+   "p(99)": 54191.24033861003,
+   "max": 59997.531861
+  }
+ },
+ "k6_error": "",
  "power": {
   "start": true,
   "end": true
  },
  "watch": {
-  "cost": 0.000186529725342989,
-  "resizes": 0,
-  "reversals": 0,
-  "max_replicas": 2,
-  "polls": 2,
-  "max_gap_s": 10.213034391403198
+  "cost": 0.024497231073023814,
+  "resizes": 1,
+  "reversals": 1,
+  "max_replicas": 8,
+  "polls": 43,
+  "max_gap_s": 10.23386263847351
  },
  "objects": {
   "hpa": [
    {
-    "currentMetrics": null,
-    "desiredReplicas": 0
+    "conditions": [
+     {
+      "lastTransitionTime": "2026-11-16T04:17:23Z",
+      "message": "recent recommendations were higher than current one, applying the highest recent recommendation",
+      "reason": "ScaleDownStabilized",
+      "status": "True",
+      "type": "AbleToScale"
+     },
+     {
+      "lastTransitionTime": "2026-11-16T04:22:08Z",
+      "message": "the HPA was able to successfully calculate a replica count from cpu resource utilization (percentage of request)",
+      "reason": "ValidMetricFound",
+      "status": "True",
+      "type": "ScalingActive"
+     },
+     {
+      "lastTransitionTime": "2026-11-16T04:22:53Z",
+      "message": "the desired replica count is more than the maximum replica count",
+      "reason": "TooManyReplicas",
+      "status": "True",
+      "type": "ScalingLimited"
+     }
+    ],
+    "currentMetrics": [
+     {
+      "resource": {
+       "current": {
+        "averageUtilization": 11,
+        "averageValue": "65m"
+       },
+       "name": "cpu"
+      },
+      "type": "Resource"
+     }
+    ],
+    "currentReplicas": 8,
+    "desiredReplicas": 8,
+    "lastScaleTime": "2026-11-16T04:22:53Z"
    }
   ],
   "vpa": [
-   {}
+   {
+    "conditions": [
+     {
+      "lastTransitionTime": "2026-11-16T04:18:22Z",
+      "status": "True",
+      "type": "RecommendationProvided"
+     }
+    ],
+    "observedGeneration": 1,
+    "recommendation": {
+     "containerRecommendations": [
+      {
+       "containerName": "cpuburn",
+       "lowerBound": {
+        "cpu": "250m"
+       },
+       "target": {
+        "cpu": "587m"
+       },
+       "uncappedTarget": {
+        "cpu": "587m"
+       },
+       "upperBound": {
+        "cpu": "2"
+       }
+      }
+     ]
+    }
+   }
   ]
  },
- "problems": [
-  "k6 job failed",
-  "no k6 summary (ValueError: substring not found)",
-  "k6 sent no request",
-  "the service never grew: no pod added and none resized under three times the base rate",
-  "the HPA read no CPU utilisation (metrics-server)",
-  "the VPA had no recommendation by the run's end"
- ]
+ "problems": []
 }
