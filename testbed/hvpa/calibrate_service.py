@@ -39,6 +39,7 @@ RMAX = 8                       # research/hvpa/lattice.py
 JOB_TIMEOUT_S, JOB_POLL_S = 5400.0, 10.0
 PYTHON_IMAGE = "docker.io/library/python:3.13.17-slim-bookworm"
 sys.path.insert(0, str(HERE / "measure"))
+sys.path.insert(1, str(TESTBED / "measure"))  # load_curve.py, which cpu_curve imports (the Job mounts both)
 
 import cpu_curve  # noqa: E402
 

@@ -136,3 +136,17 @@ def test_wp11b_is_prepared_only_with_its_inputs_committed_unchanged_and_every_sc
     assert after_wp11.wp11b_prepared(schedules, repo)
     (val / "predictions_v2.json").write_text('{"changed": 1}')
     assert not after_wp11.wp11b_prepared(schedules, repo)            # predictions differ from the commit
+
+
+def test_a_chain_stopped_in_wp17_resumes_there_alone(tmp_path, monkeypatch):
+    monkeypatch.setattr(after_wp11, "LOG", tmp_path / "log.txt")
+    calls = []
+    monkeypatch.setattr(after_wp11, "main", lambda: calls.append("main") or 0)
+    monkeypatch.setattr(after_wp11, "wp17", lambda py, kc: calls.append(("wp17", kc)) or 0)
+    assert after_wp11.resume_wp17() == 0
+    assert calls == [("wp17", ["kubectl", "--context", after_wp11.CONTEXT])]
+    assert [line[20:] for line in (tmp_path / "log.txt").read_text().splitlines()] == [
+        "resumed at WP17 (steps 6-10)", "done"]
+    monkeypatch.setattr(after_wp11, "wp17", lambda py, kc: 3)
+    assert after_wp11.resume_wp17() == 3
+    assert (tmp_path / "log.txt").read_text().splitlines()[-1].endswith("resumed at WP17 (steps 6-10)")

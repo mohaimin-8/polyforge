@@ -46,7 +46,8 @@ The live pilots are not started here: their regimes and arms come from the
 predictions, and a person reads those first. Log:
 testbed/out/hvpa/after_wp11.log.
 
-    python after_wp11.py      # detached, under tools/keepawake.py
+    python after_wp11.py                # detached, under tools/keepawake.py
+    python after_wp11.py --wp17-only    # steps 6-10 alone, after a stop in them
 """
 
 from __future__ import annotations
@@ -278,5 +279,15 @@ def wp11b(py: str) -> None:
            "results(testbed): WP11b scored, the revised simulator against the testbed on new cells")
 
 
+def resume_wp17() -> int:
+    """Steps 6-10 alone, after the chain stopped in them: each step is idempotent
+    or resumes (images and objects re-applied, measured levels kept)."""
+    log("resumed at WP17 (steps 6-10)")
+    rc = wp17(sys.executable, ["kubectl", "--context", CONTEXT])
+    if not rc:
+        log("done")
+    return rc
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(resume_wp17() if sys.argv[1:] == ["--wp17-only"] else main())
