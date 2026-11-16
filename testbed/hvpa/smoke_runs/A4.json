@@ -1,0 +1,68 @@
+{
+ "arm": "A4",
+ "target": 2.0,
+ "regime": {
+  "step_s": 10.0,
+  "slo_s": 0.5188897673360771,
+  "shape": "smoke",
+  "sigma": 0.0,
+  "seed": 0
+ },
+ "start_unix": 1794801380.9901786,
+ "end_unix": 1794801391.6998916,
+ "k6_job": "failed",
+ "k6": null,
+ "k6_error": "ValueError: substring not found",
+ "power": {
+  "start": true,
+  "end": true
+ },
+ "watch": {
+  "cost": 0.0003759028981129329,
+  "resizes": 1,
+  "reversals": 0,
+  "max_replicas": 2,
+  "polls": 2,
+  "max_gap_s": 10.29087781906128
+ },
+ "decisions": [
+  {
+   "event": "decision",
+   "t": 1794801383.3474283,
+   "rate_rps": 0.0,
+   "replicas": 2,
+   "cpu": 0.5,
+   "next": [
+    1,
+    0.25
+   ],
+   "acts": [
+    [
+     "scale",
+     1,
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-5647568bdb-9txz4",
+     200
+    ],
+    [
+     "resize",
+     "cpuburn-5647568bdb-wl6p6",
+     200
+    ]
+   ],
+   "index": 0.0016437500000000002,
+   "perknob_fits": true,
+   "loss": 0.0
+  }
+ ],
+ "problems": [
+  "k6 job failed",
+  "no k6 summary (ValueError: substring not found)",
+  "k6 sent no request",
+  "1 planner decisions, fewer than 6",
+  "the planner read no rate near the load from Prometheus (at most 0.00/s, base 10.15/s)"
+ ]
+}

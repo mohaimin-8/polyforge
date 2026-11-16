@@ -1,0 +1,47 @@
+{
+ "arm": "A1",
+ "target": 0.2,
+ "regime": {
+  "step_s": 10.0,
+  "slo_s": 0.5188897673360771,
+  "shape": "smoke",
+  "sigma": 0.0,
+  "seed": 0
+ },
+ "start_unix": 1794801427.9159045,
+ "end_unix": 1794801438.5565813,
+ "k6_job": "failed",
+ "k6": null,
+ "k6_error": "ValueError: substring not found",
+ "power": {
+  "start": true,
+  "end": true
+ },
+ "watch": {
+  "cost": 0.000186529725342989,
+  "resizes": 0,
+  "reversals": 0,
+  "max_replicas": 2,
+  "polls": 2,
+  "max_gap_s": 10.213034391403198
+ },
+ "objects": {
+  "hpa": [
+   {
+    "currentMetrics": null,
+    "desiredReplicas": 0
+   }
+  ],
+  "vpa": [
+   {}
+  ]
+ },
+ "problems": [
+  "k6 job failed",
+  "no k6 summary (ValueError: substring not found)",
+  "k6 sent no request",
+  "the service never grew: no pod added and none resized under three times the base rate",
+  "the HPA read no CPU utilisation (metrics-server)",
+  "the VPA had no recommendation by the run's end"
+ ]
+}
