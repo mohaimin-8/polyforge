@@ -1,0 +1,56 @@
+{
+ "allocatable": 8.0,
+ "requested_by_others": 1.4500000000000002,
+ "reserved_for_load_and_planner": 1.25,
+ "node_cpu": 5.3,
+ "others": [
+  {
+   "pod": "keda/keda-admission-67b4d7dd76-45nm7",
+   "cpu": 0.1
+  },
+  {
+   "pod": "keda/keda-metrics-apiserver-994f49bf6-6gxf2",
+   "cpu": 0.1
+  },
+  {
+   "pod": "keda/keda-operator-579f8ccf86-hd88j",
+   "cpu": 0.1
+  },
+  {
+   "pod": "kube-system/coredns-589f44dc88-5wsjj",
+   "cpu": 0.1
+  },
+  {
+   "pod": "kube-system/coredns-589f44dc88-lnndt",
+   "cpu": 0.1
+  },
+  {
+   "pod": "kube-system/etcd-polyforge-testbed-control-plane",
+   "cpu": 0.1
+  },
+  {
+   "pod": "kube-system/kindnet-fjthw",
+   "cpu": 0.1
+  },
+  {
+   "pod": "kube-system/kube-apiserver-polyforge-testbed-control-plane",
+   "cpu": 0.25
+  },
+  {
+   "pod": "kube-system/kube-controller-manager-polyforge-testbed-control-plane",
+   "cpu": 0.2
+  },
+  {
+   "pod": "kube-system/kube-scheduler-polyforge-testbed-control-plane",
+   "cpu": 0.1
+  },
+  {
+   "pod": "kube-system/metrics-server-6cdc5dfb94-g8r27",
+   "cpu": 0.1
+  },
+  {
+   "pod": "pf-hvpa/prometheus-6c4d45b648-mdt4g",
+   "cpu": 0.1
+  }
+ ]
+}

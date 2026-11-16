@@ -1,0 +1,28 @@
+{
+  "started": "2026-11-16T03:30:22+0000",
+  "tier": null,
+  "replicas": 2,
+  "base_url": "http://cpuburn.pf-hvpa",
+  "slots": 4,
+  "threads": null,
+  "n_predict": 48,
+  "seed": 20261112,
+  "quick": false,
+  "phases": "capacity",
+  "capacity_workers": 16,
+  "capacity_seconds": 90.0,
+  "host": {
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "processor": "",
+    "python": "3.13.17"
+  },
+  "cluster": {},
+  "protocol": "WP2 protocol on GET /work (WP17 step 3)",
+  "mu_pre_rps": 28.087871946351704,
+  "mu_post_rps": 28.087871946351704,
+  "failed_requests": 0,
+  "finished": "2026-11-16T03:31:54+0000",
+  "service": "cpuburn",
+  "cpu": 1.0,
+  "generator_cpu_cores": 0.027916158024515275
+}
