@@ -55,3 +55,23 @@ def test_abba_order_and_quantities():
     assert live.cpu_cores("250m") == 0.25 and live.cpu_cores("2") == 2.0
     assert math.isnan(live.parse_k6(f"{live.BEGIN}\n" + json.dumps({"metrics": {"wp17_on_time": {"values": {}}}})
                                     + f"\n{live.END}")["attainment"])
+
+
+@pytest.mark.skipif(not __import__("shutil").which("k6"), reason="k6 is not on PATH")
+def test_k6_loads_the_script_on_the_twins_fractional_rates(tmp_path):
+    """k6 takes whole iterations per timeUnit; the twin's rates are fractional per second
+    (the first smoke's k6 Jobs failed to load the script on 10.1517 requests/s)."""
+    import os
+    import subprocess
+
+    rates = [10.1517, 30.4551, 2.0049]
+    sched = tmp_path / "schedule.json"
+    sched.write_text(json.dumps({"step_s": 10.0, "rates": rates, "slo_s": 0.5}), encoding="utf-8")
+    proc = subprocess.run(["k6", "inspect", "--execution-requirements", "-e", f"SCHEDULE={sched}",
+                           str(live.HERE / "load" / "rate.js")], capture_output=True, text=True, timeout=60,
+                          env={**os.environ, "K6_NO_USAGE_REPORT": "true"})
+    assert proc.returncode == 0, proc.stderr.strip()[-300:]
+    sc = json.loads(proc.stdout)["scenarios"]["wp17"]
+    per_minute = [round(r * 60) for r in rates]
+    assert sc["timeUnit"] == "1m0s" and sc["startRate"] == per_minute[0]
+    assert [s["target"] for s in sc["stages"]] == [t for t in per_minute for _ in (0, 1)]

@@ -2,7 +2,9 @@
 // of rates, one rate per step (research/hvpa/workloads.py), run in the cluster
 // (kind maps no host port for the service). k6's ramping-arrival-rate moves
 // linearly within a stage, so each step is a 0 s stage (a jump) and a held
-// stage: the twin's piecewise-constant rate.
+// stage: the twin's piecewise-constant rate. k6 takes whole iterations per
+// timeUnit, so the rates go in per minute (to 1/60 request/s, under 1 % at
+// the twin's lowest rates); k6 spaces the starts evenly either way.
 //
 // A new connection per request (noConnectionReuse): kube-proxy balances per
 // connection, and kept-alive connections would never reach pods added by a
@@ -20,10 +22,12 @@ const TARGET = __ENV.TARGET || 'http://cpuburn.pf-hvpa/work';
 const latency = new Trend('wp17_latency', true);
 const onTime = new Rate('wp17_on_time');
 
+const perMinute = (r) => Math.round(r * 60);
+
 const stages = [];
 for (const r of S.rates) {
-  stages.push({ target: r, duration: '0s' });
-  stages.push({ target: r, duration: `${S.step_s}s` });
+  stages.push({ target: perMinute(r), duration: '0s' });
+  stages.push({ target: perMinute(r), duration: `${S.step_s}s` });
 }
 
 export const options = {
@@ -32,8 +36,8 @@ export const options = {
   scenarios: {
     wp17: {
       executor: 'ramping-arrival-rate',
-      startRate: S.rates[0],
-      timeUnit: '1s',
+      startRate: perMinute(S.rates[0]),
+      timeUnit: '1m',
       preAllocatedVUs: S.preallocated_vus || 50,
       maxVUs: S.max_vus || 400,
       stages,
