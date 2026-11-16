@@ -63,3 +63,16 @@ def test_a_real_planner_log_has_no_theorem1_violation(tmp_path):
     rows, summary = index_probe.run_log(out)
     assert summary["decisions"] == len(rows) > 0
     assert summary["theorem1_violations"] == 0 and summary["incompletely_logged"] == 0
+
+
+def test_a_kubernetes_planner_log_gives_the_planners_own_index(tmp_path):
+    """Worked example 3: the WP17 twin's joint planner on the calibrated plant."""
+    out = tmp_path / "k8s.jsonl"
+    subprocess.run([sys.executable, str(HERE / "examples" / "kubernetes_log.py"), "--minutes", "10", "--out", str(out)],
+                   check=True, capture_output=True, timeout=600)
+    logged = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines() if line.strip()]
+    rows, summary = index_probe.run_log(out)
+    assert summary["decisions"] == len(rows) == len(logged) == 20        # one per 30 s in 10 minutes
+    assert summary["theorem1_violations"] == 0 and summary["incompletely_logged"] == 0
+    for row, d in zip(rows, logged):
+        assert row["index"] == pytest.approx(d["planner_index"], abs=1e-12)

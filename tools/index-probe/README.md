@@ -72,10 +72,35 @@ $ python gateway_log.py --steps 10 && python ../index_probe.py log gateway_log.j
   per-knob and joint disagree on 6.8%; repair 0%; Theorem 1 checked 88, violated 0
 ```
 
-**Not yet covered** (the plan asks for three systems): the fused routing
-decision (RouteBalance, WP15) and the Kubernetes HPA + VPA pair (WP17) do
-not exist in this repository yet; each needs a logger that writes the
-format above.
+**RouteBalance's fused routing decision** (WP15, exploratory):
+`research/external/routebalance/rb_model.py` writes each fused decision in
+the format above, and `analyse.py` passes every 7th decision of every run
+through this tool's log mode (`index_probe.run_log`). It needs RouteBalance's
+published labels, which are not shipped here (that folder's README says how
+to fetch them).
+
+```text
+$ cd research/external/routebalance && python -I analyse.py report
+  log mode on every 7th fused decision of every run: 24,240 decisions;
+  Theorem 1 checked 24,088, violated 0; largest difference from analyse.py's own index 0.0e+00
+```
+
+**The Kubernetes HPA + VPA pair's planners** (`kubernetes_log.py`, WP17):
+the twin of the horizontal-with-vertical system on its calibrated plant
+(`research/hvpa/calibration.json`), with the joint planner (A4) at width 2 on
+one of the twin's own draws (step_up, volatility 0.2). Every decision is
+logged with its whole (replicas, CPU) box.
+
+```text
+$ python kubernetes_log.py && python ../index_probe.py log kubernetes_log.jsonl
+  120 decisions; index mean 0.0185, median 0.0185, max 0.0383; loss mean 8.36e-05, max 0.00227;
+  per-knob and joint disagree on 3.4%; repair 2%; Theorem 1 checked 116, violated 0
+```
+
+At every decision the tool's index equals the planner's own (`lattice.decide`,
+which the planner pod in the cluster runs too); the tests check this. The
+one-step loss is far below the index here: the bound holds but is loose on
+this plant.
 
 ## Tests
 

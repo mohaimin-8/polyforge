@@ -1,3 +1,4 @@
 gateway_log.jsonl
 tight_box.json
 __pycache__/
+kubernetes_log.jsonl
