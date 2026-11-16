@@ -8,20 +8,20 @@
   "sigma": 0.0,
   "seed": 0
  },
- "start_unix": 1794802628.683015,
- "end_unix": 1794803057.5278916,
+ "start_unix": 1794804988.8999481,
+ "end_unix": 1794805419.3475013,
  "k6_job": "succeeded",
  "k6": {
   "requests": 7916,
-  "dropped": 3508,
-  "on_time": 1323,
-  "attainment": 0.16712986356745832,
+  "dropped": 93,
+  "on_time": 5731,
+  "attainment": 0.7239767559373421,
   "latency_ms": {
-   "avg": 16245.80759308236,
-   "med": 6965.0864385,
-   "p(95)": 47482.891950850004,
-   "p(99)": 54191.24033861003,
-   "max": 59997.531861
+   "avg": 1852.456869094725,
+   "med": 156.085215,
+   "p(95)": 11182.943293499997,
+   "p(99)": 15750.45005708,
+   "max": 22961.468344
   }
  },
  "k6_error": "",
@@ -30,33 +30,33 @@
   "end": true
  },
  "watch": {
-  "cost": 0.024497231073023814,
-  "resizes": 1,
+  "cost": 0.045841364555938395,
+  "resizes": 3,
   "reversals": 1,
   "max_replicas": 8,
   "polls": 43,
-  "max_gap_s": 10.23386263847351
+  "max_gap_s": 10.361881256103516
  },
  "objects": {
   "hpa": [
    {
     "conditions": [
      {
-      "lastTransitionTime": "2026-11-16T04:17:23Z",
+      "lastTransitionTime": "2026-11-16T04:56:43Z",
       "message": "recent recommendations were higher than current one, applying the highest recent recommendation",
       "reason": "ScaleDownStabilized",
       "status": "True",
       "type": "AbleToScale"
      },
      {
-      "lastTransitionTime": "2026-11-16T04:22:08Z",
+      "lastTransitionTime": "2026-11-16T04:56:58Z",
       "message": "the HPA was able to successfully calculate a replica count from cpu resource utilization (percentage of request)",
       "reason": "ValidMetricFound",
       "status": "True",
       "type": "ScalingActive"
      },
      {
-      "lastTransitionTime": "2026-11-16T04:22:53Z",
+      "lastTransitionTime": "2026-11-16T04:58:43Z",
       "message": "the desired replica count is more than the maximum replica count",
       "reason": "TooManyReplicas",
       "status": "True",
@@ -67,8 +67,8 @@
      {
       "resource": {
        "current": {
-        "averageUtilization": 11,
-        "averageValue": "65m"
+        "averageUtilization": 17,
+        "averageValue": "69m"
        },
        "name": "cpu"
       },
@@ -77,14 +77,14 @@
     ],
     "currentReplicas": 8,
     "desiredReplicas": 8,
-    "lastScaleTime": "2026-11-16T04:22:53Z"
+    "lastScaleTime": "2026-11-16T04:58:43Z"
    }
   ],
   "vpa": [
    {
     "conditions": [
      {
-      "lastTransitionTime": "2026-11-16T04:18:22Z",
+      "lastTransitionTime": "2026-11-16T04:57:41Z",
       "status": "True",
       "type": "RecommendationProvided"
      }
@@ -98,10 +98,10 @@
         "cpu": "250m"
        },
        "target": {
-        "cpu": "587m"
+        "cpu": "350m"
        },
        "uncappedTarget": {
-        "cpu": "587m"
+        "cpu": "350m"
        },
        "upperBound": {
         "cpu": "2"
