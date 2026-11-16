@@ -1,0 +1,125 @@
+# WP13 step 5 (programme 2): the confirmatory simulation campaign, run from the frozen
+# commit C with the drand round the registered protocol names as its only input.
+# Start it by hand on C (Actions > confirmatory > Run workflow, "Use workflow from" C's
+# branch or tag) once that round is due. The procedure allows one run; every run stays
+# in the repository's Actions history, so a second one cannot be hidden.
+#
+#   draw   fetch the round from two agreeing relays, derive the master seed (draw.json)
+#   run    one job per shard of research/registration/campaign.json, each under 6 hours
+#   score  the frozen scorer on every shard's output, then SHA256SUMS over all of it;
+#          the hashes go to the run summary, everything to the "confirmatory" artifact
+#
+# The logic, and every refusal, is in research/registration/confirm.py.
+name: confirmatory
+
+on:
+  workflow_dispatch:
+    inputs:
+      round:
+        description: "drand quicknet round named by the registered protocol"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: confirmatory
+  cancel-in-progress: false
+
+env:
+  PYTHONHASHSEED: "0"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  draw:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      shards: ${{ steps.shards.outputs.list }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Fetch the named round from two relays and derive the master seed
+        env:
+          ROUND: ${{ inputs.round }}
+        run: python research/registration/confirm.py draw --round "$ROUND" --out draw
+      - id: shards
+        name: The shards the manifest fixes
+        run: |
+          list=$(python research/registration/confirm.py shards)
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: draw
+          path: draw/draw.json
+          if-no-files-found: error
+          retention-days: 90
+
+  run:
+    needs: draw
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.draw.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install the pinned dependencies
+        run: pip install -r eval/requirements-reproduce.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: draw
+          path: draw
+      - name: Run this shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python research/registration/confirm.py run --draw draw/draw.json --shard "$SHARD" --out "shard-$SHARD"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shard-${{ matrix.shard }}
+          path: shard-${{ matrix.shard }}
+          if-no-files-found: warn
+          retention-days: 90
+
+  score:
+    needs: run
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install the pinned dependencies
+        run: pip install -r eval/requirements-reproduce.txt
+      - uses: actions/download-artifact@v4
+        with:
+          path: results
+      - name: Score every shard with the frozen scorer
+        run: python research/registration/confirm.py score --draw results/draw/draw.json --results results --out results/score
+      - name: Seal the results and publish the hashes
+        env:
+          ROUND: ${{ inputs.round }}
+        run: |
+          python research/registration/confirm.py seal results
+          {
+            echo "## Confirmatory campaign: round ${ROUND}, commit ${GITHUB_SHA}"
+            echo
+            echo '```'
+            cat results/SHA256SUMS
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: confirmatory
+          path: results
+          if-no-files-found: error
+          retention-days: 90
