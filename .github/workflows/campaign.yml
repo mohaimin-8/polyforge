@@ -11,7 +11,7 @@
 # Back on the laptop: gh run download <id> -n outputs -D <dir>, then
 # python research/offload.py collect <campaign> --artifact <dir> --run-url <url>.
 #
-# offload/reproduce instead runs scripts/reproduce_programme2.py once (the queue's last
+# offload/reproduce* instead runs scripts/reproduce_programme2.py once (the queue's last
 # step): every programme-2 report rebuilt from the committed data; its log and any drift
 # (git status, git diff) go to the "reproduce" artifact. Nothing is committed.
 name: campaign
@@ -33,11 +33,13 @@ env:
 
 jobs:
   reproduce:
-    if: github.ref_name == 'offload/reproduce'
+    if: startsWith(github.ref_name, 'offload/reproduce')
     runs-on: ubuntu-24.04
     timeout-minutes: 355
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # steps that name a commit (WP12's plans) read the history
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -63,7 +65,7 @@ jobs:
           retention-days: 30
 
   plan:
-    if: github.ref_name != 'offload/reproduce'
+    if: "!startsWith(github.ref_name, 'offload/reproduce')"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
@@ -86,7 +88,7 @@ jobs:
           echo "n=$(python -c 'import json, sys; print(len(json.loads(sys.argv[1])))' "$list")" >> "$GITHUB_OUTPUT"
 
   crosscheck:
-    if: github.ref_name != 'offload/reproduce'
+    if: "!startsWith(github.ref_name, 'offload/reproduce')"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     continue-on-error: true
