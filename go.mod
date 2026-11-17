@@ -21,7 +21,7 @@ go 1.26.0
 // x/net, x/text and the OTLP trace exporter (bumped below).
 // Bumped 1.26.9 -> 1.26.10 (2026-10-22): GO-2026-6809, a reachable
 // crypto/x509 advisory published after v1.0.1, is fixed only in 1.26.10.
-toolchain go1.26.10
+toolchain go1.26.11
 
 require (
 	github.com/alicebob/miniredis/v2 v2.38.0
