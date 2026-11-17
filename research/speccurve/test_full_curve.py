@@ -131,3 +131,14 @@ def test_a_plants_two_budget_campaigns_must_share_the_plant_constants():
     del camps[("B", "plant")].tuned["settings"]["plant_digest"]
     with pytest.raises(SystemExit):
         fc.same_plant(camps)
+
+
+def test_the_runs_made_here_are_counted_from_the_committed_copy_when_the_journal_is_gone(tmp_path, monkeypatch):
+    monkeypatch.setattr(fc, "OUT", tmp_path)
+    c = fc.Campaign("B", "plant", tmp_path / "plantB_own_large_s120_plant_00000000", {}, pd.DataFrame(),
+                    pd.DataFrame())
+    assert fc.runs_made_here(c) == 0
+    pd.DataFrame({"arm": ["joint"] * 3, "config": [0, 1, 2], "workload": ["p1"] * 3}).to_csv(c.extra, index=False)
+    assert fc.runs_made_here(c) == 3                       # a rebuild from committed data
+    c.journal.write_text('{"arm": "joint", "J": 1.0}\n{"arm": "joint", "error": "boom"}\n', encoding="utf-8")
+    assert fc.runs_made_here(c) == 1                       # the journal, failed runs left out, while it exists

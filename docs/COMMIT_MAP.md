@@ -179,9 +179,10 @@ before any of its history was public, in the same way:
   predictions, the WP12 plans, the WP17 twin predictions) reads as before.
 - **Only commit identifiers changed** (the 47 commits from 15 Nov 13:35 on;
   older commits are untouched). The deviation logs now cite the new hashes
-  (`testbed/hvpa/DEVIATIONS.md`, `testbed/validation/DEVIATIONS_V2.md`); the
-  frozen WP12 record `testbed/wp12/pilot.json` keeps `8c5049b`, and commit
-  messages keep the hashes they were written with. Resolve any of them with
+  (`testbed/hvpa/DEVIATIONS.md`, `testbed/validation/DEVIATIONS_V2.md`), and
+  `testbed/wp12/pilot.json`, which the WP12 report step rebuilds from git, names
+  the plans' new commit (`07fd7da`); commit messages keep the hashes they were
+  written with. Resolve any of them with
   [`commit-map-2026-11-17.txt`](commit-map-2026-11-17.txt) (`old<TAB>new`;
   the dropped commit maps to the commit whose tree it had).
 
