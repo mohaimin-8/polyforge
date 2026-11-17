@@ -239,7 +239,8 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install harness dependencies
-        run: pip install -r eval/requirements.txt
+        # pyarrow: research/cachereplay reads its parquet inputs with pyarrow only
+        run: pip install -r eval/requirements.txt pyarrow
       # `unittest discover` exits 0 when it discovers NOTHING -- measured: a
       # pattern matching no file prints NO TESTS RAN and returns 0. This suite
       # is 167 tests, the largest in the repo and the only cover the simulator

@@ -1,0 +1,21 @@
+# gitleaks (ci.yml's secret-scan) with its default rules, and one allowlist.
+#
+# The testbed's pin files list public container images and their sha256
+# digests, read from the registries' public OCI distribution API (see each
+# file's header). A digest after an image name such as
+# keda-metrics-apiserver matches gitleaks' generic-api-key rule ("api" then a
+# long hex value); it is an identifier anyone can fetch, not a credential.
+# Found 2026-11-17, the first scan of research-v2 (testbed/hvpa/images.lock).
+title = "polyforge"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "public container image digests in the testbed's pin files"
+paths = [
+  '''^testbed/images\.lock$''',
+  '''^testbed/hvpa/images\.lock$''',
+  '''^testbed/hvpa/components\.lock$''',
+  '''^testbed/k8s/base/models\.lock$''',
+]
