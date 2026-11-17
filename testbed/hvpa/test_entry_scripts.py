@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 HERE = Path(__file__).resolve().parent
-SCRIPTS = ("after_wp11.py", "calibrate_service.py", "install.py", "live.py", "pilot.py", "run_pilot.py",
-           "smoke_live.py")
+SCRIPTS = ("after_wp11.py", "calibrate_service.py", "install.py", "live.py", "main_runs.py", "pilot.py",
+           "run_pilot.py", "smoke_live.py")
 
 CHECK = """
 import ast, importlib, runpy, sys
