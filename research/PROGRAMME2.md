@@ -39,7 +39,7 @@ pushing a branch `offload/<campaign>`), while the laptop keeps the live campaign
 with the CI run named.
 
 Tests: `python -m pytest research/theory research/control2 research/plant2 research/population
-research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark research/sensitivity tools/index-probe -q`
+research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark research/sensitivity tools/index-probe research/test_run_queue.py research/test_offload.py scripts/test_reproduce_programme2.py -q`
 (CI runs the same line), plus `testbed/` (`python -m pytest -q` inside it).
 
 What the pilots say so far, in one line each (details in the files above):

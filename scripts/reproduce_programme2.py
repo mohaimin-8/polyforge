@@ -8,17 +8,30 @@ committed text no longer agree. Steps that need files the repository does
 not ship (downloaded datasets, third-party code) are skipped when the files
 are absent, and say so.
 
+On another platform the last digits of floating-point results can differ
+(2026-11-17, GitHub's Linux runners against the Windows laptop that wrote the
+records: at most 9e-9 relative, in plant 2's seeded bootstrap fits). A report
+whose text is unchanged and whose numbers all agree within TOLERANCE is
+reported as `numeric` and passes; any other change, and any binary file, is
+drift. `--strict` asks for byte identity, the claim on the records' own
+platform.
+
     python scripts/reproduce_programme2.py            # every step
+    python scripts/reproduce_programme2.py --strict   # numbers byte for byte too
     python scripts/reproduce_programme2.py --list     # the steps, run nothing
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+NUMBER = re.compile(rb"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
+TOLERANCE = 1e-6   # relative; the cross-platform differences seen are 1e-16 to 9e-9
 
 REPO = Path(__file__).resolve().parents[1]
 R = REPO / "research"
@@ -88,7 +101,7 @@ STEPS = [
 ]
 
 
-def run(step) -> tuple[str, str]:
+def run(step, strict: bool = False) -> tuple[str, str]:
     name, cwd, cmd, reports, needs = step
     missing = [n for n in needs if not (cwd / n).exists()]
     if missing:
@@ -101,23 +114,52 @@ def run(step) -> tuple[str, str]:
     paths = [str((cwd / r).relative_to(REPO)) for r in reports]
     diff = subprocess.run(["git", "diff", "--ignore-cr-at-eol", "--stat", "--", *paths], cwd=REPO,
                           capture_output=True, text=True).stdout.strip()
-    return ("drift", diff.splitlines()[-1]) if diff else ("identical", f"{time.time() - t0:.0f} s")
+    if not diff:
+        return "identical", f"{time.time() - t0:.0f} s"
+    changed = subprocess.run(["git", "diff", "--ignore-cr-at-eol", "--name-only", "--", *paths], cwd=REPO,
+                             capture_output=True, text=True).stdout.split()
+    worst = [numbers_only(rel, REPO) for rel in changed]
+    if not strict and changed and all(w is not None and w <= TOLERANCE for w in worst):
+        return "numeric", f"numbers only, largest relative difference {max(worst):.1e} ({diff.splitlines()[-1]})"
+    return "drift", diff.splitlines()[-1]
 
 
-def main() -> int:
+def numbers_only(rel: str, repo: Path = REPO) -> float | None:
+    """The largest relative difference between the committed and the rebuilt
+    file when they differ in numbers only, else None (text or binary drift)."""
+    old = subprocess.run(["git", "show", f"HEAD:{rel}"], cwd=repo, capture_output=True).stdout
+    new = (repo / rel).read_bytes()
+    if b"\0" in old or b"\0" in new:
+        return None
+    old, new = old.replace(b"\r\n", b"\n"), new.replace(b"\r\n", b"\n")
+    if NUMBER.sub(b"#", old) != NUMBER.sub(b"#", new):
+        return None
+    worst = 0.0
+    for a, b in zip(NUMBER.findall(old), NUMBER.findall(new)):
+        if a != b:
+            x, y = float(a), float(b)
+            scale = max(abs(x), abs(y))
+            worst = max(worst, abs(x - y) / scale if scale else 0.0)
+    return worst
+
+
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--list", action="store_true")
-    args = ap.parse_args()
+    ap.add_argument("--strict", action="store_true", help="numbers must match byte for byte too")
+    args = ap.parse_args(argv)
     if args.list:
         for name, cwd, cmd, reports, _ in STEPS:
             print(f"{name}: (cd {cwd.relative_to(REPO)} && python {' '.join(cmd)}) -> {', '.join(reports)}")
         return 0
-    bad = 0
+    bad = numeric = 0
     for step in STEPS:
-        status, note = run(step)
+        status, note = run(step, args.strict)
         bad += status in ("drift", "failed")
+        numeric += status == "numeric"
         print(f"{status:9s} {step[0]}: {note}", flush=True)
-    print("programme 2 reproduces" if not bad else f"{bad} step(s) drifted or failed")
+    tail = f" ({numeric} step(s) differ in the last digits of numbers only, within {TOLERANCE:g})" if numeric else ""
+    print(("programme 2 reproduces" if not bad else f"{bad} step(s) drifted or failed") + tail)
     return 1 if bad else 0
 
 
