@@ -11,13 +11,13 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP3, WP18 index theory and property checks | `research/theory/` | `python property_check.py ...`, `python t4_check.py ...` | `INDEX_THEORY.md`, `PROPERTY_CHECKS.md` |
 | WP3 index on the planner's decisions | `research/theory/` | `python index_pilot.py` | `INDEX_PILOT.md` |
 | WP4 dose-response (step width x coupling) | `research/theory/`, `research/control2/` | `python dose_response_pilot.py` | `DOSE_RESPONSE_PILOT.md` |
-| WP5 Morris screen of plant 2 | `research/sensitivity/` | `python morris_pilot.py` (`--crn` for common random numbers) | `MORRIS_PILOT.md` (10 trajectories); `MORRIS_r20_crn.md` (the plan's screen) once run |
-| WP5 Sobol indices of the gain | `research/sensitivity/` | `python sobol.py` (after a Morris screen) | `SOBOL.md` once run |
-| WP5 specification curve | `research/speccurve/` | `python pilot_curve.py` | `SPEC_CURVE_PILOT.md`, `spec_curve_pilot.png` |
+| WP5 Morris screen of plant 2 | `research/sensitivity/` | `python morris_pilot.py` (`--crn` for common random numbers) | `MORRIS_PILOT.md` (10 trajectories); `MORRIS_r20_crn.md` (the plan's screen: 20 trajectories, common random numbers) |
+| WP5 Sobol indices of the gain | `research/sensitivity/` | `python sobol.py` (after a Morris screen) | `SOBOL.md` (the r20 screen's six leading factors, N = 128) |
+| WP5 specification curve | `research/speccurve/` | `python pilot_curve.py`; the plan's curve: `python full_curve.py run`, then `curve` | `SPEC_CURVE_PILOT.md`; `FULL_SPEC_CURVE.md`, `full_spec_curve.png` (every arm re-selected per specification) |
 | WP6 cache replay of real prompts (Go-verified) | `research/cachereplay/` | `python run_all.py --preset full --workers 6` | `out/full/` |
 | WP7 tier price and quality (RouterBench, mode A; own ARC measurement, mode B) | `research/tierquality/` | `python tiers.py`, `python selfhosted.py run` | `TIERS.md`, `SELFHOSTED.md` |
 | WP8 workload population, native replay | `research/population/` | `python features.py`, `python native.py`, `python population.py` | `FEATURES.md`, `POPULATION.md` |
-| WP9 comparators and tuning | `research/comparators/` | `python tune.py --plant B ...` | `pilot/*/report.md`, `SAMPLE_SIZE.md` |
+| WP9 comparators and tuning | `research/comparators/` | `python tune.py --plant A\|B --mix own\|native --budget enforced\|plant --references` | `full/*/report.md` (six campaigns), `pilot/*/report.md`, `SAMPLE_SIZE.md` |
 | WP10 testbed | `testbed/` | runbook in `testbed/README.md`; `python scripts/bringup.py` | built and up on kind (2026-11-14) |
 | WP11 simulator against the testbed | `testbed/validation/` | `cell_schedules.py`, `predict.py`, `run_cells.py`, `score.py`, `diagnose.py`, `coupling.py` | `predictions.json` (committed before the runs), `VALIDATION.md`, `DIAGNOSE.md`, `COUPLING.md` (exploratory: the two tiers share one host); WP11b by the rule in `testbed/hvpa/after_wp11.py` |
 | WP12 live pilot of the main contrast | `testbed/wp12/` | `tb_planner.py`, `plans.py`, `pairs.py`, `after_wp11b.py` | `regimes.json`, `design.json`, `tuning/`, `plans.json` (all committed before any live run), then `PILOT.md` with gate G3 and `pilot.json`; started by `testbed/hvpa/after_wp11.py` after WP11b |
@@ -60,3 +60,14 @@ What the pilots say so far, in one line each (details in the files above):
 - The semantic cache, replayed on 1,000,000 real first turns through the gateway's own logic,
   saturates at about 300 entries (1.19 MiB of heap) with a ceiling of 0.21 at tau 0.85 (WP6); plant 2
   now uses that curve, which makes the cache knob close to on/off at the simulator's sizes.
+
+What the full campaigns say (2026-11-17; still exploratory):
+
+- WP9, six campaigns (plants A and B; own and native mixes; enforced and plant-only budgets): the
+  joint, per-knob and one-knob planners tie in five of six; with only the plant's budget on plant B the
+  joint planner beats per-knob by 0.0011 J [0.0002, 0.0023]; layers and rules lose on average. In plant A
+  no tenant reaches its budget, so its two budget modes give identical runs.
+- WP5 specification curve, 4,608 specifications: median effect 0; the joint planner is better in 37%
+  of them and worse in 25%; whole-curve sign-flip test p = 0.32.
+- WP5 Morris (r = 20) and Sobol: replica capacity drives the gain (first-order 0.72, total 0.75);
+  congestion, the cache ceiling and the tail slope act mostly through interactions.
