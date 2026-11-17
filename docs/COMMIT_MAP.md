@@ -161,3 +161,28 @@ Frozen files that cite hashes changed by the second rewrite:
 - `research/analysis/reanalysis_noninferiority.py`
 
 Rewrite tool: `git filter-repo`, message and blob callbacks.
+
+## Third rewrite — 2026-11-17 (`research-v2`, before its first push)
+
+On 2026-11-17 the programme-2 branch `research-v2` was reworded once more,
+before any of its history was public, in the same way:
+
+- **Commit messages:** one sentence in each of two messages (now `279aa21`
+  and `e0a3efc`, both of 15 Nov).
+- **File history:** lines 3–4 of the docstring of `tools/detach.py`, in the
+  35 versions between the commit that added the script and the commit that
+  reworded those lines; that rewording commit (`9074d51`) changed nothing any
+  more and was dropped. Every other file at every commit is byte-for-byte
+  what it was, and the branch's final tree is unchanged.
+- **Author, committer and both timestamps are preserved** on all 46 rewritten
+  commits, so every "committed before the run" order (WP11 and WP11b
+  predictions, the WP12 plans, the WP17 twin predictions) reads as before.
+- **Only commit identifiers changed** (the 47 commits from 15 Nov 13:35 on;
+  older commits are untouched). The deviation logs now cite the new hashes
+  (`testbed/hvpa/DEVIATIONS.md`, `testbed/validation/DEVIATIONS_V2.md`); the
+  frozen WP12 record `testbed/wp12/pilot.json` keeps `8c5049b`, and commit
+  messages keep the hashes they were written with. Resolve any of them with
+  [`commit-map-2026-11-17.txt`](commit-map-2026-11-17.txt) (`old<TAB>new`;
+  the dropped commit maps to the commit whose tree it had).
+
+Rewrite tool: `git filter-branch`, a message filter and an index filter.
