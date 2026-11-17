@@ -187,7 +187,7 @@ def main() -> None:
                                                           else run / "precision.json"),
            "plant2": plant2_block(curves)}
     (run / "plant2_cache.json").write_text(json.dumps(out, indent=1, default=float), encoding="utf-8")
-    from report import fit_markdown  # noqa: PLC0415
+    from replay_report import fit_markdown  # noqa: PLC0415
     (run / "FIT.md").write_text(fit_markdown(out), encoding="utf-8")
     print(f"wrote {run / 'plant2_cache.json'}: plant2 {out['plant2']}")
 

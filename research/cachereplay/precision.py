@@ -196,7 +196,7 @@ def main() -> None:
                   "The LMSYS proxy counts a hit wrong when responses disagree, including stylistic "
                   "disagreement between models; it is a pessimistic bound (CACHE_PRECISION.md)."]}
     (out / "precision.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
-    from report import precision_markdown  # noqa: PLC0415
+    from replay_report import precision_markdown  # noqa: PLC0415
     (out / "PRECISION.md").write_text(precision_markdown(result), encoding="utf-8")
     print(f"wrote {out / 'precision.json'}: {len(df)} pairs, AP {result['qqp']['average_precision']:.3f}, "
           f"embed {seconds:.1f}s for {questions} questions")

@@ -32,7 +32,7 @@ import pandas as pd
 
 from cachesim import NeighborIndex, replay_stream
 from engine import store_cost_usd
-from report import replay_markdown
+from replay_report import replay_markdown
 from streams import CLASSES, DATA, ENCODER, Encoder, class_masks, doc_tiekeys, load_stream, tenant_streams
 
 HERE = Path(__file__).resolve().parent
