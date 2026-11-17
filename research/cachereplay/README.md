@@ -22,7 +22,7 @@ Exploratory until a registration says otherwise.
 | `gocheck/main.go` | Go evidence (build tag `cachereplay`, so normal builds, vet and tests never see it): `parity` traces of the real policies and the real `SemanticCache` on seeded scripts (`testdata/go_parity.json`); `mem` heap bytes per entry through the real `Store` path |
 | `run_all.py` | every stage in one command |
 | `estimate.py` | the runtime estimate below, from CPU-time measurements on the smoke data |
-| `report.py` | markdown for the outputs |
+| `replay_report.py` | markdown for the outputs |
 | `test_*.py` | 41 tests (below) |
 
 ## The Go semantics mirrored
