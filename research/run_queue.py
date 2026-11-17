@@ -184,22 +184,27 @@ def run(c: Campaign) -> int:
     return rc
 
 
-def selected(start: str | None) -> list[Campaign]:
+def selected(start: str | None, only: list[str] | None = None) -> list[Campaign]:
+    """From `start` on (default: the first), and with `only` just the named
+    campaigns, always in queue order (2026-11-17: the CPU campaigns moved to
+    GitHub Actions, research/offload.py, and the laptop kept the live ones)."""
     names = [c.name for c in CAMPAIGNS]
-    if start is None:
-        return list(CAMPAIGNS)
-    if start not in names:
-        raise SystemExit(f"no campaign {start!r}; campaigns: {', '.join(names)}")
-    return list(CAMPAIGNS[names.index(start):])
+    unknown = [n for n in [start, *(only or [])] if n is not None and n not in names]
+    if unknown:
+        raise SystemExit(f"no campaign {', '.join(map(repr, unknown))}; campaigns: {', '.join(names)}")
+    todo = list(CAMPAIGNS if start is None else CAMPAIGNS[names.index(start):])
+    return todo if only is None else [c for c in todo if c.name in only]
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--after-pid", type=int, default=None, help="wait for this process to exit first")
     ap.add_argument("--start", default=None, help="the first campaign to run (default: the first)")
+    ap.add_argument("--only", nargs="+", default=None, metavar="NAME",
+                    help="run just these campaigns (in queue order); the others run elsewhere")
     ap.add_argument("--list", action="store_true", help="print the campaigns and run nothing")
     args = ap.parse_args(argv)
-    todo = selected(args.start)
+    todo = selected(args.start, args.only)
     if args.list:
         for c in todo:
             print(f"{c.name}: (cd {c.cwd.relative_to(REPO).as_posix()} && python {' '.join(c.args)})")

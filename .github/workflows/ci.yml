@@ -2,6 +2,8 @@ name: ci
 
 on:
   push:
+    branches-ignore: ["offload/**"]   # campaign.yml's runs (research/offload.py), not code changes
+    tags: ["**"]
   pull_request:
 
 permissions:

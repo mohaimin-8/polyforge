@@ -1,0 +1,4 @@
+# The CPU campaigns on GitHub Actions (research/offload.py, .github/workflows/campaign.yml):
+# the versions the laptop's campaigns ran with, and SALib for sobol.py.
+-r ../eval/requirements-reproduce.txt
+SALib==1.6.0

@@ -30,6 +30,14 @@ def test_the_smoke_then_wp9_run_first_and_start_skips_to_a_named_campaign():
         rq.selected("nope")
 
 
+def test_only_runs_the_named_campaigns_in_queue_order():
+    names = [c.name for c in rq.selected(None, ["reproduce", "wp17-pilot", "wp9-B-own-plant"])]
+    assert names == ["wp9-B-own-plant", "wp17-pilot", "reproduce"]
+    assert [c.name for c in rq.selected("wp17-pilot", ["wp9-B-own-plant", "reproduce"])] == ["reproduce"]
+    with pytest.raises(SystemExit, match="nope"):
+        rq.selected(None, ["wp17-pilot", "nope"])
+
+
 def test_outputs_expand_to_the_files_the_campaign_wrote_and_never_its_journal(tmp_path):
     d = tmp_path / "research" / "comparators" / "full" / "plantB_own_large_s120_enforced_abcd1234"
     d.mkdir(parents=True)

@@ -32,7 +32,11 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (24 steps; those needing downloaded inputs or not-yet-committed run data are skipped without them).
 
 The long CPU campaigns (WP9's full protocol, WP5's Morris and Sobol stages) run one after another once the
-testbed is free, resumable: `python research/run_queue.py --list`.
+testbed is free, resumable: `python research/run_queue.py --list`. From 2026-11-17 they can also run on
+GitHub Actions, split into shards (`research/offload.py`, `.github/workflows/campaign.yml`, started by
+pushing a branch `offload/<campaign>`), while the laptop keeps the live campaigns
+(`run_queue.py --only ...`); `python research/offload.py collect` commits the outputs as the queue does,
+with the CI run named.
 
 Tests: `python -m pytest research/theory research/control2 research/plant2 research/population
 research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark research/sensitivity tools/index-probe -q`
