@@ -11,6 +11,7 @@
 # Back on the laptop: gh run download <id> -n outputs -D <dir>, then
 # python research/offload.py collect <campaign> --artifact <dir> --run-url <url>.
 #
+# offload/secretscan* lists gitleaks' findings on the commits main lacks (redacted).
 # offload/reproduce* instead runs scripts/reproduce_programme2.py once (the queue's last
 # step): every programme-2 report rebuilt from the committed data; its log and any drift
 # (git status, git diff) go to the "reproduce" artifact. Nothing is committed.
@@ -64,8 +65,29 @@ jobs:
             drift.diff
           retention-days: 30
 
+  secretscan:
+    if: startsWith(github.ref_name, 'offload/secretscan')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: The CI's pinned gitleaks on the commits main does not have, each finding listed (redacted)
+        run: |
+          curl -sSL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks detect --source . --redact --verbose --exit-code=0 --log-opts="origin/main..HEAD"             --report-format json --report-path findings.json 2>&1 | tee scan.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: secretscan
+          path: |
+            findings.json
+            scan.log
+          retention-days: 30
+
   plan:
-    if: "!startsWith(github.ref_name, 'offload/reproduce')"
+    if: "!startsWith(github.ref_name, 'offload/reproduce') && !startsWith(github.ref_name, 'offload/secretscan')"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
@@ -88,7 +110,7 @@ jobs:
           echo "n=$(python -c 'import json, sys; print(len(json.loads(sys.argv[1])))' "$list")" >> "$GITHUB_OUTPUT"
 
   crosscheck:
-    if: "!startsWith(github.ref_name, 'offload/reproduce')"
+    if: "!startsWith(github.ref_name, 'offload/reproduce') && !startsWith(github.ref_name, 'offload/secretscan')"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     continue-on-error: true
