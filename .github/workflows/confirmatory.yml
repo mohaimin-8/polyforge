@@ -33,7 +33,7 @@ env:
 
 jobs:
   draw:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # the image the WP14 rehearsal ran on (Python 3.13)
     timeout-minutes: 15
     outputs:
       shards: ${{ steps.shards.outputs.list }}
@@ -60,7 +60,7 @@ jobs:
 
   run:
     needs: draw
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # the image the WP14 rehearsal ran on (Python 3.13)
     timeout-minutes: 355
     strategy:
       fail-fast: false
@@ -91,7 +91,7 @@ jobs:
 
   score:
     needs: run
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # the image the WP14 rehearsal ran on (Python 3.13)
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
