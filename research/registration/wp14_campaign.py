@@ -5,6 +5,7 @@ confirm.py runs this once per shard from the frozen commit C (campaign.json name
     python wp14_campaign.py --master HEX --shard I --shards N --out DIR
     python wp14_campaign.py --rehearsal --out DIR    # pipeline check: two of everything,
                                                      # a made-up master seed, the draft design allowed
+    python wp14_campaign.py --check                  # commit C's design: not draft, every job buildable
 
 design.json, frozen with the protocol, fixes what runs; a design still marked
 "draft" runs only as a rehearsal. Two parts:
@@ -261,6 +262,19 @@ def write_rows(path: Path, rows: list[dict]) -> None:
     pd.DataFrame(rows).to_csv(path, index=False)
 
 
+def check(design_path: Path) -> int:
+    """Commit C's readiness, before the round is due: the design is final and every job builds."""
+    design = load_design(design_path)
+    jobs, workloads = plan(REHEARSAL_MASTER, design)
+    parts: dict[str, int] = {}
+    for j in jobs:
+        key = "dose" if j["part"] == "dose" else f"comp {j['plant']}"
+        parts[key] = parts.get(key, 0) + 1
+    print(f"{design_path.name} is final: {len(jobs)} jobs build {parts}, {len(workloads)} workloads drawn "
+          "(with a made-up seed: this checks identities and sizes, not the registered draw)")
+    return 0
+
+
 def master_of(args: argparse.Namespace) -> str:
     if args.rehearsal:
         if args.master:
@@ -276,11 +290,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--master", help="the registered draw's master seed (confirm.py passes it)")
     ap.add_argument("--shard", type=int, default=0)
     ap.add_argument("--shards", type=int, default=1)
-    ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--out", type=Path)
     ap.add_argument("--design", type=Path, default=DESIGN)
     ap.add_argument("--workers", type=int, default=os.cpu_count() or 1)
     ap.add_argument("--rehearsal", action="store_true", help="two of everything, a made-up seed (pipeline check)")
+    ap.add_argument("--check", action="store_true",
+                    help="before the round is due: the design is final and every job builds (nothing runs)")
     args = ap.parse_args(argv)
+    if args.check:
+        return check(args.design)
+    if args.out is None:
+        raise SystemExit("--out is required to run")
     master = master_of(args)
     if not 0 <= args.shard < args.shards:
         raise SystemExit(f"--shard must be one of 0..{args.shards - 1}")

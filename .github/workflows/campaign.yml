@@ -18,6 +18,7 @@
 # offload/rehearsal* rehearses WP14's confirmatory campaign (research/registration/wp14_*.py):
 # the full job list built and timed, then two of everything run with a made-up master
 # seed and scored; the "rehearsal" artifact holds it. A pipeline check, never a result.
+# Pushed at commit C (the protocol's), its last step says whether C is ready for the round.
 name: campaign
 
 on:
@@ -119,6 +120,12 @@ jobs:
         run: python research/registration/wp14_campaign.py --rehearsal --out rehearsal/shard-0 2>&1 | tee rehearsal/run.log
       - name: And scored
         run: python research/registration/wp14_score.py --rehearsal --results rehearsal --out rehearsal/score
+      - name: Commit C readiness (fails until PROTOCOL.md is in and design.json is no longer draft)
+        continue-on-error: true
+        shell: bash
+        run: |
+          python research/registration/confirm.py shards 2>&1 | tee rehearsal/ready.log
+          python research/registration/wp14_campaign.py --check 2>&1 | tee -a rehearsal/ready.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

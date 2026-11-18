@@ -120,6 +120,16 @@ def test_a_draft_design_runs_only_as_a_rehearsal(tmp_path, design):
     assert campaign.load_design(p)["draft"] is False
 
 
+def test_check_tells_whether_commit_c_is_ready(tmp_path, design, capsys):
+    p = tmp_path / "design.json"
+    p.write_text(json.dumps({**design, "draft": True}), encoding="utf-8")
+    with pytest.raises(SystemExit, match="draft"):
+        campaign.main(["--check", "--design", str(p)])
+    p.write_text(json.dumps({**design, "draft": False}), encoding="utf-8")
+    assert campaign.main(["--check", "--design", str(p)]) == 0
+    assert "is final" in capsys.readouterr().out
+
+
 def test_the_master_is_the_draws_and_a_rehearsal_never_takes_one(tmp_path):
     with pytest.raises(SystemExit, match="64 lower-case hex"):
         campaign.main(["--master", "AB" * 32, "--out", str(tmp_path)])
