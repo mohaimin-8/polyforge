@@ -21,9 +21,14 @@ attainment)), the twin's objective. Then, per contrast (plan WP12):
   n_eq      pairs for equivalence within +-2 % of the comparator's mean J,
             ((1.645 + 1.645) sigma_d / eps)^2.
 Resumable: a run whose record exists is not repeated. Writes PILOT.md.
+--report-only rebuilds the report from kept records (testbed/hvpa/pilot_runs)
+and never starts a run: a missing record is a pair the pilot lost.
 
     python pilot.py --predictions ../../research/hvpa/predictions.json \
         --calibration ../../research/hvpa/calibration.json --out ../out/hvpa/pilot
+    python pilot.py --report-only --predictions ../../research/hvpa/predictions.json \
+        --calibration ../../research/hvpa/calibration.json --out pilot_runs \
+        --report ../../research/hvpa/PILOT_LIVE.md
 """
 
 from __future__ import annotations
@@ -135,7 +140,7 @@ def record_path(out: Path, width: int, sigma: float, k: int, arm: str) -> Path:
 
 
 def run_schedule(out: Path, width: int, sigma: float, k: int, targets: dict, reg: dict,
-                 calibration: Path) -> dict[str, float]:
+                 calibration: Path, report_only: bool = False) -> dict[str, float]:
     """J of each arm's valid run on schedule k, the arms in order(k). A lost
     joint run ends the schedule: neither contrast could use the others."""
     js = {}
@@ -143,6 +148,8 @@ def run_schedule(out: Path, width: int, sigma: float, k: int, targets: dict, reg
         path = record_path(out, width, sigma, k, arm)
         if path.exists():
             rec = json.loads(path.read_text(encoding="utf-8"))
+        elif report_only:   # rebuilding from kept records: a missing one was lost, never run here
+            rec = None
         else:
             rec = attempt(arm, float(targets[arm]), reg, calibration, path)
         if rec is None:
@@ -159,6 +166,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--calibration", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--pairs", type=int, default=PAIRS)
+    ap.add_argument("--report-only", action="store_true",
+                    help="rebuild the report from the records in --out; a missing record is a lost pair, never run")
+    ap.add_argument("--report", type=Path, help="where the report goes (default: PILOT.md in --out)")
     args = ap.parse_args(argv)
     import live
     import service_plant
@@ -178,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
     for w, sigma, targets, group in regimes(contrasts(preds)):
         per_schedule = [run_schedule(args.out, w, sigma, k, targets,
                                      live.schedule(shapes[k % len(shapes)], sigma, k, plant.slo_s, plant),
-                                     args.calibration) for k in range(args.pairs)]
+                                     args.calibration, args.report_only) for k in range(args.pairs)]
         for c in group:
             diffs, comp_j = [], []
             for k, js in enumerate(per_schedule):
@@ -192,7 +202,7 @@ def main(argv: list[str] | None = None) -> int:
                           f"{st['sigma_d']:.5f} | {c['gain']:+.3f} | {st['n_superiority']} | {st['n_equivalence']} |")
     report += ["", f"Pairs left out after {ATTEMPTS} invalid attempts of an arm: "
                + (", ".join(left_out) if left_out else "none") + "."]
-    (args.out / "PILOT.md").write_text("\n".join(report) + "\n", encoding="utf-8")
+    (args.report or args.out / "PILOT.md").write_text("\n".join(report) + "\n", encoding="utf-8")
     print("\n".join(report))
     return 0
 

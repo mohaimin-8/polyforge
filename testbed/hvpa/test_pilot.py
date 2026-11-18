@@ -122,6 +122,30 @@ def test_the_joint_run_serves_both_contrasts_and_a_rerun_resumes(tmp_path, monke
     assert calls == []                                      # every record exists: nothing runs again
 
 
+def test_the_report_rebuilds_from_kept_records_and_never_runs(tmp_path, monkeypatch):
+    import live
+
+    def fake_run(arm, target, regime, calibration, out):
+        return {**GOOD, "watch": {"cost": J_OF[arm] + 0.001 * regime["seed"], "max_gap_s": 10.0}}
+
+    live_report = run_main(tmp_path, monkeypatch, fake_run)
+
+    def no_run(*args):
+        raise AssertionError("a report-only rebuild started a live run")
+
+    monkeypatch.setattr(live, "run", no_run)
+    rebuilt = tmp_path / "PILOT_LIVE.md"
+    argv = ["--report-only", "--predictions", str(tmp_path / "p.json"), "--calibration", str(tmp_path / "cal.json"),
+            "--out", str(tmp_path / "o"), "--pairs", "4", "--report", str(rebuilt)]
+    assert pilot.main(argv) == 0
+    assert rebuilt.read_text(encoding="utf-8") == live_report
+    pilot.record_path(tmp_path / "o", 2, 0.2, 2, "A1").unlink()        # a pair the pilot lost
+    assert pilot.main(argv) == 0
+    text = rebuilt.read_text(encoding="utf-8")
+    assert "| w2 s0.2 | A4 vs A1 | 3 |" in text and text.rstrip().endswith("w2 s0.2 A4 vs A1 schedule 2.")
+    assert not list((tmp_path / "o").rglob("*.invalid.json"))
+
+
 def test_a_lost_joint_run_ends_its_schedule_for_both_contrasts(tmp_path, monkeypatch):
     calls = []
 

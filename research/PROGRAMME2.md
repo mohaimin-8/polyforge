@@ -29,7 +29,7 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP22 controls, adversarial search, blind predictions | `research/controls/` | `python negative_control.py`, `adversarial_search.py`, `blind_predictions.py` | `NEGATIVE_CONTROL.md`, `ADVERSARIAL_SEARCH.md`, `DIAGNOSE_158.md`, `RANDOM_SAMPLE_CHECK.md`, `GATE_REACH.md` |
 | WP23 the index as a tool | `tools/index-probe/` | `python index_probe.py log|box ...` | `README.md` |
 
-Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (24 steps; those needing downloaded inputs or not-yet-committed run data are skipped without them).
+Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (31 steps, the WP17 live pilot's report rebuilt from `testbed/hvpa/pilot_runs` among them; those needing downloaded inputs or not-yet-committed run data are skipped without them).
 
 The long CPU campaigns (WP9's full protocol, WP5's Morris and Sobol stages) run one after another once the
 testbed is free, resumable: `python research/run_queue.py --list`. From 2026-11-17 they can also run on

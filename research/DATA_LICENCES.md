@@ -7,7 +7,7 @@ sources named (GitHub's licence API, the Hugging Face API's card metadata, the d
 
 | dataset | used by | licence | in the repository | how to get it |
 |---|---|---|---|---|
-| BurstGPT (HPMLL/BurstGPT) | population, native replay, comparators | CC-BY-4.0 (repository LICENSE); cite the KDD '25 paper, doi:10.1145/3711896.3737413 | derived counts and features only (`research/population/data/`) | `python research/traces/fetch_burstgpt.py` (release v2.0) |
+| BurstGPT (HPMLL/BurstGPT) | population, native replay, comparators | CC-BY-4.0 (repository LICENSE); cite the KDD '25 paper, doi:10.1145/3711896.3737413 | derived counts and features only (`research/population/data/`; per-600 s request rates of programme 1's trace campaigns in `eval/harness/trace_cache/`) | `python research/traces/fetch_burstgpt.py` (release v2.0) |
 | Azure LLM inference trace 2024 (AzurePublicDataset) | population, native replay, WP11 cells | CC-BY; cite DynamoLLM, HPCA 2025 | derived counts and features only | `research/traces/etl_azure_llm.py` downloads the release assets |
 | Azure Functions trace 2019 (AzurePublicDataset) | WP17 workloads | CC-BY; cite "Serverless in the Wild", USENIX ATC 2020 | the two derived per-minute windows (`research/hvpa/data/`) | release `dataset-functions-2019`, then `python -I research/hvpa/azure_workloads.py <d01 csv>` |
 | LMSYS-Chat-1M (lmsys/lmsys-chat-1m) | cache replay (WP6), WP11 prompts | gated; its own dataset licence agreement forbids redistribution | never: no prompt text, only byte lengths, doc-ID hashes in git-ignored caches and aggregates | accept the terms on Hugging Face, then `huggingface-cli download lmsys/lmsys-chat-1m` |
