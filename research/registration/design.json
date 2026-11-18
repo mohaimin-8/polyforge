@@ -1,0 +1,37 @@
+{
+ "draft": true,
+ "about": "WP14's confirmatory simulation campaign (wp14_campaign.py runs it, wp14_score.py scores it). Every value here follows the plan's Part D placeholders and the pilots' records; the protocol fixes each one, sets draft to false, and commit C freezes this file with it.",
+ "dose": {
+  "about": "H1, H2: new regimes of WP4's dose-response design (research/theory/dose_response_pilot.py)",
+  "widths": [1, 2, 4, 8, 16],
+  "kappa_min": 0.0,
+  "kappa_max": 2.0,
+  "kappa_strata": 4,
+  "workloads": ["ai_cacheable", "ai_uncacheable", "agentic", "joint_stress", "mmpp_mixed"],
+  "mixes": ["uniform", "premium_heavy", "besteffort_heavy", "whale"],
+  "cluster_size": "large",
+  "steps": 120
+ },
+ "comp": {
+  "about": "H3, H4: WP9's selected configurations on fresh workloads from the population process",
+  "workloads": 120,
+  "mix": "own",
+  "budget": "enforced",
+  "cluster_size": "large",
+  "steps": 120,
+  "granularities": ["overall", "per_class"],
+  "plants": {
+   "A": "research/comparators/full/plantA_own_large_s120_enforced_ca352ebd/tuned.json",
+   "B": "research/comparators/full/plantB_own_large_s120_enforced_58b57ad3/tuned.json"
+  }
+ },
+ "tests": {
+  "alpha": 0.05,
+  "holm": ["H2", "H3", "H4"],
+  "H1": {"rule": "no logged decision of the dose part violates Theorem 1"},
+  "H2": {"predictor": "index", "rank_correlation_min": 0.8, "slope_range": [0.5, 1.5],
+         "calibration": "research/theory/data/dose_response_runs.csv.gz", "permutations": 10000},
+  "H3": {"plant": "A", "comparator": "per_knob", "granularity": "overall", "test": "equivalence", "margin": 0.02},
+  "H4": {"plant": "B", "comparator": "per_knob", "granularity": "overall", "test": "superiority"}
+ }
+}

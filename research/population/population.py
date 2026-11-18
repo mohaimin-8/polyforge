@@ -67,13 +67,16 @@ def window_model(row) -> MMPP2:
     return fit(m, float(row.dispersion), acf, float(row.p99_ratio))
 
 
-def sample(windows: pd.DataFrame, rng: np.random.Generator) -> list[dict]:
+def sample(windows: pd.DataFrame, rng: np.random.Generator, n: int | None = None) -> list[dict]:
+    """The population: N_WORKLOADS workloads, split into tuning and evaluation halves. With `n`, only
+    the first n workloads and no split: each workload's draws precede the next one's and the split
+    comes last, so they are the first n of the full draw from the same generator state."""
     act = active_windows(windows)
     streams = sorted(act.stream.unique())
     by_stream = {s: act[act.stream == s] for s in streams}
     classes, weights = list(CLASS_WEIGHTS), np.array(list(CLASS_WEIGHTS.values()))
     workloads = []
-    for w in range(N_WORKLOADS):
+    for w in range(N_WORKLOADS if n is None else n):
         tenants = []
         for t in range(TENANTS):
             stream = streams[rng.integers(len(streams))]
@@ -91,6 +94,8 @@ def sample(windows: pd.DataFrame, rng: np.random.Generator) -> list[dict]:
                 "seed": int(rng.integers(2**31 - 1)),
             })
         workloads.append({"workload": f"pop{w:03d}", "tenants": tenants})
+    if n is not None:
+        return workloads
     order = rng.permutation(N_WORKLOADS)
     for rank, idx in enumerate(order):
         workloads[idx]["split"] = "tuning" if rank < N_WORKLOADS // 2 else "evaluation"

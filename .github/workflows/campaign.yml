@@ -15,6 +15,9 @@
 # offload/reproduce* instead runs scripts/reproduce_programme2.py once (the queue's last
 # step): every programme-2 report rebuilt from the committed data; its log and any drift
 # (git status, git diff) go to the "reproduce" artifact. Nothing is committed.
+# offload/rehearsal* rehearses WP14's confirmatory campaign (research/registration/wp14_*.py):
+# the full job list built and timed, then two of everything run with a made-up master
+# seed and scored; the "rehearsal" artifact holds it. A pipeline check, never a result.
 name: campaign
 
 on:
@@ -86,8 +89,45 @@ jobs:
             scan.log
           retention-days: 30
 
+  rehearsal:
+    if: startsWith(github.ref_name, 'offload/rehearsal')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: research/requirements-campaigns.txt
+      - run: pip install -r research/requirements-campaigns.txt
+      - name: The full job list (a made-up master seed), timed
+        shell: bash   # -eo pipefail: tee does not hide a failure
+        run: |
+          mkdir -p rehearsal
+          python - <<'PY' 2>&1 | tee rehearsal/plan.log
+          import collections, json, sys, time
+          sys.path.insert(0, "research/registration")
+          import wp14_campaign as c
+          t = time.time()
+          jobs, workloads = c.plan(c.REHEARSAL_MASTER, json.loads(c.DESIGN.read_text(encoding="utf-8")))
+          print(f"{len(jobs)} jobs, {len(workloads)} drawn workloads, built in {time.time() - t:.0f} s")
+          print(dict(collections.Counter((j["part"], j.get("plant", "")) for j in jobs)))
+          PY
+      - name: Two of everything, run
+        shell: bash
+        run: python research/registration/wp14_campaign.py --rehearsal --out rehearsal/shard-0 2>&1 | tee rehearsal/run.log
+      - name: And scored
+        run: python research/registration/wp14_score.py --rehearsal --results rehearsal --out rehearsal/score
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rehearsal
+          path: rehearsal
+          retention-days: 30
+
   plan:
-    if: "!startsWith(github.ref_name, 'offload/reproduce') && !startsWith(github.ref_name, 'offload/secretscan')"
+    if: "!startsWith(github.ref_name, 'offload/reproduce') && !startsWith(github.ref_name, 'offload/secretscan') && !startsWith(github.ref_name, 'offload/rehearsal')"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
@@ -110,7 +150,7 @@ jobs:
           echo "n=$(python -c 'import json, sys; print(len(json.loads(sys.argv[1])))' "$list")" >> "$GITHUB_OUTPUT"
 
   crosscheck:
-    if: "!startsWith(github.ref_name, 'offload/reproduce') && !startsWith(github.ref_name, 'offload/secretscan')"
+    if: "!startsWith(github.ref_name, 'offload/reproduce') && !startsWith(github.ref_name, 'offload/secretscan') && !startsWith(github.ref_name, 'offload/rehearsal')"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     continue-on-error: true

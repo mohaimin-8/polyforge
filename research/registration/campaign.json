@@ -1,0 +1,13 @@
+{
+ "protocol": "research/registration/PROTOCOL.md",
+ "shards": 16,
+ "run": [
+  {"name": "wp14", "cwd": "research/registration",
+   "command": ["python", "wp14_campaign.py", "--master", "{master}", "--shard", "{shard}", "--shards", "{shards}",
+               "--out", "{out}"]}
+ ],
+ "score": [
+  {"name": "wp14-score", "cwd": "research/registration",
+   "command": ["python", "wp14_score.py", "--master", "{master}", "--results", "{results}", "--out", "{out}"]}
+ ]
+}

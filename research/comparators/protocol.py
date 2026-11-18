@@ -100,11 +100,16 @@ def workload_class(workload: str) -> str:
     spec = _population().get(workload)
     if spec is None:
         raise ValueError(f"unknown population workload {workload!r}")
+    return class_of_spec(spec)
+
+
+def class_of_spec(spec: dict) -> str:
+    """The class rule on one workload's population entry (its tenants' streams and rates)."""
     shares = {c: 0.0 for c in CLASSES}
     for tenant in spec["tenants"]:
         family = STREAM_FAMILY.get(tenant["stream"])
         if family is None:
-            raise ValueError(f"{workload}: stream {tenant['stream']!r} has no family in the class rule")
+            raise ValueError(f"{spec.get('workload')}: stream {tenant['stream']!r} has no family in the class rule")
         shares[family] += float(tenant["rate_rps"])
     return class_of_shares(shares)
 
