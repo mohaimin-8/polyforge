@@ -130,6 +130,21 @@ def test_check_tells_whether_commit_c_is_ready(tmp_path, design, capsys):
     assert "is final" in capsys.readouterr().out
 
 
+def test_a_failed_run_fails_a_rehearsal_and_is_missing_data_in_the_campaign(tmp_path, monkeypatch, capsys, design):
+    job = {"identity": "dose|w1q0|agentic|uniform|joint", "seed": 7}
+    monkeypatch.setattr(campaign, "plan", lambda master, d, rehearsal=False: ([job], []))
+    monkeypatch.setattr(campaign, "write_population", lambda path, workloads: None)
+    monkeypatch.setattr(campaign, "execute", lambda jobs, pop, workers: [{**job, "J": math.nan, "error": "boom"}])
+    assert campaign.main(["--rehearsal", "--out", str(tmp_path / "r")]) == 1
+    assert "rehearsal failed: dose|w1q0|agentic|uniform|joint: boom" in capsys.readouterr().err
+    final = tmp_path / "design.json"
+    final.write_text(json.dumps({**design, "draft": False}), encoding="utf-8")
+    assert campaign.main(["--master", MASTER, "--design", str(final), "--out", str(tmp_path / "c")]) == 0
+    assert pd.read_csv(tmp_path / "c" / "rows.csv").error.tolist() == ["boom"]
+    monkeypatch.setattr(campaign, "execute", lambda jobs, pop, workers: [{**job, "J": 1.0, "error": ""}])
+    assert campaign.main(["--rehearsal", "--out", str(tmp_path / "ok")]) == 0
+
+
 def test_the_master_is_the_draws_and_a_rehearsal_never_takes_one(tmp_path):
     with pytest.raises(SystemExit, match="64 lower-case hex"):
         campaign.main(["--master", "AB" * 32, "--out", str(tmp_path)])
@@ -179,6 +194,46 @@ def test_the_shards_must_hold_every_job_once_with_its_seed(planned):
     bad.loc[0, "seed"] += 1
     with pytest.raises(SystemExit, match="another seed"):
         score.check_coverage(bad, jobs)
+
+
+def nudged(value):
+    """`value` with its first non-zero float moved by one unit in the last place."""
+    moved = False
+
+    def walk(v):
+        nonlocal moved
+        if isinstance(v, dict):
+            return {k: walk(x) for k, x in v.items()}
+        if isinstance(v, list):
+            return [walk(x) for x in v]
+        if isinstance(v, float) and v != 0.0 and not moved:
+            moved = True
+            return float(np.nextafter(v, math.inf))
+        return v
+
+    out = walk(json.loads(json.dumps(value)))
+    assert moved
+    return out
+
+
+def test_the_scorer_says_whether_every_shard_ran_the_drawn_workloads(planned, tmp_path):
+    _, workloads = planned
+    for i, cpu in enumerate(("AMD EPYC 7763", "Intel Xeon 8370C")):
+        (tmp_path / f"shard-{i}").mkdir()
+        campaign.write_population(tmp_path / f"shard-{i}" / "population.json", workloads)
+        (tmp_path / f"shard-{i}" / "provenance.json").write_text(json.dumps({"cpu": cpu}), encoding="utf-8")
+    same = score.population_check(tmp_path, workloads)
+    assert (same["shards"], same["versions"], same["differ"], same["largest_difference"]) == (2, 1, [], 0.0)
+    assert "every shard ran the same 3 workloads" in score.population_line(same)
+    campaign.write_population(tmp_path / "shard-1" / "population.json", nudged(workloads))
+    one_ulp = score.population_check(tmp_path, workloads)
+    assert (one_ulp["versions"], one_ulp["differ"]) == (2, [1])
+    assert 0 < one_ulp["largest_difference"] < 1e-15
+    assert one_ulp["by_shard"][1]["cpu"] == "Intel Xeon 8370C"
+    assert "1 of 2 shards differ" in score.population_line(one_ulp)
+    renamed = json.loads(json.dumps(workloads))
+    renamed[0]["workload"] = "pop999"
+    assert score.largest_difference(workloads, renamed) == math.inf
 
 
 def synthetic(jobs: list[dict], line: tuple[float, float], plant_a_shift: float) -> pd.DataFrame:

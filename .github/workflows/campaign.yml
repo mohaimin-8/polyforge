@@ -17,7 +17,8 @@
 # (git status, git diff) go to the "reproduce" artifact. Nothing is committed.
 # offload/rehearsal* rehearses WP14's confirmatory campaign (research/registration/wp14_*.py):
 # the full job list built and timed, then two of everything run with a made-up master
-# seed and scored; the "rehearsal" artifact holds it. A pipeline check, never a result.
+# seed and scored, from the manifest's folder (one failed run fails it); the "rehearsal"
+# artifact holds it. A pipeline check, never a result.
 # Pushed at commit C (the protocol's), its last step says whether C is ready for the round.
 name: campaign
 
@@ -115,11 +116,15 @@ jobs:
           print(f"{len(jobs)} jobs, {len(workloads)} drawn workloads, built in {time.time() - t:.0f} s")
           print(dict(collections.Counter((j["part"], j.get("plant", "")) for j in jobs)))
           PY
-      - name: Two of everything, run
+      # Both from the folder campaign.json names as their cwd, as confirm.py runs them: a path
+      # read relative to the working directory fails here, not in the registered campaign.
+      - name: Two of everything, run (one failed run fails the rehearsal)
         shell: bash
-        run: python research/registration/wp14_campaign.py --rehearsal --out rehearsal/shard-0 2>&1 | tee rehearsal/run.log
+        working-directory: research/registration
+        run: python wp14_campaign.py --rehearsal --out "$GITHUB_WORKSPACE/rehearsal/shard-0" 2>&1 | tee "$GITHUB_WORKSPACE/rehearsal/run.log"
       - name: And scored
-        run: python research/registration/wp14_score.py --rehearsal --results rehearsal --out rehearsal/score
+        working-directory: research/registration
+        run: python wp14_score.py --rehearsal --results "$GITHUB_WORKSPACE/rehearsal" --out "$GITHUB_WORKSPACE/rehearsal/score"
       - name: Commit C readiness (fails until PROTOCOL.md is in and design.json is no longer draft)
         continue-on-error: true
         shell: bash

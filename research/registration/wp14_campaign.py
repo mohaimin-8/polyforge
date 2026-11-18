@@ -293,7 +293,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path)
     ap.add_argument("--design", type=Path, default=DESIGN)
     ap.add_argument("--workers", type=int, default=os.cpu_count() or 1)
-    ap.add_argument("--rehearsal", action="store_true", help="two of everything, a made-up seed (pipeline check)")
+    ap.add_argument("--rehearsal", action="store_true",
+                    help="two of everything, a made-up seed (a pipeline check: one failed run fails it)")
     ap.add_argument("--check", action="store_true",
                     help="before the round is due: the design is final and every job builds (nothing runs)")
     args = ap.parse_args(argv)
@@ -317,6 +318,10 @@ def main(argv: list[str] | None = None) -> int:
     write_rows(args.out / "rows.csv", rows)
     failed = sum(1 for r in rows if r.get("error"))
     print(f"done in {time.time() - t0:.0f}s: {len(rows)} runs, {failed} failed (recorded, not retried)")
+    if args.rehearsal and failed:   # the campaign records a failed run as missing data; a rehearsal stops on it
+        first = next(r for r in rows if r.get("error"))
+        print(f"rehearsal failed: {first['identity']}: {first['error']}", file=sys.stderr)
+        return 1
     return 0
 
 

@@ -109,6 +109,7 @@ def test_a_shard_runs_with_the_master_seed_and_keeps_its_log(tmp_path):
     assert "emitted shard 1" in (out / "sim.log").read_text(encoding="utf-8")
     prov = json.loads((out / "provenance.json").read_text(encoding="utf-8"))
     assert (prov["commit"], prov["master_seed"], prov["shard"], prov["round"]) == (HEAD["commit"], MASTER, 1, 1000)
+    assert prov["cpu"] == confirm.cpu_model() and prov["cpu"]
     with pytest.raises(confirm.Refused, match="not empty"):
         confirm.do_run(tmp_path / "out" / "draw.json", 1, out, manifest, HEAD)
 

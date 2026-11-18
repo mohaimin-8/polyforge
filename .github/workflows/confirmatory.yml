@@ -88,6 +88,9 @@ jobs:
           path: shard-${{ matrix.shard }}
           if-no-files-found: warn
           retention-days: 90
+          # A shard lost to the runner (not to its own code) can be re-run with the same draw;
+          # its new upload replaces the partial one, and every attempt's log stays in the history.
+          overwrite: true
 
   score:
     needs: run

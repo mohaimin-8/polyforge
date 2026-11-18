@@ -187,9 +187,24 @@ def run_component(c: dict, values: dict[str, str], logs: Path) -> None:
         raise Failed(f"{c['name']} exited {rc}; see {c['name']}.log")
 
 
+def cpu_model() -> str:
+    """The processor's model name (Linux's /proc/cpuinfo), else what the platform module reports.
+
+    The shards of one campaign can land on different processors, and numpy picks its SIMD code per
+    processor, so a float's last bits can differ between shards: this names each shard's machine."""
+    try:
+        with open("/proc/cpuinfo", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if line.startswith("model name"):
+                    return line.split(":", 1)[1].strip()
+    except OSError:
+        pass
+    return platform.processor() or platform.machine()
+
+
 def provenance(out: Path, head: dict, draw: dict, **extra: object) -> None:
     record = {"commit": head["commit"], "round": draw["round"], "master_seed": draw["master_seed"],
-              "python": platform.python_version(), "platform": platform.platform(), **extra}
+              "python": platform.python_version(), "platform": platform.platform(), "cpu": cpu_model(), **extra}
     (out / "provenance.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
 
 
