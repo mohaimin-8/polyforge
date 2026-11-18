@@ -49,6 +49,8 @@ PREDICTIONS = REPO / "research" / "hvpa" / "predictions.json"
 CALIBRATION = REPO / "research" / "hvpa" / "calibration.json"
 TESTS = ("superiority", "equivalence")
 BALANCE = len(pilot.ORDERS)   # six orders of the three arms
+RUN_HOURS = 60.2 / 60         # one live run with its reset, as the pilot's runs took
+Z_POWER_80 = 0.8416           # for the 80 %-power column of `sizes` (the plan's is 90 %)
 
 
 def identity(width: int, sigma: float, k: int) -> str:
@@ -82,6 +84,47 @@ def regime_size(contrast_sizes: dict[str, int | None]) -> int:
                          "(no spread or no difference to detect): decide the size in the protocol")
     n = max(contrast_sizes.values())
     return max(BALANCE, BALANCE * math.ceil(n / BALANCE))
+
+
+def sizes(pilot_out: Path, predictions: dict) -> list[dict]:
+    """What the pilot's records so far ask for, per regime and contrast (exploratory; no draw needed):
+    the pairs needed at the plan's 90 % power and at 80 %."""
+    out = []
+    for (w, s, arm), d in pilot_differences(pilot_out, predictions).items():
+        if len(d["diffs"]) < 2:
+            continue
+        mean_j = statistics.fmean(d["comparator_j"])
+        st = pilot.sample_sizes(d["diffs"], mean_j, d["gain"])
+        n80 = ((pilot.Z_ALPHA + Z_POWER_80) * st["sigma_d"] / st["delta"]) ** 2 if st["delta"] > 0 else math.inf
+        out.append({"width": w, "sigma": s, "arm": arm, **st, "comparator_j": mean_j,
+                    "gain_observed": st["mean_diff"] / mean_j, "gain_predicted": d["gain"],
+                    "n_superiority_80": math.ceil(n80) if math.isfinite(n80) else None})
+    return out
+
+
+def hours(schedules: int) -> float:
+    """Testbed hours for `schedules` schedules, each run once by every arm."""
+    return len(pilot.ARMS) * schedules * RUN_HOURS
+
+
+def print_sizes(rows: list[dict]) -> None:
+    for r in rows:
+        print(f"w{r['width']} s{r['sigma']} A4 vs {r['arm']}: {r['pairs']} pairs; gain {r['gain_observed']:+.1%} "
+              f"of {r['arm']}'s J (twin predicted {r['gain_predicted']:+.1%}); sigma_d {r['sigma_d']:.4f}; pairs "
+              f"needed: superiority {r['n_superiority']} (at 80 % power {r['n_superiority_80']}), "
+              f"equivalence {r['n_equivalence']}")
+    for (w, s) in dict.fromkeys((r["width"], r["sigma"]) for r in rows):
+        group = [r for r in rows if (r["width"], r["sigma"]) == (w, s)]
+        for key, power in (("n_superiority", "90 %"), ("n_superiority_80", "80 %")):
+            cells = []
+            for name, picked in [("every contrast", group)] + [(f"A4 vs {r['arm']} only", [r]) for r in group]:
+                ns = {r["arm"]: r[key] for r in picked}
+                if None in ns.values():
+                    cells.append(f"{name}: n/a")
+                    continue
+                n = regime_size(ns)
+                cells.append(f"{name}: {n} schedules, {hours(n):.0f} h")
+            print(f"w{w} s{s} main runs, superiority at {power} power, all arms on every schedule: " + "; ".join(cells))
 
 
 def checked_master(draw: dict) -> str:
@@ -170,7 +213,13 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--plan", type=Path, required=True)
     r.add_argument("--calibration", type=Path, default=CALIBRATION)
     r.add_argument("--out", type=Path, required=True)
+    z = sub.add_parser("sizes", help="what the pilot's records so far ask for (exploratory, no draw)")
+    z.add_argument("--pilot", type=Path, required=True)
+    z.add_argument("--predictions", type=Path, default=PREDICTIONS)
     args = ap.parse_args(argv)
+    if args.cmd == "sizes":
+        print_sizes(sizes(args.pilot, json.loads(args.predictions.read_text(encoding="utf-8"))))
+        return 0
     if args.cmd == "plan":
         if args.out.exists():
             raise SystemExit(f"{args.out} exists: a plan is written once")

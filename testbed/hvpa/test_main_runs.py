@@ -91,6 +91,19 @@ def test_no_main_run_from_an_uncommitted_plan(tmp_path, monkeypatch):
         main_runs.run_plan(plan, tmp_path / "out")
 
 
+def test_sizes_reads_the_pilot_so_far_without_a_draw(tmp_path, capsys):
+    pilot_records(tmp_path)
+    rows = main_runs.sizes(tmp_path, PREDICTIONS)
+    assert {r["arm"] for r in rows} == {"A3", "A1"} and all(r["pairs"] == pilot.PAIRS for r in rows)
+    plan = main_runs.make_plan(tmp_path, PREDICTIONS, draw(), {})
+    assert ({r["arm"]: r["n_superiority"] for r in rows}
+            == {arm: c["n_superiority"] for arm, c in plan["regimes"][0]["contrasts"].items()})
+    assert all(r["n_superiority_80"] <= r["n_superiority"] for r in rows)
+    assert main_runs.hours(6) == pytest.approx(3 * 6 * 60.2 / 60)
+    main_runs.print_sizes(rows)
+    assert "every contrast" in capsys.readouterr().out
+
+
 def test_a_plan_is_written_once(tmp_path):
     out = tmp_path / "main_plan.json"
     out.write_text("{}", encoding="utf-8")

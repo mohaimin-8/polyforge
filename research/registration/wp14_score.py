@@ -309,14 +309,14 @@ def report(s: dict, meta: dict) -> str:
     L += ["", "## H2 by regime", "", "| width | kappa | design points | mean predictor | gain | predicted gain |",
           "|---:|---:|---:|---:|---:|---:|"]
     for r in sorted(h["H2"]["table"], key=lambda r: (r["width"], r["kappa"])):
-        L.append(f"| {r['width']} | {r['kappa']:.3f} | {r['n']} | {f(r['x'], '.4f')} | {f(r['gain'])} | "
+        L.append(f"| {int(r['width'])} | {r['kappa']:.3f} | {r['n']} | {f(r['x'], '.4f')} | {f(r['gain'])} | "
                  f"{f(r['predicted_gain'])} |")
     L += ["", "## Every arm against the joint planner (descriptive, no test)", "",
           "| plant | granularity | arm | n | mean J(joint) | mean J(arm) - J(joint) [95% CI] | cost (USD) | violation |",
           "|---|---|---|---:|---:|---|---:|---:|"]
     for r in s["descriptive"]:
         L.append(f"| {r['plant']} | {r['granularity']} | {r['arm']} | {r['n']} | {f(r['mean_J_joint'], '.4f')} | "
-                 f"{f(r['mean_d_J'])} [{f(r['ci95'][0])}, {f(r['ci95'][1])}] | {f(r['mean_d_cost_usd'], '+.2f')} | "
+                 f"{f(r['mean_d_J'])} [{f(r['ci95'][0])}, {f(r['ci95'][1])}] | {f(r['mean_d_cost_usd'], '+.4f')} | "
                  f"{f(r['mean_d_violation'])} |")
     return "\n".join(L) + "\n"
 
