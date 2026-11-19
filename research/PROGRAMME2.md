@@ -102,7 +102,7 @@ Status at the deadline (2026-11-20 14:00), one line per work package of the plan
 | WP13 | tooling done | seeds and the CI campaign built, tested and rehearsed; the protocol (`PROTOCOL.md`) and its registration are the author's and do not exist yet |
 | WP14 | built, not run | 2,420 runs in 16 shards, rehearsed on GitHub; waits for the protocol, then 24 h for its drand round |
 | WP15 | done | `REPORT.md`, `RESULTS.md` |
-| WP16 | done but the DOI | the benchmark harness, one-command reproduction (31 steps), `DATA_LICENCES.md`, the deposit builder; publishing is the author's |
+| WP16 | done but the DOI | the benchmark harness, one-command reproduction (31 steps; on 2026-11-20 every one rebuilt its report identically on the laptop, line ends aside, none skipped), `DATA_LICENCES.md`, the deposit builder; publishing is the author's |
 | WP17 | pilot done | 54 live runs, none invalid (`PILOT_LIVE.md`); the main runs need 433 laptop-hours at 90 % power and the registered draw: not run |
 | WP19 | not started | needs GPU access |
 | WP20 | not started | needs the DOI and an outside checker |
