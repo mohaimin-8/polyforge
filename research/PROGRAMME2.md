@@ -25,7 +25,7 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP13 step 5 the confirmatory campaign in CI, the round its only input | `research/registration/`, `.github/workflows/confirmatory.yml` | `python confirm.py draw\|shards\|run\|score\|seal` (run by the workflow, started by hand on commit C); what runs: `wp14_campaign.py` (H1-H4: new WP4 regimes, WP9's selected arms on freshly drawn workloads), scored by `wp14_score.py`, both as `design.json` fixes them (marked draft until the protocol fixes every value; a draft runs only as `--rehearsal`) | `campaign.json` (the manifest; it names `PROTOCOL.md`, which the protocol supplies); the workflow's `confirmatory` artifact (every shard's `rows.csv` and `population.json`, then `score.json` and `SCORE.md`) and `SHA256SUMS` in the run summary |
 | WP15 external check (RouteBalance) | `research/external/routebalance/` | `python -I analyse.py report` | `REPORT.md`, `RESULTS.md` |
 | WP16 benchmark: any controller scored by regret | `research/benchmark/` | `python bench.py --controller module:Class --plant B` | per-workload CSV, summary JSON |
-| WP17 horizontal with vertical autoscaling | `research/hvpa/`, `testbed/hvpa/` | `python twin_pilot.py`; cluster: `install.py`, `calibrate_service.py`, `twin_predict.py`; live: `run_pilot.py` (the pilot, 54 one-hour runs), then `main_runs.py plan|run` (the main runs: the pilot's design at the size it asks for, the demand seeded by the registered draw; waits for the registration) | `VPA_MODEL.md`, `TWIN_PILOT.md`, `calibration.json`, `predictions.json` (committed before any live run); `PILOT_LIVE.md` once the pilot ends |
+| WP17 horizontal with vertical autoscaling | `research/hvpa/`, `testbed/hvpa/` | `python twin_pilot.py`; cluster: `install.py`, `calibrate_service.py`, `twin_predict.py`; live: `run_pilot.py` (the pilot, 54 one-hour runs), then `main_runs.py plan|run` (the main runs: the pilot's design at the size it asks for, the demand seeded by the registered draw; waits for the registration) | `VPA_MODEL.md`, `TWIN_PILOT.md`, `calibration.json`, `predictions.json` (committed before any live run); `PILOT_LIVE.md` (the pilot's 54 runs, records in `testbed/hvpa/pilot_runs/`); `python main_runs.py sizes --pilot pilot_runs` prints the main runs' sizes |
 | WP22 controls, adversarial search, blind predictions | `research/controls/` | `python negative_control.py`, `adversarial_search.py`, `blind_predictions.py` | `NEGATIVE_CONTROL.md`, `ADVERSARIAL_SEARCH.md`, `DIAGNOSE_158.md`, `RANDOM_SAMPLE_CHECK.md`, `GATE_REACH.md` |
 | WP23 the index as a tool | `tools/index-probe/` | `python index_probe.py log|box ...` | `README.md` |
 
@@ -65,6 +65,11 @@ What the pilots say so far, in one line each (details in the files above):
 - The semantic cache, replayed on 1,000,000 real first turns through the gateway's own logic,
   saturates at about 300 entries (1.19 MiB of heap) with a ceiling of 0.21 at tau 0.85 (WP6); plant 2
   now uses that curve, which makes the cache knob close to on/off at the simulator's sizes.
+- WP17's live pilot (54 one-hour runs, none invalid; six schedules per regime): joint control's J was
+  below per-knob control's in all three regimes, by 20 % to 60 % of per-knob's J (the twin predicted 13 %
+  to 28 %), and below the HPA-plus-VPA pair's in two of three (26 % and 47 %; 10 % above it at width 4,
+  sigma 0.2; the twin predicted 52 % to 67 %). Six pairs only size the main runs: every contrast at 90 %
+  power needs 66, 36 and 42 schedules, 433 laptop-hours in all; not run.
 
 What the full campaigns say (2026-11-17; still exploratory):
 
@@ -76,3 +81,32 @@ What the full campaigns say (2026-11-17; still exploratory):
   of them and worse in 25%; whole-curve sign-flip test p = 0.32.
 - WP5 Morris (r = 20) and Sobol: replica capacity drives the gain (first-order 0.72, total 0.75);
   congestion, the cache ceiling and the tail slope act mostly through interactions.
+
+Status at the deadline (2026-11-20 14:00), one line per work package of the plan:
+
+| WP | state | where it stands |
+|---|---|---|
+| WP0 | partly | tag `programme-1-final`; `research/plant2/`, `control2/`, `theory/` (programme 2's campaigns live under `research/`, not `eval/campaign2/`); the chart installs the corrected planner and counts demand by default (31f93f0); publishing programme 1's bundle, the index and route decisions and gate G0's literature table are the author's (no record of them here) |
+| WP1 | done | `HEADROOM_PILOT.md` |
+| WP2 | done | `FITS.md`, `CONSTANTS.md` |
+| WP3, WP18 | done | Theorems 1 and 2 hold on every check, T4 false as planned; the proofs are drafts until a second person reads them |
+| WP4 | done | `DOSE_RESPONSE_PILOT.md` |
+| WP5 | done | Morris r = 20 with common random numbers, Sobol N = 128, the specification curve of 4,608 specifications |
+| WP6 | done | `out/full/` |
+| WP7 | done | `TIERS.md`, `SELFHOSTED.md` |
+| WP8 | done | `FEATURES.md`, `POPULATION.md` |
+| WP9 | done | six full campaigns |
+| WP10 | done | the testbed, built and up on kind (2026-11-14) |
+| WP11 | done, target missed | attainment error 65 % (WP11) and 29.8 % (WP11b) against 25 %; rank correlation 0.89 met in WP11b |
+| WP12 | done, gate G3 not met | `PILOT.md` |
+| WP13 | tooling done | seeds and the CI campaign built, tested and rehearsed; the protocol (`PROTOCOL.md`) and its registration are the author's and do not exist yet |
+| WP14 | built, not run | 2,420 runs in 16 shards, rehearsed on GitHub; waits for the protocol, then 24 h for its drand round |
+| WP15 | done | `REPORT.md`, `RESULTS.md` |
+| WP16 | done but the DOI | the benchmark harness, one-command reproduction (31 steps), `DATA_LICENCES.md`, the deposit builder; publishing is the author's |
+| WP17 | pilot done | 54 live runs, none invalid (`PILOT_LIVE.md`); the main runs need 433 laptop-hours at 90 % power and the registered draw: not run |
+| WP19 | not started | needs GPU access |
+| WP20 | not started | needs the DOI and an outside checker |
+| WP21 | the author's decision | |
+| WP22 | done | `NEGATIVE_CONTROL.md`, `ADVERSARIAL_SEARCH.md`, blind predictions, `RANDOM_SAMPLE_CHECK.md`, `GATE_REACH.md` |
+| WP23 | done | `tools/index-probe/` |
+| WP24 | not started | the preprint and outside readers are the author's |
