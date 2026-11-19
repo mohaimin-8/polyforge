@@ -1,0 +1,40 @@
+{
+ "arm": "A1",
+ "target": 0.1,
+ "regime": {
+  "step_s": 10.0,
+  "slo_s": 0.5188897673360771,
+  "shape": "ramp",
+  "sigma": 0.05,
+  "seed": 2
+ },
+ "start_unix": 1795075542.993189,
+ "end_unix": 1795079152.0990577,
+ "k6_job": "succeeded",
+ "k6": {
+  "requests": 91175,
+  "dropped": 147,
+  "on_time": 61952,
+  "attainment": 0.6794845078146422,
+  "latency_ms": {
+   "avg": 1397.5922400150055,
+   "med": 202.25557550000002,
+   "p(95)": 6410.8285937999935,
+   "p(99)": 20663.297510049968,
+   "max": 51477.588725
+  }
+ },
+ "k6_error": "",
+ "power": {
+  "start": true,
+  "end": true
+ },
+ "watch": {
+  "cost": 0.5590094304931524,
+  "resizes": 3,
+  "reversals": 0,
+  "max_replicas": 8,
+  "polls": 351,
+  "max_gap_s": 10.50486969947815
+ }
+}

@@ -1,0 +1,42 @@
+{
+ "arm": "A1",
+ "target": 0.1,
+ "regime": {
+  "step_s": 10.0,
+  "slo_s": 0.5188897673360771,
+  "shape": "azure_app2",
+  "sigma": 0.05,
+  "seed": 5
+ },
+ "start_unix": 1795100858.141854,
+ "end_unix": 1795104471.3626678,
+ "k6_job": "succeeded",
+ "k6": {
+  "requests": 72846,
+  "dropped": 21,
+  "on_time": 71925,
+  "attainment": 0.9873568898772753,
+  "latency_ms": {
+   "avg": 123.06041472834806,
+   "med": 94.663452,
+   "p(95)": 248.62756060000004,
+   "p(99)": 600.4543923999997,
+   "max": 6105.687546
+  }
+ },
+ "k6_error": "",
+ "power": {
+  "start": true,
+  "end": true
+ },
+ "watch": {
+  "cost": 0.5901119754883486,
+  "resizes": 2,
+  "reversals": 1,
+  "max_replicas": 8,
+  "polls": 353,
+  "max_gap_s": 10.449032068252563
+ },
+ "attempt": 1,
+ "problems": []
+}
