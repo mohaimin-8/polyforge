@@ -153,8 +153,12 @@ def wait_for_exit(pid: int) -> None:
 
 
 def expand(globs: tuple[str, ...], repo: Path = REPO) -> list[str]:
-    """The repository-relative files the globs match now."""
-    return sorted({p.relative_to(repo).as_posix() for g in globs for p in repo.glob(g) if p.is_file()})
+    """The repository-relative files the globs match now; a matched directory
+    stands for every file under it (until 2026-11-20 a directory was dropped:
+    25e887c committed WP17's PILOT_LIVE.md without testbed/hvpa/pilot_runs)."""
+    matched = [p for g in globs for p in repo.glob(g)]
+    files = [f for p in matched for f in ([p] if p.is_file() else p.rglob("*")) if f.is_file()]
+    return sorted({f.relative_to(repo).as_posix() for f in files})
 
 
 def commit(c: Campaign, repo: Path = REPO, note: str = "") -> None:

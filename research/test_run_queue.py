@@ -50,6 +50,19 @@ def test_outputs_expand_to_the_files_the_campaign_wrote_and_never_its_journal(tm
     assert rq.expand(rq.wp9("B", "own", "plant").outputs, tmp_path) == []    # another budget's directory
 
 
+def test_a_directory_among_the_outputs_stands_for_every_file_under_it(tmp_path):
+    (pilot,) = rq.selected(None, ["wp17-pilot"])
+    runs = tmp_path / "testbed" / "hvpa" / "pilot_runs" / "w2_s0.2" / "schedule0"
+    runs.mkdir(parents=True)
+    for f in ("A4.json", "A4_1794916314.json"):
+        (runs / f).write_text("{}")
+    (tmp_path / "research" / "hvpa").mkdir(parents=True)
+    (tmp_path / "research" / "hvpa" / "PILOT_LIVE.md").write_text("# WP17 live pilot\n")
+    rel = "testbed/hvpa/pilot_runs/w2_s0.2/schedule0/"
+    assert rq.expand(pilot.outputs, tmp_path) == ["research/hvpa/PILOT_LIVE.md", rel + "A4.json",
+                                                  rel + "A4_1794916314.json"]
+
+
 def test_a_wp9_exit_1_is_a_result_and_a_crash_is_not(monkeypatch, tmp_path):
     monkeypatch.setattr(rq, "LOG", tmp_path / "log.txt")
     committed = []
