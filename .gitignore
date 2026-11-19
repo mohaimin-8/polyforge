@@ -84,3 +84,7 @@ eval/results/live_soak_evidence/
 
 # Presentation runs (docs/DEMO.md): never evidence.
 eval/results/demo_cluster*
+
+# Programme 2's local outputs (the run queue's log, the deposit that
+# scripts/bundle_programme2.py builds): never committed.
+research/out/

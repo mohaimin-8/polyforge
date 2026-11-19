@@ -31,6 +31,11 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 
 Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (31 steps, the WP17 live pilot's report rebuilt from `testbed/hvpa/pilot_runs` among them; those needing downloaded inputs or not-yet-committed run data are skipped without them).
 
+The deposit (WP16: one DOI with code, protocols, run data and the audit scripts):
+`python scripts/bundle_programme2.py --audit ../PolyForge_Audit_2026-11-11_scripts` (`--confirmatory <dir>` adds
+WP14's workflow artifact) writes the zip of one commit's tracked tree and the audit scripts, its `MANIFEST.sha256`
+and `deposit.json` to `research/out/zenodo/`; publishing it on Zenodo is the author's step.
+
 The long CPU campaigns (WP9's full protocol, WP5's Morris and Sobol stages) run one after another once the
 testbed is free, resumable: `python research/run_queue.py --list`. From 2026-11-17 they can also run on
 GitHub Actions, split into shards (`research/offload.py`, `.github/workflows/campaign.yml`, started by
@@ -39,7 +44,7 @@ pushing a branch `offload/<campaign>`), while the laptop keeps the live campaign
 with the CI run named.
 
 Tests: `python -m pytest research/theory research/control2 research/plant2 research/population
-research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark research/sensitivity tools/index-probe research/registration research/test_run_queue.py research/test_offload.py scripts/test_reproduce_programme2.py -q`
+research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark research/sensitivity tools/index-probe research/registration research/test_run_queue.py research/test_offload.py scripts/test_reproduce_programme2.py scripts/test_bundle_programme2.py -q`
 (CI runs the same line), plus `testbed/` (`python -m pytest -q` inside it).
 
 What the pilots say so far, in one line each (details in the files above):

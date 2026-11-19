@@ -1,0 +1,102 @@
+"""Programme 2's deposit: what goes in, byte for byte, and what refuses."""
+
+import hashlib
+import json
+import subprocess
+import sys
+import zipfile
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import bundle_programme2 as bundle  # noqa: E402
+
+GIT = ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "core.autocrlf=false"]
+
+
+@pytest.fixture
+def inputs(tmp_path):
+    """A one-commit repository, an audit folder (with bytecode to leave out), a creators file."""
+    repo = tmp_path / "repo"
+    (repo / "sub").mkdir(parents=True)
+    (repo / "a.txt").write_bytes(b"alpha\n")
+    (repo / "sub" / "b.bin").write_bytes(bytes(range(256)))
+    for cmd in (["init", "-q"], ["add", "."], ["commit", "-qm", "init"]):
+        subprocess.run([*GIT, *cmd], cwd=repo, check=True)
+    audit = tmp_path / "audit"
+    (audit / "__pycache__").mkdir(parents=True)
+    (audit / "check.py").write_bytes(b"print('audit')\n")
+    (audit / "__pycache__" / "check.cpython-312.pyc").write_bytes(b"\0bytecode")
+    creators = tmp_path / "creators.json"
+    creators.write_text(json.dumps([{"name": "Doe, Jane", "affiliation": "Somewhere"},
+                                    {"name": "Roe, Rick", "type": "Supervisor"}]), encoding="utf-8")
+    return repo, audit, creators
+
+
+def build(repo, audit, creators, out, *extra):
+    assert bundle.main(["--repo", str(repo), "--audit", str(audit), "--creators", str(creators),
+                        "--out", str(out), *extra]) == 0
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True,
+                         check=True).stdout.strip()
+    meta = json.loads((out / "deposit.json").read_text(encoding="utf-8"))["metadata"]
+    return out / f"polyforge-programme2-{sha[:12]}.zip", sha, meta
+
+
+def test_the_deposit_holds_the_commit_the_audit_scripts_and_a_manifest_of_both(tmp_path, inputs):
+    repo, audit, creators = inputs
+    (repo / "a.txt").write_bytes(b"edited, never committed\n")        # the working tree is not the deposit
+    zpath, sha, meta = build(repo, audit, creators, tmp_path / "out")
+    with zipfile.ZipFile(zpath) as zf:
+        names = zf.namelist()
+        assert names == ["repository/a.txt", "repository/sub/b.bin", "audit_scripts/check.py", "MANIFEST.sha256"]
+        assert zf.read("repository/a.txt") == b"alpha\n"
+        assert zf.read("repository/sub/b.bin") == bytes(range(256))
+        manifest = zf.read("MANIFEST.sha256").decode("utf-8")
+        lines = manifest.splitlines()
+        assert [line.split("  ", 1)[1] for line in lines] == names[:-1]
+        assert all(hashlib.sha256(zf.read(name)).hexdigest() == digest
+                   for digest, name in (line.split("  ", 1) for line in lines))
+    assert (tmp_path / "out" / "MANIFEST.sha256").read_bytes() == manifest.encode("utf-8")
+    assert meta["version"] == sha[:12] and sha in meta["description"]
+    assert "audit_scripts/, audit (1 files)" in meta["description"] and "confirmatory" not in meta["description"]
+    assert [c["name"] for c in meta["creators"]] == ["Doe, Jane"]
+    assert [c["type"] for c in meta["contributors"]] == ["Supervisor"]
+    assert not list((tmp_path / "out").glob("*.partial"))
+
+
+def test_the_same_inputs_give_the_same_zip_byte_for_byte(tmp_path, inputs):
+    first, _, _ = build(*inputs, tmp_path / "one")
+    second, _, _ = build(*inputs, tmp_path / "two")
+    assert first.read_bytes() == second.read_bytes()
+
+
+def test_the_confirmatory_artifact_goes_in_when_given(tmp_path, inputs):
+    conf = tmp_path / "confirmatory"
+    (conf / "shard-0").mkdir(parents=True)
+    (conf / "shard-0" / "rows.csv").write_bytes(b"identity,j\n")
+    (conf / "SCORE.md").write_bytes(b"# score\n")
+    zpath, _, meta = build(*inputs, tmp_path / "out", "--confirmatory", str(conf))
+    with zipfile.ZipFile(zpath) as zf:
+        assert [n for n in zf.namelist() if n.startswith("confirmatory/")] == [
+            "confirmatory/SCORE.md", "confirmatory/shard-0/rows.csv"]
+    assert "confirmatory/, the confirmatory campaign's workflow artifact (2 files)" in meta["description"]
+
+
+def test_a_missing_or_empty_folder_a_bad_commit_or_bad_creators_refuse_before_anything_is_written(tmp_path, inputs):
+    repo, audit, creators = inputs
+    out = tmp_path / "out"
+    empty = tmp_path / "empty"
+    (empty / "__pycache__").mkdir(parents=True)
+    (empty / "__pycache__" / "x.pyc").write_bytes(b"\0")                # only bytecode: nothing to deposit
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps([{"name": "NoComma"}]), encoding="utf-8")
+    cases = [(["--audit", str(tmp_path / "nowhere"), "--creators", str(creators)], "is not a directory"),
+             (["--audit", str(empty), "--creators", str(creators)], "has no files"),
+             (["--audit", str(audit), "--creators", str(creators), "--commit", "no-such-commit"], "rev-parse"),
+             (["--audit", str(audit), "--creators", str(bad)], "Family, Given")]
+    for args, message in cases:
+        with pytest.raises(SystemExit, match=message):
+            bundle.main(["--repo", str(repo), "--out", str(out), *args])
+    assert not out.exists()
