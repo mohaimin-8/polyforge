@@ -54,3 +54,18 @@ def test_a_resumed_sobol_run_cannot_mix_two_factor_choices():
     assert a == sobol.design_tag(["cache_hit_max", "replica_capacity_wu"]) and a.startswith("k2_")
     assert a != sobol.design_tag(["replica_capacity_wu", "cache_hit_max"])
     assert a != sobol.design_tag(["cache_hit_max", "congestion_exponent"])
+
+
+def test_a_report_only_rebuild_reads_the_committed_runs_exactly_and_never_rewrites_them(tmp_path):
+    import pandas as pd
+
+    exact = [26.742575566088775, 0.1 + 0.2]     # the first came back a digit off through pandas' default parser
+    committed = tmp_path / "sobol_runs.csv.gz"
+    pd.DataFrame({"gain": exact}).to_csv(committed, index=False)
+    before = committed.read_bytes()
+    runs, from_campaign = sobol.finished_runs(tmp_path / "absent.partial.csv", committed, report_only=True)
+    assert runs.gain.tolist() == exact and not from_campaign and committed.read_bytes() == before
+    partial = tmp_path / "runs.partial.csv"
+    pd.DataFrame({"gain": [1.5]}).to_csv(partial, index=False)
+    assert sobol.finished_runs(partial, committed, report_only=True)[1]      # a campaign's runs are written
+    assert sobol.finished_runs(partial, committed, report_only=False)[1]

@@ -126,6 +126,17 @@ def report(pp: pd.DataFrame, prob: dict, n: int, source: str = "") -> str:
     return "\n".join(L) + "\n"
 
 
+def finished_runs(partial: Path, committed: Path, report_only: bool) -> tuple[pd.DataFrame, bool]:
+    """The runs to report and whether they are a campaign's, to be written to
+    `committed`. The partial file is not committed, so a report-only rebuild
+    elsewhere reads the committed runs: exactly (pandas' default float parser
+    can move the last digit) and never rewritten (until 2026-11-20 a rebuild
+    wrote them back, a digit off here and there)."""
+    if partial.exists() or not report_only:
+        return pd.read_csv(partial), True
+    return pd.read_csv(committed, float_precision="round_trip"), False
+
+
 def main(argv: list[str] | None = None) -> int:
     from SALib.sample import sobol as sobol_sample
 
@@ -160,12 +171,12 @@ def main(argv: list[str] | None = None) -> int:
                 pd.DataFrame([row]).to_csv(partial, mode="a", header=not partial.exists(), index=False)
                 if i % 200 == 0:
                     print(f"{i}/{len(todo)} runs, {time.time() - t0:.0f} s", flush=True)
-    # the partial file is not committed: a report-only rebuild elsewhere reads the finished runs
-    runs = pd.read_csv(partial if partial.exists() or not args.report_only else OUT / "sobol_runs.csv.gz")
+    runs, from_campaign = finished_runs(partial, OUT / "sobol_runs.csv.gz", args.report_only)
     pp = per_plant(runs)
     if len(pp) != len(X):
         raise RuntimeError(f"{len(pp)} of {len(X)} plants finished; rerun to resume")
-    runs.to_csv(OUT / "sobol_runs.csv.gz", index=False)
+    if from_campaign:
+        runs.to_csv(OUT / "sobol_runs.csv.gz", index=False)
     text = report(pp, prob, args.n, source)
     (HERE / "SOBOL.md").write_text(text, encoding="utf-8")
     print(text)
