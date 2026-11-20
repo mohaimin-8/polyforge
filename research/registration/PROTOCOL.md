@@ -44,8 +44,9 @@ All of it is pilot data; none of it is reused as confirmatory evidence.
 - **Rehearsals**: the campaign and the scorer were run with a made-up master
   seed and two of everything (35 runs), as a pipeline check that gives no
   result: on GitHub (`.github/workflows/campaign.yml`, branch
-  `offload/rehearsal`, last on 2026-11-18, run 44341439376) and on the
-  laptop on 2026-11-20; every run completed both times.
+  `offload/rehearsal`, last on 2026-11-20 with the current scorer, run
+  44693289176) and on the laptop the same day. Every run completed each
+  time, and both logged the same 3,824 decisions under Theorem 1.
 
 ## 3. Hypotheses
 
