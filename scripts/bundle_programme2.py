@@ -9,7 +9,9 @@ The zip holds
                    protocols, predictions committed before their runs, every
                    committed run record and report;
   audit_scripts/   the audit's scripts, kept outside the repository;
-  confirmatory/    WP14's workflow artifact, when the campaign ran;
+  confirmatory/    WP14's workflow artifact, when the campaign ran, exactly as
+                   its SHA256SUMS seals it (a file missing, changed or added
+                   since the seal refuses the build);
   MANIFEST.sha256  the sha256 of every other file in the zip (sha256sum format).
 The out directory gets the zip, the same MANIFEST.sha256 and deposit.json
 (creators from eval/zenodo_creators.json, checked by programme 1's reader).
@@ -26,6 +28,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 import tarfile
@@ -38,6 +41,8 @@ REPO = Path(__file__).resolve().parents[1]
 CREATORS = REPO / "eval" / "zenodo_creators.json"
 PROGRAMME1_BUILDER = REPO / "eval" / "scripts" / "archive_zenodo.py"
 SKIP_DIRS = frozenset({"__pycache__"})      # bytecode is derived, never deposited
+SEAL = "SHA256SUMS"                          # what confirm.py seal writes at the artifact's root
+SEAL_LINE = re.compile(r"([0-9a-f]{64})  (\S.*)")
 KEYWORDS = ["kubernetes", "autoscaling", "LLM serving", "joint control", "interaction index",
             "vertical pod autoscaling", "pre-registration", "reproducibility"]
 
@@ -101,6 +106,38 @@ def folder_listing(folder: Path, prefix: str) -> list[tuple[str, Path]]:
     return files
 
 
+def sealed_names(sums: Path) -> dict[str, str]:
+    """SHA256SUMS as confirm.py seal writes it: '<sha256>  <path>' lines, each path relative and inside."""
+    names: dict[str, str] = {}
+    for n, line in enumerate(sums.read_text(encoding="utf-8").splitlines(), 1):
+        m = SEAL_LINE.fullmatch(line)
+        name = m.group(2) if m else ""
+        if not m or name.startswith("/") or "\\" in name or ":" in name or ".." in name.split("/"):
+            raise SystemExit(f"confirmatory: {SEAL} line {n} is not '<sha256>  <path inside the folder>'")
+        if name in names:
+            raise SystemExit(f"confirmatory: {SEAL} line {n} lists {name} again")
+        names[name] = m.group(1)
+    return names
+
+
+def check_seal(folder: Path, files: list[tuple[str, Path]]) -> None:
+    """The artifact exactly as the run sealed it: its SHA256SUMS lists every other file with its
+    sha256, and nothing else is there, so the deposit holds what the run's summary published.
+    `sha256sum -c` alone would miss a file added after the seal."""
+    if not (folder / SEAL).is_file():
+        raise SystemExit(f"confirmatory: {folder} has no {SEAL}; give the folder the workflow's "
+                         "`confirmatory` artifact unpacks to")
+    sealed = sealed_names(folder / SEAL)
+    present = {rel: path for rel, path in files if rel != SEAL}
+    found = {"missing": sorted(set(sealed) - set(present)),
+             "changed": sorted(r for r in set(sealed) & set(present) if file_sha256(present[r]) != sealed[r]),
+             "not sealed": sorted(set(present) - set(sealed))}
+    wrong = [f"{len(v)} {k} ({', '.join(v[:3])}{', ...' if len(v) > 3 else ''})" for k, v in found.items() if v]
+    if wrong:
+        raise SystemExit(f"confirmatory: {folder} does not match its {SEAL}: {'; '.join(wrong)}. Deposit the "
+                         "artifact as downloaded (research/registration/PROTOCOL_NOTES.md, step 8).")
+
+
 def add(zf: zipfile.ZipFile, name: str, data: bytes, stamp: tuple[int, ...]) -> str:
     """One entry, written the same way on every platform; its sha256."""
     info = zipfile.ZipInfo(name, date_time=stamp)
@@ -125,6 +162,7 @@ def build(repo: Path, rev: str, audit: Path, confirmatory: Path | None, out: Pat
     folders = {"audit_scripts": folder_listing(audit, "audit_scripts")}
     if confirmatory is not None:
         folders["confirmatory"] = folder_listing(confirmatory, "confirmatory")
+        check_seal(confirmatory, folders["confirmatory"])
     parts = [("repository", tracked_files(repo, sha)),
              *((prefix, ((rel, p.read_bytes()) for rel, p in files)) for prefix, files in folders.items())]
     out.mkdir(parents=True, exist_ok=True)

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import zipfile
@@ -10,8 +11,10 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "research" / "registration"))
 
 import bundle_programme2 as bundle  # noqa: E402
+import confirm  # noqa: E402  (the workflow's seal, so the deposit takes exactly what it writes)
 
 GIT = ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "core.autocrlf=false"]
 
@@ -72,16 +75,48 @@ def test_the_same_inputs_give_the_same_zip_byte_for_byte(tmp_path, inputs):
     assert first.read_bytes() == second.read_bytes()
 
 
+def artifact(conf: Path) -> Path:
+    """A folder laid out as the workflow's `confirmatory` artifact unpacks, sealed by confirm.py seal."""
+    for rel, data in (("draw/draw.json", b'{"round": 1}\n'), ("shard-0/rows.csv", b"identity,j\n"),
+                      ("score/SCORE.md", b"# score\n")):
+        (conf / rel).parent.mkdir(parents=True, exist_ok=True)
+        (conf / rel).write_bytes(data)
+    confirm.seal(conf)
+    return conf
+
+
 def test_the_confirmatory_artifact_goes_in_when_given(tmp_path, inputs):
-    conf = tmp_path / "confirmatory"
-    (conf / "shard-0").mkdir(parents=True)
-    (conf / "shard-0" / "rows.csv").write_bytes(b"identity,j\n")
-    (conf / "SCORE.md").write_bytes(b"# score\n")
+    conf = artifact(tmp_path / "confirmatory")
     zpath, _, meta = build(*inputs, tmp_path / "out", "--confirmatory", str(conf))
     with zipfile.ZipFile(zpath) as zf:
         assert [n for n in zf.namelist() if n.startswith("confirmatory/")] == [
-            "confirmatory/SCORE.md", "confirmatory/shard-0/rows.csv"]
-    assert "confirmatory/, the confirmatory campaign's workflow artifact (2 files)" in meta["description"]
+            "confirmatory/SHA256SUMS", "confirmatory/draw/draw.json", "confirmatory/score/SCORE.md",
+            "confirmatory/shard-0/rows.csv"]
+        sealed = zf.read("confirmatory/SHA256SUMS").decode("utf-8").splitlines()
+        assert all(hashlib.sha256(zf.read(f"confirmatory/{name}")).hexdigest() == digest
+                   for digest, name in (line.split("  ", 1) for line in sealed))
+    assert "confirmatory/, the confirmatory campaign's workflow artifact (4 files)" in meta["description"]
+
+
+@pytest.mark.parametrize("change, message", [
+    (lambda c: (c / "desktop.ini").write_bytes(b"[.ShellClassInfo]\n"), "1 not sealed (desktop.ini)"),
+    (lambda c: (c / "shard-0" / "rows.csv").unlink(), "1 missing (shard-0/rows.csv)"),
+    (lambda c: (c / "score" / "SCORE.md").write_bytes(b"# edited\n"), "1 changed (score/SCORE.md)"),
+    (lambda c: (c / "SHA256SUMS").unlink(), "has no SHA256SUMS"),
+    (lambda c: (c / "SHA256SUMS").write_text("0" * 64 + "  ../outside\n", encoding="utf-8"), "SHA256SUMS line 1"),
+    (lambda c: (c / "SHA256SUMS").write_text(2 * ("0" * 64 + "  draw/draw.json\n"), encoding="utf-8"),
+     "SHA256SUMS line 2 lists draw/draw.json again"),
+])
+def test_a_confirmatory_folder_unlike_its_seal_refuses_before_anything_is_written(tmp_path, inputs, change, message):
+    """The deposit holds the artifact exactly as the run sealed it (the hashes its summary published):
+    `sha256sum -c` alone misses a file added after the seal; the bundler does not."""
+    conf = artifact(tmp_path / "confirmatory")
+    change(conf)
+    out = tmp_path / "out"
+    with pytest.raises(SystemExit, match=re.escape(message)):
+        bundle.main(["--repo", str(inputs[0]), "--audit", str(inputs[1]), "--creators", str(inputs[2]),
+                     "--out", str(out), "--confirmatory", str(conf)])
+    assert not out.exists()
 
 
 def test_a_missing_or_empty_folder_a_bad_commit_or_bad_creators_refuse_before_anything_is_written(tmp_path, inputs):

@@ -16,7 +16,8 @@
 #          seed (draw.json)
 #   run    one job per shard of research/registration/campaign.json, each under 6 hours
 #   score  the frozen scorer on every shard's output, then SHA256SUMS over all of it;
-#          the hashes go to the run summary, everything to the "confirmatory" artifact
+#          the hashes and SHA256SUMS' own sha256 go to the run summary, everything to the
+#          "confirmatory" artifact
 #
 # The logic, and every refusal, is in research/registration/confirm.py.
 name: confirmatory
@@ -136,10 +137,16 @@ jobs:
       - name: Seal the results and publish the hashes
         env:
           ROUND: ${{ needs.draw.outputs.round }}
+        # The digest of SHA256SUMS itself, in the summary and the log: one hash to compare a
+        # downloaded artifact with (PROTOCOL_NOTES.md, step 8).
         run: |
           python research/registration/confirm.py seal results
+          digest=$(sha256sum results/SHA256SUMS | cut -d' ' -f1)
+          echo "sha256 of SHA256SUMS: ${digest}"
           {
             echo "## Confirmatory campaign: round ${ROUND}, commit ${GITHUB_SHA}"
+            echo
+            echo "sha256 of SHA256SUMS: ${digest}"
             echo
             echo '```'
             cat results/SHA256SUMS

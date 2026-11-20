@@ -107,10 +107,16 @@ commit 4920f02, CI green, run 44688664965).
    plus setup).
 8. The results: the run's `confirmatory` artifact (every shard's
    `rows.csv` and `population.json`, then `score.json` and `SCORE.md`) and
-   `SHA256SUMS` in its summary. Download it with
+   `SHA256SUMS` in its summary, with that file's own sha256. Download it with
    `gh run download <run id> --name confirmatory --dir research/out/confirmatory`
    (the run id ends the run's URL; `gh run list --workflow confirmatory`
-   lists it) and check it against those hashes:
-   `cd research/out/confirmatory && sha256sum -c SHA256SUMS`. Then rebuild
-   the deposit with them:
-   `python scripts/bundle_programme2.py --audit ../PolyForge_Audit_2026-11-11_scripts --confirmatory <the artifact's folder>`.
+   lists it) and check it against the summary:
+   `sha256sum research/out/confirmatory/SHA256SUMS` prints the summary's
+   digest, and `cd research/out/confirmatory && sha256sum -c SHA256SUMS`
+   passes. Then rebuild the deposit with them:
+   `python scripts/bundle_programme2.py --audit ../PolyForge_Audit_2026-11-11_scripts --confirmatory research/out/confirmatory`
+   (it refuses a folder that differs from its `SHA256SUMS` in any way, a
+   file added after the seal included, which `sha256sum -c` misses). The
+   summary lasts as long as GitHub keeps the run (deleting a run deletes its
+   summary); a dated OSF update giving that one digest would keep the seal
+   checkable afterwards (your call).
