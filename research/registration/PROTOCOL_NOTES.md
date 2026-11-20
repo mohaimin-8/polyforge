@@ -93,9 +93,14 @@ commit 4920f02, CI green, run 44688664965).
    never run, not on main); once `confirmatory.yml` is on main, "Run
    workflow" from the tag `wp14-c` with the round does the same. Pushed
    before the round is due, the draw stops with "not yet": re-run the
-   failed jobs once it is due. Never a
-   later commit (a deviation logged after C moves the branch): `confirm.py`
-   refuses a round due less than 24 h after the commit it runs on. It takes
+   failed jobs once it is due. The draw reads T0 from GitHub as `facts.py`
+   does and refuses any round but the one T0 names, before fetching it: a
+   mistyped tag is refused (delete it with
+   `git push origin :refs/tags/wp14-round-<N>` and push the right one; the
+   refused run stays in the history, with no randomness fetched), and so is
+   a later commit (a deviation logged after C moves the branch), whose own
+   first run names a later round. Never delete C's runs on GitHub: the
+   first one is T0. It takes
    about 15 minutes (the full campaign took 10.4 worker-hours in the
    laptop's completion check: about 10 minutes over 16 runners of 4 CPUs,
    plus setup).

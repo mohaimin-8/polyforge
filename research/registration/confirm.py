@@ -19,16 +19,20 @@ code. Placeholders: {master} {round} {shards} {out} in both lists, {shard} in `r
 `score`. A leading "python" means this interpreter. Beside a component's own files the driver writes
 provenance.json (commit, round, master seed, interpreter, platform) and <name>.log into {out}.
 
-    python confirm.py draw  --round N --out OUT        # OUT/draw.json: seeds.py's draw, checked
+    python confirm.py draw  --round N --t0-from-github --out OUT   # OUT/draw.json: seeds.py's draw, checked
+    python confirm.py draw  --round N --t0 T0 --out OUT            # T0 by hand (a rehearsal)
     python confirm.py shards                           # [0, 1, ...] for the CI matrix
     python confirm.py run   --draw OUT/draw.json --shard I --out OUT/shard-I
     python confirm.py score --draw OUT/draw.json --results DIR --out DIR/score   # DIR/shard-0 ...
     python confirm.py seal  DIR                        # DIR/SHA256SUMS, sha256sum's format
 
 Every step refuses (exit 2) to run from a checkout with modified tracked files, or with a draw made
-for another protocol or commit. A round due less than 24 h after the commit cannot be the one the
-protocol names, and is refused. A component that fails fails the step (exit 1): nothing is retried
-and nothing is re-rolled. Asking before the round is due exits 3, as seeds.py does.
+for another protocol or commit. The draw refuses every round but the one the protocol names, the
+first due at or after T0 + 24 h, before fetching anything from it: T0 is the creation time of the
+commit's first GitHub run, read with gh as facts.py reads it for the registration, so a mistyped
+round is refused, and so is a later commit (its first run names a later round). A component that
+fails fails the step (exit 1): nothing is retried and nothing is re-rolled. Asking before the round
+is due, or GitHub not answering for the runs, exits 3, as seeds.py does: run the draw again later.
 """
 
 from __future__ import annotations
@@ -45,6 +49,7 @@ from typing import Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import facts  # noqa: E402
 import seeds  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
@@ -128,18 +133,29 @@ def frozen(repo: Path = REPO) -> dict:
     return head
 
 
+def named_round(t0: str, fetch: seeds.Fetch | None = None) -> int:
+    """The round the protocol names (section 7): quicknet's first round due at or after T0 + 24 h."""
+    info = seeds.chain_info(fetch=fetch)
+    return seeds.round_at_or_after(seeds.parse_time(t0) + seeds.DELAY_S, info["genesis_time"], info["period"])
+
+
 def do_draw(rnd: int, out: Path, manifest: dict, head: dict, fetch: seeds.Fetch | None = None,
-            now: float | None = None) -> dict:
+            now: float | None = None, *, t0: str) -> dict:
+    """Round rnd's draw, once it is due, if rnd is the round T0 names.
+
+    T0 is GitHub's clock, not the committer's: the commit's own time may run ahead of GitHub's, so
+    it is recorded and not checked."""
     if rnd < 1:
         raise Refused("drand rounds start at 1")
     path = out / "draw.json"
     if path.exists():
         raise Refused(f"{path} exists: a draw is made once and never repeated")
+    named = named_round(t0, fetch)
+    if rnd != named:
+        raise Refused(f"round {rnd} is not the named round: T0, the creation time of commit {head['commit'][:12]}'s "
+                      f"first GitHub run, is {t0}, which names round {named} (the first due at or after T0 + 24 h)")
     record = seeds.draw(manifest["protocol"], rnd, fetch=fetch, now=now)
-    if seeds.parse_time(record["round_due_utc"]) < head["commit_time"] + seeds.DELAY_S:
-        raise Refused(f"round {rnd} is due at {record['round_due_utc']}, less than 24 h after commit "
-                      f"{head['commit'][:12]} ({seeds.utc(head['commit_time'])}): it is not the named round")
-    record = {**record, "commit": head["commit"], "commit_time_utc": seeds.utc(head["commit_time"])}
+    record = {**record, "t0": t0, "commit": head["commit"], "commit_time_utc": seeds.utc(head["commit_time"])}
     out.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return record
@@ -259,12 +275,25 @@ def seal(root: Path) -> list[str]:
     return lines
 
 
+def t0_arg(text: str) -> str:
+    """--t0 as written, once it reads as ISO 8601 with its UTC offset."""
+    try:
+        seeds.parse_time(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"{exc}; write T0 in UTC with Z, e.g. 2026-11-21T08:00:03Z") from None
+    return text
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("draw", help="fetch the named round and derive the master seed")
     p.add_argument("--round", type=int, required=True)
     p.add_argument("--out", type=Path, required=True)
+    t0 = p.add_mutually_exclusive_group(required=True)
+    t0.add_argument("--t0-from-github", action="store_true",
+                    help="T0 from GitHub's record of this commit's runs (gh run list), as in CI")
+    t0.add_argument("--t0", type=t0_arg, help="T0 by hand, ISO 8601 in UTC with Z (a rehearsal)")
     sub.add_parser("shards", help="the shard numbers, as JSON, for the CI matrix")
     p = sub.add_parser("run", help="run one shard of the campaign")
     p.add_argument("--draw", type=Path, required=True)
@@ -287,9 +316,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         head = frozen(REPO)
         if args.cmd == "draw":
-            d = do_draw(args.round, args.out, manifest, head)
-            print(f"round {d['round']} (due {d['round_due_utc']}) from {', '.join(d['relays'])}; "
-                  f"commit {d['commit'][:12]}; master seed {d['master_seed']}")
+            t0 = args.t0 or facts.first_run(head["commit"], REPO, subprocess.run)
+            d = do_draw(args.round, args.out, manifest, head, t0=t0)
+            print(f"round {d['round']} (due {d['round_due_utc']}, named by T0 {d['t0']}) from "
+                  f"{', '.join(d['relays'])}; commit {d['commit'][:12]}; master seed {d['master_seed']}")
         elif args.cmd == "run":
             do_run(args.draw, args.shard, args.out, manifest, head)
         else:
@@ -302,6 +332,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     except seeds.NotYet as exc:
         print(f"not yet: {exc}", file=sys.stderr)
+        return 3
+    except facts.NoT0 as exc:
+        print(f"not yet: {exc}; run the draw again (in CI, re-run the failed jobs: the draw job reads the "
+              "runs with the workflow's token, which needs actions: read)", file=sys.stderr)
         return 3
     except Failed as exc:
         print(f"failed: {exc}", file=sys.stderr)

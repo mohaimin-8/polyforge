@@ -60,7 +60,7 @@ def test_the_facts_of_a_frozen_tag(tmp_path):
     assert f["D"] == hashlib.sha256(PROTOCOL).hexdigest()
     assert f["T0"] == "2026-11-17T11:29:04Z"                        # the first run, not the last
     assert (f["round"], f["round_due_utc"]) == (34065994, "2026-11-18T11:29:06Z")   # as drawn live on 2026-11-20
-    assert runner.calls[0][:5] == ["gh", "run", "list", "--commit", c]
+    assert runner.calls == [["gh", "run", "list", "--commit", c, "--limit", "1000", "--json", "createdAt"]]
 
 
 def test_D_is_the_committed_file_not_the_working_copy(tmp_path):
@@ -82,10 +82,23 @@ def test_a_commit_without_the_protocol_is_refused(tmp_path):
         facts.facts("wp14-c", repo=tmp_path, runner=gh("2026-11-17T11:29:04Z"), fetch=fetch)
 
 
-def test_no_run_yet_means_push_first(tmp_path):
+def test_a_design_that_is_not_a_json_object_is_refused(tmp_path):
     frozen_repo(tmp_path)
-    with pytest.raises(SystemExit, match="push"):
+    for broken in (b"{draft: false", b"[]"):
+        (tmp_path / "research" / "registration" / "design.json").write_bytes(broken)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@invalid", "commit", "-qam", "C2"],
+                       cwd=tmp_path, check=True)
+        subprocess.run(["git", "tag", "-f", "wp14-c"], cwd=tmp_path, check=True, capture_output=True)
+        with pytest.raises(SystemExit, match="not a JSON object"):
+            facts.facts("wp14-c", repo=tmp_path, runner=gh("2026-11-17T11:29:04Z"), fetch=fetch)
+
+
+def test_no_run_yet_means_push_first(tmp_path, capsys):
+    frozen_repo(tmp_path)
+    with pytest.raises(facts.NoT0, match="no run"):
         facts.facts("wp14-c", repo=tmp_path, runner=gh(), fetch=fetch)
+    assert facts.main(["--tag", "wp14-c"], repo=tmp_path, fetch=fetch, runner=gh()) == 2
+    assert "push the branch and the tag" in capsys.readouterr().err
 
 
 def test_t0_given_by_hand_does_not_ask_github(tmp_path):
@@ -107,21 +120,29 @@ def test_the_command_prints_what_the_registration_records(tmp_path, capsys):
         assert want in out
 
 
-def test_a_t0_without_its_utc_offset_is_refused_with_a_message(tmp_path, capsys):
+@pytest.mark.parametrize("t0", ["2026-11-17T11:29:04", "yesterday"])
+def test_a_t0_that_is_not_utc_iso_is_refused_with_a_message(tmp_path, capsys, t0):
     frozen_repo(tmp_path)
-    assert facts.main(["--tag", "wp14-c", "--t0", "2026-11-17T11:29:04"], repo=tmp_path, fetch=fetch) == 2
-    assert "UTC" in capsys.readouterr().err
+    assert facts.main(["--tag", "wp14-c", "--t0", t0], repo=tmp_path, fetch=fetch) == 2
+    assert "UTC with Z" in capsys.readouterr().err
 
 
-def test_without_gh_it_says_to_give_t0_by_hand(tmp_path):
+def test_the_first_run_is_the_earliest_whatever_the_order_gh_lists(tmp_path):
+    frozen_repo(tmp_path)
+    runner = gh("2026-11-17T11:30:00Z", "2026-11-17T11:29:04Z", "2026-11-17T11:29:59Z")
+    assert facts.facts("wp14-c", repo=tmp_path, runner=runner, fetch=fetch)["T0"] == "2026-11-17T11:29:04Z"
+
+
+def test_without_gh_it_says_to_give_t0_by_hand(tmp_path, capsys):
     frozen_repo(tmp_path)
 
     def missing(args, **kw):
         raise FileNotFoundError("gh")
-    with pytest.raises(SystemExit, match="--t0"):
-        facts.facts("wp14-c", repo=tmp_path, runner=missing, fetch=fetch)
 
     def logged_out(args, **kw):
         raise subprocess.CalledProcessError(4, args, stderr="gh auth login")
-    with pytest.raises(SystemExit, match="--t0"):
-        facts.facts("wp14-c", repo=tmp_path, runner=logged_out, fetch=fetch)
+    for runner in (missing, logged_out):
+        with pytest.raises(facts.NoT0, match="could not list"):
+            facts.facts("wp14-c", repo=tmp_path, runner=runner, fetch=fetch)
+        assert facts.main(["--tag", "wp14-c"], repo=tmp_path, fetch=fetch, runner=runner) == 2
+        assert "--t0" in capsys.readouterr().err

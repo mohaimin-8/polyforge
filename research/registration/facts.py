@@ -43,19 +43,26 @@ def committed(repo: Path, commit: str, path: str) -> bytes:
         raise SystemExit(f"{path} is not in commit {commit[:12]}") from None
 
 
+class NoT0(RuntimeError):
+    """GitHub's record of the commit's runs could not be read, or holds no run yet: no T0."""
+
+
 def first_run(commit: str, repo: Path, runner: Runner) -> str:
-    """The creation time of the commit's first GitHub run (every workflow, branch and tag pushes)."""
+    """T0: the creation time of the commit's first GitHub run (every workflow, branch and tag push).
+
+    confirm.py's draw reads it the same way in CI. gh pages through the runs up to --limit, newest
+    first, so the limit is far above any commit's count of runs (157 for the whole repository on
+    2026-11-21). Deleting the first run would move T0."""
     try:
-        out = runner(["gh", "run", "list", "--commit", commit, "--limit", "100", "--json", "createdAt"],
+        out = runner(["gh", "run", "list", "--commit", commit, "--limit", "1000", "--json", "createdAt"],
                      cwd=repo, capture_output=True, text=True, check=True)
     except (OSError, subprocess.CalledProcessError) as exc:
         detail = (getattr(exc, "stderr", "") or str(exc)).strip()
-        raise SystemExit(f"gh could not list the runs ({detail}): log in (gh auth login), or give T0 with "
-                         "--t0 from the first run's page") from None
-    times = sorted(r["createdAt"] for r in json.loads(out.stdout))
+        raise NoT0(f"gh could not list the runs of {commit[:12]} ({detail})") from None
+    times = [r["createdAt"] for r in json.loads(out.stdout)]
     if not times:
-        raise SystemExit(f"GitHub has no run for {commit[:12]} yet: push the branch and the tag, then ask again")
-    return times[0]
+        raise NoT0(f"GitHub has no run of {commit[:12]} yet")
+    return min(times, key=seeds.parse_time)
 
 
 def facts(tag: str, t0: str | None = None, repo: Path = REPO, runner: Runner = subprocess.run,
@@ -64,7 +71,13 @@ def facts(tag: str, t0: str | None = None, repo: Path = REPO, runner: Runner = s
         c = git(repo, "rev-parse", f"{tag}^{{commit}}").decode().strip()
     except subprocess.CalledProcessError:
         raise SystemExit(f"no tag {tag!r} here: tag C first (git tag {tag})") from None
-    if json.loads(committed(repo, c, DESIGN)).get("draft", True):
+    try:
+        design = json.loads(committed(repo, c, DESIGN))
+    except ValueError:                  # not UTF-8, or not JSON
+        design = None
+    if not isinstance(design, dict):
+        raise SystemExit(f"{DESIGN} in {c[:12]} is not a JSON object")
+    if design.get("draft", True):
         raise SystemExit(f"design.json in {c[:12]} is still marked draft: that commit is not C")
     d = hashlib.sha256(committed(repo, c, PROTOCOL)).hexdigest()
     t0 = t0 or first_run(c, repo, runner)
@@ -76,20 +89,27 @@ def facts(tag: str, t0: str | None = None, repo: Path = REPO, runner: Runner = s
 
 
 def main(argv: list[str] | None = None, repo: Path = REPO, fetch: seeds.Fetch | None = None,
-         now: float | None = None) -> int:
+         now: float | None = None, runner: Runner = subprocess.run) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--tag", required=True, help="the tag at C, pushed with the branch")
     ap.add_argument("--t0", help="T0 by hand (ISO 8601 with Z); default: C's first GitHub run")
     args = ap.parse_args(argv)
+    if args.t0 is not None:
+        try:
+            seeds.parse_time(args.t0)
+        except ValueError as exc:   # not ISO 8601, or without its UTC offset
+            print(f"T0 {args.t0!r}: {exc}; write it as GitHub shows it, in UTC with Z, e.g. 2026-11-21T08:00:03Z",
+                  file=sys.stderr)
+            return 2
     try:
-        f = facts(args.tag, args.t0, repo, fetch=fetch)
+        f = facts(args.tag, args.t0, repo, runner=runner, fetch=fetch)
+    except NoT0 as exc:
+        print(f"{exc}: push the branch and the tag first and log in to gh (gh auth login), or give T0 by "
+              "hand with --t0, the creation time on the first run's page", file=sys.stderr)
+        return 2
     except (seeds.DrawError, seeds.NotYet) as exc:
         print(f"no chain info: {exc}", file=sys.stderr)
         return 3
-    except ValueError as exc:   # a T0 that is not ISO 8601 with its UTC offset
-        print(f"T0 {args.t0!r}: {exc}; write it as GitHub shows it, in UTC with Z, e.g. 2026-11-21T08:00:03Z",
-              file=sys.stderr)
-        return 2
     left = (f["round_due"] - (time.time() if now is None else now)) / 3600
     print(f"C      {f['C']}\nD      {f['D']}\nT0     {f['T0']}\n"
           f"round  {f['round']}, due {f['round_due_utc']} (drand quicknet, chain {seeds.QUICKNET[:12]}...)\n"

@@ -228,9 +228,10 @@ ran the workloads the scorer draws from M.
   i + 16, ... of the fixed list (`campaign.json`); one scoring with the
   frozen scorer; a seal (the SHA-256 of every output, published in the run's
   summary).
-- Every step refuses a checkout with modified tracked files, a draw made for
-  another protocol or commit, and a round due less than 24 h after C's
-  commit time.
+- Every step refuses a checkout with modified tracked files and a draw made
+  for another protocol or commit. The draw refuses any round but the one T0
+  names (section 7), T0 read from GitHub's record of C's runs, before
+  fetching it.
 - The campaign runs once and is scored once.
 
 ## 9. Missing data, exclusions and stopping
