@@ -107,7 +107,7 @@ Status at the deadline (2026-11-20 14:00), one line per work package of the plan
 | WP14 | built, not run | 2,360 + c runs in 16 shards (c: drawn workloads of class `conversation`; 2,420 at c = 60), rehearsed on GitHub; waits for the protocol, then 24 h for its drand round |
 | WP15 | done | `REPORT.md`, `RESULTS.md` |
 | WP16 | done but the DOI | the benchmark harness, one-command reproduction (31 steps; on 2026-11-20 every one rebuilt its report identically on the laptop, line ends aside, none skipped), `DATA_LICENCES.md`, the deposit builder; publishing is the author's |
-| WP17 | pilot done | 54 live runs, none invalid (`PILOT_LIVE.md`); the main runs need 433 laptop-hours at 90 % power and the registered draw: not run |
+| WP17 | pilot done | 54 live runs, none invalid (`PILOT_LIVE.md`); the main runs need 433 laptop-hours at 90 % power and the registered draw: not run; their scorer is drafted (`testbed/hvpa/main_score.py`, `main_design.json` marked draft; on the pilot's records it gives `PILOT_LIVE.md`'s numbers) |
 | WP19 | not started | needs GPU access |
 | WP20 | both levels prepared | level 1: `codecheck.yml`, the manifest a codechecker works from (its `paper` fields are the author's); level 2: `testbed/REPLICATION.md`, drafted for site B (WP11b's cells and WP12's pilot, expected values, tolerances proposed from our bootstrap and prediction intervals: the author declares them); requesting the check after the DOI and finding site B are the author's |
 | WP21 | the author's decision | |
