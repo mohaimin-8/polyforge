@@ -199,3 +199,17 @@ def test_the_cli_draws_once(tmp_path, monkeypatch, capsys):
     argv = ["draw", "--round", "1000", "--out", str(tmp_path / "out")]
     assert confirm.main(argv) == 0 and MASTER in capsys.readouterr().out
     assert confirm.main(argv) == 2 and "never repeated" in capsys.readouterr().err
+
+
+def test_the_seal_is_in_sha256sums_format_on_every_platform(tmp_path):
+    """SHA256SUMS written in text mode had CRLF on Windows, and `sha256sum -c` then found no file."""
+    import hashlib
+    (tmp_path / "shard-0").mkdir()
+    (tmp_path / "shard-0" / "rows.csv").write_bytes(b"1,2")
+    (tmp_path / "draw.json").write_bytes(b"{}")
+    confirm.seal(tmp_path)
+    raw = (tmp_path / "SHA256SUMS").read_bytes()
+    assert 13 not in raw                                   # no CR
+    for line in raw.decode("utf-8").splitlines():
+        digest, name = line.split("  ", 1)
+        assert hashlib.sha256((tmp_path / name).read_bytes()).hexdigest() == digest

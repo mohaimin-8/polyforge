@@ -255,7 +255,7 @@ def seal(root: Path) -> list[str]:
     if not files:
         raise Refused(f"{root} has no files to seal")
     lines = [f"{sha256_file(p)}  {p.relative_to(root).as_posix()}" for p in files]
-    sums.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    sums.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")   # LF everywhere: sha256sum -c
     return lines
 
 
