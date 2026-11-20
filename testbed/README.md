@@ -3,8 +3,9 @@
 A one-node kind cluster that serves real models on this laptop's CPU (mode B) or a mock API tier
 (mode A), with the PolyForge gateway (OpenAI-compatible adapter, semantic cache, real embedder) in
 front, Prometheus scraping gateway and servers, k6 replaying real arrival schedules, and an actuator
-that applies the planner's replica decisions. Prepared and validated statically; **not yet built or
-run** (no image pulled, no cluster created).
+that applies the planner's replica decisions. Built and up on kind since 2026-11-14 (WP10); WP11's
+and WP11b's validation cells (`validation/`), WP12's live pilot (`wp12/`) and WP17's live pilot
+(`hvpa/`) ran on it.
 
 | path | what it is |
 |---|---|
