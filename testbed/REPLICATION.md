@@ -67,12 +67,15 @@ second mean of 8 pairs (t with 14 degrees of freedom, our sigma_d).
 
 Each step starts at the repository's root, and paths in the text are relative to it.
 
-1. Get the code at the deposit's commit, and install the Python packages:
+1. Clone the repository and check out the deposit's commit (`git clone <the repository's URL>`,
+   then `git checkout <the commit>`): steps 6 and 8 commit, and `run_cells.py` checks that the
+   predictions are committed, so an unpacked deposit needs `git init -q && git add -A && git -c
+   user.name=site-b -c user.email=site-b@invalid commit -qm deposit` first. Install the Python packages:
    `python -m pip install -r eval/requirements-reproduce.txt pyarrow==25.0.0` (pyarrow reads the
    parquet files in steps 3, 5 and 6), and for step 3's vectors `python -m pip install torch==2.6.0`
    (a CPU build is enough; on Linux add `--index-url https://download.pytorch.org/whl/cpu`), then
-   `python -m pip install sentence-transformers==5.6.0 transformers==5.13.1`. On Windows, unpack
-   or clone it into a short folder: the longest tracked path is 148 characters, Windows' default
+   `python -m pip install sentence-transformers==5.6.0 transformers==5.13.1`. On Windows, clone
+   or unpack it into a short folder: the longest tracked path is 148 characters, Windows' default
    limit is 260, and a clone more than about 110 characters deep fails at checkout unless git has
    `core.longpaths` set (`git clone -c core.longpaths=true ...`; seen on 2026-11-20).
 2. Record your machine and versions in `site-b/versions.txt`: CPU model,
