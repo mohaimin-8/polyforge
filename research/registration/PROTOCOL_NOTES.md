@@ -95,9 +95,10 @@ commit 4920f02, CI green, run 44688664965).
    before the round is due, the draw stops with "not yet": re-run the
    failed jobs once it is due. The draw reads T0 from GitHub as `facts.py`
    does and refuses any round but the one T0 names, before fetching it: a
-   mistyped tag is refused (delete it with
-   `git push origin :refs/tags/wp14-round-<N>` and push the right one; the
-   refused run stays in the history, with no randomness fetched), and so is
+   mistyped tag is refused (delete it with `git tag -d wp14-round-<N>` and
+   `git push origin :refs/tags/wp14-round-<N>`, note it in `DEVIATIONS.md`
+   as an event, and push the right one; the refused run stays in the
+   history, with no randomness fetched), and so is
    a later commit (a deviation logged after C moves the branch), whose own
    first run names a later round. Never delete C's runs on GitHub: the
    first one is T0. It takes
