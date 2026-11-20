@@ -134,3 +134,25 @@ def test_the_command_writes_both_files(tmp_path):
     assert main_score.main(["--plan", str(plan), "--runs", str(PILOT_RUNS), "--out", str(out), "--allow-draft"]) == 0
     assert "DRAFT DESIGN" in (out / "SCORE.md").read_text(encoding="utf-8")
     assert len(json.loads((out / "score.json").read_text(encoding="utf-8"))["contrasts"]) == 6
+
+
+def test_the_plan_main_runs_writes_scores_as_the_hand_built_one():
+    """make_plan's own plan (the pilot's records, predictions.json, a valid drand draw), cut to the
+    pilot's schedules, scores as plan_of's does: the scorer reads the format main_runs.py writes."""
+    import seeds
+    from test_seeds import ROUND_1000
+
+    preds, digest = predictions(), "ab" * 32
+    draw = {"round": 1000, "randomness": ROUND_1000["randomness"], "signature": ROUND_1000["signature"],
+            "protocol_sha256": digest, "master_seed": seeds.master_seed(digest, ROUND_1000["randomness"])}
+    plan = main_runs.make_plan(PILOT_RUNS, preds, draw, main_runs.parse_tests(["A1=equivalence"]))
+    assert all(r["schedules_n"] >= pilot.PAIRS for r in plan["regimes"])
+    cut = {**plan, "regimes": [{**r, "schedules": r["schedules"][:pilot.PAIRS]} for r in plan["regimes"]]}
+    got = main_score.score(cut, PILOT_RUNS, design(), preds)["contrasts"]
+    want = main_score.score(plan_of(preds, pilot.PAIRS, tests={"A1": "equivalence"}), PILOT_RUNS, design(),
+                            preds)["contrasts"]
+    assert [main_score.key(c) for c in got] == [main_score.key(c) for c in want] and len(got) == 6
+    for g, w in zip(got, want):
+        assert (g["test"], g["n"], g["left_out"]) == (w["test"], w["n"], w["left_out"])
+        assert g["mean_d"] == pytest.approx(w["mean_d"]) and g["p"] == pytest.approx(w["p"], nan_ok=True)
+    assert {c["test"] for c in got if c["arm"] == "A1"} == {"equivalence"}
