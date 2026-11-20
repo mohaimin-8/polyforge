@@ -26,11 +26,17 @@ and, since 2026-11-20, no longer writes them back.
     python scripts/reproduce_programme2.py            # every step
     python scripts/reproduce_programme2.py --strict   # numbers byte for byte too
     python scripts/reproduce_programme2.py --list     # the steps, run nothing
+
+It runs only in a git checkout of the repository: the comparison reads the committed text through
+git, and before 2026-11-20 a run outside one (the deposit's repository/, a git archive) read every
+report as identical. In the deposit, commit the shipped files once first: git init -q && git add -A
+&& git -c user.name=deposit -c user.email=deposit@invalid commit -qm deposit
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -39,6 +45,10 @@ from pathlib import Path
 
 NUMBER = re.compile(rb"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
 TOLERANCE = 1e-6   # relative; the cross-platform differences seen are 1e-16 to 9e-9
+NOT_A_CHECKOUT = ("not a git checkout of this repository: every rebuilt report is compared with the committed "
+                  "text through git, and without it each comparison would read as identical. In the deposit's "
+                  "repository/ folder, commit the shipped files once first: git init -q && git add -A && "
+                  "git -c user.name=deposit -c user.email=deposit@invalid commit -qm deposit")
 
 REPO = Path(__file__).resolve().parents[1]
 R = REPO / "research"
@@ -117,14 +127,23 @@ def run(step, strict: bool = False) -> tuple[str, str]:
     missing = [n for n in needs if not (cwd / n).exists()]
     if missing:
         return "skipped", f"needs {', '.join(missing)}"
+    paths = [(cwd / r).relative_to(REPO).as_posix() for r in reports]
+    tracked = subprocess.run(["git", "ls-files", "--", *paths], cwd=REPO, capture_output=True, text=True)
+    if tracked.returncode != 0:
+        return "failed", f"git ls-files: {first_line(tracked)}"
+    untracked = sorted(set(paths) - set(tracked.stdout.splitlines()))
+    if untracked:   # git diff ignores an untracked file: it would read as identical
+        return "failed", f"not tracked by git, so nothing to compare with: {', '.join(untracked)}"
     t0 = time.time()
     proc = subprocess.run([sys.executable, *cmd], cwd=cwd, capture_output=True, text=True,
                           encoding="utf-8", errors="replace")
     if proc.returncode != 0:
         return "failed", proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else f"exit {proc.returncode}"
-    paths = [str((cwd / r).relative_to(REPO)) for r in reports]
-    diff = subprocess.run(["git", "diff", "--ignore-cr-at-eol", "--stat", "--", *paths], cwd=REPO,
-                          capture_output=True, text=True).stdout.strip()
+    stat = subprocess.run(["git", "diff", "--ignore-cr-at-eol", "--stat", "--", *paths], cwd=REPO,
+                          capture_output=True, text=True)
+    if stat.returncode != 0:   # an error prints nothing on stdout: never read that as identical
+        return "failed", f"git diff: {first_line(stat)}"
+    diff = stat.stdout.strip()
     if not diff:
         return "identical", f"{time.time() - t0:.0f} s"
     changed = subprocess.run(["git", "diff", "--ignore-cr-at-eol", "--name-only", "--", *paths], cwd=REPO,
@@ -133,6 +152,19 @@ def run(step, strict: bool = False) -> tuple[str, str]:
     if not strict and changed and all(w is not None and w <= TOLERANCE for w in worst):
         return "numeric", f"numbers only, largest relative difference {max(worst):.1e} ({diff.splitlines()[-1]})"
     return "drift", diff.splitlines()[-1]
+
+
+def first_line(proc: subprocess.CompletedProcess) -> str:
+    text = (proc.stderr or "").strip()
+    return text.splitlines()[0] if text else f"exit {proc.returncode}"
+
+
+def in_checkout(repo: Path) -> bool:
+    """Whether repo is the top of a git work tree (not a plain folder, nor one inside another repository)."""
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=repo, capture_output=True, text=True)
+    if top.returncode != 0:
+        return False
+    return os.path.normcase(Path(top.stdout.strip()).resolve()) == os.path.normcase(repo.resolve())
 
 
 def numbers_only(rel: str, repo: Path = REPO) -> float | None:
@@ -163,6 +195,9 @@ def main(argv: list[str] | None = None) -> int:
         for name, cwd, cmd, reports, _ in STEPS:
             print(f"{name}: (cd {cwd.relative_to(REPO)} && python {' '.join(cmd)}) -> {', '.join(reports)}")
         return 0
+    if not in_checkout(REPO):
+        print(NOT_A_CHECKOUT, file=sys.stderr)
+        return 2
     bad = numeric = 0
     for step in STEPS:
         status, note = run(step, args.strict)

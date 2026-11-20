@@ -161,8 +161,11 @@ def deposit(sha: str, people: list[dict], counts: dict, audit_name: str, today: 
         "upload_type": "dataset",
         "version": sha[:12],
         "description": ("Programme 2 of PolyForge: " + "; ".join(parts) + ". MANIFEST.sha256 gives every file's "
-                        "sha256. In repository/, python scripts/reproduce_programme2.py rebuilds every report "
-                        "from the committed data and compares it with the committed text; "
+                        "sha256. In repository/ (a git archive: commit its files once, git init -q && git add -A && "
+                        "git -c user.name=deposit -c user.email=deposit@invalid commit -qm deposit, or clone "
+                        "that commit), with Python 3.13 and pip install -r research/requirements-campaigns.txt, "
+                        "python scripts/reproduce_programme2.py rebuilds every report from the committed data and "
+                        "compares it with the committed text; "
                         "research/PROGRAMME2.md maps the work packages to their files; "
                         "research/DATA_LICENCES.md names the third-party data included and those fetched by "
                         "script."),
