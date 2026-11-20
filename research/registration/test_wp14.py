@@ -182,6 +182,18 @@ def test_rank_correlation_and_its_permutation_p():
     assert score.permutation_p(x, -x, 2000, 1) == pytest.approx(1.0)
 
 
+def test_h1_holds_only_when_some_decision_was_checked():
+    every_run_failed = pd.DataFrame({"error": ["ValueError: a", "ValueError: b"]})
+    h1 = score.score_h1(every_run_failed)
+    assert not h1["holds"] and h1["checked"] == 0 and h1["failed_runs"] == 2
+    nothing_applied = pd.DataFrame({"error": ["", ""], "theorem_applies": [0, 0], "theorem_violations": [0, 0]})
+    assert not score.score_h1(nothing_applied)["holds"]
+    some = pd.DataFrame({"error": ["", "boom"], "theorem_applies": [5, np.nan], "theorem_violations": [0, np.nan]})
+    h1 = score.score_h1(some)
+    assert h1["holds"] and h1["checked"] == 5 and h1["violations"] == 0 and h1["failed_runs"] == 1
+    assert not score.score_h1(some.assign(theorem_violations=[1, np.nan]))["holds"]
+
+
 def test_the_shards_must_hold_every_job_once_with_its_seed(planned):
     jobs, _ = planned
     rows = pd.DataFrame([{"identity": j["identity"], "seed": j["seed"]} for j in jobs])

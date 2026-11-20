@@ -9,8 +9,8 @@ It first checks that the shards hold every job of the campaign exactly once,
 each with its own seed (the job list is rebuilt from the master and the frozen
 design). Then:
 
-  H1  Theorem 1 on every logged decision of the dose part: holds when no
-      decision violates it. A count, not a test.
+  H1  Theorem 1 on every logged decision of the dose part: holds when some
+      decision was checked and none violates it. A count, not a test.
   H2  per new regime, the gain J(decoupled) - J(joint) and the predictor (the
       joint planner's mean of the logged quantity the design names), each a
       mean over the regime's design points; Spearman's rho of gain on
@@ -247,10 +247,14 @@ def per_regime(runs: pd.DataFrame, predictor: str) -> pd.DataFrame:
 
 
 def score_h1(dose: pd.DataFrame) -> dict:
-    ok = dose[dose.error == ""]
-    violations = int(ok.theorem_violations.sum())
-    return {"checked": int(ok.theorem_applies.sum()), "violations": violations, "failed_runs": int(len(dose) - len(ok)),
-            "holds": violations == 0}
+    """Theorem 1 over the completed runs' logged decisions. It holds only when some decision was
+    checked and none violates it: with nothing checked (every run failed, or the theorem never
+    applied) there is no evidence either way (until 2026-11-20 that read as holding, and a dose part
+    whose every run failed stopped the scorer)."""
+    ok = with_columns(dose[dose.error == ""], ["theorem_applies", "theorem_violations"])
+    checked, violations = int(ok.theorem_applies.sum()), int(ok.theorem_violations.sum())
+    return {"checked": checked, "violations": violations, "failed_runs": int(len(dose) - len(ok)),
+            "holds": checked > 0 and violations == 0}
 
 
 def score_h2(dose: pd.DataFrame, spec: dict, master: str, repo: Path) -> dict:
