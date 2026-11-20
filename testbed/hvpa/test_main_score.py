@@ -72,16 +72,23 @@ def test_its_numbers_match_the_pilots_report():
         assert c["n"] == int(pairs) and f"{c['mean_d']:+.5f}" == mean and f"{c['sigma_d']:.5f}" == sd
 
 
-def test_known_answers_with_a_lost_run_and_an_equivalence_contrast(tmp_path):
+def known_answers(runs: Path) -> tuple[dict, dict]:
+    """Six schedules per regime: A3 0.1 dearer than joint (A4); A1 the same as joint, tested for
+    equivalence, with schedule 0's A1 run lost."""
     preds = predictions()
     plan = plan_of(preds, 6, tests={"A1": "equivalence"})
     noise = [0.001, -0.001, 0.0005, -0.0005, 0.0002, -0.0002]
     for r in plan["regimes"]:
         for k in range(6):
-            write(tmp_path, r["width"], r["sigma"], k, "A4", 1.0)
-            write(tmp_path, r["width"], r["sigma"], k, "A3", 1.1 + noise[k])      # joint 0.1 cheaper
-            if k:                                                                 # schedule 0 lost its A1 run
-                write(tmp_path, r["width"], r["sigma"], k, "A1", 1.0 + noise[k])  # the same as joint
+            write(runs, r["width"], r["sigma"], k, "A4", 1.0)
+            write(runs, r["width"], r["sigma"], k, "A3", 1.1 + noise[k])      # joint 0.1 cheaper
+            if k:                                                             # schedule 0 lost its A1 run
+                write(runs, r["width"], r["sigma"], k, "A1", 1.0 + noise[k])  # the same as joint
+    return plan, preds
+
+
+def test_known_answers_with_a_lost_run_and_an_equivalence_contrast(tmp_path):
+    plan, preds = known_answers(tmp_path)
     s = main_score.score(plan, tmp_path, design(), preds)
     for c in s["contrasts"]:
         if c["arm"] == "A3":
@@ -89,6 +96,24 @@ def test_known_answers_with_a_lost_run_and_an_equivalence_contrast(tmp_path):
         else:
             assert c["test"] == "equivalence" and c["supported"] and c["n"] == 5 and c["left_out"] == 1
     assert len(s["H8_beat"]) == 3 and not any(b["supported"] for b in s["H8_beat"])   # equivalence never beats
+
+
+def test_the_report_gives_an_equivalence_contrasts_margin_and_90_percent_interval(tmp_path):
+    """An equivalence contrast holds at 0.05 exactly when its 90% interval lies inside +-margin, so
+    SCORE.md gives the margin and that interval beside the 95% one; a superiority contrast its 95% one."""
+    plan, preds = known_answers(tmp_path)
+    s = main_score.score(plan, tmp_path, design(), preds)
+    text = main_score.report(s, {"draft": True, "plan_sha256": "0" * 64, "design_sha256": "0" * 64})
+    for c in s["contrasts"]:
+        row = next(r for r in text.splitlines() if r.startswith(f"| {main_score.key(c)} |"))
+        lo95, hi95 = (main_score.f(v) for v in c["ci95"])
+        assert f"95% CI [{lo95}, {hi95}]" in row
+        if c["test"] == "equivalence":
+            lo90, hi90 = (main_score.f(v) for v in c["ci90"])
+            assert f"90% CI [{lo90}, {hi90}]" in row and f"margin +-{c['margin']:.4f}" in row
+            assert c["supported"] and -c["margin"] < c["ci90"][0] and c["ci90"][1] < c["margin"]
+        else:
+            assert "90% CI" not in row and "margin" not in row
 
 
 def test_the_rank_criterion_follows_the_twins_index(tmp_path):
