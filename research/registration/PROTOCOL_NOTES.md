@@ -66,7 +66,8 @@ commit 4920f02, CI green, run 44688664965).
 2. In `design.json`, change any value, then set `"draft": false`.
 3. Both must pass: `python research/registration/wp14_campaign.py --check`
    and `python research/registration/confirm.py shards`.
-4. Commit (this is C) and push. Note the push time: T0.
+4. Commit (this is C), tag it (`git tag wp14-c`) and push both
+   (`git push origin research-v2 wp14-c`). Note the push time: T0.
 5. `python research/registration/seeds.py round --t0 <T0 in UTC>` gives the
    round's number.
 6. Register on OSF before that round is due, with the file, D, C's hash, T0
@@ -74,8 +75,12 @@ commit 4920f02, CI green, run 44688664965).
    copy (an editor on Windows may have saved it with CRLF line ends):
    `git show HEAD:research/registration/PROTOCOL.md | sha256sum` in Git Bash.
    Check that the registration's archived copy has the same SHA-256.
-7. When the round is due: GitHub, Actions, `confirmatory`, Run workflow on
-   C, with the round's number. It takes about 15 minutes.
+7. When the round is due: GitHub, Actions, `confirmatory`, Run workflow,
+   "Use workflow from" the tag `wp14-c`, with the round's number. Never a
+   later commit (a deviation logged after C moves the branch): `confirm.py`
+   refuses a round due less than 24 h after the commit it runs on. It takes
+   about 20 minutes (the full campaign is about 19 worker-hours on the
+   laptop, over 16 runners of 4 CPUs).
 8. The results: the run's `confirmatory` artifact (every shard's
    `rows.csv` and `population.json`, then `score.json` and `SCORE.md`) and
    `SHA256SUMS` in its summary. Then rebuild the deposit with them:

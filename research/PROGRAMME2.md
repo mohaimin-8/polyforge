@@ -118,8 +118,9 @@ Status at the deadline (2026-11-20 14:00), one line per work package of the plan
 What is left is the author's, in this order (each step names the file that prepares it):
 
 1. The protocol: decide the seven choices in `research/registration/PROTOCOL_NOTES.md`, edit
-   `PROTOCOL.md`, set `design.json` to `"draft": false`, commit and push (T0), register on OSF before
-   the round 24 h later; then the `confirmatory` workflow scores WP14 in about 15 minutes.
+   `PROTOCOL.md`, set `design.json` to `"draft": false`, commit, tag and push (T0), register on OSF
+   before the round 24 h later; then the `confirmatory` workflow, started on the tag, scores WP14 in
+   about 20 minutes.
 2. The deposit: publish `research/out/zenodo/` on Zenodo (its `deposit.json` holds the metadata); after
    WP14, a new version with `--confirmatory`.
 3. WP20: fill `codecheck.yml`'s `paper` fields and request a CODECHECK; declare the tolerances in
