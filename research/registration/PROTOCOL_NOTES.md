@@ -35,8 +35,9 @@ before commit C.
 ## Cross-check of the draft (2026-11-20)
 
 Every number and name in `PROTOCOL.md` was checked against its source:
-the run counts (800 + 720 + 900 = 2,420) and workload names (`pop1000` to
-`pop1119`) from `wp14_campaign.plan`; the seed identities, the modulus and
+the run counts (800 dose runs; 600 + 2c and 960 - c comparison runs for c
+drawn `conversation` workloads, 2,420 at c = 60 and 2,431 at c = 71) and
+the workload names (`pop1000` to `pop1119`) from `wp14_campaign.plan`; the seed identities, the modulus and
 the relays from `wp14_campaign.py` and `seeds.py`; alpha, the margin, the
 slope range, the rho threshold, the permutations, the kappa range and
 strata and the shard count from `design.json` and `campaign.json`; the
@@ -44,8 +45,10 @@ tests from `wp14_score.py`; the pilot numbers from `DOSE_RESPONSE_PILOT.md`,
 the WP9 reports and `SAMPLE_SIZE.md`; H5 and H6 from `testbed/wp12/PILOT.md`
 and `testbed/validation/VALIDATION.md` / `VALIDATION_V2.md`; the cache radii
 from `research/control2/width.py`; the CI image, Python and dependency file
-from `.github/workflows/confirmatory.yml`. Two sentences were corrected
-(where the rehearsals ran; how an incomputable test is reported).
+from `.github/workflows/confirmatory.yml`. Three statements were corrected
+(where the rehearsals ran; how an incomputable test is reported; the run
+count, which depends on the draw: a full-scale check with another made-up
+seed built 2,431 jobs, not the 2,420 of the rehearsal's draw).
 
 ## Scorer change made with the draft (2026-11-20)
 

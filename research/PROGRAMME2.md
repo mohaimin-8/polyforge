@@ -100,7 +100,7 @@ Status at the deadline (2026-11-20 14:00), one line per work package of the plan
 | WP11 | done, target missed | attainment error 65 % (WP11) and 29.8 % (WP11b) against 25 %; rank correlation 0.89 met in WP11b |
 | WP12 | done, gate G3 not met | `PILOT.md` |
 | WP13 | tooling done, protocol drafted | seeds and the CI campaign built, tested and rehearsed; `PROTOCOL.md` drafted on 2026-11-20 for the author's review (`PROTOCOL_NOTES.md` lists the choices left to the author and the steps to freeze it); freezing and registering it are the author's |
-| WP14 | built, not run | 2,420 runs in 16 shards, rehearsed on GitHub; waits for the protocol, then 24 h for its drand round |
+| WP14 | built, not run | 2,360 + c runs in 16 shards (c: drawn workloads of class `conversation`; 2,420 at c = 60), rehearsed on GitHub; waits for the protocol, then 24 h for its drand round |
 | WP15 | done | `REPORT.md`, `RESULTS.md` |
 | WP16 | done but the DOI | the benchmark harness, one-command reproduction (31 steps; on 2026-11-20 every one rebuilt its report identically on the laptop, line ends aside, none skipped), `DATA_LICENCES.md`, the deposit builder; publishing is the author's |
 | WP17 | pilot done | 54 live runs, none invalid (`PILOT_LIVE.md`); the main runs need 433 laptop-hours at 90 % power and the registered draw: not run |

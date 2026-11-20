@@ -90,7 +90,13 @@ The plan's other hypotheses are outside this campaign:
 - Arms: the joint planner and the decoupled (per-knob) planner at width w
   (`x_w{w}_joint`, `x_w{w}_decoupled`).
 
-**Comparison part (H3, H4): 1,620 runs, 720 in plant A and 900 in plant B.**
+**Comparison part (H3, H4): 1,560 + c runs, where c is the number of drawn
+workloads in class `conversation`: 600 + 2c in plant A and 960 - c in
+plant B (1,620 when c = 60; the whole campaign 2,360 + c runs).** In plant
+A the joint and one-knob arms selected another configuration for
+`conversation` workloads; in plant B the joint and rules arms did for
+`conversation`, and the per-knob, one-knob and layers arms for
+`api_or_code`. Each such workload runs both configurations.
 - Plants: plant 2 (`research/plant2/`): mode A (API-backed gateway) as
   plant A and mode B (self-hosted pools of model servers) as plant B, with
   the constants `research/plant2/CONSTANTS.md` lists (plant digests
