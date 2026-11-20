@@ -218,9 +218,10 @@ ran the workloads the scorer draws from M.
 ## 8. Execution
 
 - Where: GitHub Actions, the workflow `confirmatory`
-  (`.github/workflows/confirmatory.yml`), started by hand on commit C,
-  through a tag at C (the branch can move on, a deviation log entry for
-  one), with the round's number as its only input; ubuntu-24.04, Python 3.13, the
+  (`.github/workflows/confirmatory.yml`), started on commit C by pushing
+  a tag named after the round, `wp14-round-<N>`, at C (the branch can move
+  on, a deviation log entry for one), the round's number its only input;
+  ubuntu-24.04, Python 3.13, the
   dependencies pinned in `eval/requirements-reproduce.txt`.
 - Steps (`research/registration/confirm.py`): draw (fetch and check the
   round, derive M, write `draw.json`); 16 shards, shard i running jobs i,

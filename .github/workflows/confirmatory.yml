@@ -1,8 +1,13 @@
 # WP13 step 5 (programme 2): the confirmatory simulation campaign, run from the frozen
 # commit C with the drand round the registered protocol names as its only input.
-# Start it by hand on C (Actions > confirmatory > Run workflow, "Use workflow from" C's
-# branch or tag) once that round is due. The procedure allows one run; every run stays
-# in the repository's Actions history, so a second one cannot be hidden.
+# Start it once that round is due by pushing a tag named after the round at C:
+#   git tag wp14-round-<N> wp14-c && git push origin wp14-round-<N>
+# (GitHub offers "Run workflow" for a workflow_dispatch workflow only once this file is on
+# the default branch; on 2026-11-20 it was not, and GitHub did not list the workflow at all.
+# Once it is there, Actions > confirmatory > Run workflow, "Use workflow from" the tag wp14-c,
+# with the round, does the same.) A draw pushed before the round is due stops with "not yet":
+# re-run the failed jobs once it is due. The procedure allows one run; every run stays in
+# the repository's Actions history, so a second one cannot be hidden.
 #
 #   draw   fetch the round from two agreeing relays, derive the master seed (draw.json)
 #   run    one job per shard of research/registration/campaign.json, each under 6 hours
@@ -13,6 +18,8 @@
 name: confirmatory
 
 on:
+  push:
+    tags: ["wp14-round-*"]
   workflow_dispatch:
     inputs:
       round:
@@ -37,14 +44,23 @@ jobs:
     timeout-minutes: 15
     outputs:
       shards: ${{ steps.shards.outputs.list }}
+      round: ${{ steps.round.outputs.round }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - id: round
+        name: The round (the tag's name on a push, the input on a dispatch)
+        env:
+          INPUT_ROUND: ${{ inputs.round }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then round="${GITHUB_REF_NAME#wp14-round-}"; else round="$INPUT_ROUND"; fi
+          case "$round" in ''|*[!0-9]*) echo "not a round number: '$round'" >&2; exit 2;; esac
+          echo "round=$round" >> "$GITHUB_OUTPUT"
       - name: Fetch the named round from two relays and derive the master seed
         env:
-          ROUND: ${{ inputs.round }}
+          ROUND: ${{ steps.round.outputs.round }}
         run: python research/registration/confirm.py draw --round "$ROUND" --out draw
       - id: shards
         name: The shards the manifest fixes
@@ -93,7 +109,7 @@ jobs:
           overwrite: true
 
   score:
-    needs: run
+    needs: [draw, run]
     runs-on: ubuntu-24.04   # the image the WP14 rehearsal ran on (Python 3.13)
     timeout-minutes: 120
     steps:
@@ -110,7 +126,7 @@ jobs:
         run: python research/registration/confirm.py score --draw results/draw/draw.json --results results --out results/score
       - name: Seal the results and publish the hashes
         env:
-          ROUND: ${{ inputs.round }}
+          ROUND: ${{ needs.draw.outputs.round }}
         run: |
           python research/registration/confirm.py seal results
           {

@@ -85,8 +85,15 @@ commit 4920f02, CI green, run 44688664965).
    draft. Rehearsed on 2026-11-20 in a scratch clone against the live chain
    and a live draw (`confirm.py draw` fetched the round it named from two
    relays; an early round was refused, a future one was "not yet").
-7. When the round is due: GitHub, Actions, `confirmatory`, Run workflow,
-   "Use workflow from" the tag `wp14-c`, with the round's number. Never a
+7. When the round is due, push a tag named after it at C:
+   `git tag wp14-round-<N> wp14-c` and `git push origin wp14-round-<N>`;
+   the `confirmatory` workflow starts on that push (Actions, confirmatory).
+   GitHub offers "Run workflow" only for a workflow on the default branch,
+   and on 2026-11-20 it did not list `confirmatory` at all (dispatch-only,
+   never run, not on main); once `confirmatory.yml` is on main, "Run
+   workflow" from the tag `wp14-c` with the round does the same. Pushed
+   before the round is due, the draw stops with "not yet": re-run the
+   failed jobs once it is due. Never a
    later commit (a deviation logged after C moves the branch): `confirm.py`
    refuses a round due less than 24 h after the commit it runs on. It takes
    about 15 minutes (the full campaign took 10.4 worker-hours in the
