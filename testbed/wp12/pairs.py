@@ -448,6 +448,17 @@ def plans_commit(path: Path) -> str:
     return rc.git("log", "-1", "--format=%H", "--", path.resolve().relative_to(rc.REPO).as_posix()).stdout.strip()
 
 
+def report_commit(plans_path: Path, dest: Path = HERE) -> str:
+    """The plans' commit for a rebuilt report: the one the report already records (a fact of the live
+    run, kept by a copy without the history, such as the deposit), else the one git names."""
+    recorded = dest / "pilot.json"
+    if recorded.exists():
+        commit = json.loads(recorded.read_text(encoding="utf-8")).get("plans_commit")
+        if commit:
+            return commit
+    return plans_commit(plans_path)
+
+
 def write_report(plans: dict, out: Path, commit: str, dest: Path = HERE) -> str:
     runs, left_out = collect(plans, out)
     summary, text = report(plans, runs, left_out)
@@ -474,7 +485,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(" ".join(f"{r}/{k}:{'/'.join(order(k))}" for r, k in sequence_of(plans)))
         return 0
     if args.report_only:
-        print(write_report(plans, args.out, plans_commit(args.plans)))
+        print(write_report(plans, args.out, report_commit(args.plans)))
         return 0
     if not (args.schedules and args.tokens and args.admin_key_file):
         ap.error("live runs need --schedules, --tokens and --admin-key-file")

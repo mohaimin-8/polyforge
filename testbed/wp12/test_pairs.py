@@ -244,3 +244,13 @@ def test_the_report_has_a_row_per_regime_and_metric():
     summary, text = pairs.report(plans, runs, ["high pair 4"])
     assert summary["low"]["J"]["pairs"] == 4 and summary["low"]["J"]["mean_diff"] == pytest.approx(0.015)
     assert text.count("| low |") == 3 and text.count("| high |") == 3 and "high pair 4" in text
+
+
+def test_a_rebuilt_report_keeps_the_plans_commit_it_recorded(tmp_path, monkeypatch):
+    """The commit holding the plans is a fact of the live run. Re-derived from git, a copy without
+    the history (the deposit, one commit) renamed it, and the rebuilt pilot.json drifted."""
+    monkeypatch.setattr(pairs, "plans_commit", lambda path: "the copy's own commit")
+    (tmp_path / "pilot.json").write_text(json.dumps({"plans_commit": "07fd7da", "summary": {}}), encoding="utf-8")
+    assert pairs.report_commit(tmp_path / "plans.json", tmp_path) == "07fd7da"
+    (tmp_path / "pilot.json").unlink()                      # no report yet: git names it
+    assert pairs.report_commit(tmp_path / "plans.json", tmp_path) == "the copy's own commit"
