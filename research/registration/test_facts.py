@@ -105,3 +105,23 @@ def test_the_command_prints_what_the_registration_records(tmp_path, capsys):
     for want in (f"C      {c}", f"D      {hashlib.sha256(PROTOCOL).hexdigest()}", "T0     2026-11-17T11:29:04Z",
                  "round  34065994, due 2026-11-18T11:29:06Z", "23.0 h"):
         assert want in out
+
+
+def test_a_t0_without_its_utc_offset_is_refused_with_a_message(tmp_path, capsys):
+    frozen_repo(tmp_path)
+    assert facts.main(["--tag", "wp14-c", "--t0", "2026-11-17T11:29:04"], repo=tmp_path, fetch=fetch) == 2
+    assert "UTC" in capsys.readouterr().err
+
+
+def test_without_gh_it_says_to_give_t0_by_hand(tmp_path):
+    frozen_repo(tmp_path)
+
+    def missing(args, **kw):
+        raise FileNotFoundError("gh")
+    with pytest.raises(SystemExit, match="--t0"):
+        facts.facts("wp14-c", repo=tmp_path, runner=missing, fetch=fetch)
+
+    def logged_out(args, **kw):
+        raise subprocess.CalledProcessError(4, args, stderr="gh auth login")
+    with pytest.raises(SystemExit, match="--t0"):
+        facts.facts("wp14-c", repo=tmp_path, runner=logged_out, fetch=fetch)

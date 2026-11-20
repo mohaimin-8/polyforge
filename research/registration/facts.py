@@ -45,8 +45,13 @@ def committed(repo: Path, commit: str, path: str) -> bytes:
 
 def first_run(commit: str, repo: Path, runner: Runner) -> str:
     """The creation time of the commit's first GitHub run (every workflow, branch and tag pushes)."""
-    out = runner(["gh", "run", "list", "--commit", commit, "--limit", "100", "--json", "createdAt"],
-                 cwd=repo, capture_output=True, text=True, check=True)
+    try:
+        out = runner(["gh", "run", "list", "--commit", commit, "--limit", "100", "--json", "createdAt"],
+                     cwd=repo, capture_output=True, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        detail = (getattr(exc, "stderr", "") or str(exc)).strip()
+        raise SystemExit(f"gh could not list the runs ({detail}): log in (gh auth login), or give T0 with "
+                         "--t0 from the first run's page") from None
     times = sorted(r["createdAt"] for r in json.loads(out.stdout))
     if not times:
         raise SystemExit(f"GitHub has no run for {commit[:12]} yet: push the branch and the tag, then ask again")
@@ -81,6 +86,10 @@ def main(argv: list[str] | None = None, repo: Path = REPO, fetch: seeds.Fetch | 
     except (seeds.DrawError, seeds.NotYet) as exc:
         print(f"no chain info: {exc}", file=sys.stderr)
         return 3
+    except ValueError as exc:   # a T0 that is not ISO 8601 with its UTC offset
+        print(f"T0 {args.t0!r}: {exc}; write it as GitHub shows it, in UTC with Z, e.g. 2026-11-21T08:00:03Z",
+              file=sys.stderr)
+        return 2
     left = (f["round_due"] - (time.time() if now is None else now)) / 3600
     print(f"C      {f['C']}\nD      {f['D']}\nT0     {f['T0']}\n"
           f"round  {f['round']}, due {f['round_due_utc']} (drand quicknet, chain {seeds.QUICKNET[:12]}...)\n"
