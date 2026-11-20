@@ -89,7 +89,8 @@ def main(argv: list[str] | None = None, target: Path = TARGET) -> int:
     ap.add_argument("--check", action="store_true", help="exit 1 when the manifest is stale")
     args = ap.parse_args(argv)
     body = manifest_text(entries())
-    old = target.read_bytes().decode("utf-8") if target.exists() else None
+    # read as git commits it (LF, .gitattributes): an editor on Windows may have saved CRLF
+    old = target.read_bytes().decode("utf-8").replace("\r\n", "\n") if target.exists() else None
     if args.check:
         current = old is not None and old[len(head_of(old)):] == body
         print(f"{target.name}: manifest {'current' if current else 'STALE (run scripts/codecheck_manifest.py)'}")

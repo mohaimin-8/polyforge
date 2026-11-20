@@ -52,3 +52,14 @@ def test_a_file_without_the_marker_is_refused(tmp_path):
     target.write_text("---\nmanifest: []\n", encoding="utf-8")
     with pytest.raises(SystemExit):
         cm.main([], target)
+
+
+def test_crlf_line_ends_are_read_as_git_commits_them(tmp_path):
+    """An editor on Windows may save CRLF; git commits LF (.gitattributes), so --check and a rerun
+    read the file as it would be committed, and a rerun writes LF."""
+    target = tmp_path / "codecheck.yml"
+    current = cm.TARGET.read_bytes().replace(b"\r\n", b"\n")
+    target.write_bytes(current.replace(b"\n", b"\r\n"))
+    assert cm.main(["--check"], target) == 0
+    assert cm.main([], target) == 0
+    assert target.read_bytes() == current
