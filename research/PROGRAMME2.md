@@ -49,7 +49,7 @@ with the CI run named.
 
 Tests: `python -m pytest research/theory research/control2 research/plant2 research/population
 research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark research/sensitivity tools/index-probe research/registration research/test_run_queue.py research/test_offload.py scripts/test_reproduce_programme2.py scripts/test_bundle_programme2.py scripts/test_codecheck_manifest.py -q`
-(CI runs the same line), and `python -m pytest testbed -q` in a process of its own (313 tests; CI runs it
+(CI runs the same line), and `python -m pytest testbed -q` in a process of its own (316 tests; CI runs it
 too since 2026-11-20).
 
 What the pilots say so far, in one line each (details in the files above):
@@ -128,7 +128,10 @@ What is left is the author's, in this order (each step names the file that prepa
    identical), then publish `research/out/zenodo/` on Zenodo (its `deposit.json` holds the metadata);
    after WP14, a new version with `--confirmatory`.
 3. WP20: fill `codecheck.yml`'s `paper` fields and request a CODECHECK; declare the tolerances in
-   `testbed/REPLICATION.md` and send it to a site B.
+   `testbed/REPLICATION.md` and send it to a site B. Part A's proposal is our own 95% interval, which a
+   site whose true values equal ours misses about one time in six per metric;
+   `testbed/validation/replication_tolerances.py` also prints a second estimate's interval (error
+   [10.2%, 88.8%], rank correlation [+0.631, +0.975]), as Part B's prediction interval is for a second mean.
 4. WP21 and WP0's decisions with the supervisor (the route, which index defines Q1); WP0's reading
    table (plan B1 and B5, read in full).
 5. WP17's main runs, if wanted: register H8 (scorer drafted in `testbed/hvpa/main_score.py`), draw its

@@ -31,7 +31,7 @@ runs each): attainment's median absolute percentage error 29.8% and Spearman
 rank correlation +0.89 between predicted and measured attainment. Your result
 reproduces ours when both of yours fall inside our 95% bootstrap intervals over
 cells (10,000 resamples of the 20 cells, seed 20261120): error in
-[15.9%, 71.5%] and rank correlation in [+0.705, +0.949] *(proposed)*. The plan's
+[16.0%, 71.5%] and rank correlation in [+0.705, +0.949] *(proposed)*. The plan's
 targets for the simulator (error at most 25%, rank correlation at least 0.8)
 are reported for your run as they were for ours.
 
@@ -39,8 +39,10 @@ are reported for your run as they were for ours.
 J(joint) = +0.0036 with sigma_d 0.0052, on a joint mean of 0.0806, that is
 +4.51% of the joint mean. J's level depends on the hardware, so the comparison
 is relative: your mean difference over your joint mean reproduces ours when it
-falls inside [-2.37%, +11.38%] *(proposed)*, our 95% prediction interval for a
-second mean of 8 pairs (t with 14 degrees of freedom, our sigma_d).
+falls inside [-3.07%, +12.08%] *(proposed)*, our 95% prediction interval for a
+second mean of 8 pairs (t with 7 degrees of freedom, as our sigma_d comes from
+our 8 pair differences). `python testbed/validation/replication_tolerances.py`
+recomputes both parts' values from the committed runs.
 
 ## 3. What you need
 
