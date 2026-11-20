@@ -36,6 +36,10 @@ The deposit (WP16: one DOI with code, protocols, run data and the audit scripts)
 WP14's workflow artifact) writes the zip of one commit's tracked tree and the audit scripts, its `MANIFEST.sha256`
 and `deposit.json` to `research/out/zenodo/`; publishing it on Zenodo is the author's step.
 
+The CODECHECK manifest (WP20, level 1): `codecheck.yml` at the repository's root lists the 36 files the
+reproduction rebuilds, each with its step and command; `python scripts/codecheck_manifest.py` rewrites the
+manifest from the steps (`--check` says whether it is current) and keeps the author's `paper` fields.
+
 The long CPU campaigns (WP9's full protocol, WP5's Morris and Sobol stages) run one after another once the
 testbed is free, resumable: `python research/run_queue.py --list`. From 2026-11-17 they can also run on
 GitHub Actions, split into shards (`research/offload.py`, `.github/workflows/campaign.yml`, started by
@@ -105,7 +109,7 @@ Status at the deadline (2026-11-20 14:00), one line per work package of the plan
 | WP16 | done but the DOI | the benchmark harness, one-command reproduction (31 steps; on 2026-11-20 every one rebuilt its report identically on the laptop, line ends aside, none skipped), `DATA_LICENCES.md`, the deposit builder; publishing is the author's |
 | WP17 | pilot done | 54 live runs, none invalid (`PILOT_LIVE.md`); the main runs need 433 laptop-hours at 90 % power and the registered draw: not run |
 | WP19 | not started | needs GPU access |
-| WP20 | not started | needs the DOI and an outside checker |
+| WP20 | level 1 prepared | `codecheck.yml`, the manifest a codechecker works from (its `paper` fields are the author's); requesting the check after the DOI, and an outside replicator for level 2, are the author's |
 | WP21 | the author's decision | |
 | WP22 | done | `NEGATIVE_CONTROL.md`, `ADVERSARIAL_SEARCH.md`, blind predictions, `RANDOM_SAMPLE_CHECK.md`, `GATE_REACH.md` |
 | WP23 | done | `tools/index-probe/` |
