@@ -27,6 +27,7 @@ port-forward pinned all load to one pod and dropped 127-220 connections per run 
 ## Runbook (run only when the CPU is free; about 2 GB of images and the model files)
 
 ```bash
+python -m pip install -r eval/requirements-reproduce.txt pyarrow==25.0.0   # from the root: the scripts' packages
 cd testbed/scripts
 python verify_pins.py                    # the pins still match the registries
 python validate_static.py                # manifests, kustomize builds, cross-references
