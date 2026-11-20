@@ -67,7 +67,10 @@ second mean of 8 pairs (t with 14 degrees of freedom, our sigma_d).
 All paths are relative to the repository's root.
 
 1. Get the code at the deposit's commit, and install the Python packages:
-   `python -m pip install -r eval/requirements-reproduce.txt`.
+   `python -m pip install -r eval/requirements-reproduce.txt`. On Windows, unpack or clone it into a
+   short folder: the longest tracked path is 148 characters, Windows' default limit is 260, and a
+   clone more than about 110 characters deep fails at checkout unless git has `core.longpaths` set
+   (`git clone -c core.longpaths=true ...`; seen on 2026-11-20).
 2. Record your machine and versions in `site-b/versions.txt`: CPU model,
    cores and threads, RAM, operating system, and the output of
    `docker version`, `kind version`, `kubectl version --client`,
