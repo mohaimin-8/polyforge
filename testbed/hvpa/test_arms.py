@@ -8,7 +8,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import arms  # noqa: E402
+import hvpa_arms as arms  # noqa: E402  (not `arms`: research/comparators has one)
 
 
 def test_a1_is_a_cpu_hpa_with_an_in_place_cpu_vpa():

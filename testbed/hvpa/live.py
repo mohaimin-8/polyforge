@@ -38,7 +38,7 @@ REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(REPO / "research" / "hvpa"))
 
-import arms  # noqa: E402
+import hvpa_arms as arms  # noqa: E402  (not `arms`: research/comparators has one)
 
 CONTEXT, NAMESPACE = "kind-polyforge-testbed", "pf-hvpa"
 K6_IMAGE = "docker.io/grafana/k6:2.1.0"

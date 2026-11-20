@@ -11,7 +11,7 @@ twin's CPU levels (minAllowed 250m, maxAllowed 2); the recommender's flags
 (default or fast, research/hvpa/vpa.SETTINGS) are set where the VPA is
 installed (install.py), not here. Replica bounds match the twin: 1 to 8.
 
-    python arms.py A1 --target 0.5 > a1.yaml
+    python hvpa_arms.py A1 --target 0.5 > a1.yaml
 """
 
 from __future__ import annotations
