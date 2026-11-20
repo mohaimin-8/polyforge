@@ -72,5 +72,5 @@ Scale-out in a public CI runner (the plan's option) is not set up; check the pro
 acceptable-use terms before using it.
 
 ```bash
-python -m pytest -q        # 310 unit tests, WP12's and WP17's among them (no cluster needed)
+python -m pytest -q        # 313 unit tests, WP12's and WP17's among them (no cluster needed)
 ```

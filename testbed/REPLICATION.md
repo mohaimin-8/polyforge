@@ -70,7 +70,10 @@ Each step starts at the repository's root, and paths in the text are relative to
 1. Clone the repository and check out the deposit's commit (`git clone <the repository's URL>`,
    then `git checkout <the commit>`): steps 6 and 8 commit, and `run_cells.py` checks that the
    predictions are committed, so an unpacked deposit needs `git init -q && git add -A && git -c
-   user.name=site-b -c user.email=site-b@invalid commit -qm deposit` first. Install the Python packages:
+   user.name=site-b -c user.email=site-b@invalid commit -qm deposit` first. Git refuses to commit
+   without a name and an e-mail, and step 8 commits on its own after hours of tuning: if
+   `git config user.name` prints nothing in the clone, set both there first (`git config user.name
+   site-b` and `git config user.email site-b@invalid`). Install the Python packages:
    `python -m pip install -r eval/requirements-reproduce.txt pyarrow==25.0.0` (pyarrow reads the
    parquet files in steps 3, 5 and 6), and for step 3's vectors `python -m pip install torch==2.6.0`
    (a CPU build is enough; on Linux add `--index-url https://download.pytorch.org/whl/cpu`), then
