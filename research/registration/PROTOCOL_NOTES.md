@@ -82,8 +82,9 @@ commit 4920f02, CI green, run 44688664965).
    "Use workflow from" the tag `wp14-c`, with the round's number. Never a
    later commit (a deviation logged after C moves the branch): `confirm.py`
    refuses a round due less than 24 h after the commit it runs on. It takes
-   about 20 minutes (the full campaign is about 19 worker-hours on the
-   laptop, over 16 runners of 4 CPUs).
+   about 15 minutes (the full campaign took 10.4 worker-hours in the
+   laptop's completion check: about 10 minutes over 16 runners of 4 CPUs,
+   plus setup).
 8. The results: the run's `confirmatory` artifact (every shard's
    `rows.csv` and `population.json`, then `score.json` and `SCORE.md`) and
    `SHA256SUMS` in its summary. Then rebuild the deposit with them:

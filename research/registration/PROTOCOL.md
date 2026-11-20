@@ -47,6 +47,11 @@ All of it is pilot data; none of it is reused as confirmatory evidence.
   `offload/rehearsal`, last on 2026-11-20 with the current scorer, run
   44693289176) and on the laptop the same day. Every run completed each
   time, and both logged the same 3,824 decisions under Theorem 1.
+- **Completion check** (the laptop, 2026-11-20): every job of the full
+  design, built from another made-up master seed (2,431 jobs, c = 71 in
+  section 4), was run once, keeping only whether each completed and its run
+  time; no outcome was written or read. All 2,431 completed (10.4
+  worker-hours).
 
 ## 3. Hypotheses
 
