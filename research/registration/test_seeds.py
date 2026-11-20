@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sys
 import urllib.error
 from pathlib import Path
@@ -129,3 +130,45 @@ def test_the_cli_never_overwrites_a_draw(tmp_path, monkeypatch, capsys):
     first = out.read_text(encoding="utf-8")
     assert seeds.main(argv) == 2 and out.read_text(encoding="utf-8") == first
     assert "never repeated" in capsys.readouterr().err
+
+
+T0_1000 = seeds.utc(seeds.round_time(1000, GENESIS, PERIOD) - seeds.DELAY_S)   # names round 1000
+
+
+def test_the_named_round_comes_from_the_chains_info():
+    assert seeds.named_round(T0_1000, RELAYS, fetch=fake({r: ROUND_1000 for r in RELAYS})) == 1000
+    later = seeds.utc(seeds.parse_time(T0_1000) + 1)
+    assert seeds.named_round(later, RELAYS, fetch=fake({r: ROUND_1000 for r in RELAYS})) == 1001
+
+
+@pytest.mark.parametrize("rnd", ["999", "1001"])
+def test_the_cli_draw_with_t0_refuses_another_round_before_fetching_it(tmp_path, monkeypatch, capsys, rnd):
+    protocol, out = tmp_path / "PROTOCOL.md", tmp_path / "draw.json"
+    protocol.write_bytes(b"protocol v1\n")
+    asked, answer = [], fake({r: ROUND_1000 for r in RELAYS})
+
+    def fetch(url: str) -> dict:
+        asked.append(url)
+        return answer(url)
+    monkeypatch.setattr(seeds, "fetch_json", fetch)
+    argv = ["draw", "--protocol", str(protocol), "--round", rnd, "--t0", T0_1000, "--out", str(out), "--relays", *RELAYS]
+    assert seeds.main(argv) == 2 and "names round 1000" in capsys.readouterr().err
+    assert not out.exists() and asked and all(url.endswith("/info") for url in asked)
+
+
+def test_the_cli_draw_with_t0_records_it(tmp_path, monkeypatch):
+    protocol, out = tmp_path / "PROTOCOL.md", tmp_path / "draw.json"
+    protocol.write_bytes(b"protocol v1\n")
+    monkeypatch.setattr(seeds, "fetch_json", fake({r: ROUND_1000 for r in RELAYS}))
+    argv = ["draw", "--protocol", str(protocol), "--round", "1000", "--t0", T0_1000, "--out", str(out), "--relays", *RELAYS]
+    assert seeds.main(argv) == 0
+    d = json.loads(out.read_text(encoding="utf-8"))
+    assert d["t0"] == T0_1000 and d["master_seed"] == "8d5e855bca040a95993c79d2a6a6a500e6101f680f55e9be1892cd147313ab9d"
+
+
+@pytest.mark.parametrize("argv", [["round", "--t0", "2026-11-20T12:00:00"],
+                                  ["run-seed", "--master", "not-hex", "wp14|x"]])
+def test_the_cli_refuses_a_t0_without_offset_and_a_master_that_is_not_hex(argv, capsys, monkeypatch):
+    monkeypatch.setattr(seeds, "fetch_json", fake({r: ROUND_1000 for r in RELAYS}))
+    assert seeds.main([*argv, *(["--relays", *RELAYS] if argv[0] == "round" else [])]) == 2
+    assert capsys.readouterr().err.startswith("refused: ")

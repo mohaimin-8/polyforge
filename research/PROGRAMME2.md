@@ -21,7 +21,7 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP10 testbed | `testbed/` | runbook in `testbed/README.md`; `python scripts/bringup.py` | built and up on kind (2026-11-14) |
 | WP11 simulator against the testbed | `testbed/validation/` | `cell_schedules.py`, `predict.py`, `run_cells.py`, `score.py`, `diagnose.py`, `coupling.py` | `predictions.json` (committed before the runs), `VALIDATION.md`, `DIAGNOSE.md`, `COUPLING.md` (exploratory: the two tiers share one host); WP11b by the rule in `testbed/hvpa/after_wp11.py` |
 | WP12 live pilot of the main contrast | `testbed/wp12/` | `tb_planner.py`, `plans.py`, `pairs.py`, `after_wp11b.py` | `regimes.json`, `design.json`, `tuning/`, `plans.json` (all committed before any live run), then `PILOT.md` with gate G3 and `pilot.json`; started by `testbed/hvpa/after_wp11.py` after WP11b |
-| WP13 verifiable seeds (drand quicknet round at or after T0 + 24 h, two agreeing relays, no re-roll) | `research/registration/` | `python seeds.py digest`, `round --t0 ...`, `draw --protocol ... --round N --out ...`, `run-seed`; `python facts.py --tag wp14-c` (what the registration records: C, D, T0, the round) | `draw.json`, written once after the named round |
+| WP13 verifiable seeds (drand quicknet round at or after T0 + 24 h, two agreeing relays, no re-roll) | `research/registration/` | `python seeds.py digest`, `round --t0 ...`, `draw --protocol ... --round N --t0 T0 --out ...` (refuses a round T0 does not name), `run-seed`; `python facts.py --tag wp14-c` (what the registration records: C, D, T0, the round) | `draw.json`, written once after the named round |
 | WP13 step 5 the confirmatory campaign in CI, the round its only input | `research/registration/`, `.github/workflows/confirmatory.yml` | `python confirm.py draw\|shards\|run\|score\|seal` (run by the workflow, started by pushing the tag `wp14-round-<N>` at C); what runs: `wp14_campaign.py` (H1-H4: new WP4 regimes, WP9's selected arms on freshly drawn workloads), scored by `wp14_score.py`, both as `design.json` fixes them (marked draft until the protocol fixes every value; a draft runs only as `--rehearsal`) | `campaign.json` (the manifest; it names `PROTOCOL.md`, which the protocol supplies); the workflow's `confirmatory` artifact (every shard's `rows.csv` and `population.json`, then `score.json` and `SCORE.md`) and `SHA256SUMS` in the run summary |
 | WP15 external check (RouteBalance) | `research/external/routebalance/` | `python -I analyse.py report` | `REPORT.md`, `RESULTS.md` |
 | WP16 benchmark: any controller scored by regret | `research/benchmark/` | `python bench.py --controller module:Class --plant B` | per-workload CSV, summary JSON |
@@ -131,6 +131,6 @@ What is left is the author's, in this order (each step names the file that prepa
    `testbed/REPLICATION.md` and send it to a site B.
 4. WP21 and WP0's decisions with the supervisor (the route, which index defines Q1); WP0's reading
    table (plan B1 and B5, read in full).
-5. WP17's main runs, if wanted: register H8 (scorer drafted in `testbed/hvpa/main_score.py`), then about
-   433 laptop-hours. WP19 needs GPU access; WP24 the preprint and outside readers.
+5. WP17's main runs, if wanted: register H8 (scorer drafted in `testbed/hvpa/main_score.py`), draw its
+   round with `seeds.py draw --t0`, then about 433 laptop-hours. WP19 needs GPU access; WP24 the preprint and outside readers.
 6. Merging `research-v2` into `main`, and the writing.

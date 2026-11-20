@@ -18,8 +18,11 @@ the plan asks for two relays that agree.
 
     python seeds.py digest PROTOCOL.md
     python seeds.py round --t0 2026-11-20T12:00:00Z          # the round the protocol names
-    python seeds.py draw --protocol PROTOCOL.md --round N --out draw.json
+    python seeds.py draw --protocol PROTOCOL.md --round N --t0 T0 --out draw.json
     python seeds.py run-seed --master HEX "wp14|pop017|joint" ...
+
+With --t0, `draw` refuses any round but the one T0 names before fetching it (a mistyped
+round would otherwise be drawn, and redrawing is a re-roll) and records T0 in the draw.
 """
 
 from __future__ import annotations
@@ -106,6 +109,12 @@ def chain_info(relays: Sequence[str] = RELAYS, chain: str = QUICKNET, fetch: Fet
     raise NotYet("no relay answered for the chain's info (" + "; ".join(failures) + ")")
 
 
+def named_round(t0: str, relays: Sequence[str] = RELAYS, chain: str = QUICKNET, fetch: Fetch | None = None) -> int:
+    """Step 2's round: the chain's first round due at or after T0 + 24 h."""
+    info = chain_info(relays, chain, fetch)
+    return round_at_or_after(parse_time(t0) + DELAY_S, info["genesis_time"], info["period"])
+
+
 def checked(beacon: dict, r: int, relay: str) -> dict:
     """One relay's answer for round r, held to drand's rules."""
     if not isinstance(beacon, dict):
@@ -182,6 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("draw", help="fetch the named round from two relays and derive the master seed")
     p.add_argument("--protocol", type=Path, required=True)
     p.add_argument("--round", type=int, required=True)
+    p.add_argument("--t0", help="T0 (ISO 8601 with offset): refuse any round but the one it names")
     p.add_argument("--relays", nargs="+", default=list(RELAYS))
     p.add_argument("--out", type=Path, required=True)
     p = sub.add_parser("run-seed", help="the seed of each named run")
@@ -201,7 +211,11 @@ def main(argv: list[str] | None = None) -> int:
             if args.out.exists():
                 print(f"{args.out} exists: a draw is made once and never repeated", file=sys.stderr)
                 return 2
+            if args.t0 is not None and args.round != (named := named_round(args.t0, args.relays)):
+                print(f"round {args.round} is not the named round: T0 {args.t0} names round {named}", file=sys.stderr)
+                return 2
             result = draw(args.protocol, args.round, args.relays)
+            result = result if args.t0 is None else {**result, "t0": args.t0}
             args.out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
             print(f"round {result['round']} from {', '.join(result['relays'])}: master seed {result['master_seed']}")
         else:
@@ -213,6 +227,9 @@ def main(argv: list[str] | None = None) -> int:
     except NotYet as exc:
         print(f"not yet: {exc}", file=sys.stderr)
         return 3
+    except ValueError as exc:   # a T0 without its UTC offset, a master seed that is not hex
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
     return 0
 
 

@@ -133,12 +133,6 @@ def frozen(repo: Path = REPO) -> dict:
     return head
 
 
-def named_round(t0: str, fetch: seeds.Fetch | None = None) -> int:
-    """The round the protocol names (section 7): quicknet's first round due at or after T0 + 24 h."""
-    info = seeds.chain_info(fetch=fetch)
-    return seeds.round_at_or_after(seeds.parse_time(t0) + seeds.DELAY_S, info["genesis_time"], info["period"])
-
-
 def do_draw(rnd: int, out: Path, manifest: dict, head: dict, fetch: seeds.Fetch | None = None,
             now: float | None = None, *, t0: str) -> dict:
     """Round rnd's draw, once it is due, if rnd is the round T0 names.
@@ -150,7 +144,7 @@ def do_draw(rnd: int, out: Path, manifest: dict, head: dict, fetch: seeds.Fetch 
     path = out / "draw.json"
     if path.exists():
         raise Refused(f"{path} exists: a draw is made once and never repeated")
-    named = named_round(t0, fetch)
+    named = seeds.named_round(t0, fetch=fetch)
     if rnd != named:
         raise Refused(f"round {rnd} is not the named round: T0, the creation time of commit {head['commit'][:12]}'s "
                       f"first GitHub run, is {t0}, which names round {named} (the first due at or after T0 + 24 h)")
