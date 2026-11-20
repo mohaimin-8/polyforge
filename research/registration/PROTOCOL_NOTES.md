@@ -101,5 +101,10 @@ commit 4920f02, CI green, run 44688664965).
    plus setup).
 8. The results: the run's `confirmatory` artifact (every shard's
    `rows.csv` and `population.json`, then `score.json` and `SCORE.md`) and
-   `SHA256SUMS` in its summary. Then rebuild the deposit with them:
+   `SHA256SUMS` in its summary. Download it with
+   `gh run download <run id> --name confirmatory --dir research/out/confirmatory`
+   (the run id ends the run's URL; `gh run list --workflow confirmatory`
+   lists it) and check it against those hashes:
+   `cd research/out/confirmatory && sha256sum -c SHA256SUMS`. Then rebuild
+   the deposit with them:
    `python scripts/bundle_programme2.py --audit ../PolyForge_Audit_2026-11-11_scripts --confirmatory <the artifact's folder>`.
