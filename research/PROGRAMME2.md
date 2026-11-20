@@ -114,3 +114,18 @@ Status at the deadline (2026-11-20 14:00), one line per work package of the plan
 | WP22 | done | `NEGATIVE_CONTROL.md`, `ADVERSARIAL_SEARCH.md`, blind predictions, `RANDOM_SAMPLE_CHECK.md`, `GATE_REACH.md` |
 | WP23 | done | `tools/index-probe/` |
 | WP24 | not started | the preprint and outside readers are the author's |
+
+What is left is the author's, in this order (each step names the file that prepares it):
+
+1. The protocol: decide the seven choices in `research/registration/PROTOCOL_NOTES.md`, edit
+   `PROTOCOL.md`, set `design.json` to `"draft": false`, commit and push (T0), register on OSF before
+   the round 24 h later; then the `confirmatory` workflow scores WP14 in about 15 minutes.
+2. The deposit: publish `research/out/zenodo/` on Zenodo (its `deposit.json` holds the metadata); after
+   WP14, a new version with `--confirmatory`.
+3. WP20: fill `codecheck.yml`'s `paper` fields and request a CODECHECK; declare the tolerances in
+   `testbed/REPLICATION.md` and send it to a site B.
+4. WP21 and WP0's decisions with the supervisor (the route, which index defines Q1); WP0's reading
+   table (plan B1 and B5, read in full).
+5. WP17's main runs, if wanted: register H8 (scorer drafted in `testbed/hvpa/main_score.py`), then about
+   433 laptop-hours. WP19 needs GPU access; WP24 the preprint and outside readers.
+6. Merging `research-v2` into `main`, and the writing.
