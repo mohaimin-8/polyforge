@@ -67,7 +67,10 @@ commit 4920f02, CI green, run 44688664965).
 3. Both must pass: `python research/registration/wp14_campaign.py --check`
    and `python research/registration/confirm.py shards`.
 4. Commit (this is C), tag it (`git tag wp14-c`) and push both
-   (`git push origin research-v2 wp14-c`). Note the push time: T0.
+   (`git push origin research-v2 wp14-c`). T0 is GitHub's record of the
+   push, not a time noted by hand (rounds come every 3 s, so seconds
+   matter): `gh run list --commit <C's full hash> --json createdAt`, the
+   earliest CI run of C. The draft defines T0 that way (section 7).
 5. `python research/registration/seeds.py round --t0 <T0 in UTC>` gives the
    round's number.
 6. Register on OSF before that round is due, with the file, D, C's hash, T0

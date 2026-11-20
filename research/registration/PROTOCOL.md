@@ -190,7 +190,9 @@ ran the workloads the scorer draws from M.
 1. D = SHA-256 of this file's bytes as stored in commit C
    (`git show C:research/registration/PROTOCOL.md`; `python seeds.py digest
    PROTOCOL.md` in a fresh checkout of C gives the same).
-2. T0 = the time commit C is pushed to the public repository. The randomness
+2. T0 = the time commit C is pushed to the public repository, as GitHub
+   records it: the creation time of the first CI run the push starts
+   (`gh run list --commit C --json createdAt`). The randomness
    is drand quicknet's (chain
    `52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971`) first
    round due at or after T0 + 24 h; its number follows from the chain's
