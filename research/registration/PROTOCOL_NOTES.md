@@ -78,6 +78,13 @@ commit 4920f02, CI green, run 44688664965).
    copy (an editor on Windows may have saved it with CRLF line ends):
    `git show HEAD:research/registration/PROTOCOL.md | sha256sum` in Git Bash.
    Check that the registration's archived copy has the same SHA-256.
+   Steps 4 to 6 in one command, once the push has its first run:
+   `python research/registration/facts.py --tag wp14-c` prints C, D (from
+   the committed bytes), T0 (the first run's creation time), the round and
+   the hours left to register; it refuses a tag whose design.json is still
+   draft. Rehearsed on 2026-11-20 in a scratch clone against the live chain
+   and a live draw (`confirm.py draw` fetched the round it named from two
+   relays; an early round was refused, a future one was "not yet").
 7. When the round is due: GitHub, Actions, `confirmatory`, Run workflow,
    "Use workflow from" the tag `wp14-c`, with the round's number. Never a
    later commit (a deviation logged after C moves the branch): `confirm.py`

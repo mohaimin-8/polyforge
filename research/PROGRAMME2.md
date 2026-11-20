@@ -120,7 +120,7 @@ What is left is the author's, in this order (each step names the file that prepa
 
 1. The protocol: decide the seven choices in `research/registration/PROTOCOL_NOTES.md`, edit
    `PROTOCOL.md`, set `design.json` to `"draft": false`, commit, tag and push (T0), register on OSF
-   before the round 24 h later; then the `confirmatory` workflow, started on the tag, scores WP14 in
+   before the round 24 h later (`research/registration/facts.py --tag wp14-c` prints what it records); then the `confirmatory` workflow, started on the tag, scores WP14 in
    about 15 minutes.
 2. The deposit: publish `research/out/zenodo/` on Zenodo (its `deposit.json` holds the metadata); after
    WP14, a new version with `--confirmatory`.
