@@ -59,18 +59,22 @@ second mean of 8 pairs (t with 14 degrees of freedom, our sigma_d).
   `research/traces/data/lmsys-chat-1m/data/`. Its licence forbids passing
   the text on: never send us prompt text or vectors. The vectors are built
   with torch and sentence-transformers (ours: torch 2.6.0+cpu,
-  sentence-transformers 5.6.0, transformers 5.13.1), which the pinned
-  requirements do not include.
+  sentence-transformers 5.6.0, transformers 5.13.1) and the parquet files
+  are read with pyarrow (ours: 25.0.0); the pinned requirements include none
+  of them (step 1 installs them).
 
 ## 4. Steps
 
-All paths are relative to the repository's root.
+Each step starts at the repository's root, and paths in the text are relative to it.
 
 1. Get the code at the deposit's commit, and install the Python packages:
-   `python -m pip install -r eval/requirements-reproduce.txt`. On Windows, unpack or clone it into a
-   short folder: the longest tracked path is 148 characters, Windows' default limit is 260, and a
-   clone more than about 110 characters deep fails at checkout unless git has `core.longpaths` set
-   (`git clone -c core.longpaths=true ...`; seen on 2026-11-20).
+   `python -m pip install -r eval/requirements-reproduce.txt pyarrow==25.0.0` (pyarrow reads the
+   parquet files in steps 3, 5 and 6), and for step 3's vectors `python -m pip install torch==2.6.0`
+   (a CPU build is enough; on Linux add `--index-url https://download.pytorch.org/whl/cpu`), then
+   `python -m pip install sentence-transformers==5.6.0 transformers==5.13.1`. On Windows, unpack
+   or clone it into a short folder: the longest tracked path is 148 characters, Windows' default
+   limit is 260, and a clone more than about 110 characters deep fails at checkout unless git has
+   `core.longpaths` set (`git clone -c core.longpaths=true ...`; seen on 2026-11-20).
 2. Record your machine and versions in `site-b/versions.txt`: CPU model,
    cores and threads, RAM, operating system, and the output of
    `docker version`, `kind version`, `kubectl version --client`,
@@ -98,6 +102,7 @@ All paths are relative to the repository's root.
 6. Schedules and predictions from your calibration, committed in your clone
    before any cell runs (`run_cells.py` refuses to start otherwise):
    ```
+   cd testbed/validation
    python cell_schedules.py cells --cells cells_v2.json --curves calibration --out ../out/schedules_v2 --inputs inputs_v2
    python predict.py --calibration calibration --cells cells_v2.json --inputs inputs_v2 --replica-scaling fitted --out predictions_v2.json
    git add calibration inputs_v2 predictions_v2.json && git commit -m "site B: calibration and predictions"
@@ -105,14 +110,14 @@ All paths are relative to the repository's root.
    **Send us `predictions_v2.json` and that commit's hash now, before step 7.**
 7. Provision the tenants, then run and score the cells:
    ```
-   cd ../scripts
+   cd testbed/scripts
    python provision.py --meta ../out/schedules_v2/cell00/schedule.meta.json --admin-key-file ../out/admin-key.txt --out-dir ../out
    cd ../validation
    python run_cells.py --cells cells_v2.json --predictions predictions_v2.json --schedules ../out/schedules_v2 --tokens ../out/tokens.json --admin-key-file ../out/admin-key.txt --out ../out/validation_v2
    python run_cells.py --cells cells_v2.json --predictions predictions_v2.json --schedules ../out/schedules_v2 --tokens ../out/tokens.json --admin-key-file ../out/admin-key.txt --out ../out/validation_v2 --redo-invalid
    python score.py --runs ../out/validation_v2 --cells cells_v2.json --predictions predictions_v2.json --report VALIDATION_V2.md --plot validation_v2_bland_altman.png
    ```
-8. Part B, on the cluster Part A leaves: `cd ../wp12 && python after_wp11b.py`.
+8. Part B, on the cluster Part A leaves: `cd testbed/wp12 && python after_wp11b.py`.
    It reads your `VALIDATION_V2.md`, designs the two regimes on your
    calibration, tunes the planners, commits the plans before any live run,
    runs the ABBA pairs and writes `PILOT.md` (its log:
