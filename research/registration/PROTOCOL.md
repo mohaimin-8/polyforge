@@ -128,8 +128,10 @@ order, from M and `design.json`.
     off.
 - **Gain** = J(per-knob) - J(joint), positive when joint control is better
   (in the dose part, J(decoupled) - J(joint)).
-- **Predictor** (H2): the worst-case interaction index the joint planner logs
-  at each decision (`research/theory/interaction_index.py`; definitions in
+- **Predictor** (H2): the worst-case interaction index of the joint
+  planner's decisions, logged for every tenant at every interval
+  (`research/theory/controller_index.py`, which applies
+  `research/theory/interaction_index.py`; definitions in
   `research/theory/INDEX_THEORY.md`), as its mean over a run, averaged over
   the regime's design points.
 - Reported beside J and not tested: each arm's differences in total cost
