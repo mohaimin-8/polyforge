@@ -3,6 +3,10 @@
 One entry point for every document in this repository. Start here rather than
 browsing directories.
 
+Programme 2 (plan v2: the interaction index, plant 2, the testbed, WP0 to WP24) keeps its own
+index, [research/PROGRAMME2.md](../research/PROGRAMME2.md): where each work package's code,
+commands and records are, how to reproduce them, and each package's state.
+
 The repository holds ~180 markdown files. That number is not accidental clutter:
 the evidence base is **the pre-registrations plus the records**, and most of the
 records are verified byte-identically by `scripts/reproduce.py`. Those cannot be
