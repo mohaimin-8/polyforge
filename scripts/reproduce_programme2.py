@@ -16,12 +16,15 @@ reported as `numeric` and passes; any other change, and any binary file, is
 drift. `--strict` asks for byte identity, the claim on the records' own
 platform.
 
-Two steps touch more than their report. WP5's specification curve rebuilds
-full/curve_effects.csv.gz and full_spec_curve.png from WP9's runs, so off the
-Linux runners that produced them their last digits and the image's metadata
-can differ while the report stays identical (`git checkout -- <file>`
-restores the record). WP5's Sobol rebuild reads its committed runs exactly
-and, since 2026-11-20, no longer writes them back.
+Some steps write files besides their report, and those are not compared: WP5's
+specification curve rebuilds full/curve_effects.csv.gz and full_spec_curve.png
+from WP9's runs, the specification curve pilot redraws spec_curve_pilot.png, and
+the WP11 and WP11b scores redraw their Bland-Altman plots. Off the platform
+that wrote them, their last digits and the images' bytes (fonts, metadata) can
+differ while every report stays identical: on Linux on 2026-11-20,
+curve_effects.csv.gz, spec_curve_pilot.png and both Bland-Altman plots
+(`git checkout -- <file>` restores the record). WP5's Sobol rebuild reads its
+committed runs exactly and, since 2026-11-20, no longer writes them back.
 
     python scripts/reproduce_programme2.py            # every step
     python scripts/reproduce_programme2.py --strict   # numbers byte for byte too
