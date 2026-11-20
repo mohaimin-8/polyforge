@@ -346,6 +346,14 @@ def f(x: float, fmt: str = "+.4f") -> str:
     return "n/a" if x is None or not math.isfinite(x) else format(x, fmt)
 
 
+def intervals(r: dict) -> str:
+    """The mean of d with its intervals: H3's 90% one (the TOST holds exactly when it lies inside the
+    margins) beside the 95% one, as section 6 of the protocol reports both; H4's 95% one."""
+    levels = ("90", "95") if r["test"] == "equivalence" else ("95",)
+    return f"{f(r['mean_d'])} (" + "; ".join(
+        f"{lv}% CI [{f(r[f'ci{lv}'][0])}, {f(r[f'ci{lv}'][1])}]" for lv in levels) + ")"
+
+
 def report(s: dict, meta: dict) -> str:
     h = s["hypotheses"]
     L = ["# WP14 confirmatory campaign: scores", ""]
@@ -368,7 +376,7 @@ def report(s: dict, meta: dict) -> str:
         r = h[k]
         what = (f"TOST, margin {f(r['margin'], '.4f')}" if r["test"] == "equivalence" else "one-sided paired t") + \
             f": J({r['comparator']}) - J(joint), plant {r['plant']}, {r['granularity']}, n {r['n']}"
-        L.append(f"| {k} | {what} | {f(r['mean_d'])} [{f(r['ci95'][0])}, {f(r['ci95'][1])}] | {f(r['p'], '.4f')} | "
+        L.append(f"| {k} | {what} | {intervals(r)} | {f(r['p'], '.4f')} | "
                  f"{f(r.get('p_holm', math.nan), '.4f')} | {'yes' if r['supported'] else 'no'} |")
     L += ["", "## H2 by regime", "", "| width | kappa | design points | mean predictor | gain | predicted gain |",
           "|---:|---:|---:|---:|---:|---:|"]

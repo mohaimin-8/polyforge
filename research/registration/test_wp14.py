@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import stats
+from statsmodels.stats.multitest import multipletests
+from statsmodels.stats.weightstats import ttost_paired
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -182,6 +187,67 @@ def test_rank_correlation_and_its_permutation_p():
     assert score.permutation_p(x, -x, 2000, 1) == pytest.approx(1.0)
 
 
+def test_the_statistics_agree_with_scipy_and_statsmodels():
+    """The frozen statistics against independent implementations: TOST against statsmodels'
+    ttost_paired, the one-sided t-test and both intervals against scipy, Holm against statsmodels'
+    multipletests (a p that could not be computed sorts last, as p = 1 does), Spearman (with ties)
+    and the least-squares line against scipy."""
+    rng = np.random.default_rng(20261121)
+    for case in range(200):
+        n = int(rng.integers(3, 60))
+        joint = rng.normal(0.2, 0.05, n)
+        arm = joint + rng.normal(rng.normal(0, 0.005), rng.uniform(0.0005, 0.02), n)
+        d, margin = arm - joint, float(rng.uniform(0.0005, 0.02))
+        t, s = score.tost(d, margin), score.superiority(d)
+        assert t["p"] == pytest.approx(ttost_paired(arm, joint, -margin, margin)[0], abs=1e-12)
+        assert s["p"] == pytest.approx(stats.ttest_1samp(d, 0.0, alternative="greater").pvalue, abs=1e-12)
+        two_sided = stats.ttest_1samp(d, 0.0)
+        for level, key in ((0.90, "ci90"), (0.95, "ci95")):
+            assert t[key] == pytest.approx(list(two_sided.confidence_interval(level)), abs=1e-12)
+        assert (t["p"] < 0.05) == (-margin < t["ci90"][0] and t["ci90"][1] < margin)
+        x = rng.integers(0, 4, n).astype(float) if case % 3 == 0 else rng.normal(size=n)   # ties
+        y = rng.normal(size=n) + x
+        if np.ptp(x) > 0:
+            assert score.spearman(x, y) == pytest.approx(stats.spearmanr(x, y).statistic, abs=1e-12)
+            fit = stats.linregress(x, y)
+            assert score.line(x, y) == pytest.approx((fit.intercept, fit.slope), abs=1e-9)
+    family = ["H2", "H3", "H4"]
+    for _ in range(500):
+        p = rng.uniform(0, 0.2, 3)
+        p[rng.random(3) < 0.15] = np.nan
+        adjusted = score.holm(dict(zip(family, p)), family)
+        reference = multipletests(np.where(np.isnan(p), 1.0, p), method="holm")[1]
+        for h, ph, ref in zip(family, p, reference):
+            assert math.isnan(adjusted[h]) if math.isnan(ph) else adjusted[h] == pytest.approx(ref, abs=1e-12)
+
+
+def test_the_permutation_p_estimates_the_exact_one():
+    """H2's Monte Carlo p against the exact one over all 720 orderings of six regimes' gains."""
+    rng = np.random.default_rng(5)
+    for strength, ties in ((0.0, False), (0.8, False), (2.0, False), (0.8, True)):
+        x = rng.normal(size=6)
+        y = rng.normal(size=6) + strength * x
+        y = np.round(y) if ties else y
+        rx, ry = stats.rankdata(x), stats.rankdata(y)
+        observed = np.corrcoef(rx, ry)[0, 1]
+        exact = np.mean([np.corrcoef(rx, p)[0, 1] >= observed - 1e-12 for p in itertools.permutations(ry)])
+        p = score.permutation_p(x, y, 10_000, 11)
+        assert abs(p - exact) < 4.5 * math.sqrt(max(exact * (1 - exact), 1e-4) / 10_000) + 1 / 10_001
+
+
+def test_h2s_calibration_regimes_are_the_pilot_reports(design):
+    """The scorer's per-regime means of the WP4 pilot, from which H2's calibration line comes, are
+    the pilot report's: 25 regimes of 20 design points and the rank correlations it gives."""
+    text = (campaign.REPO / "research/theory/DOSE_RESPONSE_PILOT.md").read_text(encoding="utf-8")
+    quoted = dict(re.findall(r"^\| ([a-z -]+) \| ([+-]\d\.\d\d) \|", text, re.M))
+    runs = pd.read_csv(campaign.REPO / design["tests"]["H2"]["calibration"], float_precision="round_trip")
+    for predictor, label in (("index", "worst-case index"), ("quantile_index", "quantile index"),
+                             ("loss", "realised one-step loss"), ("costly", "share of costly disagreements")):
+        reg = score.per_regime(runs, predictor)
+        assert len(reg) == 25 and set(reg.n) == {20}
+        assert f"{score.spearman(reg.x, reg.gain):+.2f}" == quoted[label], predictor
+
+
 def test_h1_holds_only_when_some_decision_was_checked():
     every_run_failed = pd.DataFrame({"error": ["ValueError: a", "ValueError: b"]})
     h1 = score.score_h1(every_run_failed)
@@ -286,3 +352,21 @@ def test_the_scorer_finds_known_answers(planned, design):
     json.dumps(score.clean(s), allow_nan=False)
     h = score.score(synthetic(jobs, line, plant_a_shift=0.01), design, MASTER)["hypotheses"]
     assert not h["H3"]["supported"]
+
+
+def test_the_report_gives_h3s_90_and_95_percent_intervals(planned, design):
+    """PROTOCOL.md section 6 reports H3's 90% and 95% intervals of the mean of d. The TOST at 0.05
+    holds exactly when the 90% interval lies inside the margins, so SCORE.md shows it beside the
+    95% one (a 95% interval alone can cross a margin while H3 is supported)."""
+    jobs, _ = planned
+    pilot = score.per_regime(pd.read_csv(campaign.REPO / design["tests"]["H2"]["calibration"]), "index")
+    s = score.score(synthetic(jobs, score.line(pilot.x, pilot.gain), plant_a_shift=0.0), design, MASTER)
+    text = score.report(s, {"master": MASTER, "rehearsal": False, "alpha": 0.05, "holm": ["H2", "H3", "H4"],
+                            "design_sha256": "0" * 64})
+    row = {k: next(r for r in text.splitlines() if r.startswith(f"| {k} |")) for k in ("H3", "H4")}
+    h3, h4 = s["hypotheses"]["H3"], s["hypotheses"]["H4"]
+    for level in ("90", "95"):
+        lo, hi = h3[f"ci{level}"]
+        assert f"{level}% CI [{score.f(lo)}, {score.f(hi)}]" in row["H3"]
+    assert f"95% CI [{score.f(h4['ci95'][0])}, {score.f(h4['ci95'][1])}]" in row["H4"]
+    assert "90% CI" not in row["H4"]
