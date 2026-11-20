@@ -29,7 +29,7 @@ Programme 1 ends at tag `programme-1-final`. Programme 2 follows the plan
 | WP22 controls, adversarial search, blind predictions | `research/controls/` | `python negative_control.py`, `adversarial_search.py`, `blind_predictions.py` | `NEGATIVE_CONTROL.md`, `ADVERSARIAL_SEARCH.md`, `DIAGNOSE_158.md`, `RANDOM_SAMPLE_CHECK.md`, `GATE_REACH.md` |
 | WP23 the index as a tool | `tools/index-probe/` | `python index_probe.py log|box ...` | `README.md` |
 
-Reproduce every report from committed data and check it against the committed text: `python scripts/reproduce_programme2.py` (31 steps, the WP17 live pilot's report rebuilt from `testbed/hvpa/pilot_runs` among them; those needing downloaded inputs or not-yet-committed run data are skipped without them).
+Reproduce every report from committed data and check it against the committed text: `pip install -r research/requirements-campaigns.txt` (Python 3.13, as GitHub's Linux runs of it), then `python scripts/reproduce_programme2.py` (31 steps, the WP17 live pilot's report rebuilt from `testbed/hvpa/pilot_runs` among them; those needing downloaded inputs or not-yet-committed run data are skipped without them).
 
 The deposit (WP16: one DOI with code, protocols, run data and the audit scripts):
 `python scripts/bundle_programme2.py --audit ../PolyForge_Audit_2026-11-11_scripts` (`--confirmatory <dir>` adds

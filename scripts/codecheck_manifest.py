@@ -29,8 +29,10 @@ TARGET = REPO / "codecheck.yml"
 MARKER = "# manifest: written by scripts/codecheck_manifest.py from scripts/reproduce_programme2.py's steps"
 HEAD = """---
 version: https://codecheck.org.uk/spec/config/2.0/
-# Recreate every file in the manifest: python scripts/reproduce_programme2.py (--list prints the
-# steps). Inputs the repository does not ship are named in research/DATA_LICENCES.md.
+# Recreate every file in the manifest: pip install -r research/requirements-campaigns.txt (Python
+# 3.13; what GitHub's Linux runs of the reproduction installed), then python
+# scripts/reproduce_programme2.py (--list prints the steps). Inputs the repository does not ship
+# are named in research/DATA_LICENCES.md.
 paper:
   title: "FILL IN: the paper's title"
   authors:
