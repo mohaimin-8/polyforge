@@ -41,9 +41,11 @@ All of it is pilot data; none of it is reused as confirmatory evidence.
   variances; alpha 0.05, power 0.9): equivalence within 2% of J in plant A
   needs 76 paired workloads (sigma_d 0.0099); superiority at an effect of 2%
   of J in plant B needs 11 (sigma_d 0.0044). This campaign draws 120.
-- **Rehearsals**: the campaign and the scorer run in CI with a made-up master
-  seed and two of everything (`.github/workflows/campaign.yml`), as a
-  pipeline check that gives no result.
+- **Rehearsals**: the campaign and the scorer were run with a made-up master
+  seed and two of everything (35 runs), as a pipeline check that gives no
+  result: on GitHub (`.github/workflows/campaign.yml`, branch
+  `offload/rehearsal`, last on 2026-11-18, run 44341439376) and on the
+  laptop on 2026-11-20; every run completed both times.
 
 ## 3. Hypotheses
 
@@ -166,7 +168,8 @@ frozen with this file, computes everything below.
   t-test that the mean of d is above zero. Supported when the Holm-adjusted
   p < 0.05. The 95% interval of the mean of d is reported.
 - A test that cannot be computed (fewer than two complete pairs or regimes)
-  is not supported, and the report says why.
+  is not supported; its p-value is reported as n/a beside the number of
+  pairs or regimes it had.
 - Equivalence is claimed only from H3's test; a non-significant difference is
   never called equivalence.
 

@@ -3,19 +3,21 @@
 Written 2026-11-20 with the draft of `PROTOCOL.md`. The draft describes what
 the built code does (`design.json`, `wp14_campaign.py`, `wp14_score.py`).
 Where that differs from plan v2's Part D, or where the pilots point one way,
-it is listed here for the author to decide before freezing. This file is not
-hashed into the draw; keep it or delete it before commit C.
+it is listed here for the author to decide before freezing, each with a
+recommendation. This file is not hashed into the draw; keep it or delete it
+before commit C.
 
 ## Choices the draft makes that are the author's
 
-| # | Plan v2, Part D | The draft (= the built scorer) | To follow Part D instead |
+| # | Plan v2, Part D | The draft (= the built scorer) | Recommended, and why |
 |---|---|---|---|
-| 1 | primary metrics: cost per 1,000 requests at matched attainment, attainment at matched cost, unserved share | J, the composite objective; cost and violation differences reported, not tested | change the scorer before C |
-| 2 | outcome ~ arm x regime + (1 \| workload); Holm across H2 to H5 and H7 | paired tests per workload (H3, H4) and Spearman over regimes (H2); Holm over H2 to H4, since H5 and H7 are not in this campaign | change the scorer before C |
-| 3 | H3's margin: 2% of cost at matched attainment | 2% of mean J(joint) | follows from 1 |
-| 4 | H4: one-sided, smallest effect from WP4 | one-sided against zero, no smallest effect in the decision | add a margin to the test (a scorer change), or state a smallest effect for interpretation only |
-| 5 | H8 (WP17) among the registered hypotheses | outside this protocol | add WP17's live design; its main runs need 433 laptop-hours at power 0.9 (324 at 0.8), sized from the pilot (`testbed/hvpa/main_runs.py sizes`) |
-| 6 | registered-report route (WP21) | not assumed | push C only after in-principle acceptance; this protocol is then the Stage 1 design |
+| 1 | primary metrics: cost per 1,000 requests at matched attainment, attainment at matched cost, unserved share | J, the composite objective; cost and violation differences reported, not tested | keep J: every pilot, WP9's selection and the sample size are on J, and a new matched-attainment scorer written now would be untested code inside a frozen campaign |
+| 2 | outcome ~ arm x regime + (1 \| workload); Holm across H2 to H5 and H7 | paired tests per workload (H3, H4) and Spearman over regimes (H2); Holm over H2 to H4, since H5 and H7 are not in this campaign | keep: with two arms and one run each per workload, the paired test is that model's contrast |
+| 3 | H3's margin: 2% of cost at matched attainment | 2% of mean J(joint) | keep (follows from 1; 120 workloads exceed the 76 the margin needs) |
+| 4 | H4: one-sided, smallest effect from WP4 | one-sided against zero, no smallest effect in the decision | keep the test, and add one sentence to H4 naming 2% of mean J(joint) as the smallest effect of interest for interpretation (the effect the sample size was planned for); text only, no scorer change |
+| 5 | H8 (WP17) among the registered hypotheses | outside this protocol | keep it outside: its main runs need 433 laptop-hours at power 0.9 (324 at 0.8, `testbed/hvpa/main_runs.py sizes`); register them separately when they can be run |
+| 6 | registered-report route (WP21) | not assumed | the author's, with the supervisor (WP21 step 1); if chosen, push C only after in-principle acceptance |
+| 7 | H2's predictor: the index, rho >= 0.8 | the same (`design.json`: `predictor` `index`) | keep: the index is the claim under test; switching to the pilot's best predictor (the realised loss, rho 0.79) would fit the registration to the pilot and is still below 0.8 |
 
 ## What the pilots suggest
 
@@ -30,12 +32,28 @@ hashed into the draw; keep it or delete it before commit C.
   [-0.0006, +0.0006]), so H4 is likely not supported. The account calls
   either outcome a result (Part A3).
 
+## Cross-check of the draft (2026-11-20)
+
+Every number and name in `PROTOCOL.md` was checked against its source:
+the run counts (800 + 720 + 900 = 2,420) and workload names (`pop1000` to
+`pop1119`) from `wp14_campaign.plan`; the seed identities, the modulus and
+the relays from `wp14_campaign.py` and `seeds.py`; alpha, the margin, the
+slope range, the rho threshold, the permutations, the kappa range and
+strata and the shard count from `design.json` and `campaign.json`; the
+tests from `wp14_score.py`; the pilot numbers from `DOSE_RESPONSE_PILOT.md`,
+the WP9 reports and `SAMPLE_SIZE.md`; H5 and H6 from `testbed/wp12/PILOT.md`
+and `testbed/validation/VALIDATION.md` / `VALIDATION_V2.md`; the cache radii
+from `research/control2/width.py`; the CI image, Python and dependency file
+from `.github/workflows/confirmatory.yml`. Two sentences were corrected
+(where the rehearsals ran; how an incomputable test is reported).
+
 ## Scorer change made with the draft (2026-11-20)
 
 H1 used to read as holding when no decision had been checked, and a dose
 part in which every run failed stopped the scorer. It now holds only when at
 least one decision is checked and none violates it
-(`wp14_score.score_h1`, test `test_h1_holds_only_when_some_decision_was_checked`).
+(`wp14_score.score_h1`, test `test_h1_holds_only_when_some_decision_was_checked`;
+commit 4920f02, CI green, run 44688664965).
 
 ## Freezing and running
 
