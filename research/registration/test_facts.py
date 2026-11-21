@@ -146,3 +146,31 @@ def test_without_gh_it_says_to_give_t0_by_hand(tmp_path, capsys):
             facts.facts("wp14-c", repo=tmp_path, runner=runner, fetch=fetch)
         assert facts.main(["--tag", "wp14-c"], repo=tmp_path, fetch=fetch, runner=runner) == 2
         assert "--t0" in capsys.readouterr().err
+
+
+def test_a_second_protocol_and_its_own_design_are_named_by_path(tmp_path, capsys):
+    """WP17's H8 registers a protocol of its own with a design file of its own: D is that
+    protocol's digest, and that design (not WP14's design.json) must be final."""
+    frozen_repo(tmp_path)                                    # WP14's files, final, tagged wp14-c
+
+    def git(*args: str) -> str:
+        return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@invalid", "-c", "core.autocrlf=false",
+                               *args], cwd=tmp_path, capture_output=True, text=True, check=True).stdout.strip()
+
+    h8, design = b"# Protocol H8\n", tmp_path / "testbed" / "hvpa" / "main_design.json"
+    (tmp_path / "research" / "registration" / "PROTOCOL_H8.md").write_bytes(h8)
+    design.parent.mkdir(parents=True)
+    names = {"protocol": "research/registration/PROTOCOL_H8.md", "design": "testbed/hvpa/main_design.json"}
+    for draft, tag in ((True, "wp17-draft"), (False, "wp17-c")):
+        design.write_bytes(json.dumps({"draft": draft}).encode())
+        git("add", ".")
+        git("commit", "-qm", tag)
+        git("tag", tag)
+    with pytest.raises(SystemExit, match="main_design.json in .* is still marked draft"):
+        facts.facts("wp17-draft", "2026-11-17T11:29:04Z", tmp_path, fetch=fetch, **names)
+    f = facts.facts("wp17-c", "2026-11-17T11:29:04Z", tmp_path, fetch=fetch, **names)
+    assert f["D"] == hashlib.sha256(h8).hexdigest() != hashlib.sha256(PROTOCOL).hexdigest()
+    assert f["C"] == git("rev-parse", "wp17-c")
+    assert facts.main(["--tag", "wp17-c", "--t0", "2026-11-17T11:29:04Z", "--protocol", names["protocol"],
+                       "--design", names["design"]], repo=tmp_path, fetch=fetch, now=0.0) == 0
+    assert f"D      {hashlib.sha256(h8).hexdigest()}" in capsys.readouterr().out

@@ -8,6 +8,8 @@ drand quicknet round due first at or after T0 + 24 h, with the time left to regi
 
     python research/registration/facts.py --tag wp14-c                          # T0 from `gh run list`
     python research/registration/facts.py --tag wp14-c --t0 2026-11-21T08:00:00Z   # T0 by hand
+    python research/registration/facts.py --tag wp17-c --protocol research/registration/PROTOCOL_H8.md \
+        --design testbed/hvpa/main_design.json                                   # a second protocol (H8)
 """
 
 from __future__ import annotations
@@ -66,20 +68,22 @@ def first_run(commit: str, repo: Path, runner: Runner) -> str:
 
 
 def facts(tag: str, t0: str | None = None, repo: Path = REPO, runner: Runner = subprocess.run,
-          fetch: seeds.Fetch | None = None) -> dict:
+          fetch: seeds.Fetch | None = None, protocol: str = PROTOCOL, design: str = DESIGN) -> dict:
+    """C, D, T0 and the round for the protocol and design file named (repository paths; WP14's by
+    default, H8's are PROTOCOL_H8.md and testbed/hvpa/main_design.json)."""
     try:
         c = git(repo, "rev-parse", f"{tag}^{{commit}}").decode().strip()
     except subprocess.CalledProcessError:
         raise SystemExit(f"no tag {tag!r} here: tag C first (git tag {tag})") from None
     try:
-        design = json.loads(committed(repo, c, DESIGN))
+        values = json.loads(committed(repo, c, design))
     except ValueError:                  # not UTF-8, or not JSON
-        design = None
-    if not isinstance(design, dict):
-        raise SystemExit(f"{DESIGN} in {c[:12]} is not a JSON object")
-    if design.get("draft", True):
-        raise SystemExit(f"design.json in {c[:12]} is still marked draft: that commit is not C")
-    d = hashlib.sha256(committed(repo, c, PROTOCOL)).hexdigest()
+        values = None
+    if not isinstance(values, dict):
+        raise SystemExit(f"{design} in {c[:12]} is not a JSON object")
+    if values.get("draft", True):
+        raise SystemExit(f"{Path(design).name} in {c[:12]} is still marked draft: that commit is not C")
+    d = hashlib.sha256(committed(repo, c, protocol)).hexdigest()
     t0 = t0 or first_run(c, repo, runner)
     info = seeds.chain_info(fetch=fetch)
     r = seeds.round_at_or_after(seeds.parse_time(t0) + seeds.DELAY_S, info["genesis_time"], info["period"])
@@ -93,6 +97,8 @@ def main(argv: list[str] | None = None, repo: Path = REPO, fetch: seeds.Fetch | 
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--tag", required=True, help="the tag at C, pushed with the branch")
     ap.add_argument("--t0", help="T0 by hand (ISO 8601 with Z); default: C's first GitHub run")
+    ap.add_argument("--protocol", default=PROTOCOL, help=f"the protocol, a repository path (default {PROTOCOL})")
+    ap.add_argument("--design", default=DESIGN, help=f"its design file, a repository path (default {DESIGN})")
     args = ap.parse_args(argv)
     if args.t0 is not None:
         try:
@@ -102,7 +108,7 @@ def main(argv: list[str] | None = None, repo: Path = REPO, fetch: seeds.Fetch | 
                   file=sys.stderr)
             return 2
     try:
-        f = facts(args.tag, args.t0, repo, runner=runner, fetch=fetch)
+        f = facts(args.tag, args.t0, repo, runner=runner, fetch=fetch, protocol=args.protocol, design=args.design)
     except NoT0 as exc:
         print(f"{exc}: push the branch and the tag first and log in to gh (gh auth login), or give T0 by "
               "hand with --t0, the creation time on the first run's page", file=sys.stderr)
