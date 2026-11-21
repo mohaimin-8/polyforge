@@ -141,11 +141,19 @@ def picks(tuned: dict) -> dict:
 
 
 def check_settings(plant: str, settings: dict, comp: dict, rel: str) -> None:
+    """The tuned file's settings are the design's, and its plant is today's: research/plant2 gives
+    the plant digest WP9 recorded (PROTOCOL.md section 4 names both)."""
+    import tune
+
     want = {"plant": plant, "mix": comp["mix"], "budget": comp["budget"], "steps": int(comp["steps"]),
             "cluster_size": comp["cluster_size"]}
     got = {k: settings.get(k) for k in want}
     if got != want:
         raise SystemExit(f"{rel} was tuned for {got}, the design asks for {want}")
+    digest = tune.plant_digest(plant)
+    if settings.get("plant_digest") != digest:
+        raise SystemExit(f"{rel} was tuned on plant {plant} with digest {settings.get('plant_digest')}, and "
+                         f"research/plant2 now gives {digest}: its configurations would run on another plant")
 
 
 def comp_jobs(master: str, comp: dict, workloads: list[dict], rehearsal: bool = False) -> list[dict]:

@@ -386,3 +386,20 @@ def test_the_report_gives_h3s_90_and_95_percent_intervals(planned, design):
         assert f"{level}% CI [{score.f(lo)}, {score.f(hi)}]" in row["H3"]
     assert f"95% CI [{score.f(h4['ci95'][0])}, {score.f(h4['ci95'][1])}]" in row["H4"]
     assert "90% CI" not in row["H4"]
+
+
+def test_the_comparison_runs_only_on_the_plant_wp9_tuned_on(monkeypatch):
+    """PROTOCOL.md section 4 names the plant digests WP9's tuned.json files record. A plant 2 changed
+    since (plant.py, CONSTANTS, fits) would run WP9's selected configurations on another plant."""
+    import tune
+
+    design = json.loads(campaign.DESIGN.read_text(encoding="utf-8"))
+    comp = design["comp"]
+    for plant, rel in comp["plants"].items():
+        settings = json.loads((campaign.REPO / rel).read_text(encoding="utf-8"))["settings"]
+        assert settings["plant_digest"] == tune.plant_digest(plant)
+        campaign.check_settings(plant, settings, comp, rel)
+        monkeypatch.setattr(tune, "plant_digest", lambda mode: "0" * 12)
+        with pytest.raises(SystemExit, match="another plant"):
+            campaign.check_settings(plant, settings, comp, rel)
+        monkeypatch.undo()
