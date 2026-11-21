@@ -56,3 +56,10 @@ def test_strong_regime_has_large_index_and_positive_gain():
     assert strong["theorem_violations"] == 0 and weak["theorem_violations"] == 0
     assert pc.regime_passes(strong, weak)
     assert strong["gain"] > 0.05 and strong["loss_mean"] > 10 * weak["loss_mean"]
+    # infeasible anchors leave some decisions outside Theorem 1: the report says how many it checked
+    assert strong["theorem_applies"] < strong["decisions"]
+    spike = pc.spike_run(steps=8)
+    text = pc.report(pc.unit_t3(), pc.unit_embedded(), spike, [(strong, weak)], 15)
+    assert f"on the {strong['theorem_applies']} of {strong['decisions']} logged decisions it applies to" in text
+    assert f"on the {spike['theorem_applies']} of {spike['decisions']} decisions it applies to" in text
+    assert "Theorem 1 holds on every decision it applies to" in text

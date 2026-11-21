@@ -144,6 +144,7 @@ def spike_run(steps: int = 15, workload: str = "crud_bursty", mix: str = "unifor
         "bound_min": min((r["bound"] for r in applies), default=math.nan),
         "per_knob_on_ridge": sum(r["per_knob"] != r["joint"] for r in present),
         "theorem_violations": cc.summarise_rows(rows, steps)["theorem_violations"],
+        "theorem_applies": cc.summarise_rows(rows, steps)["theorem_applies"],
         "planner_disagreement_share": result["metrics"]["coordination_disagreement_share"],
     }
 
@@ -192,7 +193,8 @@ def report(t3: pd.DataFrame, emb, spike: dict, regimes: list[tuple[dict, dict]],
           f"{RIDGE_RHO - RIDGE_ETA:g} plus the native objective's spread); smallest bound "
           f"{spike['bound_min']:.6g}",
           f"- per-knob choice on the ridge (x^D != x^J): {spike['per_knob_on_ridge']} of "
-          f"{spike['ridge_present']}; Theorem 1 violations: {spike['theorem_violations']}",
+          f"{spike['ridge_present']}; Theorem 1 violations: {spike['theorem_violations']} on the "
+          f"{spike['theorem_applies']} of {spike['decisions']} decisions it applies to",
           f"- the planner's own decoupled search disagreed with its joint search at "
           f"{spike['planner_disagreement_share']:.1%} of best-response calls", "",
           f"## Strong regime against weak regime ({steps} steps, the pilot's own demand seeds)", "",
@@ -206,7 +208,11 @@ def report(t3: pd.DataFrame, emb, spike: dict, regimes: list[tuple[dict, dict]],
             verdict = ("yes" if ok else "NO") if r is strong else ""
             L.append(f"| {dp} | {label} | {r['index_mean']:.3f} | {r['loss_mean']:.5f} | "
                      f"{r['costly_share']:.2%} | {r['gain']:+.4f} | {verdict} |")
-    L += ["", "Pass: Theorem 1 holds on every decision, the strong regime's mean index is at least 10x the "
+    L += ["", "Theorem 1 over the regime runs: " + "; ".join(
+        f"{label}: {r['theorem_violations']} violations on the {r['theorem_applies']} of {r['decisions']} logged "
+        "decisions it applies to" for strong, weak in regimes
+        for r, label in ((strong, "kappa 2, width 16"), (weak, "kappa 0, width 1"))) + "."]
+    L += ["", "Pass: Theorem 1 holds on every decision it applies to, the strong regime's mean index is at least 10x the "
           "weak regime's, and its run gain is positive. Short runs of single design points: the gain is "
           "one paired difference, not an estimate (the pilot's 120-step, 20-point means are in "
           "research/theory/DOSE_RESPONSE_PILOT.md).", ""]

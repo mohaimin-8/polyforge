@@ -19,7 +19,7 @@ T3 ridge (rho 10000, eta 1000) added to the real planner's score on the crud_onl
 
 - ridge in the box: 120 decisions; logged index 10000 to 10000 (expected 10000)
 - one-step loss 9000.05 to 9004.12 (expected rho - eta = 9000 plus the native objective's spread); smallest bound 10000
-- per-knob choice on the ridge (x^D != x^J): 120 of 120; Theorem 1 violations: 0
+- per-knob choice on the ridge (x^D != x^J): 120 of 120; Theorem 1 violations: 0 on the 120 of 120 decisions it applies to
 - the planner's own decoupled search disagreed with its joint search at 50.0% of best-response calls
 
 ## Strong regime against weak regime (30 steps, the pilot's own demand seeds)
@@ -29,4 +29,6 @@ T3 ridge (rho 10000, eta 1000) added to the real planner's score on the crud_onl
 | agentic/uniform/large | kappa 2, width 16 | 2.796 | 0.18894 | 22.50% | +0.1580 | yes |
 | agentic/uniform/large | kappa 0, width 1 | 0.096 | 0.00048 | 6.67% | +0.0020 |  |
 
-Pass: Theorem 1 holds on every decision, the strong regime's mean index is at least 10x the weak regime's, and its run gain is positive. Short runs of single design points: the gain is one paired difference, not an estimate (the pilot's 120-step, 20-point means are in research/theory/DOSE_RESPONSE_PILOT.md).
+Theorem 1 over the regime runs: kappa 2, width 16: 0 violations on the 222 of 240 logged decisions it applies to; kappa 0, width 1: 0 violations on the 227 of 240 logged decisions it applies to.
+
+Pass: Theorem 1 holds on every decision it applies to, the strong regime's mean index is at least 10x the weak regime's, and its run gain is positive. Short runs of single design points: the gain is one paired difference, not an estimate (the pilot's 120-step, 20-point means are in research/theory/DOSE_RESPONSE_PILOT.md).
