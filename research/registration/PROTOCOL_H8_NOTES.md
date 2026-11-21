@@ -7,6 +7,11 @@ what the built code does (`testbed/hvpa/main_runs.py`, `main_score.py`,
 pilot point one way, it is listed here with a recommendation. This file is
 not hashed into the draw.
 
+**2026-11-22 (local time), the author's decision:** every recommendation below accepted
+("Apply + freeze tonight"). Rows 3 and 4 are in `testbed/hvpa/main_runs.py` (`main_order`, the sizing
+after Holm), with a check that the draw was made for `PROTOCOL_H8.md`; the protocol says so and was
+frozen as C8 (tag `wp17-c`).
+
 ## Choices that are the author's
 
 | # | the draft (= the built code) | other options | recommended, and why |

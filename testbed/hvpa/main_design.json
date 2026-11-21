@@ -1,5 +1,5 @@
 {
- "draft": true,
+ "draft": false,
  "about": "WP17's main live runs, scored by main_score.py (H8). Every value follows plan v2's Part D (H8) and the pilot; a protocol fixes each one, sets draft to false, and freezes this file with it. Each contrast's test (superiority or equivalence) is the plan's, from main_runs.py plan --test.",
  "alpha": 0.05,
  "equivalence_margin": 0.02,

@@ -130,9 +130,14 @@ def test_the_rank_criterion_follows_the_twins_index(tmp_path):
     assert rank["regimes"] == 3 and rank["rho"] == pytest.approx(1.0) and rank["met"]
 
 
-def test_a_draft_design_is_refused_unless_allowed():
-    with pytest.raises(SystemExit):
-        main_score.load_design()
+def test_a_draft_design_is_refused_unless_allowed(tmp_path):
+    """The registered design (frozen with H8's protocol, C8) loads; a draft scores only as a pipeline check."""
+    assert main_score.load_design()["draft"] is False
+    draft = tmp_path / "main_design.json"
+    draft.write_text(json.dumps({**main_score.load_design(), "draft": True}), encoding="utf-8")
+    with pytest.raises(SystemExit, match="still marked draft"):
+        main_score.load_design(draft)
+    assert main_score.load_design(draft, allow_draft=True)["draft"] is True
 
 
 def test_a_plan_from_other_predictions_is_refused():
@@ -156,9 +161,14 @@ def test_the_command_writes_both_files(tmp_path):
     plan = tmp_path / "plan.json"
     plan.write_text(json.dumps(plan_of(predictions(), pilot.PAIRS)), encoding="utf-8")
     out = tmp_path / "score"
-    assert main_score.main(["--plan", str(plan), "--runs", str(PILOT_RUNS), "--out", str(out), "--allow-draft"]) == 0
-    assert "DRAFT DESIGN" in (out / "SCORE.md").read_text(encoding="utf-8")
+    assert main_score.main(["--plan", str(plan), "--runs", str(PILOT_RUNS), "--out", str(out)]) == 0
+    assert "DRAFT DESIGN" not in (out / "SCORE.md").read_text(encoding="utf-8")       # the registered design
     assert len(json.loads((out / "score.json").read_text(encoding="utf-8"))["contrasts"]) == 6
+    draft = tmp_path / "draft_design.json"
+    draft.write_text(json.dumps({**main_score.load_design(), "draft": True}), encoding="utf-8")
+    assert main_score.main(["--plan", str(plan), "--runs", str(PILOT_RUNS), "--out", str(tmp_path / "check"),
+                            "--design", str(draft), "--allow-draft"]) == 0
+    assert "DRAFT DESIGN" in (tmp_path / "check" / "SCORE.md").read_text(encoding="utf-8")
 
 
 def test_the_plan_main_runs_writes_scores_as_the_hand_built_one():

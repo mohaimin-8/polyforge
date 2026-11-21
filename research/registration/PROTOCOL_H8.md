@@ -1,13 +1,10 @@
 # PROTOCOL: WP17, the main live runs of the second system (H8)
 
-**Status:** DRAFT, not frozen. It describes what the built code does
-(`testbed/hvpa/main_runs.py`, `main_score.py`, `main_design.json`). The
-choices that are the author's are listed in `PROTOCOL_H8_NOTES.md` with a
-recommendation each. Freezing: the commit that replaces this line (C8), with
+**Status:** frozen in the commit that adds this line (C8), together with
 `testbed/hvpa/main_design.json` marked `"draft": false`; the push of C8 is T0
-(section 7); registered on OSF before the round named in section 7 is due.
-Later changes only as dated notes after this text, each one also a deviation
-(section 10).
+(section 7). It is registered on OSF before the round named in section 7 is
+due. Later changes only as dated notes after this text, each one also a
+deviation (section 10).
 
 ## 1. Question
 
@@ -57,10 +54,10 @@ on CPU, which the VPA's documentation says should not be used together.
 | H8a (rank) | the twin's mean index ranks the live regimes by the gain of joint over per-knob control | the three live regimes | Spearman's rho between the twin's mean index and the observed gain against A3 is at least 0.8; with three regimes rho is -1, -0.5, +0.5 or +1, so this holds exactly when both orders agree. A criterion, not a test: no permutation p-value can fall below 1/6. |
 | H8b (beat) | joint control lowers J against HPA with VPA on CPU | each live regime | one-sided paired t-test of d = J(A1) - J(A4) > 0; Holm-adjusted p < 0.05 |
 
-Also tested, with H8b in one Holm family (choice: notes row 1): joint
-control lowers J against the per-knob planner in each regime, d = J(A3) -
-J(A4) > 0. H8 holds when H8a holds and H8b is supported in every regime
-(choice: notes row 2); each part is reported on its own.
+Also tested, with H8b in one Holm family: joint control lowers J against
+the per-knob planner in each regime, d = J(A3) - J(A4) > 0. H8 holds when
+H8a holds and H8b is supported in every regime; each part is reported on its
+own.
 
 ## 4. Design
 
@@ -75,21 +72,34 @@ J(A4) > 0. H8 holds when H8a holds and H8b is supported in every regime
   InPlaceOrRecreate, 250m to 2 cores, the recommender's default flags), its
   target the one the twin tuned for the regime's volatility (0.2 at sigma
   0.2, 0.1 at sigma 0.05). Replicas 1 to 8. A2 (HPA on request rate through
-  KEDA, with the VPA) is not run, as in the pilot (notes row 6).
-- **Regimes:** the three live regimes of section 2.
+  KEDA, with the VPA) is not run, as in the pilot: H8 names the same-metric
+  pair.
+- **Regimes:** the three live regimes of section 2. Width w: every 30 s a
+  planner decision picks replicas within r - w to r + w (1 to 8) and CPU
+  one level down, the same or up (0.25, 0.5, 1 or 2 cores), the box of
+  `research/hvpa/lattice.py`, where the joint arm takes the box's best point
+  and the per-knob arm the best replica count at the current CPU combined
+  with the best CPU at the current count. Sigma: the demand's volatility.
 - **Schedules:** schedule k of a regime has the demand shape k mod 6 (step
   up, step down, ramp, burst train, Azure app 1, Azure app 2) at the regime's
   volatility, its demand seeded from the draw (section 7). Each schedule is
-  run once by each arm, back to back, in the order `pilot.order(k)`: the six
-  orders of the three arms in turn, so over six schedules every arm takes
-  every place twice (notes row 3). The joint arm's run serves both
-  contrasts.
+  run once by each arm, back to back, in the order `main_runs.main_order(k)`:
+  the six orders of the three arms in turn, moved on by one every six
+  schedules, order (k + floor(k / 6)) mod 6. Every block of six schedules
+  holds all six orders, so every arm takes every place equally often, and
+  over 36 schedules every shape meets every order. The joint arm's run
+  serves both contrasts.
 - **Size:** per regime, the largest pair count its two contrasts need by
   WP12's formula at alpha 0.05 one-sided and power 0.9,
   n = ((1.645 + 1.282) sigma_d / Delta)^2, Delta = the twin's predicted gain
   x the comparator's pilot mean J, sigma_d the pilot's, rounded up to a
-  multiple of six: 66 schedules at w2 s0.2, 36 at w4 s0.2, 42 at w4 s0.05.
-  That is 144 schedules, 432 one-hour runs, about 433 hours (notes row 4).
+  multiple of six (66, 36 and 42); then raised six schedules at a time, in
+  each regime with a contrast short of it, until every contrast keeps power
+  0.9 after the Holm correction of section 6 (20,000 simulated campaigns at
+  the pilot's sigma_d and the twin's gains, seed 20261121;
+  `main_runs.holm_schedules`): 72 schedules at w2 s0.2, 42 at w4 s0.2 and 48
+  at w4 s0.05, each contrast's simulated power 0.92 or more. That is 162
+  schedules, 486 one-hour runs, about 488 hours.
 - **One run** (`testbed/hvpa/live.py`): reset (the arm's objects and the
   VPA's checkpoints deleted, the recommender restarted, the service back to
   2 pods x 0.5 core, every pod ready); the arm applied; a k6 Job in the
@@ -112,7 +122,7 @@ J(A4) > 0. H8 holds when H8a holds and H8b is supported in every regime
   of both arms: d_k = J(B) - J(A4). One-sided paired t-test that the mean of
   d is above zero (`wp14_score.superiority`); its 95 % interval reported.
 - Holm's correction over the six contrasts (three regimes x two
-  comparators), alpha = 0.05 (notes row 1).
+  comparators), alpha = 0.05.
 - H8a: Spearman's rho on average ranks between `mean_index` of the three
   live regimes in `predictions.json` and the regimes' gain against A3 (the
   mean of d over A3's mean J on the same schedules).
@@ -150,8 +160,9 @@ J(A4) > 0. H8 holds when H8a holds and H8b is supported in every regime
 
 - `python testbed/hvpa/main_runs.py plan --pilot testbed/hvpa/pilot_runs
   --draw research/registration/draw_h8.json --out testbed/hvpa/main_plan.json`
-  writes the plan once; the plan and the draw are committed before any main
-  run.
+  writes the plan once, and refuses a draw that was not made for this file
+  or whose master seed does not follow from it; the plan and the draw are
+  committed before any main run.
 - `python testbed/hvpa/main_runs.py run --plan testbed/hvpa/main_plan.json
   --out testbed/out/hvpa/main`, detached from the session that starts it
   (`tools/detach.py`), the host kept awake and on mains. It refuses a plan,

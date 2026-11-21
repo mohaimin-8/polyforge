@@ -59,6 +59,42 @@ def test_the_plan_is_sized_by_the_pilot_and_seeded_by_the_draw(tmp_path):
     assert reg["targets"] == {"A4": 2, "A3": 2, "A1": 0.7}
 
 
+def test_the_run_order_rotates_so_shapes_and_orders_cross():
+    """H8's protocol (notes row 3): order (k + floor(k / 6)) mod 6. Every block of six schedules
+    still holds the six orders, and over 36 schedules every shape (k mod 6) meets every order."""
+    assert [main_runs.main_order(k) for k in range(6)] == [pilot.order(k) for k in range(6)]
+    assert main_runs.main_order(6) == pilot.ORDERS[1] != pilot.order(6)
+    for n in (36, 42, 48, 66, 72):
+        assert all(sorted(main_runs.main_order(k) for k in range(b, b + 6)) == sorted(pilot.ORDERS)
+                   for b in range(0, n - n % 6, 6))
+        assert len({(k % 6, main_runs.main_order(k)) for k in range(n)}) == 36
+
+
+def test_the_plan_is_sized_for_the_power_after_holm_and_runs_the_rotated_order(tmp_path):
+    pilot_records(tmp_path)
+    plan = main_runs.make_plan(tmp_path, PREDICTIONS, draw(), {})
+    (reg,) = plan["regimes"]
+    rows = [{"width": 2, "sigma": 0.2, "arm": arm, "delta": c["delta"], "sigma_d": c["sigma_d"]}
+            for arm, c in reg["contrasts"].items()]
+    start = {(2, 0.2): main_runs.regime_size({arm: c["n_superiority"] for arm, c in reg["contrasts"].items()})}
+    n, power = main_runs.holm_schedules(rows, start)
+    assert plan["sizing"] == "after Holm" and reg["schedules_n"] == n[(2, 0.2)]
+    assert all(c["power_after_holm"] == power[(2, 0.2, arm)] >= main_runs.POWER for arm, c in reg["contrasts"].items())
+    assert [tuple(s["order"]) for s in reg["schedules"]] == [main_runs.main_order(k) for k in range(n[(2, 0.2)])]
+
+
+def test_a_draw_made_for_another_protocol_is_refused(tmp_path):
+    pilot_records(tmp_path)
+    protocol = tmp_path / "PROTOCOL_H8.md"
+    protocol.write_bytes(b"# H8\n")
+    with pytest.raises(SystemExit, match="another protocol"):
+        main_runs.make_plan(tmp_path, PREDICTIONS, draw(), {}, protocol=protocol)
+    import hashlib
+    mine = hashlib.sha256(protocol.read_bytes()).hexdigest()
+    ok = draw(protocol_sha256=mine, master_seed=seeds.master_seed(mine, ROUND_1000["randomness"]))
+    assert main_runs.make_plan(tmp_path, PREDICTIONS, ok, {}, protocol=protocol)["draw"]["protocol_sha256"] == mine
+
+
 def test_equivalence_can_be_named_per_comparator(tmp_path):
     pilot_records(tmp_path)
     plan = main_runs.make_plan(tmp_path, PREDICTIONS, draw(), main_runs.parse_tests(["A3=equivalence"]))

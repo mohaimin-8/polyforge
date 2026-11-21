@@ -2,16 +2,19 @@
 
 The plan (WP17 step 5): per live regime, pairs in balanced order, as many as
 the pilot's numbers ask by WP12's formulas. This is pilot.py's design run at
-that size: a schedule is run once by each of A4, A3 and A1, back to back, in
-pilot.order(k), and the joint arm's run serves both contrasts. Two things
-differ from the pilot:
+that size: a schedule is run once by each of A4, A3 and A1, back to back, and
+the joint arm's run serves both contrasts. Three things differ from the pilot:
 
   size   n schedules per regime: the largest pair count the regime's
          contrasts need on the pilot's records (pilot.sample_sizes:
          superiority at the twin's predicted gain, or equivalence within
          +-2 %, per comparator as --test names; superiority by default),
          rounded up to a multiple of six so that every arm takes every place
-         equally often;
+         equally often; then, when every contrast is a superiority test,
+         raised six at a time until every contrast keeps power 0.9 after
+         main_score.py's Holm over all of them (holm_schedules, simulated);
+  order  main_order(k): the pilot's six orders in turn, moved on by one every
+         six schedules, so demand shapes and run orders cross (H8's protocol);
   seeds  schedule k of a regime draws its demand with the seed
          seeds.run_seed(master, "wp17|w<width>|s<sigma>|k<k>"), the master seed
          of the registered draw (WP13), not k: nobody chooses the demand, and
@@ -46,6 +49,7 @@ import pilot  # noqa: E402
 import seeds  # noqa: E402
 
 PREDICTIONS = REPO / "research" / "hvpa" / "predictions.json"
+PROTOCOL_H8 = REPO / "research" / "registration" / "PROTOCOL_H8.md"
 CALIBRATION = REPO / "research" / "hvpa" / "calibration.json"
 TESTS = ("superiority", "equivalence")
 BALANCE = len(pilot.ORDERS)   # six orders of the three arms
@@ -57,6 +61,13 @@ POWER_DRAWS, POWER_SEED = 20000, 20261121   # `sizes`' simulated campaigns (holm
 
 def identity(width: int, sigma: float, k: int) -> str:
     return f"wp17|w{width}|s{sigma}|k{k}"
+
+
+def main_order(k: int) -> tuple[str, ...]:
+    """Schedule k's run order in the main runs (H8's protocol): the six orders in turn, moved on by
+    one every six schedules. Every block of six still holds all six orders, and over 36 schedules
+    every demand shape (k mod 6) meets every order; pilot.order(k) tied shape k mod 6 to order k mod 6."""
+    return pilot.ORDERS[(k + k // BALANCE) % BALANCE]
 
 
 def pilot_differences(pilot_out: Path, predictions: dict) -> dict[tuple, dict]:
@@ -197,16 +208,24 @@ def checked_master(draw: dict) -> str:
     return master
 
 
-def make_plan(pilot_out: Path, predictions: dict, draw: dict, tests: dict[str, str]) -> dict:
+def make_plan(pilot_out: Path, predictions: dict, draw: dict, tests: dict[str, str],
+              protocol: Path | None = None) -> dict:
+    """The plan: per regime the schedules' shapes, run orders (main_order) and seeds (the draw's).
+    With `protocol`, a draw made for another protocol is refused. When every contrast is a
+    superiority test, the sizes are raised a round of orders at a time until every contrast keeps
+    POWER after main_score.py's Holm over all of them (holm_schedules); otherwise each regime takes
+    its largest contrast's WP12 size."""
     import workloads
 
     master = checked_master(draw)
+    if protocol is not None:
+        want = hashlib.sha256(protocol.read_bytes()).hexdigest()
+        if draw["protocol_sha256"] != want:
+            raise SystemExit(f"the draw was made for another protocol (digest {draw['protocol_sha256'][:12]}), "
+                             f"not {protocol.name} ({want[:12]}): no plan")
     shapes = workloads.all_shapes()
     diffs = pilot_differences(pilot_out, predictions)
-    plan = {"design": "WP17 main live runs: testbed/hvpa/main_runs.py",
-            "predictions_sha256": hashlib.sha256(json.dumps(predictions, sort_keys=True).encode()).hexdigest(),
-            "draw": {"round": draw["round"], "master_seed": master, "protocol_sha256": draw["protocol_sha256"]},
-            "tests": tests, "regimes": []}
+    regimes = []
     for w, s, targets, group in pilot.regimes(pilot.contrasts(predictions)):
         sizes, per = {}, {}
         for c in group:
@@ -217,10 +236,25 @@ def make_plan(pilot_out: Path, predictions: dict, draw: dict, tests: dict[str, s
             test = tests.get(c["arm"], "superiority")
             sizes[c["arm"]] = st["n_superiority"] if test == "superiority" else st["n_equivalence"]
             per[c["arm"]] = {**st, "test": test}
-        n = regime_size(sizes)
+        regimes.append({"width": w, "sigma": s, "targets": targets, "contrasts": per, "n": regime_size(sizes)})
+    holm = all(c["test"] == "superiority" for r in regimes for c in r["contrasts"].values())
+    if holm:
+        rows = [{"width": r["width"], "sigma": r["sigma"], "arm": arm, "delta": c["delta"], "sigma_d": c["sigma_d"]}
+                for r in regimes for arm, c in r["contrasts"].items()]
+        n_by, power = holm_schedules(rows, {(r["width"], r["sigma"]): r["n"] for r in regimes})
+        for r in regimes:
+            r["n"] = n_by[(r["width"], r["sigma"])]
+            for arm, c in r["contrasts"].items():
+                c["power_after_holm"] = power[(r["width"], r["sigma"], arm)]
+    plan = {"design": "WP17 main live runs: testbed/hvpa/main_runs.py",
+            "predictions_sha256": hashlib.sha256(json.dumps(predictions, sort_keys=True).encode()).hexdigest(),
+            "draw": {"round": draw["round"], "master_seed": master, "protocol_sha256": draw["protocol_sha256"]},
+            "tests": tests, "sizing": "after Holm" if holm else "per contrast", "regimes": []}
+    for r in regimes:
+        w, s, n = r["width"], r["sigma"], r["n"]
         plan["regimes"].append({
-            "width": w, "sigma": s, "targets": targets, "contrasts": per, "schedules_n": n,
-            "schedules": [{"k": k, "shape": shapes[k % len(shapes)], "order": list(pilot.order(k)),
+            "width": w, "sigma": s, "targets": r["targets"], "contrasts": r["contrasts"], "schedules_n": n,
+            "schedules": [{"k": k, "shape": shapes[k % len(shapes)], "order": list(main_order(k)),
                            "seed": seeds.run_seed(master, identity(w, s, k))} for k in range(n)]})
     return plan
 
@@ -271,6 +305,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--draw", type=Path, required=True, help="the registered draw (research/registration)")
     p.add_argument("--predictions", type=Path, default=PREDICTIONS)
     p.add_argument("--test", nargs="*", default=[], help="A3=superiority|equivalence, A1=... (default superiority)")
+    p.add_argument("--protocol", type=Path, default=PROTOCOL_H8, help="the registered protocol the draw was made for")
     p.add_argument("--out", type=Path, required=True)
     r = sub.add_parser("run")
     r.add_argument("--plan", type=Path, required=True)
@@ -287,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.out.exists():
             raise SystemExit(f"{args.out} exists: a plan is written once")
         plan = make_plan(args.pilot, json.loads(args.predictions.read_text(encoding="utf-8")),
-                         json.loads(args.draw.read_text(encoding="utf-8")), parse_tests(args.test))
+                         json.loads(args.draw.read_text(encoding="utf-8")), parse_tests(args.test), args.protocol)
         args.out.write_text(json.dumps(plan, indent=1), encoding="utf-8")
         for reg in plan["regimes"]:
             print(f"w{reg['width']} s{reg['sigma']}: {reg['schedules_n']} schedules "
