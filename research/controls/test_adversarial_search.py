@@ -123,3 +123,5 @@ def test_confirmations_that_repeat_another_regimes_runs_are_counted_once():
     assert rows[158].rstrip().endswith("| - |")
     assert rows[163].rstrip().endswith("| 158 |") and rows[164].rstrip().endswith("| 158 |")
     assert "1 distinct confirmation of 3" in text
+    assert ("**51 regime(s) in the refutation corner during the search** (before confirmation): 35 with runs "
+            "of their own, 16 repeating another's exactly; all from one phase, climb from 62.") in text

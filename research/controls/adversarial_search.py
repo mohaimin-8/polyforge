@@ -374,7 +374,12 @@ def report(ev: Evaluator, confirmed: list[dict], args, label: str) -> str:
          f"violations **{int(pts.theorem_violations.sum())}**", "",
          "## Result", ""]
     if len(corner):
-        L.append(f"**{len(corner)} regime(s) in the refutation corner during the search** (before confirmation).")
+        repeats = len(_same_runs(pts, list(corner.cid)))
+        phases = sorted(corner.phase.unique())
+        where = (f"all from one phase, {phases[0]}" if len(phases) == 1
+                 else f"from {len(phases)} phases")
+        L.append(f"**{len(corner)} regime(s) in the refutation corner during the search** (before confirmation): "
+                 f"{len(corner) - repeats} with runs of their own, {repeats} repeating another's exactly; {where}.")
     else:
         L.append(f"No evaluated regime reached the refutation corner (I <= {args.tau:g} with "
                  f"G >= {args.large_gain:g}).")
