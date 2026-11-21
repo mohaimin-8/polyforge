@@ -46,6 +46,10 @@ SKIP_DIRS = frozenset({"__pycache__"})      # bytecode is derived, never deposit
 ZIP_PREFIX = "polyforge-programme2-"         # + the commit's first 12 hex digits + .zip
 SEAL = "SHA256SUMS"                          # what confirm.py seal writes at the artifact's root
 SEAL_LINE = re.compile(r"([0-9a-f]{64})  (\S.*)")
+# The record's licence: Zenodo's id (SPDX) of the repository's own LICENSE, MIT, so the zip and its
+# record say the same (the author's choice, 2026-11-21; it was cc-by-4.0 until then). Third-party
+# data keep their own terms, listed in research/DATA_LICENCES.md.
+LICENCE = "mit"
 KEYWORDS = ["kubernetes", "autoscaling", "LLM serving", "joint control", "interaction index",
             "vertical pod autoscaling", "pre-registration", "reproducibility"]
 
@@ -220,7 +224,7 @@ def deposit(sha: str, people: list[dict], counts: dict, audit_name: str, today: 
                         "script."),
         "creators": [c for c in people if "type" not in c],
         "keywords": KEYWORDS,
-        "license": "cc-by-4.0",
+        "license": LICENCE,
         "publication_date": today,
     }
     contributors = [c for c in people if "type" in c]

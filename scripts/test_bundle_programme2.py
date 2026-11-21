@@ -69,6 +69,15 @@ def test_the_deposit_holds_the_commit_the_audit_scripts_and_a_manifest_of_both(t
     assert not list((tmp_path / "out").glob("*.partial"))
 
 
+def test_the_record_carries_the_repositorys_own_licence(tmp_path, inputs):
+    """The author's choice (2026-11-21): one licence everywhere. LICENSE is MIT, so the record
+    carries Zenodo's `mit`; until then deposit.json said cc-by-4.0 beside a zip whose LICENSE says MIT."""
+    repo, audit, creators = inputs
+    _, _, meta = build(repo, audit, creators, tmp_path / "out")
+    assert meta["license"] == bundle.LICENCE == "mit"
+    assert (bundle.REPO / "LICENSE").read_text(encoding="utf-8").startswith("MIT License")
+
+
 def test_the_same_inputs_give_the_same_zip_byte_for_byte(tmp_path, inputs):
     first, _, _ = build(*inputs, tmp_path / "one")
     second, _, _ = build(*inputs, tmp_path / "two")
