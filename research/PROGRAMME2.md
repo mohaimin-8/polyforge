@@ -112,7 +112,7 @@ Status at the deadline (2026-11-20 14:00), one line per work package of the plan
 | WP14 | built, not run | 2,360 + c runs in 16 shards (c: drawn workloads of class `conversation`; 2,420 at c = 60), rehearsed on GitHub; frozen at C; starts when round 34183619 is due (2026-11-22T13:30:21Z), on the push of the tag `wp14-round-34183619` at `wp14-c` |
 | WP15 | done | `REPORT.md`, `RESULTS.md` |
 | WP16 | done but the DOI | the benchmark harness, one-command reproduction (39 steps; on 2026-11-20 each of the 31 it then had rebuilt its report identically on the laptop, line ends aside, none skipped, and on 2026-11-21 so did the 8 added (WP1, WP3, WP4 pilot reports, WP9's campaign reports, WP22's negative control and adversarial search); on Linux with `research/requirements-campaigns.txt`, from a clone and from the deposit's archive committed once, 34 reproduce, 7 of them in the last digits within 1e-6, and the 5 needing unshipped inputs skip), `DATA_LICENCES.md`, the deposit builder; publishing is the author's |
-| WP17 | pilot done | 54 live runs, none invalid (`PILOT_LIVE.md`); the main runs need 433 laptop-hours at 90 % power and the registered draw: not run; their scorer is drafted (`testbed/hvpa/main_score.py`, `main_design.json` marked draft; on the pilot's records it gives `PILOT_LIVE.md`'s numbers) |
+| WP17 | pilot done | 54 live runs, none invalid (`PILOT_LIVE.md`); the main runs need 433 laptop-hours at 90 % power and the registered draw: not run; their scorer is drafted (`testbed/hvpa/main_score.py`, `main_design.json` marked draft; on the pilot's records it gives `PILOT_LIVE.md`'s numbers), and so is their protocol (`research/registration/PROTOCOL_H8.md`, the author's choices in `PROTOCOL_H8_NOTES.md`, 2026-11-21) |
 | WP19 | not started | needs GPU access |
 | WP20 | both levels prepared | level 1: `codecheck.yml`, the manifest a codechecker works from (its `paper` fields are the author's); level 2: `testbed/REPLICATION.md`, drafted for site B (WP11b's cells and WP12's pilot, expected values, tolerances proposed from our bootstrap and prediction intervals: the author declares them); requesting the check after the DOI and finding site B are the author's |
 | WP21 | the author's decision | |
@@ -141,7 +141,8 @@ What is left is the author's, in this order (each step names the file that prepa
    [10.2%, 88.8%], rank correlation [+0.639, +0.979]), as Part B's prediction interval is for a second mean.
 4. WP21 and WP0's decisions with the supervisor (the route, which index defines Q1); WP0's reading
    table (plan B1 and B5, read in full).
-5. WP17's main runs, if wanted: register H8 (scorer drafted in `testbed/hvpa/main_score.py`), draw its
-   round with `seeds.py draw --t0`, then about 433 laptop-hours (488 if the drafted scorer's Holm over the six
-   contrasts stays: H8's registration decides, `research/registration/PROTOCOL_NOTES.md` row 5). WP19 needs GPU access; WP24 the preprint and outside readers.
+5. WP17's main runs: H8's protocol is drafted (`research/registration/PROTOCOL_H8.md`; the choices, each with
+   a recommendation, in `PROTOCOL_H8_NOTES.md`): decide them, freeze it (C8, tag `wp17-c`), register it, draw its
+   round with `seeds.py draw --t0`, then about 433 laptop-hours (488 if sized for the drafted scorer's Holm over
+   the six contrasts, as the notes recommend). WP19 needs GPU access; WP24 the preprint and outside readers.
 6. Merging `research-v2` into `main`, and the writing.
