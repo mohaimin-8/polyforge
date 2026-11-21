@@ -352,6 +352,63 @@ SAME_RUNS = ("*Same runs as*: {where}every run of that regime gave the same J, i
              "named (the parameters it changes changed no run)")
 
 
+def _corner_lines(corner: pd.DataFrame, pts: pd.DataFrame, args) -> list[str]:
+    """How many searched regimes reached the corner, and how many of them hold runs of their own."""
+    if not len(corner):
+        return [f"No evaluated regime reached the refutation corner (I <= {args.tau:g} with "
+                f"G >= {args.large_gain:g})."]
+    repeats = len(_same_runs(pts, list(corner.cid)))
+    phases = sorted(corner.phase.unique())
+    where = f"all from one phase, {phases[0]}" if len(phases) == 1 else f"from {len(phases)} phases"
+    return [f"**{len(corner)} regime(s) in the refutation corner during the search** (before confirmation): "
+            f"{len(corner) - repeats} with runs of their own, {repeats} repeating another's exactly; {where}."]
+
+
+def _worst_case_lines(best) -> list[str]:
+    if best is None:
+        return []
+    params = ", ".join(f"{p.name}={best[p.name]:.4g}" if isinstance(best[p.name], float)
+                       else f"{p.name}={best[p.name]}" for p in SPACE)
+    return ["", f"Worst case for H2 by the objective (regime {best.cid}, {best.phase}): G {best.G:+.4f} "
+            f"(se {best.G_se:.4f}), I {best.I:.4f}, quantile index {best.I_quantile:.4f}, one-step loss "
+            f"{best.loss:.5f}, costly disagreements {best.costly:.2%}, per-knob infeasible "
+            f"{best.per_knob_infeasible:.2%}, anchor infeasible {best.anchor_infeasible:.2%}, "
+            f"decoupled repairs {best.repaired_dec:.2%}.", "", f"Parameters: {params}"]
+
+
+def _confirmation_lines(regs: pd.DataFrame, pts: pd.DataFrame, confirmed: list[dict], args) -> list[str]:
+    """The confirmation table; a confirmation that repeats another's fresh runs is marked and counted once."""
+    of = {c["cid"]: c["of"] for c in confirmed}
+    again = _same_runs(pts, [c["cid"] for c in confirmed])
+    L = ["", "## Confirmation on fresh seeds", "",
+         "| regime | search G | search I | fresh G | fresh se | fresh I | still in corner | same runs as |",
+         "|---:|---:|---:|---:|---:|---:|---|---:|"]
+    for c in confirmed:
+        s = regs[regs.cid == c["of"]].iloc[0]
+        gc = abs(c["G"]) if args.two_sided else c["G"]
+        inside = c["I"] <= args.tau and gc >= args.large_gain
+        L.append(f"| {c['of']} | {s.G:+.4f} | {s.I:.4f} | {c['G']:+.4f} | {c['G_se']:.4f} | "
+                 f"{c['I']:.4f} | {'YES' if inside else 'no'} | {of[again[c['cid']]] if c['cid'] in again else '-'} |")
+    if again:
+        distinct = len(confirmed) - len(again)
+        L += ["", f"{SAME_RUNS.format(where='on the fresh seeds, ')}; the table holds {distinct} distinct "
+              f"confirmation{'s' if distinct != 1 else ''} of {len(confirmed)}."]
+    return L
+
+
+def _top_lines(top: pd.DataFrame, pts: pd.DataFrame) -> list[str]:
+    again = _same_runs(pts, list(top.cid))
+    L = ["", "## Top regimes by the objective", "",
+         "| regime | phase | width | kappa | workload | size | I | G | loss | per-knob infeasible | same runs as |",
+         "|---:|---|---:|---:|---|---|---:|---:|---:|---:|---:|"]
+    for r in top.itertuples():
+        L.append(f"| {r.cid} | {r.phase} | {r.width} | {r.kappa:.2f} | {r.workload} | {r.cluster_size} | "
+                 f"{r.I:.4f} | {r.G:+.4f} | {r.loss:.5f} | {r.per_knob_infeasible:.2%} | {again.get(r.cid, '-')} |")
+    if again:
+        L += ["", f"{SAME_RUNS.format(where='')}."]
+    return L
+
+
 def report(ev: Evaluator, confirmed: list[dict], args, label: str) -> str:
     ranked = sorted((r for r in ev.regimes if not r["phase"].startswith("confirm")),
                     key=lambda r: r["key"], reverse=True)  # best first, by the objective
@@ -373,50 +430,10 @@ def report(ev: Evaluator, confirmed: list[dict], args, label: str) -> str:
          f"{int(pts.decisions.sum()):,}; Theorem 1 checked on {int(pts.theorem_applies.sum()):,}, "
          f"violations **{int(pts.theorem_violations.sum())}**", "",
          "## Result", ""]
-    if len(corner):
-        repeats = len(_same_runs(pts, list(corner.cid)))
-        phases = sorted(corner.phase.unique())
-        where = (f"all from one phase, {phases[0]}" if len(phases) == 1
-                 else f"from {len(phases)} phases")
-        L.append(f"**{len(corner)} regime(s) in the refutation corner during the search** (before confirmation): "
-                 f"{len(corner) - repeats} with runs of their own, {repeats} repeating another's exactly; {where}.")
-    else:
-        L.append(f"No evaluated regime reached the refutation corner (I <= {args.tau:g} with "
-                 f"G >= {args.large_gain:g}).")
-    if best is not None:
-        params = ", ".join(f"{p.name}={best[p.name]:.4g}" if isinstance(best[p.name], float)
-                           else f"{p.name}={best[p.name]}" for p in SPACE)
-        L += ["", f"Worst case for H2 by the objective (regime {best.cid}, {best.phase}): G {best.G:+.4f} "
-              f"(se {best.G_se:.4f}), I {best.I:.4f}, quantile index {best.I_quantile:.4f}, one-step loss "
-              f"{best.loss:.5f}, costly disagreements {best.costly:.2%}, per-knob infeasible "
-              f"{best.per_knob_infeasible:.2%}, anchor infeasible {best.anchor_infeasible:.2%}, "
-              f"decoupled repairs {best.repaired_dec:.2%}.", "", f"Parameters: {params}"]
+    L += _corner_lines(corner, pts, args) + _worst_case_lines(best)
     if confirmed:
-        of = {c["cid"]: c["of"] for c in confirmed}
-        again = _same_runs(pts, [c["cid"] for c in confirmed])
-        L += ["", "## Confirmation on fresh seeds", "",
-              "| regime | search G | search I | fresh G | fresh se | fresh I | still in corner | same runs as |",
-              "|---:|---:|---:|---:|---:|---:|---|---:|"]
-        for c in confirmed:
-            s = regs[regs.cid == c["of"]].iloc[0]
-            gc = abs(c["G"]) if args.two_sided else c["G"]
-            inside = c["I"] <= args.tau and gc >= args.large_gain
-            L.append(f"| {c['of']} | {s.G:+.4f} | {s.I:.4f} | {c['G']:+.4f} | {c['G_se']:.4f} | "
-                     f"{c['I']:.4f} | {'YES' if inside else 'no'} | {of[again[c['cid']]] if c['cid'] in again else '-'} |")
-        if again:
-            distinct = len(confirmed) - len(again)
-            L += ["", f"{SAME_RUNS.format(where='on the fresh seeds, ')}; the table holds {distinct} distinct "
-                  f"confirmation{'s' if distinct != 1 else ''} of {len(confirmed)}."]
-    top = regs.head(8)
-    again = _same_runs(pts, list(top.cid))
-    L += ["", "## Top regimes by the objective", "",
-          "| regime | phase | width | kappa | workload | size | I | G | loss | per-knob infeasible | same runs as |",
-          "|---:|---|---:|---:|---|---|---:|---:|---:|---:|---:|"]
-    for r in top.itertuples():
-        L.append(f"| {r.cid} | {r.phase} | {r.width} | {r.kappa:.2f} | {r.workload} | {r.cluster_size} | "
-                 f"{r.I:.4f} | {r.G:+.4f} | {r.loss:.5f} | {r.per_knob_infeasible:.2%} | {again.get(r.cid, '-')} |")
-    if again:
-        L += ["", f"{SAME_RUNS.format(where='')}."]
+        L += _confirmation_lines(regs, pts, confirmed, args)
+    L += _top_lines(regs.head(8), pts)
     L += ["", f"Across the {len(regs)} regimes searched (not a test of H2: the sample is selected), rank "
           f"correlation of I with G: {_spearman(regs.I, regs.G):+.2f}; of the one-step loss with G: "
           f"{_spearman(regs.loss, regs.G):+.2f}.", ""]
