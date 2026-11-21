@@ -121,3 +121,28 @@ def test_bootstrap_is_seeded_and_brackets_the_mean():
 
 def test_controllers_load_by_module_and_class():
     assert bench.load_factory("baselines:HPAController").__name__ == "HPAController"
+
+
+HOLD = '''class Hold:
+    def __init__(self, configs, **kw):
+        self.configs = configs
+        self.name = "hold"
+
+    def plan(self, states, demands):
+        return dict(states)
+'''
+
+
+def test_a_controller_in_a_file_of_its_own_runs_and_cannot_stand_in_for_the_simulator(tmp_path):
+    """An outside controller is a file outside the repository: module:Class could not reach it. A
+    file called model.py loads under a name of its own; the simulator's model stays the one it imports."""
+    import model
+
+    (tmp_path / "model.py").write_text(HOLD, encoding="utf-8")
+    factory = bench.load_factory(f"{tmp_path / 'model.py'}:Hold")      # a drive letter's colon stays in the path
+    assert factory.__name__ == "Hold" and sys.modules["model"] is model
+    assert math.isfinite(bench.score(factory, {}, **TINY).J[0])
+    for spec, message in ((f"{tmp_path / 'none.py'}:Hold", "no file"), (f"{tmp_path / 'model.py'}:Nope", "has no"),
+                          ("no_such_module:Hold", "cannot import"), ("baselines", "module:Class")):
+        with pytest.raises(SystemExit, match=message):
+            bench.load_factory(spec)

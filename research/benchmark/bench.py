@@ -37,6 +37,12 @@ or within about 1e-5 of it (J near 0.2), on most workloads, which leaves
 that ratio noise over noise. References need the quality weight 0.
 
     python bench.py --controller baselines:HPAController --params '{"target_rho": 0.6}' --plant B --workloads 12
+    python bench.py --controller path/to/mine.py:MyController --plant B --workloads 0
+
+`--controller` takes module:Class, the module importable from research/
+jcac_sim, research/comparators, eval or PYTHONPATH, or file.py:Class for a
+controller in a file of its own (loaded under a name of its own, so a file
+called model.py cannot stand in for the simulator's model).
 """
 
 from __future__ import annotations
@@ -45,6 +51,7 @@ import argparse
 import contextlib
 import dataclasses
 import importlib
+import importlib.util
 import json
 import sys
 import tempfile
@@ -171,14 +178,35 @@ def summary(df: pd.DataFrame) -> dict:
 
 
 def load_factory(spec: str) -> Callable:
-    """module:Class, the module importable from research/jcac_sim or the path."""
-    module, _, attr = spec.partition(":")
-    return getattr(importlib.import_module(module), attr)
+    """module:Class or file.py:Class (the last colon splits, so a drive letter
+    stays in the path); a refusal names what was not found."""
+    source, _, attr = spec.rpartition(":")
+    if not source or not attr:
+        raise SystemExit(f"--controller {spec!r}: give module:Class or file.py:Class")
+    if source.endswith(".py"):
+        path = Path(source).resolve()
+        if not path.is_file():
+            raise SystemExit(f"--controller: no file {path}")
+        name = f"{NAME}_{path.stem}"                    # never one of the simulator's module names
+        loader = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(loader)
+        sys.modules[name] = module                      # dataclasses and pickling look it up
+        loader.loader.exec_module(module)
+    else:
+        try:
+            module = importlib.import_module(source)
+        except ModuleNotFoundError as exc:
+            raise SystemExit(f"--controller: cannot import {source!r} ({exc}); give file.py:Class for "
+                             "a controller in a file of its own, or put its folder on PYTHONPATH") from exc
+    factory = getattr(module, attr, None)
+    if not callable(factory):
+        raise SystemExit(f"--controller: {source} has no callable {attr!r}")
+    return factory
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--controller", required=True, help="module:Class")
+    ap.add_argument("--controller", required=True, help="module:Class or file.py:Class")
     ap.add_argument("--params", default="{}", help="JSON keyword arguments for the controller")
     ap.add_argument("--plant", default="B", choices=("A", "B"))
     ap.add_argument("--mix", default="native", choices=("native", "own"))
