@@ -7,6 +7,7 @@ import math
 import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 HERE = Path(__file__).resolve().parent
@@ -52,3 +53,14 @@ def test_the_report_names_the_replica_scaling_the_primary_prediction_used():
               "calibration": {"small": {"replica_scaling_exponent": 0.5975}, "mid": {"replica_scaling_exponent": 0.359}}}
     assert score.scaling_note(fitted) == ("The primary prediction scales each tier's capacity with replicas as "
                                           "n ** beta, beta fitted to the calibration's curves (small 0.598, mid 0.359)")
+
+
+def test_spearman_gives_tied_values_their_average_rank_whatever_the_order():
+    """A bootstrap resample repeats cells, and cells can share a hit rate: ties take the mean of
+    their ranks (the old argsort-of-argsort ranks gave 1.0 or 0.8 here, by sort order)."""
+    a, b = np.array([1.0, 2.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0, 4.0])
+    assert score.spearman(a, b) == pytest.approx(3 / math.sqrt(10))
+    assert score.spearman(a[::-1], b[::-1]) == pytest.approx(3 / math.sqrt(10))
+    assert list(score.average_ranks([5.0, 1.0, 5.0, 5.0])) == [3.0, 1.0, 3.0, 3.0]
+    repeated = np.array([0.2, 0.2, 0.5, 0.9]), np.array([0.3, 0.3, 0.4, 0.8])
+    assert score.spearman(*repeated) == pytest.approx(1.0)

@@ -190,9 +190,7 @@ def coupled_attainment(cell: dict, demand: dict, hits: dict, calm: dict, gamma: 
     return within / served
 
 
-def spearman(a: np.ndarray, b: np.ndarray) -> float:
-    ra, rb = np.argsort(np.argsort(a)), np.argsort(np.argsort(b))
-    return float(np.corrcoef(ra, rb)[0, 1])
+spearman = score.spearman  # average ranks for ties
 
 
 def sweep(cells: list[dict], runs: Path, inputs: Path, cal: dict, calibration: Path, gammas) -> tuple[list, list]:

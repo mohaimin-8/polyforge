@@ -31,7 +31,7 @@ runs each): attainment's median absolute percentage error 29.8% and Spearman
 rank correlation +0.89 between predicted and measured attainment. Your result
 reproduces ours when both of yours fall inside our 95% bootstrap intervals over
 cells (10,000 resamples of the 20 cells, seed 20261120): error in
-[16.0%, 71.5%] and rank correlation in [+0.705, +0.949] *(proposed)*. The plan's
+[16.0%, 71.5%] and rank correlation in [+0.711, +0.951] *(proposed)*. The plan's
 targets for the simulator (error at most 25%, rank correlation at least 0.8)
 are reported for your run as they were for ours.
 

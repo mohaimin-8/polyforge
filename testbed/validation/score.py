@@ -47,9 +47,19 @@ def measure_run(path: Path, slo_ms: float, scored_s: float) -> dict:
             "failed_rate": s["failed_rate"]}
 
 
+def average_ranks(x) -> np.ndarray:
+    """Ranks 1..n with each group of tied values given the mean of its ranks."""
+    x = np.asarray(x, dtype=float)
+    ranks = np.empty(len(x))
+    ranks[np.argsort(x, kind="stable")] = np.arange(1, len(x) + 1)
+    _, group, size = np.unique(x, return_inverse=True, return_counts=True)
+    return (np.bincount(group, weights=ranks) / size)[group]
+
+
 def spearman(a, b) -> float:
-    ra, rb = np.argsort(np.argsort(a)), np.argsort(np.argsort(b))
-    return float(np.corrcoef(ra, rb)[0, 1])
+    """Spearman's rank correlation: Pearson's on average ranks, so tied values (a bootstrap
+    resample's repeated cells, cells with the same hit rate) do not depend on the input order."""
+    return float(np.corrcoef(average_ranks(a), average_ranks(b))[0, 1])
 
 
 def on_mains(info: dict) -> bool:
