@@ -23,11 +23,11 @@ All of it is pilot data; none of it is reused as confirmatory evidence.
 - **WP4 dose-response pilot** (`research/theory/DOSE_RESPONSE_PILOT.md`): the
   published plant, 25 regimes (kappa in {0, 0.25, 0.5, 1, 2} x step width in
   {1, 2, 4, 8, 16}), 20 design points each, one replication. Theorem 1 held
-  on all 456,876 logged decisions. Spearman's rho of the regime's gain on its
-  mean worst-case index was +0.74 (quantile index +0.74, realised one-step
-  loss +0.79, share of costly disagreements +0.77). Its runs
-  (`research/theory/data/dose_response_runs.csv.gz`) fix H2's calibration
-  line.
+  on all 456,876 decisions it applies to (of 480,000 logged). Spearman's rho
+  of the regime's gain on its mean worst-case index was +0.74 (quantile
+  index +0.74, realised one-step loss +0.79, share of costly disagreements
+  +0.77). Its runs (`research/theory/data/dose_response_runs.csv.gz`) fix
+  H2's calibration line.
 - **WP9 comparator campaigns**
   (`research/comparators/full/plantA_own_large_s120_enforced_ca352ebd/` and
   `plantB_own_large_s120_enforced_58b57ad3/`): each arm's configuration was

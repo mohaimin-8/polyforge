@@ -157,7 +157,8 @@ def report(runs: pd.DataFrame) -> str:
         "any, any). 20 AI design points of the large cluster, replication 0, one demand seed per "
         "design point shared by all regimes. Gain = J(decoupled) - J(joint), positive = joint better.",
         "",
-        f"Theorem 1 over all logged decisions: {int(runs.theorem_applies.sum()):,} checked, "
+        f"Theorem 1 over all {int(runs.decisions.sum()):,} logged decisions: it applies (anchor, per-knob "
+        f"and joint choices feasible, both remainders defined) to {int(runs.theorem_applies.sum()):,}, "
         f"{total_viol} violations.",
         "",
         "## Gain by regime (mean over design points, 95% bootstrap CI)",
