@@ -37,7 +37,7 @@ WP14's workflow artifact) writes the zip of one commit's tracked tree and the au
 and `deposit.json` to `research/out/zenodo/` (or `--out <dir>`); a folder holds one deposit, so the bundler refuses one that
 holds another commit's zip, and never replaces a built one. Publishing it on Zenodo is the author's step.
 
-The CODECHECK manifest (WP20, level 1): `codecheck.yml` at the repository's root lists the 49 files the
+The CODECHECK manifest (WP20, level 1): `codecheck.yml` at the repository's root lists the 51 files the
 reproduction rebuilds, each with its step and command; `python scripts/codecheck_manifest.py` rewrites the
 manifest from the steps (`--check` says whether it is current) and keeps the author's `paper` fields.
 
