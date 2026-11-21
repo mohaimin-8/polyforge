@@ -254,10 +254,26 @@ def test_h1_holds_only_when_some_decision_was_checked():
     assert not h1["holds"] and h1["checked"] == 0 and h1["failed_runs"] == 2
     nothing_applied = pd.DataFrame({"error": ["", ""], "theorem_applies": [0, 0], "theorem_violations": [0, 0]})
     assert not score.score_h1(nothing_applied)["holds"]
-    some = pd.DataFrame({"error": ["", "boom"], "theorem_applies": [5, np.nan], "theorem_violations": [0, np.nan]})
+    some = pd.DataFrame({"error": ["", "boom"], "decisions": [8, np.nan], "theorem_applies": [5, np.nan],
+                         "theorem_violations": [0, np.nan]})
     h1 = score.score_h1(some)
     assert h1["holds"] and h1["checked"] == 5 and h1["violations"] == 0 and h1["failed_runs"] == 1
+    assert h1["logged"] == 8                       # the completed runs' decisions, checked or not
     assert not score.score_h1(some.assign(theorem_violations=[1, np.nan]))["holds"]
+
+
+def test_the_h1_row_says_the_theorem_was_checked_where_it_applies_of_all_logged(planned, design):
+    """The WP4 pilot's line gave only the checked count 'over all logged decisions', and the
+    protocol draft read it as 'held on all 456,876 logged decisions' (480,000 were logged)."""
+    jobs, _ = planned
+    pilot = score.per_regime(pd.read_csv(campaign.REPO / design["tests"]["H2"]["calibration"]), "index")
+    s = score.score(synthetic(jobs, score.line(pilot.x, pilot.gain), plant_a_shift=0.0), design, MASTER)
+    text = score.report(s, {"master": MASTER, "rehearsal": False, "alpha": 0.05, "holm": ["H2", "H3", "H4"],
+                            "design_sha256": "0" * 64})
+    h1 = s["hypotheses"]["H1"]
+    assert 0 < h1["checked"] < h1["logged"]
+    row = next(r for r in text.splitlines() if r.startswith("| H1 |"))
+    assert "where it applies" in row and f"{h1['checked']:,} of {h1['logged']:,} logged decisions" in row
 
 
 def test_the_shards_must_hold_every_job_once_with_its_seed(planned):
@@ -325,7 +341,7 @@ def synthetic(jobs: list[dict], line: tuple[float, float], plant_a_shift: float)
         r["error"] = ""
         if j["part"] == "dose":
             x = 0.1 + j["width"] * (0.05 + j["kappa"]) / 8
-            r.update(J=1.0 + (a + b * x if j["search"] == "decoupled" else 0.0), theorem_applies=10,
+            r.update(J=1.0 + (a + b * x if j["search"] == "decoupled" else 0.0), decisions=12, theorem_applies=10,
                      theorem_violations=0, index=x if j["search"] == "joint" else math.nan)
         else:
             base = 0.2 + 0.0001 * (int(j["workload"][3:]) % 7)

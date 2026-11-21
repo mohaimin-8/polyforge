@@ -9,8 +9,9 @@ It first checks that the shards hold every job of the campaign exactly once,
 each with its own seed (the job list is rebuilt from the master and the frozen
 design). Then:
 
-  H1  Theorem 1 on every logged decision of the dose part: holds when some
-      decision was checked and none violates it. A count, not a test.
+  H1  Theorem 1 on every logged decision of the dose part where it applies:
+      holds when some decision was checked and none violates it. A count, not
+      a test; the report gives the checked decisions of all logged ones.
   H2  per new regime, the gain J(decoupled) - J(joint) and the predictor (the
       joint planner's mean of the logged quantity the design names), each a
       mean over the regime's design points; Spearman's rho of gain on
@@ -251,10 +252,10 @@ def score_h1(dose: pd.DataFrame) -> dict:
     checked and none violates it: with nothing checked (every run failed, or the theorem never
     applied) there is no evidence either way (until 2026-11-20 that read as holding, and a dose part
     whose every run failed stopped the scorer)."""
-    ok = with_columns(dose[dose.error == ""], ["theorem_applies", "theorem_violations"])
+    ok = with_columns(dose[dose.error == ""], ["decisions", "theorem_applies", "theorem_violations"])
     checked, violations = int(ok.theorem_applies.sum()), int(ok.theorem_violations.sum())
-    return {"checked": checked, "violations": violations, "failed_runs": int(len(dose) - len(ok)),
-            "holds": checked > 0 and violations == 0}
+    return {"checked": checked, "violations": violations, "logged": int(ok.decisions.sum()),
+            "failed_runs": int(len(dose) - len(ok)), "holds": checked > 0 and violations == 0}
 
 
 def score_h2(dose: pd.DataFrame, spec: dict, master: str, repo: Path) -> dict:
@@ -366,8 +367,9 @@ def report(s: dict, meta: dict) -> str:
     if "population" in s:
         L += [population_line(s["population"]), ""]
     L += ["| Hypothesis | Test | Estimate | p | Holm p | Supported |", "|---|---|---|---:|---:|---|",
-          f"| H1 | Theorem 1 on every logged decision | {h['H1']['violations']} violations in "
-          f"{h['H1']['checked']:,} decisions | | | {'yes' if h['H1']['holds'] else 'no'} |",
+          f"| H1 | Theorem 1 on every logged decision where it applies | {h['H1']['violations']} violations in "
+          f"the {h['H1']['checked']:,} of {h['H1']['logged']:,} logged decisions it applies to | | | "
+          f"{'yes' if h['H1']['holds'] else 'no'} |",
           f"| H2 | Spearman rho of gain on mean {h['H2']['predictor']} over {h['H2']['regimes']} regimes; "
           f"calibration slope | rho {f(h['H2']['rho'], '.3f')}; slope {f(h['H2']['calibration_slope'], '.3f')} | "
           f"{f(h['H2']['p'], '.4f')} | {f(h['H2'].get('p_holm', math.nan), '.4f')} | "
