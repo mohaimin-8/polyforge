@@ -56,6 +56,20 @@ def test_a_resumed_sobol_run_cannot_mix_two_factor_choices():
     assert a != sobol.design_tag(["cache_hit_max", "congestion_exponent"])
 
 
+def test_the_report_counts_the_plants_with_a_positive_gain():
+    """One plant of 384 with a negative gain: a share rounded to two places
+    read 1.00, as if every plant gained (SOBOL.md said so of 1023 of 1024)."""
+    import pandas as pd
+    from SALib.sample import sobol as sample
+
+    prob = {"num_vars": 1, "names": ["x"], "bounds": [[1.0, 2.0]]}
+    X = sample.sample(prob, 128, calc_second_order=False, seed=1)
+    pp = pd.DataFrame({"plant": range(len(X)), "gain": X[:, 0], "J_joint": 2.0 * X[:, 0]})
+    pp.loc[5, "gain"] = -0.1
+    text = sobol.report(pp, prob, 128)
+    assert "; plants with gain > 0: 383 of 384." in text and "gain > 0: 1.00" not in text
+
+
 def test_a_report_only_rebuild_reads_the_committed_runs_exactly_and_never_rewrites_them(tmp_path):
     import pandas as pd
 
