@@ -111,7 +111,10 @@ def normalised_regret(j: np.ndarray, static: np.ndarray, low: np.ndarray,
                       reps: int = BOOT_REPS, seed: int = BOOT_SEED) -> dict | None:
     """(mean J - mean LB) / (mean static - mean LB), WP9's ratio of means, with
     a seeded bootstrap over workloads (J, static and LB resampled together).
-    None when the static plan is no worse than the bound on average."""
+    None when the static plan is no worse than the bound on average. A draw
+    of zero-gap workloads only has no ratio: then ci95 is None and
+    undefined_draws says in how many draws (the defined draws alone would
+    make the interval conditional on the draw)."""
     def ratio(jm, sm, lm):
         den = sm - lm
         return np.where(den > 0, (jm - lm) / np.where(den > 0, den, 1.0), np.nan)
@@ -121,8 +124,11 @@ def normalised_regret(j: np.ndarray, static: np.ndarray, low: np.ndarray,
         return None
     idx = np.random.default_rng(seed).integers(0, len(j), size=(reps, len(j)))
     draws = ratio(j[idx].mean(axis=1), static[idx].mean(axis=1), low[idx].mean(axis=1))
-    lo, hi = np.nanquantile(draws, [0.025, 0.975])
-    return {"mean": point, "ci95": (float(lo), float(hi))}
+    undefined = int(np.isnan(draws).sum())
+    if undefined:
+        return {"mean": point, "ci95": None, "undefined_draws": undefined}
+    lo, hi = np.quantile(draws, [0.025, 0.975])
+    return {"mean": point, "ci95": (float(lo), float(hi)), "undefined_draws": 0}
 
 
 def cap_overflow_share(rows: list[dict], limits) -> float:

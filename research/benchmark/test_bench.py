@@ -79,6 +79,18 @@ def test_the_summary_is_wp9s_ratio_of_means_never_a_ratio_per_workload():
     assert bench.summary(flat)["vs_lb2"] is None
 
 
+def test_the_normalised_regret_has_no_interval_where_a_draw_leaves_it_undefined():
+    """A draw of zero-gap workloads only (static plan = bound) has no ratio; dropping such draws
+    would make the interval conditional on the draw, so none is given and the count is."""
+    cols = ("J", "static", "lb2")
+    df = pd.DataFrame({"J": [0.30, 0.20], "static": [0.25, 0.19], "lb2": [0.20, 0.19]})
+    r = bench.normalised_regret(*(df[c].to_numpy(float) for c in cols))
+    assert r["mean"] == pytest.approx((0.25 - 0.195) / (0.22 - 0.195))
+    assert r["ci95"] is None and 0 < r["undefined_draws"] < bench.BOOT_REPS
+    ok = bench.normalised_regret(*(df.assign(static=[0.25, 0.21])[c].to_numpy(float) for c in cols))
+    assert ok["undefined_draws"] == 0 and ok["ci95"][0] <= ok["mean"] <= ok["ci95"][1]
+
+
 def test_cap_overflow_counts_steps_over_a_cap_never_at_it():
     limits = type("Limits", (), {"replicas": 4, "cache_mb": 256})()
     rows = [{"step": 1, "replicas": 2, "cache_mb": 128}, {"step": 1, "replicas": 2, "cache_mb": 128},
