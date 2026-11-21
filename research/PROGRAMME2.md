@@ -87,7 +87,9 @@ What the full campaigns say (2026-11-17; still exploratory):
 - WP5 specification curve, 4,608 specifications: median effect 0; the joint planner is better in 37%
   of them and worse in 25%; whole-curve sign-flip test p = 0.32.
 - WP5 Morris (r = 20) and Sobol: replica capacity drives the gain (first-order 0.72, total 0.75);
-  congestion, the cache ceiling and the tail slope act mostly through interactions.
+  congestion acts mostly through interactions (first-order 0.08 of its total 0.29), the cache ceiling
+  and the tail slope partly (0.09 of 0.20 and 0.13 of 0.20; each first-order index is uncertain by
+  about +-0.12 at N = 128). The gain is positive in 1,023 of the 1,024 plants.
 
 Status at the deadline (2026-11-20 14:00), one line per work package of the plan:
 
