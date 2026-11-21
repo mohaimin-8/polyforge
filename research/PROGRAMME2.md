@@ -34,7 +34,8 @@ Reproduce every report from committed data and check it against the committed te
 The deposit (WP16: one DOI with code, protocols, run data and the audit scripts):
 `python scripts/bundle_programme2.py --audit ../PolyForge_Audit_2026-11-11_scripts` (`--confirmatory <dir>` adds
 WP14's workflow artifact) writes the zip of one commit's tracked tree and the audit scripts, its `MANIFEST.sha256`
-and `deposit.json` to `research/out/zenodo/`; publishing it on Zenodo is the author's step.
+and `deposit.json` to `research/out/zenodo/` (or `--out <dir>`); a folder holds one deposit, so the bundler refuses one that
+holds another commit's zip, and never replaces a built one. Publishing it on Zenodo is the author's step.
 
 The CODECHECK manifest (WP20, level 1): `codecheck.yml` at the repository's root lists the 36 files the
 reproduction rebuilds, each with its step and command; `python scripts/codecheck_manifest.py` rewrites the
@@ -123,11 +124,12 @@ What is left is the author's, in this order (each step names the file that prepa
    `PROTOCOL.md`, set `design.json` to `"draft": false`, commit, tag and push (T0), register on OSF
    before the round 24 h later (`research/registration/facts.py --tag wp14-c` prints what it records); then pushing the tag `wp14-round-<N>` at C once the round is due starts the `confirmatory` workflow, which scores WP14 in
    about 15 minutes.
-2. The deposit: after the push, rebuild it from the pushed commit
-   (`python scripts/bundle_programme2.py --audit ../PolyForge_Audit_2026-11-11_scripts`; the zip built from
-   e172c25 has the reproduction before its fix of 2026-11-20, which read a run outside a git checkout as
-   identical), then publish `research/out/zenodo/` on Zenodo (its `deposit.json` holds the metadata);
-   after WP14, a new version with `--confirmatory`.
+2. The deposit: after the push, rebuild it from the pushed commit into a new folder
+   (`python scripts/bundle_programme2.py --audit ../PolyForge_Audit_2026-11-11_scripts --out research/out/zenodo-<commit>`:
+   `research/out/zenodo/` holds the zip built from e172c25, whose reproduction predates its fix of 2026-11-20,
+   which read a run outside a git checkout as identical; the bundler refuses a folder holding another
+   deposit), then publish that folder's zip on Zenodo (its `deposit.json` holds the metadata); after WP14, a
+   new version with `--confirmatory`, into a folder of its own again.
 3. WP20: fill `codecheck.yml`'s `paper` fields and request a CODECHECK; declare the tolerances in
    `testbed/REPLICATION.md` and send it to a site B. Part A's proposal is our own 95% interval, which a
    site whose true values equal ours misses about one time in six per metric;

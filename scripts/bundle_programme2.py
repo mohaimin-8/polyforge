@@ -14,7 +14,9 @@ The zip holds
                    since the seal refuses the build);
   MANIFEST.sha256  the sha256 of every other file in the zip (sha256sum format).
 The out directory gets the zip, the same MANIFEST.sha256 and deposit.json
-(creators from eval/zenodo_creators.json, checked by programme 1's reader).
+(creators from eval/zenodo_creators.json, checked by programme 1's reader),
+and holds one deposit: a folder with another commit's zip, or with this
+commit's zip built from other inputs, is refused, and nothing is replaced.
 The same inputs give the same zip byte for byte: entries in a fixed order,
 all dated at the commit. The working tree never enters the deposit.
 
@@ -41,6 +43,7 @@ REPO = Path(__file__).resolve().parents[1]
 CREATORS = REPO / "eval" / "zenodo_creators.json"
 PROGRAMME1_BUILDER = REPO / "eval" / "scripts" / "archive_zenodo.py"
 SKIP_DIRS = frozenset({"__pycache__"})      # bytecode is derived, never deposited
+ZIP_PREFIX = "polyforge-programme2-"         # + the commit's first 12 hex digits + .zip
 SEAL = "SHA256SUMS"                          # what confirm.py seal writes at the artifact's root
 SEAL_LINE = re.compile(r"([0-9a-f]{64})  (\S.*)")
 KEYWORDS = ["kubernetes", "autoscaling", "LLM serving", "joint control", "interaction index",
@@ -165,8 +168,12 @@ def build(repo: Path, rev: str, audit: Path, confirmatory: Path | None, out: Pat
         check_seal(confirmatory, folders["confirmatory"])
     parts = [("repository", tracked_files(repo, sha)),
              *((prefix, ((rel, p.read_bytes()) for rel, p in files)) for prefix, files in folders.items())]
+    zip_path = out / f"{ZIP_PREFIX}{sha[:12]}.zip"
+    others = sorted(p.name for p in out.glob(f"{ZIP_PREFIX}*.zip") if p.name != zip_path.name)
+    if others:
+        raise SystemExit(f"{out} holds {', '.join(others)}, another commit's deposit: a folder holds one deposit "
+                         "(its MANIFEST.sha256 and deposit.json describe one zip); give --out a new folder")
     out.mkdir(parents=True, exist_ok=True)
-    zip_path = out / f"polyforge-programme2-{sha[:12]}.zip"
     partial = out / f"{zip_path.name}.partial"
     manifest, counts = [], {}
     try:
@@ -181,7 +188,11 @@ def build(repo: Path, rev: str, audit: Path, confirmatory: Path | None, out: Pat
     except BaseException:
         partial.unlink(missing_ok=True)     # never leave a half-built deposit behind
         raise
-    partial.replace(zip_path)
+    if zip_path.exists() and file_sha256(zip_path) != file_sha256(partial):
+        partial.unlink()
+        raise SystemExit(f"{zip_path} exists with other contents (other audit scripts or confirmatory files): "
+                         "a built deposit is never replaced; give --out a new folder")
+    partial.replace(zip_path)                # a rebuild from the same inputs is the same bytes
     (out / "MANIFEST.sha256").write_text(text, encoding="utf-8", newline="\n")
     return {"commit": sha, "zip": zip_path, "counts": counts}
 

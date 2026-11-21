@@ -119,6 +119,27 @@ def test_a_confirmatory_folder_unlike_its_seal_refuses_before_anything_is_writte
     assert not out.exists()
 
 
+def test_a_folder_holds_one_deposit_and_nothing_built_is_ever_replaced(tmp_path, inputs):
+    """research/out/zenodo held the e172c25 zip: a rebuild after the push must not land beside it (two
+    zips, one MANIFEST.sha256), nor a --confirmatory build replace the zip of the same commit."""
+    repo, audit, creators = inputs
+    out = tmp_path / "out"
+    first, sha, _ = build(repo, audit, creators, out)
+    before = {p.name: p.read_bytes() for p in out.iterdir()}
+    build(repo, audit, creators, out)                                    # the same inputs: the same bytes
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == before
+    (repo / "a.txt").write_bytes(b"beta\n")
+    subprocess.run([*GIT, "commit", "-qam", "second"], cwd=repo, check=True)
+    args = ["--repo", str(repo), "--audit", str(audit), "--creators", str(creators), "--out", str(out)]
+    with pytest.raises(SystemExit, match=re.escape(f"holds {first.name}, another commit's deposit")):
+        bundle.main(args)
+    with pytest.raises(SystemExit, match="exists with other contents"):
+        bundle.main([*args, "--commit", sha, "--confirmatory", str(artifact(tmp_path / "confirmatory"))])
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == before      # nothing replaced, nothing left over
+    fresh, _, _ = build(repo, audit, creators, tmp_path / "out2")         # a new folder takes the new commit
+    assert fresh.name != first.name
+
+
 def test_a_missing_or_empty_folder_a_bad_commit_or_bad_creators_refuse_before_anything_is_written(tmp_path, inputs):
     repo, audit, creators = inputs
     out = tmp_path / "out"

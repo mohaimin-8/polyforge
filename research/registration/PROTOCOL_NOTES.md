@@ -114,9 +114,10 @@ commit 4920f02, CI green, run 44688664965).
    `sha256sum research/out/confirmatory/SHA256SUMS` prints the summary's
    digest, and `cd research/out/confirmatory && sha256sum -c SHA256SUMS`
    passes. Then rebuild the deposit with them:
-   `python scripts/bundle_programme2.py --audit ../PolyForge_Audit_2026-11-11_scripts --confirmatory research/out/confirmatory`
+   `python scripts/bundle_programme2.py --audit ../PolyForge_Audit_2026-11-11_scripts --confirmatory research/out/confirmatory --out research/out/zenodo-confirmatory`
    (it refuses a folder that differs from its `SHA256SUMS` in any way, a
-   file added after the seal included, which `sha256sum -c` misses). The
+   file added after the seal included, which `sha256sum -c` misses; and an
+   `--out` folder that holds another deposit, which it never replaces). The
    summary lasts as long as GitHub keeps the run (deleting a run deletes its
    summary); a dated OSF update giving that one digest would keep the seal
    checkable afterwards (your call).
