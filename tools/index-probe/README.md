@@ -86,8 +86,14 @@ to fetch them).
 ```text
 $ cd research/external/routebalance && python -I analyse.py report
   log mode on every 7th fused decision of every run: 24,240 decisions;
-  Theorem 1 checked 24,088, violated 0; largest difference from analyse.py's own index 0.0e+00
+  Theorem 1 checked 24,088, violated 0; largest difference from analyse.py's own index 0.0e+00;
+  outside it: per-knob combination infeasible 82, joint choice off the decomposition 70,
+  24 of which lose more than their index (the largest: 0.068 against 0.020)
 ```
+
+Theorem 1 says nothing about the 70: their joint choice uses a value that is infeasible
+on its own axis, so the index, computed where the decomposition is defined, need not
+bound their loss, and on RouteBalance it does not.
 
 **The Kubernetes HPA + VPA pair's planners** (`kubernetes_log.py`, WP17):
 the twin of the horizontal-with-vertical system on its calibrated plant
