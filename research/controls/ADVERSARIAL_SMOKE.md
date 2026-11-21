@@ -18,16 +18,16 @@ Parameters: width=1, kappa=2.369, wu_tier_mid=1.411, wu_tier_large_ratio=1.819, 
 
 ## Confirmation on fresh seeds
 
-| regime | search G | search I | fresh G | fresh se | fresh I | still in corner |
-|---:|---:|---:|---:|---:|---:|---|
-| 0 | +0.0000 | 0.0940 | +0.0000 | nan | 0.0732 | no |
+| regime | search G | search I | fresh G | fresh se | fresh I | still in corner | same runs as |
+|---:|---:|---:|---:|---:|---:|---|---:|
+| 0 | +0.0000 | 0.0940 | +0.0000 | nan | 0.0732 | no | - |
 
 ## Top regimes by the objective
 
-| regime | phase | width | kappa | workload | size | I | G | loss | per-knob infeasible |
-|---:|---|---:|---:|---|---|---:|---:|---:|---:|
-| 0 | random | 1 | 2.37 | ai_uncacheable | large | 0.0940 | +0.0000 | 0.00000 | 0.00% |
-| 2 | climb from 0 | 1 | 1.92 | ai_uncacheable | large | 0.0746 | +0.0000 | 0.00000 | 0.00% |
-| 1 | random | 2 | 2.90 | mmpp_mixed | medium | 1.7056 | +0.0034 | 0.00542 | 0.00% |
+| regime | phase | width | kappa | workload | size | I | G | loss | per-knob infeasible | same runs as |
+|---:|---|---:|---:|---|---|---:|---:|---:|---:|---:|
+| 0 | random | 1 | 2.37 | ai_uncacheable | large | 0.0940 | +0.0000 | 0.00000 | 0.00% | - |
+| 2 | climb from 0 | 1 | 1.92 | ai_uncacheable | large | 0.0746 | +0.0000 | 0.00000 | 0.00% | - |
+| 1 | random | 2 | 2.90 | mmpp_mixed | medium | 1.7056 | +0.0034 | 0.00542 | 0.00% | - |
 
 Across the 3 regimes searched (not a test of H2: the sample is selected), rank correlation of I with G: +0.87; of the one-step loss with G: +1.00.

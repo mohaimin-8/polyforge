@@ -7,6 +7,8 @@ import random
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import adversarial_search as adv  # noqa: E402
@@ -103,3 +105,21 @@ def test_smoke_search_runs_end_to_end():
     assert all(r["theorem_violations"] == 0 for r in ev.regimes)
     text = adv.report(ev, confirmed, args, "test")
     assert "violations **0**" in text and "Confirmation on fresh seeds" in text
+
+
+@pytest.mark.parametrize("tag, name", [("search", "ADVERSARIAL_SEARCH.md"), ("smoke", "ADVERSARIAL_SMOKE.md")])
+def test_the_report_is_rebuilt_from_the_committed_record(tag, name):
+    ev, confirmed, args, label = adv.from_record(tag)
+    assert adv.report(ev, confirmed, args, label) == (cc.HERE / name).read_text(encoding="utf-8").replace("\r\n", "\n")
+
+
+def test_confirmations_that_repeat_another_regimes_runs_are_counted_once():
+    """Regimes 163 and 164 differ from 158 only in parameters that changed no fresh run: their
+    confirmations are 158's runs again, so the table holds one confirmation, not three."""
+    ev, confirmed, args, label = adv.from_record("search")
+    text = adv.report(ev, confirmed, args, label)
+    rows = {int(line.split("|")[1]): line for line in text.split("## Confirmation on fresh seeds")[1]
+            .split("## Top regimes")[0].splitlines() if line.startswith("| 1")}
+    assert rows[158].rstrip().endswith("| - |")
+    assert rows[163].rstrip().endswith("| 158 |") and rows[164].rstrip().endswith("| 158 |")
+    assert "1 distinct confirmation of 3" in text

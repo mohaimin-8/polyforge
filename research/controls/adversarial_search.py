@@ -329,6 +329,29 @@ def _spearman(a, b) -> float:
     return float(s.a.rank().corr(s.b.rank())) if len(s) >= 3 else math.nan
 
 
+def _same_runs(pts: pd.DataFrame, cids) -> dict:
+    """cid -> the first earlier cid in `cids` whose evaluation gave the same J
+    in every run, in both arms (same workloads, reps and seeds): the same
+    evidence again, whatever parameters it changes."""
+    seen, out = [], {}
+    for cid in cids:
+        runs = pts[pts.cid == cid].sort_values(["workload", "rep", "seed"])
+        if not len(runs):
+            continue
+        key = tuple(zip(runs.workload, runs.rep, runs.seed))
+        js = runs[["J_joint", "J_decoupled"]].to_numpy(float)
+        match = next((c for c, k, j in seen if k == key and np.array_equal(j, js)), None)
+        if match is None:
+            seen.append((cid, key, js))
+        else:
+            out[cid] = match
+    return out
+
+
+SAME_RUNS = ("*Same runs as*: {where}every run of that regime gave the same J, in both arms, as the regime "
+             "named (the parameters it changes changed no run)")
+
+
 def report(ev: Evaluator, confirmed: list[dict], args, label: str) -> str:
     ranked = sorted((r for r in ev.regimes if not r["phase"].startswith("confirm")),
                     key=lambda r: r["key"], reverse=True)  # best first, by the objective
@@ -364,25 +387,49 @@ def report(ev: Evaluator, confirmed: list[dict], args, label: str) -> str:
               f"{best.per_knob_infeasible:.2%}, anchor infeasible {best.anchor_infeasible:.2%}, "
               f"decoupled repairs {best.repaired_dec:.2%}.", "", f"Parameters: {params}"]
     if confirmed:
+        of = {c["cid"]: c["of"] for c in confirmed}
+        again = _same_runs(pts, [c["cid"] for c in confirmed])
         L += ["", "## Confirmation on fresh seeds", "",
-              "| regime | search G | search I | fresh G | fresh se | fresh I | still in corner |",
-              "|---:|---:|---:|---:|---:|---:|---|"]
+              "| regime | search G | search I | fresh G | fresh se | fresh I | still in corner | same runs as |",
+              "|---:|---:|---:|---:|---:|---:|---|---:|"]
         for c in confirmed:
             s = regs[regs.cid == c["of"]].iloc[0]
             gc = abs(c["G"]) if args.two_sided else c["G"]
             inside = c["I"] <= args.tau and gc >= args.large_gain
             L.append(f"| {c['of']} | {s.G:+.4f} | {s.I:.4f} | {c['G']:+.4f} | {c['G_se']:.4f} | "
-                     f"{c['I']:.4f} | {'YES' if inside else 'no'} |")
+                     f"{c['I']:.4f} | {'YES' if inside else 'no'} | {of[again[c['cid']]] if c['cid'] in again else '-'} |")
+        if again:
+            distinct = len(confirmed) - len(again)
+            L += ["", f"{SAME_RUNS.format(where='on the fresh seeds, ')}; the table holds {distinct} distinct "
+                  f"confirmation{'s' if distinct != 1 else ''} of {len(confirmed)}."]
+    top = regs.head(8)
+    again = _same_runs(pts, list(top.cid))
     L += ["", "## Top regimes by the objective", "",
-          "| regime | phase | width | kappa | workload | size | I | G | loss | per-knob infeasible |",
-          "|---:|---|---:|---:|---|---|---:|---:|---:|---:|"]
-    for r in regs.head(8).itertuples():
+          "| regime | phase | width | kappa | workload | size | I | G | loss | per-knob infeasible | same runs as |",
+          "|---:|---|---:|---:|---|---|---:|---:|---:|---:|---:|"]
+    for r in top.itertuples():
         L.append(f"| {r.cid} | {r.phase} | {r.width} | {r.kappa:.2f} | {r.workload} | {r.cluster_size} | "
-                 f"{r.I:.4f} | {r.G:+.4f} | {r.loss:.5f} | {r.per_knob_infeasible:.2%} |")
+                 f"{r.I:.4f} | {r.G:+.4f} | {r.loss:.5f} | {r.per_knob_infeasible:.2%} | {again.get(r.cid, '-')} |")
+    if again:
+        L += ["", f"{SAME_RUNS.format(where='')}."]
     L += ["", f"Across the {len(regs)} regimes searched (not a test of H2: the sample is selected), rank "
           f"correlation of I with G: {_spearman(regs.I, regs.G):+.2f}; of the one-step loss with G: "
           f"{_spearman(regs.loss, regs.G):+.2f}.", ""]
     return "\n".join(L)
+
+
+def from_record(tag: str) -> tuple:
+    """(evaluations, confirmations, arguments, label) of a committed search, as
+    `report` reads them: its points, regimes and arguments under data/."""
+    stem = f"adversarial_{tag}"
+    args = argparse.Namespace(**json.loads((cc.DATA / f"{stem}_args.json").read_text(encoding="utf-8")))
+    points = pd.read_csv(cc.DATA / f"{stem}_points.csv", float_precision="round_trip").to_dict(orient="records")
+    regimes = pd.read_csv(cc.DATA / f"{stem}_regimes.csv", float_precision="round_trip").to_dict(orient="records")
+    for r in regimes:
+        r["key"] = objective_key(r, args.objective, args.tau, args.eps, args.two_sided)
+    confirmed = [{"of": int(r["phase"].split()[1]), **r} for r in regimes if r["phase"].startswith("confirm")]
+    label = "SMOKE: checks the machinery, not evidence" if args.smoke else ""
+    return argparse.Namespace(points=points, regimes=regimes), confirmed, args, label
 
 
 def parse_args(argv=None):
@@ -408,6 +455,8 @@ def parse_args(argv=None):
     ap.add_argument("--tag", default="search")
     ap.add_argument("--smoke", action="store_true",
                     help="budget 3, panel 1, 10 steps, width <= 2, one confirmation rep; tag 'smoke'")
+    ap.add_argument("--report-only", action="store_true",
+                    help="rebuild ADVERSARIAL_<TAG>.md from the committed record under data/ (no runs)")
     args = ap.parse_args(argv)
     if args.smoke:
         args.budget, args.random, args.panel, args.steps = 3, 2, 1, 10
@@ -418,6 +467,11 @@ def parse_args(argv=None):
 
 def main(argv=None) -> int:
     args = parse_args(argv)
+    if args.report_only:
+        ev, confirmed, stored, label = from_record(args.tag)
+        (cc.HERE / f"ADVERSARIAL_{args.tag.upper()}.md").write_text(report(ev, confirmed, stored, label),
+                                                                  encoding="utf-8")
+        return 0
     started = time.time()
     pool = Pool(args.workers) if args.workers > 1 else None
     try:

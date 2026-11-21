@@ -18,23 +18,27 @@ Parameters: width=2, kappa=1.476, wu_tier_mid=2.619, wu_tier_large_ratio=1.677, 
 
 ## Confirmation on fresh seeds
 
-| regime | search G | search I | fresh G | fresh se | fresh I | still in corner |
-|---:|---:|---:|---:|---:|---:|---|
-| 158 | +0.0666 | 0.0201 | +0.0417 | 0.0085 | 0.0201 | YES |
-| 163 | +0.0666 | 0.0191 | +0.0417 | 0.0085 | 0.0189 | YES |
-| 164 | +0.0666 | 0.0195 | +0.0417 | 0.0085 | 0.0195 | YES |
+| regime | search G | search I | fresh G | fresh se | fresh I | still in corner | same runs as |
+|---:|---:|---:|---:|---:|---:|---|---:|
+| 158 | +0.0666 | 0.0201 | +0.0417 | 0.0085 | 0.0201 | YES | - |
+| 163 | +0.0666 | 0.0191 | +0.0417 | 0.0085 | 0.0189 | YES | 158 |
+| 164 | +0.0666 | 0.0195 | +0.0417 | 0.0085 | 0.0195 | YES | 158 |
+
+*Same runs as*: on the fresh seeds, every run of that regime gave the same J, in both arms, as the regime named (the parameters it changes changed no run); the table holds 1 distinct confirmation of 3.
 
 ## Top regimes by the objective
 
-| regime | phase | width | kappa | workload | size | I | G | loss | per-knob infeasible |
-|---:|---|---:|---:|---|---|---:|---:|---:|---:|
-| 158 | climb from 62 | 2 | 1.48 | population | large | 0.0201 | +0.0666 | 0.00000 | 0.00% |
-| 163 | climb from 62 | 2 | 1.48 | population | large | 0.0191 | +0.0666 | 0.00000 | 0.00% |
-| 164 | climb from 62 | 2 | 1.48 | population | large | 0.0195 | +0.0666 | 0.00000 | 0.00% |
-| 169 | climb from 62 | 2 | 1.48 | population | large | 0.0201 | +0.0666 | 0.00000 | 0.00% |
-| 170 | climb from 62 | 2 | 1.48 | population | large | 0.0195 | +0.0666 | 0.00000 | 0.00% |
-| 153 | climb from 62 | 2 | 1.03 | population | large | 0.0160 | +0.0662 | 0.00000 | 0.00% |
-| 155 | climb from 62 | 2 | 1.03 | population | large | 0.0157 | +0.0662 | 0.00000 | 0.00% |
-| 150 | climb from 62 | 2 | 0.58 | population | large | 0.0132 | +0.0648 | 0.00000 | 0.00% |
+| regime | phase | width | kappa | workload | size | I | G | loss | per-knob infeasible | same runs as |
+|---:|---|---:|---:|---|---|---:|---:|---:|---:|---:|
+| 158 | climb from 62 | 2 | 1.48 | population | large | 0.0201 | +0.0666 | 0.00000 | 0.00% | - |
+| 163 | climb from 62 | 2 | 1.48 | population | large | 0.0191 | +0.0666 | 0.00000 | 0.00% | 158 |
+| 164 | climb from 62 | 2 | 1.48 | population | large | 0.0195 | +0.0666 | 0.00000 | 0.00% | - |
+| 169 | climb from 62 | 2 | 1.48 | population | large | 0.0201 | +0.0666 | 0.00000 | 0.00% | 158 |
+| 170 | climb from 62 | 2 | 1.48 | population | large | 0.0195 | +0.0666 | 0.00000 | 0.00% | 164 |
+| 153 | climb from 62 | 2 | 1.03 | population | large | 0.0160 | +0.0662 | 0.00000 | 0.00% | - |
+| 155 | climb from 62 | 2 | 1.03 | population | large | 0.0157 | +0.0662 | 0.00000 | 0.00% | - |
+| 150 | climb from 62 | 2 | 0.58 | population | large | 0.0132 | +0.0648 | 0.00000 | 0.00% | - |
+
+*Same runs as*: every run of that regime gave the same J, in both arms, as the regime named (the parameters it changes changed no run).
 
 Across the 200 regimes searched (not a test of H2: the sample is selected), rank correlation of I with G: -0.49; of the one-step loss with G: -0.28.
