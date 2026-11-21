@@ -167,7 +167,7 @@ def test_sample_sizes_are_the_plans_formulas():
     assert s["n_superiority_min_live_effect"] == math.ceil(((1.645 + 1.282) * sd / (0.10 * 0.5)) ** 2)
     assert s["n_equivalence"] == math.ceil(((1.645 + 1.645) * sd / (0.05 * 0.5)) ** 2)
     assert s["n_equivalence_sim_margin"] == math.ceil(((1.645 + 1.645) * sd / (0.02 * 0.5)) ** 2)
-    assert s["predicted_relative_effect"] == pytest.approx(0.05)
+    assert s["predicted_relative_effect"] == pytest.approx(-0.05)   # signed as the differences
     assert pairs.sample_sizes(diffs, 0.5, 0.0)["n_superiority"] is None
     assert math.isnan(pairs.sample_sizes(diffs, 0.5, -0.02)["predicted_relative_effect"])
 

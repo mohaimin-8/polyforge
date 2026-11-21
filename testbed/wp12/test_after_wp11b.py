@@ -3,6 +3,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
@@ -37,9 +39,25 @@ def test_g3_needs_a_validated_simulator_and_feasible_pairs_in_both_regimes():
 def test_g3_needs_a_high_regime_whose_predicted_effect_is_at_least_ten_percent():
     assert "G3 met." in a.g3_section(pilot(12, 30, effect_high=0.10), True, "x")
     text = a.g3_section(pilot(12, 30, effect_high=0.0008), True, "x")
-    assert "G3 NOT met." in text and "predicted effect 0.08%, below the 10%" in text
+    assert "G3 NOT met." in text and "predicted effect +0.08%, below the 10%" in text
     assert "G3 NOT met." in a.g3_section(pilot(12, 30, effect_high=float("nan")), True, "x")
     assert "G3 NOT met." in a.g3_section(pilot(12, 30, effect_high=None), True, "x")
+
+
+def test_a_high_regime_predicted_to_favour_the_per_knob_arm_is_no_h4_regime():
+    """Plan Part F: a live H4 regime needs the joint arm predicted at least 10 %
+    better. pairs.sample_sizes took |predicted diff|, so a per-knob arm predicted
+    15 % better passed as a 15 % effect (WP12's high regime: -4.29 % shown as 4.29 %)."""
+    import pairs
+
+    diffs = [0.001, -0.002, 0.0015, 0.0, 0.0005, -0.001]
+    low = pairs.sample_sizes(diffs, 0.5, 0.0005, 0.5)
+    high = pairs.sample_sizes(diffs, 0.5, -0.075, 0.5)     # per_knob - joint < 0: per-knob predicted better
+    assert high["predicted_relative_effect"] == pytest.approx(-0.15)
+    text = a.g3_section({"summary": {"low": {"J": low}, "high": {"J": high}}}, True, "x")
+    assert "G3 NOT met." in text and "predicted effect -15.00%" in text and "per-knob arm" in text
+    joint_better = pairs.sample_sizes(diffs, 0.5, 0.075, 0.5)
+    assert "G3 met." in a.g3_section({"summary": {"low": {"J": low}, "high": {"J": joint_better}}}, True, "x")
 
 
 def test_the_gate_constants_are_those_of_pairs():

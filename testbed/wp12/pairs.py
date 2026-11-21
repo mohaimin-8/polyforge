@@ -75,7 +75,7 @@ STABLE_MIN_S = 120.0
 SETTLE_S = 15.0
 # Margins from the plan's risk table (Part F, "testbed noise hides the effect"):
 # H3 live is judged within +-5% (its simulation margin, +-2%, is reported beside
-# it) and a live H4 regime needs a predicted effect of at least 10%.
+# it) and a live H4 regime needs the joint arm predicted at least 10% better.
 EQUIVALENCE = 0.05
 EQUIVALENCE_SIM = 0.02
 MIN_LIVE_EFFECT = 0.10
@@ -372,11 +372,14 @@ def sample_sizes(diffs: Sequence[float], comparator_mean: float, predicted_diff:
     """The plan's formulas (WP12 step 4) at alpha 0.05, power 0.9: superiority
     at |predicted_diff| (and at MIN_LIVE_EFFECT of the comparator's mean, beside
     it); equivalence within +-EQUIVALENCE of the comparator's mean (and
-    +-EQUIVALENCE_SIM beside it). The predicted effect is |predicted_diff| over
-    the planners' predicted comparator mean."""
+    +-EQUIVALENCE_SIM beside it). The predicted effect is predicted_diff over
+    the planners' predicted comparator mean, signed as the differences (per_knob
+    minus joint: for J and cost a negative effect predicts the per-knob arm
+    better); until 2026-11-21 it was |predicted_diff|, which let a per-knob arm
+    predicted better pass as the joint arm's effect."""
     sd = statistics.stdev(diffs) if len(diffs) > 1 else math.nan
     sup, eq, base = Z_ALPHA + Z_POWER, Z_ALPHA + Z_ALPHA, abs(comparator_mean)
-    effect = (abs(predicted_diff) / abs(predicted_comparator_mean)
+    effect = (predicted_diff / abs(predicted_comparator_mean)
               if math.isfinite(predicted_comparator_mean) and predicted_comparator_mean != 0 else math.nan)
     return {"pairs": len(diffs), "mean_diff": statistics.fmean(diffs) if diffs else math.nan, "sigma_d": sd,
             "predicted_diff": predicted_diff, "predicted_relative_effect": effect,
@@ -402,7 +405,8 @@ def report(plans: dict, runs: dict, left_out: list[str]) -> tuple[dict, str]:
                       "live H4 effect the plan allows); equivalence within "
                       f"+-{EQUIVALENCE:.0%} of the joint arm's mean (the plan's live margin for H3) and, beside it, "
                       f"+-{EQUIVALENCE_SIM:.0%} (its simulation margin). Predicted effect: the predicted difference "
-                      "over the predicted joint mean. "
+                      "over the predicted joint mean, signed as the differences (for J and cost per 1k a "
+                      "negative effect predicts the per-knob arm better). "
                       f"G3 asks for at most {G3_MAX_PAIRS} pairs per regime.", "",
                       "| regime | joint mean index | metric | pairs | joint mean | mean diff | sigma_d | predicted diff "
                       f"| predicted effect | n superiority | n sup. at {MIN_LIVE_EFFECT:.0%} "
@@ -419,7 +423,7 @@ def report(plans: dict, runs: dict, left_out: list[str]) -> tuple[dict, str]:
             out[regime][m] = {**ss, "joint_mean": joint_mean}
             lines.append(f"| {regime} | {s['joint_mean_index']:.4f} | {m} | {ss['pairs']} | {joint_mean:.5g} | "
                          f"{ss['mean_diff']:+.5g} | {ss['sigma_d']:.5g} | {ss['predicted_diff']:+.5g} | "
-                         f"{ss['predicted_relative_effect']:.2%} | {ss['n_superiority']} | "
+                         f"{ss['predicted_relative_effect']:+.2%} | {ss['n_superiority']} | "
                          f"{ss['n_superiority_min_live_effect']} | {ss['n_equivalence']} | "
                          f"{ss['n_equivalence_sim_margin']} |")
     lines += ["", f"Pairs left out after {ATTEMPTS} invalid attempts of an arm: "
