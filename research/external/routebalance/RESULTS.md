@@ -60,7 +60,7 @@ Per decision, as shares of phi at the fused optimum (mean over decisions, then o
 | 22/18/60 | 16.7% | 68% | 2.03% | 1.01% | 12.6% | 28% | 7% | 2.6% | 11.2% |
 | 25/5/70 | 5.7% | 68% | 0.50% | 0.10% | 9.1% | 27% | 1% | 3.8% | 12.2% |
 
-Theorem 1 checked on 168,481 decisions: 0 violations.
+Theorem 1 checked on 168,481 of 169,536 decisions: 0 violations. Outside it: 542 with the per-knob combination infeasible (it needs repair) and 513 with the anchor infeasible or the joint choice off the decomposition (one of its values infeasible on its own axis), where the index does not bound the loss.
 
 80/10/10 by rate:
 
@@ -137,4 +137,4 @@ Stated synthetic ranges (model.SYNTH_RANGES, 3000 decisions per preset):
 | 90/5/5 | 48.5% | 96% | 0.08% | 7.3% | 0 |
 | uniform | 97.1% | 98% | 3.20% | 14.0% | 0 |
 
-tools/index-probe, log mode, on every 7th fused decision of every run (24,240 decisions): Theorem 1 checked 24,088, violated 0; largest difference from this code's index 0.0e+00.
+tools/index-probe, log mode, on every 7th fused decision of every run (24,240 decisions): Theorem 1 checked 24,088, violated 0; largest difference from this code's index 0.0e+00. Outside it: anchor infeasible 0, joint choice off the decomposition 70, no feasible point 0, per-knob combination infeasible 82; 24 of them lose more than their index (the largest: loss 0.068 against an index of 0.020).

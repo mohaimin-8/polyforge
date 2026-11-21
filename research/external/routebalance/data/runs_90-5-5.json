@@ -65,6 +65,14 @@
      "decisions": 505,
      "index_mean": 0.009542799153260522,
      "max_index_difference": 0.0,
+     "outside_largest_excess": null,
+     "outside_loss_above_index": 0,
+     "outside_theorem1": {
+      "anchor infeasible": 0,
+      "joint choice off the decomposition": 0,
+      "no feasible point": 0,
+      "per-knob combination infeasible": 0
+     },
      "theorem1_checked": 505,
      "theorem1_violations": 0
     }
@@ -198,6 +206,14 @@
      "decisions": 505,
      "index_mean": 0.012143429947132203,
      "max_index_difference": 0.0,
+     "outside_largest_excess": null,
+     "outside_loss_above_index": 0,
+     "outside_theorem1": {
+      "anchor infeasible": 0,
+      "joint choice off the decomposition": 0,
+      "no feasible point": 0,
+      "per-knob combination infeasible": 0
+     },
      "theorem1_checked": 505,
      "theorem1_violations": 0
     }
@@ -331,6 +347,14 @@
      "decisions": 505,
      "index_mean": 0.011907992327610634,
      "max_index_difference": 0.0,
+     "outside_largest_excess": null,
+     "outside_loss_above_index": 0,
+     "outside_theorem1": {
+      "anchor infeasible": 0,
+      "joint choice off the decomposition": 2,
+      "no feasible point": 0,
+      "per-knob combination infeasible": 0
+     },
      "theorem1_checked": 503,
      "theorem1_violations": 0
     }
@@ -464,6 +488,14 @@
      "decisions": 505,
      "index_mean": 0.010898068363949836,
      "max_index_difference": 0.0,
+     "outside_largest_excess": null,
+     "outside_loss_above_index": 0,
+     "outside_theorem1": {
+      "anchor infeasible": 0,
+      "joint choice off the decomposition": 1,
+      "no feasible point": 0,
+      "per-knob combination infeasible": 0
+     },
      "theorem1_checked": 504,
      "theorem1_violations": 0
     }
@@ -597,6 +629,17 @@
      "decisions": 505,
      "index_mean": 0.012034712005754082,
      "max_index_difference": 0.0,
+     "outside_largest_excess": {
+      "index": 0.004296972270984467,
+      "loss": 0.009332326411923386
+     },
+     "outside_loss_above_index": 1,
+     "outside_theorem1": {
+      "anchor infeasible": 0,
+      "joint choice off the decomposition": 3,
+      "no feasible point": 0,
+      "per-knob combination infeasible": 0
+     },
      "theorem1_checked": 502,
      "theorem1_violations": 0
     }
@@ -730,6 +773,14 @@
      "decisions": 505,
      "index_mean": 0.013097483644885149,
      "max_index_difference": 0.0,
+     "outside_largest_excess": null,
+     "outside_loss_above_index": 0,
+     "outside_theorem1": {
+      "anchor infeasible": 0,
+      "joint choice off the decomposition": 4,
+      "no feasible point": 0,
+      "per-knob combination infeasible": 0
+     },
      "theorem1_checked": 501,
      "theorem1_violations": 0
     }

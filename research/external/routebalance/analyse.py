@@ -186,9 +186,20 @@ def probe_check(decisions: list, path: Path) -> dict:
     rows, summary = index_probe.run_log(path)
     ours = [M.analyse(d)["index"] for d in decisions]
     worst = max(abs(a - (b["index"] or 0.0)) for a, b in zip(ours, rows))
+    return {**probe_fields(rows, summary), "max_index_difference": worst}
+
+
+def probe_fields(rows: list[dict], summary: dict) -> dict:
+    """index-probe's account of the logged decisions: Theorem 1 checked and violated, every decision
+    outside it by reason, and those of them that lose more than their index (the largest excess)."""
+    import index_probe
+    above = [r for r in rows if r["outside_theorem1"] and r["loss"] is not None and r["index"] is not None
+             and r["loss"] > r["index"] + index_probe.EPS]
+    top = max(above, key=lambda r: r["loss"] - r["index"], default=None)
     return {"decisions": summary["decisions"], "theorem1_checked": summary["theorem1_checked"],
             "theorem1_violations": summary["theorem1_violations"], "index_mean": summary["index"]["mean"],
-            "max_index_difference": worst}
+            "outside_theorem1": summary["outside_theorem1"], "outside_loss_above_index": len(above),
+            "outside_largest_excess": None if top is None else {"loss": top["loss"], "index": top["index"]}}
 
 
 # ---------------------------------------------------------------- simulated runs

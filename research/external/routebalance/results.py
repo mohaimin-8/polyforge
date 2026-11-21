@@ -58,7 +58,7 @@ def cells_frame(runs: dict, theirs: dict) -> pd.DataFrame:
                                      "loss_perknob_share_mean", "loss_sequential_share_mean", "gain_fused_share_mean",
                                      "model_differs_share", "gain_left_to_sequential", "gain_left_to_perknob",
                                      "theorem1_checked", "theorem1_violations", "index_share_of_spread_mean",
-                                     "costly_perknob_share")}})
+                                     "costly_perknob_share", "decisions", "needs_repair_share")}})
     return pd.DataFrame(rows)
 
 
@@ -149,8 +149,12 @@ def section_index(df: pd.DataFrame) -> list[str]:
         L.append(f"| {pr} | {_pct(r.index_share_mean)} | {_pct(r.index_positive_share, 0)} | {_pct(r.loss_perknob_share_mean, 2)} "
                  f"| {_pct(r.loss_sequential_share_mean, 2)} | {_pct(r.gain_fused_share_mean)} | {_pct(r.model_differs_share, 0)} "
                  f"| {_pct(r.gain_left_to_sequential, 0)} | {_pct(r.their_e2e)} | {_pct(r.their_cost)} |")
-    L += ["", f"Theorem 1 checked on {int(df.theorem1_checked.sum()):,} decisions: "
-          f"{int(df.theorem1_violations.sum())} violations.", ""]
+    n, checked = int(df.decisions.sum()), int(df.theorem1_checked.sum())
+    repair = int(round(float((df.needs_repair_share * df.decisions).sum())))
+    L += ["", f"Theorem 1 checked on {checked:,} of {n:,} decisions: {int(df.theorem1_violations.sum())} violations. "
+          f"Outside it: {repair:,} with the per-knob combination infeasible (it needs repair) and "
+          f"{n - checked - repair:,} with the anchor infeasible or the joint choice off the decomposition (one of "
+          "its values infeasible on its own axis), where the index does not bound the loss.", ""]
     sub = df[df.preset == "80/10/10"].sort_values("rate")
     L += ["80/10/10 by rate:", "", "| rate | index | index > 0 | per-knob loss | sequential loss | gain over RB-decoupled "
           "| model differs | their E2E cut |", "|---:|---:|---:|---:|---:|---:|---:|---:|"]
@@ -221,8 +225,19 @@ def section_robustness(runs: dict, syn: dict, df: pd.DataFrame) -> list[str]:
     L += ["", f"tools/index-probe, log mode, on every 7th fused decision of every run ({sum(p['decisions'] for p in probes):,} "
           f"decisions): Theorem 1 checked {sum(p['theorem1_checked'] for p in probes):,}, violated "
           f"{sum(p['theorem1_violations'] for p in probes)}; largest difference from this code's index "
-          f"{max(p['max_index_difference'] for p in probes):.1e}.", ""]
+          f"{max(p['max_index_difference'] for p in probes):.1e}. Outside it: "
+          + ", ".join(f"{why} {sum(p['outside_theorem1'][why] for p in probes):,}" for why in probes[0]['outside_theorem1'])
+          + f"; {sum(p['outside_loss_above_index'] for p in probes)} of them lose more than their index"
+          + _largest_excess(probes) + ".", ""]
     return L
+
+
+def _largest_excess(probes: list[dict]) -> str:
+    tops = [p["outside_largest_excess"] for p in probes if p["outside_largest_excess"]]
+    if not tops:
+        return ""
+    top = max(tops, key=lambda e: e["loss"] - e["index"])
+    return f" (the largest: loss {top['loss']:.3f} against an index of {top['index']:.3f})"
 
 
 def write_results() -> Path:
