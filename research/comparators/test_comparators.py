@@ -325,6 +325,21 @@ def test_short_runs_keep_every_class():
     assert len(protocol.pick_workloads("evaluation")) == 120
 
 
+def test_a_class_short_of_its_quota_passes_the_rest_on_never_returning_fewer_than_asked():
+    """The evaluation half holds 56 api_or_code workloads: 119 asks 60 of them (old rule: 115 returned)."""
+    for n in (24, 112, 113, 119):
+        picked = protocol.pick_workloads("evaluation", n)
+        counts = {c: sum(protocol.workload_class(w) == c for w in picked) for c in protocol.CLASSES}
+        assert len(picked) == len(set(picked)) == n and picked == sorted(picked)
+        assert counts["api_or_code"] == min(56, n // 2 + n % 2)
+    by_class = {c: [w for w in protocol.split_names("evaluation") if protocol.workload_class(w) == c]
+                for c in protocol.CLASSES}
+    for n in (1, 2, 3, 24, 112):                                   # both quotas fit: the rule as before
+        quota = (n // 2 + n % 2, n // 2)
+        assert protocol.pick_workloads("evaluation", n) == sorted(
+            w for c, q in zip(protocol.CLASSES, quota) for w in by_class[c][:q])
+
+
 # --------------------------------------------------------------------------
 # tune.py
 # --------------------------------------------------------------------------

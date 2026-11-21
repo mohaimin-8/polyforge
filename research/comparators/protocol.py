@@ -121,17 +121,23 @@ def split_names(split: str) -> list[str]:
 def pick_workloads(split: str, n: int | None = None) -> list[str]:
     """The workloads of one half, all of them, or the first `n` in name
     order stratified by class (class i of k gets n // k, plus one while
-    i < n % k), so a short run still sees every class."""
+    i < n % k), so a short run still sees every class. A class with fewer
+    workloads than its quota passes the rest of it on, in class order, so
+    the pick always holds n workloads."""
     names = split_names(split)
     if n is None or n >= len(names):
         return names
     if n < 1:
         raise ValueError("need at least one workload")
     by_class = {c: [w for w in names if workload_class(w) == c] for c in CLASSES}
-    out = []
-    for i, c in enumerate(CLASSES):
-        out += by_class[c][: n // len(CLASSES) + (1 if i < n % len(CLASSES) else 0)]
-    return sorted(out)
+    take = {c: min(len(by_class[c]), n // len(CLASSES) + (1 if i < n % len(CLASSES) else 0))
+            for i, c in enumerate(CLASSES)}
+    short = n - sum(take.values())
+    for c in CLASSES:
+        extra = min(short, len(by_class[c]) - take[c])
+        take[c] += extra
+        short -= extra
+    return sorted(w for c in CLASSES for w in by_class[c][: take[c]])
 
 
 # --------------------------------------------------------------------------
