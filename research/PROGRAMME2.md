@@ -112,7 +112,7 @@ Status at the deadline (2026-11-20 14:00), one line per work package of the plan
 | WP14 | built, not run | 2,360 + c runs in 16 shards (c: drawn workloads of class `conversation`; 2,420 at c = 60), rehearsed on GitHub; frozen at C; starts when round 34183619 is due (2026-11-22T13:30:21Z), on the push of the tag `wp14-round-34183619` at `wp14-c` |
 | WP15 | done | `REPORT.md`, `RESULTS.md` |
 | WP16 | done but the DOI | the benchmark harness, one-command reproduction (39 steps; on 2026-11-20 each of the 31 it then had rebuilt its report identically on the laptop, line ends aside, none skipped, and on 2026-11-21 so did the 8 added (WP1, WP3, WP4 pilot reports, WP9's campaign reports, WP22's negative control and adversarial search); on Linux with `research/requirements-campaigns.txt`, from a clone and from the deposit's archive committed once, 34 reproduce, 7 of them in the last digits within 1e-6, and the 5 needing unshipped inputs skip), `DATA_LICENCES.md`, the deposit builder; publishing is the author's |
-| WP17 | pilot done | 54 live runs, none invalid (`PILOT_LIVE.md`); the main runs (H8): frozen, not yet registered; protocol `research/registration/PROTOCOL_H8.md` and `testbed/hvpa/main_design.json` frozen in C8 (tag `wp17-c`, 2026-11-22, with the recommendations of `PROTOCOL_H8_NOTES.md`: run orders that cross the demand shapes, sizes 72/42/48 for power 0.9 after Holm, about 488 laptop-hours); not run: they need the OSF registration, the round its push names, and the testbed (`main_score.py` scores them) |
+| WP17 | pilot done | 54 live runs, none invalid (`PILOT_LIVE.md`); the main runs (H8): frozen, not yet registered; protocol `research/registration/PROTOCOL_H8.md` and `testbed/hvpa/main_design.json` frozen in C8 = 925337b (tag `wp17-c`, pushed 2026-11-21 18:16 UTC, with the recommendations of `PROTOCOL_H8_NOTES.md`: run orders that cross the demand shapes, sizes 72/42/48 for power 0.9 after Holm, about 488 laptop-hours); T0 2026-11-21T18:16:01Z names drand round 34189333; registering it on OSF before that round is due (2026-11-22T18:16:03Z) is the author's; not run: then the round's draw, the plan and the testbed (`main_score.py` scores them) |
 | WP19 | not started | needs GPU access |
 | WP20 | both levels prepared | level 1: `codecheck.yml`, the manifest a codechecker works from (its `paper` fields are the author's); level 2: `testbed/REPLICATION.md`, drafted for site B (WP11b's cells and WP12's pilot, expected values, tolerances proposed from our bootstrap and prediction intervals: the author declares them); requesting the check after the DOI and finding site B are the author's |
 | WP21 | the author's decision | |
@@ -141,9 +141,11 @@ What is left is the author's, in this order (each step names the file that prepa
    [10.2%, 88.8%], rank correlation [+0.639, +0.979]), as Part B's prediction interval is for a second mean.
 4. WP21 and WP0's decisions with the supervisor (the route, which index defines Q1); WP0's reading
    table (plan B1 and B5, read in full).
-5. WP17's main runs: H8's protocol is frozen in C8 (tag `wp17-c`): register it on OSF with the file, D8, C8, T0
-   and the round (`python research/registration/facts.py --tag wp17-c --protocol research/registration/PROTOCOL_H8.md
-   --design testbed/hvpa/main_design.json`) before that round is due; then draw it (`seeds.py draw`), plan
+5. WP17's main runs: H8's protocol is frozen in C8 = 925337bde50ba91c53865d36a0f5653f151ed00d (tag `wp17-c`): register it
+   on OSF with the file `research/registration/PROTOCOL_H8.md`, D8 = 312957bce885bdbd7a876e28797aaebe92a6fb252d1337f684220f52351a3105,
+   C8, T0 = 2026-11-21T18:16:01Z and round 34189333, before the round is due at 2026-11-22T18:16:03Z (`python
+   research/registration/facts.py --tag wp17-c --protocol research/registration/PROTOCOL_H8.md --design
+   testbed/hvpa/main_design.json` prints them); then draw it (`seeds.py draw`), plan
    (`main_runs.py plan`), restart the testbed and run about 488 laptop-hours (`PROTOCOL_H8_NOTES.md`, freezing and
    running). WP19 needs GPU access; WP24 the preprint and outside readers.
 6. Merging `research-v2` into `main`, and the writing.
