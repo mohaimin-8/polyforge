@@ -49,7 +49,7 @@ with the CI run named.
 
 Tests: `python -m pytest research/theory research/control2 research/plant2 research/population
 research/speccurve research/comparators research/controls research/cachereplay research/hvpa research/benchmark research/sensitivity tools/index-probe research/registration research/test_run_queue.py research/test_offload.py scripts/test_reproduce_programme2.py scripts/test_bundle_programme2.py scripts/test_codecheck_manifest.py -q`
-(CI runs the same line), and `python -m pytest testbed -q` in a process of its own (317 tests; CI runs it
+(CI runs the same line), and `python -m pytest testbed -q` in a process of its own (319 tests; CI runs it
 too since 2026-11-20).
 
 What the pilots say so far, in one line each (details in the files above):
@@ -74,7 +74,8 @@ What the pilots say so far, in one line each (details in the files above):
   below per-knob control's in all three regimes, by 20 % to 60 % of per-knob's J (the twin predicted 13 %
   to 28 %), and below the HPA-plus-VPA pair's in two of three (26 % and 47 %; 10 % above it at width 4,
   sigma 0.2; the twin predicted 52 % to 67 %). Six pairs only size the main runs: every contrast at 90 %
-  power needs 66, 36 and 42 schedules, 433 laptop-hours in all; not run.
+  power needs 66, 36 and 42 schedules, 433 laptop-hours in all, by WP12's formula per contrast (72, 42
+  and 48, 488 hours, if the drafted scorer's Holm over the six contrasts stays: `main_runs.py sizes`); not run.
 
 What the full campaigns say (2026-11-17; still exploratory):
 

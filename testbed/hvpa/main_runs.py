@@ -51,6 +51,8 @@ TESTS = ("superiority", "equivalence")
 BALANCE = len(pilot.ORDERS)   # six orders of the three arms
 RUN_HOURS = 60.2 / 60         # one live run with its reset, as the pilot's runs took
 Z_POWER_80 = 0.8416           # for the 80 %-power column of `sizes` (the plan's is 90 %)
+ALPHA, POWER = 0.05, 0.9      # the plan's (WP12), as pilot.Z_ALPHA and pilot.Z_POWER are
+POWER_DRAWS, POWER_SEED = 20000, 20261121   # `sizes`' simulated campaigns (holm_power)
 
 
 def identity(width: int, sigma: float, k: int) -> str:
@@ -107,6 +109,48 @@ def hours(schedules: int) -> float:
     return len(pilot.ARMS) * schedules * RUN_HOURS
 
 
+def holm_power(rows: list[dict], schedules: dict[tuple, int], draws: int = POWER_DRAWS,
+               seed: int = POWER_SEED) -> dict[tuple, float]:
+    """Per contrast (width, sigma, arm), the share of `draws` simulated campaigns in which main_score.py
+    supports it, every contrast of `rows` a superiority test: a one-sided paired t-test of
+    `schedules[(width, sigma)]` differences, Holm over all of them, at ALPHA. The differences are
+    normal with the sizing's own mean (delta: the twin's gain x the comparator's mean J) and the
+    pilot's sigma_d, independent between contrasts (the pilot's correlation of a regime's two
+    contrasts, which share A4's run, moves these by under 0.01)."""
+    import numpy as np
+    from scipy import stats
+
+    import wp14_score  # the scorer's Holm (main_score.py scores with it)
+
+    rng = np.random.default_rng(seed)
+    family = [(r["width"], r["sigma"], r["arm"]) for r in rows]
+    ps = []
+    for r in rows:
+        n = schedules[(r["width"], r["sigma"])]
+        d = rng.normal(r["delta"], r["sigma_d"], size=(draws, n))
+        t = d.mean(axis=1) / (d.std(axis=1, ddof=1) / math.sqrt(n))
+        ps.append(1 - stats.t.cdf(t, n - 1))          # the p of wp14_score.superiority
+    names = [str(c) for c in family]
+    hits = [0] * len(family)
+    for draw_ps in zip(*ps):
+        adjusted = wp14_score.holm(dict(zip(names, map(float, draw_ps))), names)
+        hits = [h + (adjusted[name] < ALPHA) for h, name in zip(hits, names)]
+    return {c: h / draws for c, h in zip(family, hits)}
+
+
+def holm_schedules(rows: list[dict], start: dict[tuple, int], power: float = POWER, **kw) -> tuple[dict, dict]:
+    """From `start` up, a whole round of orders at a time in each regime with a contrast short of
+    `power`, the schedules at which every contrast keeps it after that Holm; with the powers."""
+    n = dict(start)
+    for _ in range(100):
+        got = holm_power(rows, n, **kw)
+        low = {(w, s) for (w, s, _), p in got.items() if p < power}
+        if not low:
+            return n, got
+        n = {key: v + BALANCE * (key in low) for key, v in n.items()}
+    raise SystemExit(f"no size up to {max(n.values())} schedules keeps power {power} after Holm")
+
+
 def print_sizes(rows: list[dict]) -> None:
     for r in rows:
         print(f"w{r['width']} s{r['sigma']} A4 vs {r['arm']}: {r['pairs']} pairs; gain {r['gain_observed']:+.1%} "
@@ -125,6 +169,19 @@ def print_sizes(rows: list[dict]) -> None:
                 n = regime_size(ns)
                 cells.append(f"{name}: {n} schedules, {hours(n):.0f} h")
             print(f"w{w} s{s} main runs, superiority at {power} power, all arms on every schedule: " + "; ".join(cells))
+    if not rows or any(r["n_superiority"] is None for r in rows):
+        return
+    # The sizes above are WP12's formula per contrast; main_score.py tests each after Holm over all.
+    start = {(w, s): regime_size({r["arm"]: r["n_superiority"] for r in rows if (r["width"], r["sigma"]) == (w, s)})
+             for (w, s) in dict.fromkeys((r["width"], r["sigma"]) for r in rows)}
+    show = lambda got: "; ".join(f"w{w} s{s} A4 vs {a} {p:.3f}" for (w, s, a), p in got.items())  # noqa: E731
+    print(f"after main_score.py's Holm over the {len(rows)} contrasts, power at those every-contrast 90 % sizes "
+          f"(simulated, {POWER_DRAWS} campaigns at the pilot's sigma_d and the twin's gains): "
+          + show(holm_power(rows, start)))
+    n, got = holm_schedules(rows, start)
+    print("every contrast at 90 % power after that Holm: "
+          + ", ".join(f"w{w} s{s} {v}" for (w, s), v in n.items())
+          + f" schedules ({sum(n.values())}, {hours(sum(n.values())):.0f} h): " + show(got))
 
 
 def checked_master(draw: dict) -> str:

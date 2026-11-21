@@ -101,7 +101,46 @@ def test_sizes_reads_the_pilot_so_far_without_a_draw(tmp_path, capsys):
     assert all(r["n_superiority_80"] <= r["n_superiority"] for r in rows)
     assert main_runs.hours(6) == pytest.approx(3 * 6 * 60.2 / 60)
     main_runs.print_sizes(rows)
-    assert "every contrast" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "every contrast" in out and "after main_score.py's Holm over the 2 contrasts" in out
+    assert "every contrast at 90 % power after that Holm: w2 s0.2 " in out
+
+
+def contrast(arm: str, delta: float, sigma_d: float, width: int = 2) -> dict:
+    return {"width": width, "sigma": 0.2, "arm": arm, "delta": delta, "sigma_d": sigma_d}
+
+
+def exact_power(delta: float, sigma_d: float, n: int, alpha: float) -> float:
+    """The one-sided paired t-test's power: the noncentral t."""
+    from scipy import stats
+    return float(1 - stats.nct.cdf(stats.t.ppf(1 - alpha, n - 1), n - 1, delta * n ** 0.5 / sigma_d))
+
+
+def test_the_simulated_power_is_the_t_tests_alone_and_holms_beside_others():
+    """Known answers: one contrast alone is the exact t-test (u); beside a certain one, Holm tests it
+    at alpha (u again); beside an independent twin, at alpha/2 unless the twin falls first:
+    b + (u - b) b, with b the t-test's power at alpha/2."""
+    draws = 20000
+    tol = lambda p: 4.5 * (p * (1 - p) / draws) ** 0.5 + 1e-9  # noqa: E731
+    u, b = exact_power(0.5, 1.0, 36, 0.05), exact_power(0.5, 1.0, 36, 0.025)
+    alone = main_runs.holm_power([contrast("A3", 0.5, 1.0)], {(2, 0.2): 36}, draws=draws)
+    assert alone[(2, 0.2, "A3")] == pytest.approx(u, abs=tol(u))
+    beside_certain = main_runs.holm_power([contrast("A3", 0.5, 1.0), contrast("A1", 5.0, 1.0)],
+                                          {(2, 0.2): 36}, draws=draws)
+    assert beside_certain[(2, 0.2, "A1")] == 1.0
+    assert beside_certain[(2, 0.2, "A3")] == pytest.approx(u, abs=tol(u))
+    rows, n = [contrast("A3", 0.5, 1.0), contrast("A3", 0.5, 1.0, width=4)], {(2, 0.2): 36, (4, 0.2): 36}
+    twins, holm = main_runs.holm_power(rows, n, draws=draws), b + (u - b) * b
+    assert all(q == pytest.approx(holm, abs=tol(holm)) for q in twins.values())
+    assert twins == main_runs.holm_power(rows, n, draws=draws)          # seeded: the same every time
+
+
+def test_the_holm_sizes_grow_by_whole_rounds_until_every_contrast_has_the_power():
+    """Two independent twins at 36 pairs each: 0.903 alone but 0.890 after Holm, 0.932 at 42."""
+    rows = [contrast("A3", 0.5, 1.0), contrast("A3", 0.5, 1.0, width=4)]
+    start = {(2, 0.2): 36, (4, 0.2): 36}           # 90 % for each alone (WP12's formula gives 35)
+    n, got = main_runs.holm_schedules(rows, start)
+    assert n == {(2, 0.2): 42, (4, 0.2): 42} and min(got.values()) >= 0.9
 
 
 def test_a_plan_is_written_once(tmp_path):
