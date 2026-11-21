@@ -1,8 +1,7 @@
 # PROTOCOL: WP14, programme 2's confirmatory simulation campaign (H1 to H4)
 
-**Status:** draft of 2026-11-20 for the author's review; not frozen, not
-registered. It is frozen when commit C holds it together with `design.json`
-marked `"draft": false`, and the push of C is T0 (section 7). It is
+**Status:** frozen in the commit that adds this line (C), together with
+`design.json` marked `"draft": false`; the push of C is T0 (section 7). It is
 registered on OSF before the round named in section 7 is due. Later changes
 only as dated notes after this text, each one also a deviation (section 10).
 
@@ -178,7 +177,9 @@ frozen with this file, computes everything below.
   reported.
 - **H4.** Plant B, `overall` configurations, the same d: a one-sided paired
   t-test that the mean of d is above zero. Supported when the Holm-adjusted
-  p < 0.05. The 95% interval of the mean of d is reported.
+  p < 0.05. The 95% interval of the mean of d is reported. The smallest effect
+  of interest, for interpretation only, is 2% of mean J(joint), the effect the
+  sample size was planned for; the decision does not use it.
 - A test that cannot be computed (fewer than two complete pairs or regimes)
   is not supported; its p-value is reported as n/a beside the number of
   pairs or regimes it had.

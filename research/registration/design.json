@@ -1,5 +1,5 @@
 {
- "draft": true,
+ "draft": false,
  "about": "WP14's confirmatory simulation campaign (wp14_campaign.py runs it, wp14_score.py scores it). Every value here follows the plan's Part D placeholders and the pilots' records; the protocol fixes each one, sets draft to false, and commit C freezes this file with it.",
  "dose": {
   "about": "H1, H2: new regimes of WP4's dose-response design (research/theory/dose_response_pilot.py)",
