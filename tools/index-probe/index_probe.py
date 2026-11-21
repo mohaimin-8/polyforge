@@ -12,8 +12,13 @@ candidate values per knob:
   per-knob      x^D    = each knob's best value with the others held at x0
   joint         x^J    = the best point of the box
   Theorem 1     0 <= phi(x^D) - phi(x^J) <= R(x^D) - R(x^J) <= I
-                (when x^D and x^J are both feasible; otherwise the decision
-                 is counted as needing repair, outside the bound)
+                (when the anchor, x^D and x^J are feasible and R is defined
+                 at x^J; every other decision is counted under the reason
+                 the theorem says nothing about it: no feasible point, the
+                 per-knob combination infeasible (it needs repair), the
+                 anchor infeasible, or the joint choice off the
+                 decomposition (one of its values is infeasible on its own
+                 axis), where the loss is defined and may exceed I)
 
 Two modes:
 
@@ -59,10 +64,28 @@ from interaction_index import (analyse_table, remainder_table,  # noqa: E402
                                sampling_confidence)
 
 EPS = 1e-9
+# Why Theorem 1 says nothing about a decision, in the order they are tested.
+OUTSIDE = ("no feasible point", "per-knob combination infeasible", "anchor infeasible",
+           "joint choice off the decomposition")
 
 
 def _point(p) -> tuple:
     return tuple(p)
+
+
+def outside_reason(a) -> str | None:
+    """None when Theorem 1 applies to the analysed decision, else why not.
+    With the anchor and x^D feasible, R is defined at x^D (each of its values
+    is feasible on its axis), so what is left is R undefined at x^J."""
+    if a.theorem1_applies:
+        return None
+    if a.joint is None:
+        return OUTSIDE[0]
+    if a.phi_per_knob is None:
+        return OUTSIDE[1]
+    if a.phi_anchor is None:
+        return OUTSIDE[2]
+    return OUTSIDE[3]
 
 
 def analyse_decision(d: dict) -> dict:
@@ -77,6 +100,7 @@ def analyse_decision(d: dict) -> dict:
     out = {"id": d.get("id"), "index": a.oscillation, "quantile_index": a.quantile_index,
            "per_knob": a.per_knob, "joint": a.joint, "loss": a.loss, "bound": a.bound,
            "theorem1_applies": a.theorem1_applies, "needs_repair": a.phi_per_knob is None,
+           "outside_theorem1": outside_reason(a),
            "evaluated": len(phi_map), "box_size": len(list(itertools.product(*values)))}
     if a.theorem1_applies:
         out["theorem1_holds"] = (-EPS <= a.loss <= a.bound + EPS) and a.bound <= a.oscillation + EPS
@@ -100,6 +124,9 @@ def summarise(rows: list[dict]) -> dict:
                                   if applies else None),
             "theorem1_checked": len(applies),
             "theorem1_violations": sum(not r["theorem1_holds"] for r in applies),
+            "outside_theorem1": {why: sum(r["outside_theorem1"] == why for r in rows) for why in OUTSIDE},
+            "outside_loss_above_index": sum(1 for r in rows if r["outside_theorem1"] and r["loss"] is not None
+                                            and r["index"] is not None and r["loss"] > r["index"] + EPS),
             "incompletely_logged": sum(r["evaluated"] < r["box_size"] for r in rows)}
 
 

@@ -42,6 +42,28 @@ def test_infeasible_per_knob_combination_is_counted_as_needing_repair():
     assert r["needs_repair"] and not r["theorem1_applies"]
 
 
+def test_every_decision_is_checked_or_counted_by_why_theorem1_says_nothing():
+    """A joint optimum that uses a value infeasible on its own axis lies off the decomposition:
+    both choices are feasible, the loss is defined, and it can exceed the index (here 4 against 0)."""
+    off = {(0, 0): 0.0, (1, 0): None, (0, 1): -1.0, (1, 1): -5.0}
+    r = index_probe.analyse_decision(_decision(off))
+    assert r["per_knob"] == (0, 1) and r["joint"] == (1, 1) and r["loss"] == pytest.approx(4.0)
+    assert r["index"] == pytest.approx(0.0) and not r["theorem1_applies"] and not r["needs_repair"]
+    no_anchor = {(0, 0): None, (1, 0): -1.0, (0, 1): -1.0, (1, 1): -3.0}
+    repair = {(0, 0): 0.0, (1, 0): -1.0, (0, 1): -1.0, (1, 1): None}
+    nothing = dict.fromkeys(off)
+    additive = {(0, 0): 0.0, (1, 0): -1.0, (0, 1): -2.0, (1, 1): -3.0}
+    rows = [index_probe.analyse_decision(_decision(p)) for p in (off, no_anchor, repair, nothing, additive)]
+    assert [r["outside_theorem1"] for r in rows] == [
+        "joint choice off the decomposition", "anchor infeasible", "per-knob combination infeasible",
+        "no feasible point", None]
+    s = index_probe.summarise(rows)
+    assert s["theorem1_checked"] == 1 and s["theorem1_violations"] == 0
+    assert s["theorem1_checked"] + sum(s["outside_theorem1"].values()) == s["decisions"] == 5
+    assert set(s["outside_theorem1"].values()) == {1}
+    assert s["outside_loss_above_index"] == 1
+
+
 def test_box_mode_on_the_tight_instance(tmp_path):
     import tight
 
@@ -74,5 +96,6 @@ def test_a_kubernetes_planner_log_gives_the_planners_own_index(tmp_path):
     rows, summary = index_probe.run_log(out)
     assert summary["decisions"] == len(rows) == len(logged) == 20        # one per 30 s in 10 minutes
     assert summary["theorem1_violations"] == 0 and summary["incompletely_logged"] == 0
+    assert summary["theorem1_checked"] + sum(summary["outside_theorem1"].values()) == summary["decisions"]
     for row, d in zip(rows, logged):
         assert row["index"] == pytest.approx(d["planner_index"], abs=1e-12)

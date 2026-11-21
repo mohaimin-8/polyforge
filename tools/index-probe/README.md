@@ -29,11 +29,15 @@ python index_probe.py log decisions.jsonl [--json report.json]
 
 Per decision: index, quantile index (5%–95%), per-knob and joint choices,
 the per-knob loss and its bound, whether the per-knob combination was
-infeasible (needs repair: outside the bound, counted separately), and the
-system's own gap to the joint optimum when `chosen` is given. The summary
-counts Theorem 1 violations (the exit code is 1 if there are any) and
-decisions logged incompletely (the index is then exact only over what was
-logged).
+infeasible (needs repair), why Theorem 1 says nothing about the decision
+when it does not apply, and the system's own gap to the joint optimum when
+`chosen` is given. The summary counts Theorem 1 violations (the exit code is
+1 if there are any), every decision outside the theorem under its reason (no
+feasible point; per-knob combination infeasible; anchor infeasible; joint
+choice off the decomposition, i.e. one of its values infeasible on its own
+axis, where the loss is defined but the index does not bound it), how many of
+those lose more than their index, and decisions logged incompletely (the
+index is then exact only over what was logged).
 
 ## Mode 2: an objective and a box
 
@@ -94,7 +98,8 @@ logged with its whole (replicas, CPU) box.
 ```text
 $ python kubernetes_log.py && python ../index_probe.py log kubernetes_log.jsonl
   120 decisions; index mean 0.0185, median 0.0185, max 0.0383; loss mean 8.36e-05, max 0.00227;
-  per-knob and joint disagree on 3.4%; repair 2%; Theorem 1 checked 116, violated 0
+  per-knob and joint disagree on 3.4%; Theorem 1 checked 116, violated 0; outside it: per-knob
+  combination infeasible 2 (repair 2%), joint choice off the decomposition 2, none losing more than its index
 ```
 
 At every decision the tool's index equals the planner's own (`lattice.decide`,
