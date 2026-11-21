@@ -37,7 +37,16 @@ feasible point; per-knob combination infeasible; anchor infeasible; joint
 choice off the decomposition, i.e. one of its values infeasible on its own
 axis, where the loss is defined but the index does not bound it), how many of
 those lose more than their index, and decisions logged incompletely (the
-index is then exact only over what was logged).
+index is then exact only over what was logged). A candidate logged under a
+label that is not one of its knob's values (`"128"` for `128`) lies outside
+the box: it is not used, its box point counts as unlogged, and the summary
+counts such decisions (`logged_outside_box`). A candidate logged twice must
+carry one value.
+
+Objective values must be finite numbers or `null`, in both modes. Refused
+input (not JSON, a missing field, a value that is not finite, a candidate
+logged twice with two values, a malformed box) exits with code 2 and one line
+naming the file, line and decision.
 
 ## Mode 2: an objective and a box
 
@@ -51,6 +60,9 @@ python index_probe.py box --objective mymodule:phi --box box.json --sample 59
 only the anchor, the axes and m random points are evaluated (Proposition
 T5): the sampled range never exceeds the index, and it is at least the
 5%–95% quantile range with probability ≥ 1 − 2·0.95^m (0.903 at m = 59).
+Both ways the box is checked first (distinct values per knob, the anchor in
+the box: the draws are uniform only over distinct values), and `m` must be at
+least 1.
 
 ## Worked examples (`examples/`)
 

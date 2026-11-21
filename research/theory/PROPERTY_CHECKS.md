@@ -189,27 +189,29 @@ T4a was also checked on every valid draw of this generator (start within reach, 
 
 ## Findings about the existing code and text
 
-1. **Non-finite objective values are accepted silently** (`interaction_index.py:113-119`, `:183-185`).
-   `remainder_table` treats every value that is not None as feasible, so NaN and +-inf enter the
-   remainder, and `analyse_table` sorts a list that may contain NaN. A single NaN gives a *finite and
-   wrong* index; an infinite value gives an infinite or NaN index while `theorem1_applies` stays True.
-   Reproduction (index 3.0; with the NaN point marked infeasible it is 12.0):
+1. **Non-finite objective values were accepted silently (fixed).** `remainder_table` treated every
+   value that is not None as feasible, so NaN and +-inf entered the remainder, and `analyse_table`
+   sorted a list that could contain NaN. A single NaN gave a *finite and wrong* index; an infinite
+   value gave an infinite or NaN index while `theorem1_applies` stayed True. Reproduction (index 3.0;
+   with the NaN point marked infeasible it is 12.0):
 
    ```python
    from interaction_index import analyse_box
    v = [[0, 1, 2], [0, 1, 2, 3]]
    t = [1.0, 0.0, 0.0, 2.0, -4.0, 4.0, float("nan"), -4.0, 0.0, -4.0, -2.0, -2.0]
    tab = dict(zip([(a, b) for a in v[0] for b in v[1]], t))
-   print(analyse_box(v, tab.__getitem__, (0, 0)).oscillation)   # 3.0
+   print(analyse_box(v, tab.__getitem__, (0, 0)).oscillation)   # was 3.0; now a ValueError
    ```
 
    The simulator's planner is not affected (`controller.py:1395` returns None for an infeasible
    candidate, and `jain_index` guards its zero case), so INDEX_PILOT and DOSE_RESPONSE_PILOT stand.
-   `tools/index-probe` is exposed: Python's `json.loads` accepts `NaN` and `Infinity` in a decision
-   log, and `analyse_decision` then reports e.g. `index: inf, loss: inf, theorem1_holds: True`.
-   A fix (not made here; this work package adds files only) is to reject non-finite values in
-   `remainder_table`, or to treat them as infeasible. `test_property_checks.py` holds a strict xfail
-   test that will start failing once the fix lands, so the marker gets removed.
+   `remainder_table` now refuses a non-finite value (a `ValueError` naming the point), and
+   `test_property_checks.py` checks that on this reproduction. `tools/index-probe` was exposed:
+   Python's `json.loads` accepts `NaN` and `Infinity` in a decision log, and `analyse_decision`
+   reported e.g. `index: inf, loss: inf, theorem1_holds: True`. Its log mode and exact box mode go
+   through `remainder_table`; its sampled box mode evaluates the anchor, the axes and the drawn
+   points without it and reported a sampled range of `Infinity` or `NaN` until 2026-11-21, when it
+   was made to refuse them too and to check the box as `remainder_table` does.
 2. **Notation clash in INDEX_THEORY.md** (lines 26 and 81-89): m is both the rank ceil(0.05 n) of
    the quantile index and the number of sampled points in T5, and the proof of T5 uses both
    ("q_hi (the m-th largest)" and "0.95^m"). The mathematics is right; a reader has to separate the
@@ -219,4 +221,4 @@ T4a was also checked on every valid draw of this generator (start within reach, 
    to rounding (TOL_REL), not bit for bit. Not a defect; recorded so nobody tests for equality.
 4. Checked and fine: `math.ceil(0.05 * n)` equals the exact ceil(n / 20) for every n up to 200,000;
    `index-probe --sample` draws by rejection, so its draws are uniform over the points where R is
-   defined, as T5 assumes.
+   defined, as T5 assumes (given distinct values per knob, which it checks since 2026-11-21).

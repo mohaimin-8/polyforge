@@ -150,16 +150,16 @@ def test_sample_range_never_exceeds_the_index_and_matches_the_exact_coverage():
         assert p >= sampling_confidence(59) - 1e-12
 
 
-def test_non_finite_values_are_rejected_or_treated_as_infeasible():
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
+def test_non_finite_values_are_rejected(bad):
+    """PROPERTY_CHECKS.md finding 1: one NaN gave the finite, wrong index 3.0 here."""
     values = [[0, 1, 2], [0, 1, 2, 3]]
-    t = [1.0, 0.0, 0.0, 2.0, -4.0, 4.0, math.nan, -4.0, 0.0, -4.0, -2.0, -2.0]
+    t = [1.0, 0.0, 0.0, 2.0, -4.0, 4.0, bad, -4.0, 0.0, -4.0, -2.0, -2.0]
     tab = dict(zip(itertools.product(*values), t))
-    clean = analyse_box(values, lambda x: None if math.isnan(tab[x]) else tab[x], (0, 0))
-    try:
-        got = analyse_box(values, tab.__getitem__, (0, 0))
-    except ValueError:
-        return  # rejecting non-finite values is a fix
-    assert got.oscillation == clean.oscillation == 12.0  # today: 3.0, silently
+    clean = analyse_box(values, lambda x: None if x == (1, 2) else tab[x], (0, 0))
+    assert clean.oscillation == 12.0
+    with pytest.raises(ValueError, match=r"not finite at \(1, 2\)"):
+        analyse_box(values, tab.__getitem__, (0, 0))
 
 
 def test_every_family_is_drawn_with_two_to_seventeen_values_per_knob():
