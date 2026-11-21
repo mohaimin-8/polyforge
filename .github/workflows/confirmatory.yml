@@ -83,6 +83,11 @@ jobs:
           path: draw/draw.json
           if-no-files-found: error
           retention-days: 90
+          # An artifact's name is taken for the whole run, re-runs included. A re-run of this job
+          # ("Re-run all jobs") can only draw the same round, so the same master seed: its upload
+          # replaces this one rather than failing on the name, which would fail it on every retry.
+          # The score job's upload has no overwrite: a sealed result is never replaced.
+          overwrite: true
 
   run:
     needs: draw
