@@ -342,7 +342,7 @@ Remove-Item Env:POLYFORGE_EVAL_KEEP_CLUSTER, Env:POLYFORGE_EVAL_SHARED_PG
 
 ```powershell
 go test ./...                               # all Go packages, about 40 seconds
-python -m pytest research/jcac_sim -q       # the controller and simulator, 204 tests, about 3 minutes
+python -m pytest research/jcac_sim -q       # the controller and simulator, 206 tests, about 3 minutes
 python scripts/reproduce.py                 # about 20 minutes: start it first
 ```
 
