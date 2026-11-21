@@ -234,12 +234,18 @@ def run_plan(plan_path: Path, out: Path, calibration: Path = CALIBRATION) -> int
         if not run_pilot.committed_unchanged(path):
             raise SystemExit(f"{path.name} is not committed as it is on disk: no main run")
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    bad = [f"w{r['width']} s{r['sigma']} schedule {sc['k']}" for r in plan["regimes"] for sc in r["schedules"]
+           if sorted(sc["order"]) != sorted(pilot.ARMS)]
+    if bad:   # checked before any run: the plan's order is the one that runs
+        raise SystemExit(f"{plan_path.name}: the run order of {', '.join(bad)} is not the arms "
+                         f"{', '.join(pilot.ARMS)} once each: no main run")
     plant = service_plant.from_calibration(calibration)
     lost = 0
     for r in plan["regimes"]:
         for sc in r["schedules"]:
             reg = live.schedule(sc["shape"], r["sigma"], sc["seed"], plant.slo_s, plant)
-            js = pilot.run_schedule(out, r["width"], r["sigma"], sc["k"], r["targets"], reg, calibration)
+            js = pilot.run_schedule(out, r["width"], r["sigma"], sc["k"], r["targets"], reg, calibration,
+                                    arms=tuple(sc["order"]))
             lost += len(pilot.ARMS) - len(js)
             print(f"w{r['width']} s{r['sigma']} schedule {sc['k']}: {len(js)} of {len(pilot.ARMS)} arms measured",
                   flush=True)

@@ -140,11 +140,16 @@ def record_path(out: Path, width: int, sigma: float, k: int, arm: str) -> Path:
 
 
 def run_schedule(out: Path, width: int, sigma: float, k: int, targets: dict, reg: dict,
-                 calibration: Path, report_only: bool = False) -> dict[str, float]:
-    """J of each arm's valid run on schedule k, the arms in order(k). A lost
-    joint run ends the schedule: neither contrast could use the others."""
+                 calibration: Path, report_only: bool = False,
+                 arms: tuple[str, ...] | None = None) -> dict[str, float]:
+    """J of each arm's valid run on schedule k, the arms in `arms` (a plan's
+    registered order; order(k) when none is given). A lost joint run ends the
+    schedule: neither contrast could use the others."""
+    arms = order(k) if arms is None else tuple(arms)
+    if sorted(arms) != sorted(ARMS):
+        raise ValueError(f"schedule {k}: the run order {arms} is not the arms {ARMS} once each")
     js = {}
-    for arm in order(k):
+    for arm in arms:
         path = record_path(out, width, sigma, k, arm)
         if path.exists():
             rec = json.loads(path.read_text(encoding="utf-8"))

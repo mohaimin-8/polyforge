@@ -148,3 +148,40 @@ def test_a_plan_is_written_once(tmp_path):
     out.write_text("{}", encoding="utf-8")
     with pytest.raises(SystemExit, match="written once"):
         main_runs.main(["plan", "--pilot", str(tmp_path), "--draw", str(tmp_path / "d.json"), "--out", str(out)])
+
+
+def _one_schedule_plan(tmp_path, order) -> Path:
+    plan = tmp_path / "main_plan.json"
+    plan.write_text(json.dumps({"regimes": [{"width": 2, "sigma": 0.2, "targets": {"A4": 0.5, "A3": 0.5, "A1": 0.7},
+                                             "schedules": [{"k": 0, "shape": "ramp", "order": order, "seed": 7}]}]}),
+                    encoding="utf-8")
+    return plan
+
+
+@pytest.fixture
+def no_cluster(monkeypatch):
+    """The runner with every live part stubbed: `calls` lists the arms in the order they ran."""
+    import live
+    import run_pilot
+    import service_plant
+
+    calls = []
+    monkeypatch.setattr(run_pilot, "committed_unchanged", lambda path: True)
+    monkeypatch.setattr(live, "schedule", lambda *a, **k: {})
+    monkeypatch.setattr(service_plant, "from_calibration", lambda path: type("Plant", (), {"slo_s": 1.0})())
+    monkeypatch.setattr(pilot, "attempt", lambda arm, *a, **k: calls.append(arm) or
+                        {"k6": {"requests": 10, "attainment": 1.0}, "watch": {"cost": 1.0}})
+    return calls
+
+
+def test_the_runner_runs_the_arms_in_the_order_the_plan_registers(tmp_path, no_cluster):
+    """The plan is the registered contract: its order, not one recomputed from k, is the run order."""
+    assert pilot.order(0) == ("A4", "A3", "A1")
+    main_runs.run_plan(_one_schedule_plan(tmp_path, ["A1", "A3", "A4"]), tmp_path / "out")
+    assert no_cluster == ["A1", "A3", "A4"]
+
+
+def test_a_plan_whose_order_is_not_the_three_arms_runs_nothing(tmp_path, no_cluster):
+    with pytest.raises(SystemExit, match="schedule 0"):
+        main_runs.run_plan(_one_schedule_plan(tmp_path, ["A4", "A4", "A1"]), tmp_path / "out")
+    assert no_cluster == []
