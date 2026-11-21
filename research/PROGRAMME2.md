@@ -106,8 +106,8 @@ Status at the deadline (2026-11-20 14:00), one line per work package of the plan
 | WP10 | done | the testbed, built and up on kind (2026-11-14) |
 | WP11 | done, target missed | attainment error 65 % (WP11) and 29.8 % (WP11b) against 25 %; rank correlation 0.89 met in WP11b |
 | WP12 | done, gate G3 not met | `PILOT.md` |
-| WP13 | tooling done, protocol drafted | seeds and the CI campaign built, tested and rehearsed; `PROTOCOL.md` drafted on 2026-11-20 for the author's review (`PROTOCOL_NOTES.md` lists the choices left to the author and the steps to freeze it); freezing and registering it are the author's |
-| WP14 | built, not run | 2,360 + c runs in 16 shards (c: drawn workloads of class `conversation`; 2,420 at c = 60), rehearsed on GitHub; waits for the protocol, then 24 h for its drand round |
+| WP13 | protocol frozen, not yet registered | seeds and the CI campaign built, tested and rehearsed; `PROTOCOL.md` frozen at C = 23b718e (tag `wp14-c`, pushed 2026-11-21, with the choices `PROTOCOL_NOTES.md` recommends); T0 2026-11-21T13:30:20Z names drand round 34183619; registering it on OSF before that round is due (2026-11-22T13:30:21Z) is the author's |
+| WP14 | built, not run | 2,360 + c runs in 16 shards (c: drawn workloads of class `conversation`; 2,420 at c = 60), rehearsed on GitHub; frozen at C; starts when round 34183619 is due (2026-11-22T13:30:21Z), on the push of the tag `wp14-round-34183619` at `wp14-c` |
 | WP15 | done | `REPORT.md`, `RESULTS.md` |
 | WP16 | done but the DOI | the benchmark harness, one-command reproduction (39 steps; on 2026-11-20 each of the 31 it then had rebuilt its report identically on the laptop, line ends aside, none skipped, and on 2026-11-21 so did the 8 added (WP1, WP3, WP4 pilot reports, WP9's campaign reports, WP22's negative control and adversarial search); on Linux with `research/requirements-campaigns.txt`, from a clone and from the deposit's archive committed once, 34 reproduce, 7 of them in the last digits within 1e-6, and the 5 needing unshipped inputs skip), `DATA_LICENCES.md`, the deposit builder; publishing is the author's |
 | WP17 | pilot done | 54 live runs, none invalid (`PILOT_LIVE.md`); the main runs need 433 laptop-hours at 90 % power and the registered draw: not run; their scorer is drafted (`testbed/hvpa/main_score.py`, `main_design.json` marked draft; on the pilot's records it gives `PILOT_LIVE.md`'s numbers) |
@@ -120,11 +120,13 @@ Status at the deadline (2026-11-20 14:00), one line per work package of the plan
 
 What is left is the author's, in this order (each step names the file that prepares it):
 
-1. The protocol: decide the seven choices in `research/registration/PROTOCOL_NOTES.md`, edit
-   `PROTOCOL.md`, set `design.json` to `"draft": false`, commit, tag and push (T0), register on OSF
-   before the round 24 h later (`research/registration/facts.py --tag wp14-c` prints what it records); then pushing the tag `wp14-round-<N>` at C once the round is due starts the `confirmatory` workflow, which scores WP14 in
-   about 15 minutes.
-2. The deposit: after the push, rebuild it from the pushed commit into a new folder
+1. The protocol, frozen at C = 23b718e289ee2821a2ea99a8fa71dc3559b36281 (tag `wp14-c`, pushed 2026-11-21): register
+   it on OSF with the file, D = 9067e19dac41dffae7f1b1f191078baf1ff28b5fce2e9e42dd2178908bf11642, C, T0 = 2026-11-21T13:30:20Z and round 34183619,
+   before the round is due at 2026-11-22T13:30:21Z (`research/registration/facts.py --tag wp14-c` prints them); then
+   `git tag wp14-round-34183619 wp14-c && git push origin wp14-round-34183619` starts the `confirmatory` workflow,
+   which scores WP14 in about 15 minutes.
+2. The deposit: built from C into `research/out/zenodo-23b718e/` (zip sha256 019f921e072e84a2817a5068a6c46118f39f58af935899c1db7a442a65a10238,
+   checked against its manifest and C's tree, rebuilt byte for byte); as for any later commit, rebuild into a new folder
    (`python scripts/bundle_programme2.py --audit ../PolyForge_Audit_2026-11-11_scripts --out research/out/zenodo-<commit>`:
    `research/out/zenodo/` holds the zip built from e172c25, whose reproduction predates its fix of 2026-11-20,
    which read a run outside a git checkout as identical; the bundler refuses a folder holding another
