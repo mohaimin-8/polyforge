@@ -28,7 +28,7 @@ def test_it_lists_every_report_of_every_step_once_and_each_is_tracked():
 
 def test_the_file_follows_codechecks_layout():
     text = cm.TARGET.read_text(encoding="utf-8")
-    assert text.startswith("---\n")
+    assert text.startswith("%YAML 1.1\n---\n")     # the spec: SHOULD give the YAML version, MUST have ---
     data = yaml.safe_load(text)
     assert data["version"] == "https://codecheck.org.uk/spec/config/2.0/"
     assert {"title", "authors", "reference"} <= set(data["paper"])
