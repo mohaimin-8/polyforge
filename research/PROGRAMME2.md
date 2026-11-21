@@ -138,5 +138,6 @@ What is left is the author's, in this order (each step names the file that prepa
 4. WP21 and WP0's decisions with the supervisor (the route, which index defines Q1); WP0's reading
    table (plan B1 and B5, read in full).
 5. WP17's main runs, if wanted: register H8 (scorer drafted in `testbed/hvpa/main_score.py`), draw its
-   round with `seeds.py draw --t0`, then about 433 laptop-hours. WP19 needs GPU access; WP24 the preprint and outside readers.
+   round with `seeds.py draw --t0`, then about 433 laptop-hours (488 if the drafted scorer's Holm over the six
+   contrasts stays: H8's registration decides, `research/registration/PROTOCOL_NOTES.md` row 5). WP19 needs GPU access; WP24 the preprint and outside readers.
 6. Merging `research-v2` into `main`, and the writing.
