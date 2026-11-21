@@ -57,17 +57,35 @@ REPO = Path(__file__).resolve().parents[1]
 R = REPO / "research"
 T = REPO / "testbed"
 
+# WP9's committed campaigns (research/comparators/full and pilot), each report rebuilt from its records
+WP9_CAMPAIGNS = [
+    "full/plantA_native_large_s120_enforced_4fed2d72", "full/plantA_own_large_s120_enforced_ca352ebd",
+    "full/plantA_own_large_s120_plant_e127c3ed", "full/plantB_native_large_s120_enforced_66059292",
+    "full/plantB_own_large_s120_enforced_58b57ad3", "full/plantB_own_large_s120_plant_364b32ea",
+    "pilot/plantA_own_large_s120_enforced_9e5754fd", "pilot/plantB_own_large_s120_enforced_f20c8e34",
+]
+
 # (name, working directory, command, reports checked, files required beyond the repository)
 STEPS = [
     ("plant 2 constants", R / "plant2", ["plant.py"], ["CONSTANTS.md"], []),
     ("plant 2 fits (seeded bootstrap)", R / "plant2", ["fits.py"], ["FITS.md", "data/fits.json"], []),
     ("theory property checks", R / "theory", ["property_check.py", "report"], ["PROPERTY_CHECKS.md"], []),
+    ("WP1 headroom pilot report", R / "theory", ["headroom_pilot.py", "--report-only"], ["HEADROOM_PILOT.md"], []),
+    ("WP3 index pilot report", R / "theory", ["index_pilot.py", "--report-only"], ["INDEX_PILOT.md"], []),
+    ("WP4 dose-response pilot report", R / "theory", ["dose_response_pilot.py", "--report-only"],
+     ["DOSE_RESPONSE_PILOT.md"], []),
     ("population report", R / "population", ["population.py"], ["POPULATION.md", "data/population.json"], []),
     ("Morris screen report", R / "sensitivity", ["morris_pilot.py", "--trajectories", "10", "--report-only"],
      ["MORRIS_PILOT.md"], []),
     ("gate reach report", R / "controls", ["gate_reach.py", "--report-only"], ["GATE_REACH.md"], []),
+    ("WP22 negative control report", R / "controls", ["negative_control.py", "--report-only"],
+     ["NEGATIVE_CONTROL.md"], []),
+    ("WP22 negative control smoke report", R / "controls", ["negative_control.py", "--smoke", "--report-only"],
+     ["NEGATIVE_CONTROL_SMOKE.md"], []),
     ("random-half check", R / "controls", ["random_sample_check.py"], ["RANDOM_SAMPLE_CHECK.md"], []),
     ("WP9 sample sizes", R / "comparators", ["sample_size.py"], ["SAMPLE_SIZE.md"], []),
+    ("WP9 campaign reports", R / "comparators", ["rerender.py", *WP9_CAMPAIGNS],
+     [f"{c}/report.md" for c in WP9_CAMPAIGNS], []),
     ("specification curve pilot", R / "speccurve", ["pilot_curve.py"], ["SPEC_CURVE_PILOT.md"], []),
     ("RouterBench tiers", R / "tierquality", ["tiers.py"], ["TIERS.md", "tier_summary.json"],
      ["data/routerbench_0shot.pkl", "data/routerbench_5shot.pkl"]),

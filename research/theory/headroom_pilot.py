@@ -7,6 +7,7 @@ LB0, LB1, LB2, UB and the hindsight-best static plan (clairvoyant.bounds)
 on LEVEL's objective J_L, beside each arm's J_L from the committed export.
 
     python headroom_pilot.py      # writes data/headroom_worlds.csv.gz and HEADROOM_PILOT.md
+    python headroom_pilot.py --report-only    # HEADROOM_PILOT.md from the committed worlds, nothing solved
 """
 
 from __future__ import annotations
@@ -197,7 +198,13 @@ def main() -> int:
 
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--workers", type=int, default=max(1, min(6, (os.cpu_count() or 2) - 2)))
+    ap.add_argument("--report-only", action="store_true",
+                    help="rebuild HEADROOM_PILOT.md from data/headroom_worlds.csv.gz")
     args = ap.parse_args()
+    if args.report_only:
+        worlds = pd.read_csv(HERE / "data" / "headroom_worlds.csv.gz", float_precision="round_trip")
+        (HERE / "HEADROOM_PILOT.md").write_text(report(worlds), encoding="utf-8")
+        return 0
     todo = jobs()
     print(f"{len(todo)} worlds on {args.workers} workers", flush=True)
     t0 = time.time()

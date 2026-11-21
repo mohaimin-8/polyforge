@@ -378,3 +378,40 @@ def test_runs_that_differ_in_any_setting_get_different_directories():
     assert tune.run_tag(base) == tune.run_tag({**base, "generated": "2027-01-01"})
     assert tune.run_tag(base) != tune.run_tag({**base, "configs": 2})
     assert tune.run_tag(base).startswith("plantB_own_large_s120_enforced_")
+
+
+# --------------------------------------------------------------------------
+# rerender.py: a committed campaign's report from its records
+# --------------------------------------------------------------------------
+
+def _campaign_copy(tmp_path: Path, name: str = "pilot/plantA_own_large_s120_enforced_9e5754fd") -> Path:
+    import shutil
+
+    out = tmp_path / Path(name).name
+    out.mkdir()
+    for f in ("tuned.json", "runs.csv.gz", "references.csv.gz"):
+        if (HERE / name / f).exists():
+            shutil.copy(HERE / name / f, out / f)
+    return out
+
+
+def test_a_committed_campaign_report_is_rebuilt_from_its_records(tmp_path):
+    import rerender
+
+    campaign = _campaign_copy(tmp_path)
+    out = rerender.rerender(campaign)
+    committed = (HERE / "pilot" / campaign.name / "report.md").read_text(encoding="utf-8")
+    assert out.read_text(encoding="utf-8") == committed
+
+
+def test_rerender_refuses_records_that_select_other_configurations(tmp_path):
+    import rerender
+
+    campaign = _campaign_copy(tmp_path)
+    tuned = json.loads((campaign / "tuned.json").read_text(encoding="utf-8"))
+    arm = next(a for a, e in tuned["arms"].items() if e["overall"] is not None)
+    tuned["arms"][arm]["overall"]["config"] += 1
+    (campaign / "tuned.json").write_text(json.dumps(tuned), encoding="utf-8")
+    with pytest.raises(SystemExit, match="select other configurations"):
+        rerender.rerender(campaign)
+    assert not (campaign / "report.md").exists()

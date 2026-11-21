@@ -10,6 +10,7 @@ beside the run-level coordination gain the campaign measured (joint minus
 decoupled arm on the campaign's objective, same seeds).
 
     python index_pilot.py            # writes data/index_pilot_runs.csv.gz and INDEX_PILOT.md
+    python index_pilot.py --report-only    # INDEX_PILOT.md from the committed runs, nothing run
 """
 
 from __future__ import annotations
@@ -244,7 +245,17 @@ def main() -> int:
 
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--workers", type=int, default=max(1, min(6, (os.cpu_count() or 2) - 2)))
+    ap.add_argument("--report-only", action="store_true",
+                    help="rebuild INDEX_PILOT.md from data/index_pilot_runs.csv.gz (still checked against the export)")
     args = ap.parse_args()
+    if args.report_only:
+        runs = pd.read_csv(HERE / "data" / "index_pilot_runs.csv.gz", float_precision="round_trip")
+        n_int, worst = integrity(runs)
+        if worst > 1e-12:
+            print(f"FAIL: the committed runs differ from the committed export by {worst:.3g}; no report written")
+            return 1
+        (HERE / "INDEX_PILOT.md").write_text(report(runs, n_int, worst), encoding="utf-8")
+        return 0
     todo = jobs()
     print(f"{len(todo)} runs on {args.workers} workers", flush=True)
     started = time.time()

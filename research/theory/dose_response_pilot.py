@@ -15,6 +15,7 @@ of the large cluster (5 AI workloads x 4 mixes), replication 0, with one
 demand seed per design point shared by every regime and arm.
 
     python dose_response_pilot.py     # writes data/dose_response_runs.csv.gz and DOSE_RESPONSE_PILOT.md
+    python dose_response_pilot.py --report-only   # DOSE_RESPONSE_PILOT.md from the committed runs, nothing run
 """
 
 from __future__ import annotations
@@ -206,7 +207,13 @@ def main() -> int:
 
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--workers", type=int, default=max(1, min(6, (os.cpu_count() or 2) - 2)))
+    ap.add_argument("--report-only", action="store_true",
+                    help="rebuild DOSE_RESPONSE_PILOT.md from data/dose_response_runs.csv.gz")
     args = ap.parse_args()
+    if args.report_only:
+        runs = pd.read_csv(HERE / "data" / "dose_response_runs.csv.gz", float_precision="round_trip")
+        (HERE / "DOSE_RESPONSE_PILOT.md").write_text(report(runs), encoding="utf-8")
+        return 0
     todo = jobs()
     print(f"{len(todo)} runs on {args.workers} workers", flush=True)
     t0 = time.time()
